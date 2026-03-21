@@ -43,3 +43,12 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# --- Python / FastAPI (Versin API) ---
+venv/
+.venv/
+env/
+__pycache__/
+*.pyc
+.env
+.pytest_cache/

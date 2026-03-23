@@ -1,113 +1,157 @@
 import 'package:flutter/material.dart';
-import '../pages/settings_page.dart';
+import 'package:versin/features/rimas/presentation/controller/rimas_controller.dart';
+import 'package:versin/features/rimas/presentation/pages/vocabulario_page.dart';
+import 'package:versin/features/rimas/presentation/pages/settings_page.dart';
 
 class VersinDrawer extends StatelessWidget {
-  final VoidCallback? onNewChat; // Função para limpar o chat
+  final VoidCallback onNewChat;
+  final RimasController rimasController;
 
-  const VersinDrawer({super.key, this.onNewChat});
+  const VersinDrawer({
+    super.key,
+    required this.onNewChat,
+    required this.rimasController,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Drawer(
-      backgroundColor: const Color(0xFF121212),
-      child: Container(
-        decoration: BoxDecoration(
-          border: Border(
-            right: BorderSide(
-              color: Colors.purpleAccent.withOpacity(0.3), 
-              width: 2,
-            ),
-          ),
-        ),
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(top: 60, left: 16, right: 16, bottom: 10),
-              child: OutlinedButton.icon(
-                onPressed: () {
-                  if (onNewChat != null) onNewChat!(); // Executa a limpeza
-                  Navigator.pop(context); // Fecha o menu
-                },
-                icon: const Icon(Icons.add, color: Colors.purpleAccent),
-                label: const Text("Nova conversa", style: TextStyle(color: Colors.white)),
-                style: OutlinedButton.styleFrom(
-                  side: BorderSide(color: Colors.purpleAccent.withOpacity(0.4)),
-                  minimumSize: const Size(double.infinity, 45),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                ),
-              ),
-            ),
-
-            _drawerTile(Icons.book_outlined, "Dicionário", () {}),
-            _drawerTile(Icons.star_border, "Favoritos", () {}),
-            
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-              child: TextField(
-                style: const TextStyle(color: Colors.white, fontSize: 14),
-                decoration: InputDecoration(
-                  hintText: "Pesquisar rimas...",
-                  hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
-                  prefixIcon: const Icon(Icons.search, color: Colors.purpleAccent, size: 20),
-                  filled: true,
-                  fillColor: Colors.purpleAccent.withOpacity(0.05),
-                  contentPadding: const EdgeInsets.all(0),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10), 
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-              ),
-            ),
-
-            const Divider(color: Colors.white10),
-
-            const Padding(
-              padding: EdgeInsets.only(left: 20, top: 10, bottom: 5),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  "Conversas", 
-                  style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold),
-                ),
-              ),
-            ),
-
-            Expanded(
-              child: ListView(
-                padding: EdgeInsets.zero,
+      backgroundColor: const Color(0xFF0F0F0F),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // HEADER: GENESIS V1.0.2
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20.0, 30.0, 20.0, 10.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _drawerTile(Icons.chat_bubble_outline, "Beat Trap 140bpm - Agressivo", () {}),
-                  _drawerTile(Icons.chat_bubble_outline, "Emo trap 90bpm - Melancolico ", () {}),
+                  const Text(
+                    "Genesis V1.0.2",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.1,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  // LISTRA ROXA (PURPLE) NO HEADER
+                  Container(
+                    height: 1.5,
+                    width: double.infinity,
+                    color: Colors.purpleAccent,
+                  ),
                 ],
               ),
             ),
+          ),
 
-            const Divider(color: Colors.white10),
+          // CAMPO DE PESQUISAR
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
+            child: Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFF1A1A1A),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.white10),
+              ),
+              child: const TextField(
+                style: TextStyle(color: Colors.white, fontSize: 14),
+                decoration: InputDecoration(
+                  hintText: "Pesquisar projetos...",
+                  hintStyle: TextStyle(color: Colors.grey, fontSize: 13),
+                  prefixIcon: Icon(Icons.search_rounded, color: Colors.purpleAccent, size: 20),
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+            ),
+          ),
 
-            _drawerTile(Icons.settings_outlined, "Configuração", () {
+          const SizedBox(height: 10),
+
+          // SEÇÃO DE AÇÕES
+          ListTile(
+            leading: const Icon(Icons.add_box_outlined, color: Colors.white70),
+            title: const Text("Novo Projeto", style: TextStyle(color: Colors.white, fontSize: 14)),
+            onTap: () {
+              onNewChat();
+              Navigator.pop(context);
+            },
+          ),
+
+          // DICIONÁRIO / VOCABULÁRIO
+          ListTile(
+            leading: const Icon(Icons.terminal_rounded, color: Colors.purpleAccent),
+            title: const Text(
+              "Dicionário / Vocabulário",
+              style: TextStyle(color: Colors.white, fontSize: 14),
+            ),
+            onTap: () {
               Navigator.pop(context);
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const SettingsPage()),
+                MaterialPageRoute(
+                  builder: (context) => VocabularioPage(controller: rimasController),
+                ),
               );
-            }),
-            
-            _drawerTile(Icons.help_outline, "Ajuda", () {}),
-            const SizedBox(height: 20),
-          ],
-        ),
-      ),
-    );
-  }
+            },
+          ),
 
-  Widget _drawerTile(IconData icon, String title, VoidCallback onTap) {
-    return ListTile(
-      leading: Icon(icon, color: Colors.purpleAccent, size: 22),
-      title: Text(title, style: const TextStyle(color: Colors.white, fontSize: 15)),
-      onTap: onTap,
-      dense: true,
-      visualDensity: VisualDensity.compact,
+          // CONFIGURAÇÕES
+          ListTile(
+            leading: const Icon(Icons.settings_outlined, color: Colors.white70),
+            title: const Text("Configurações", style: TextStyle(color: Colors.white, fontSize: 14)),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const SettingsPage(),
+                ),
+              );
+            },
+          ),
+
+          const Spacer(),
+
+          // RODAPÉ TÉCNICO
+          Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // DIVISOR ROXO (PURPLE) NO RODAPÉ
+                const Divider(color: Colors.purpleAccent, thickness: 1), 
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: Colors.greenAccent,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    const Text(
+                      "Versin V1.0.2 Genesis",
+                      style: TextStyle(
+                        color: Colors.grey, 
+                        fontSize: 10, 
+                        fontFamily: 'monospace'
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

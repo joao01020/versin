@@ -100,7 +100,7 @@ class VersinDrawer extends StatelessWidget {
             },
           ),
 
-          // CONFIGURAÇÕES
+          // CONFIGURAÇÕES (CORRIGIDO: Passando o controller e removendo o const)
           ListTile(
             leading: const Icon(Icons.settings_outlined, color: Colors.white70),
             title: const Text("Configurações", style: TextStyle(color: Colors.white, fontSize: 14)),
@@ -109,7 +109,8 @@ class VersinDrawer extends StatelessWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => const SettingsPage(),
+                  // Removemos o 'const' aqui pois a SettingsPage agora recebe dados dinâmicos
+                  builder: (context) => SettingsPage(controller: rimasController),
                 ),
               );
             },

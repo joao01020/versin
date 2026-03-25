@@ -5,6 +5,7 @@ import 'package:versin/features/rimas/presentation/widgets/chat_welcome_card.dar
 import 'package:versin/features/rimas/presentation/widgets/versin_drawer.dart';
 import 'package:versin/features/rimas/presentation/widgets/ai_suggestion/ai_suggestion_balloon.dart';
 import 'package:versin/features/rimas/presentation/controller/rimas_controller.dart';
+import 'package:versin/features/rimas/presentation/widgets/thermometer_gamification/thermometer_widget.dart';
 
 class ChatPage extends StatefulWidget {
   const ChatPage({super.key});
@@ -14,31 +15,85 @@ class ChatPage extends StatefulWidget {
 
 class _ChatPageState extends State<ChatPage> {
   final _messageController = TextEditingController();
+  
+  // CORREÇÃO: Usamos uma única instância e garantimos que o Listeners sejam notificados
   final RimasController _rimasController = RimasController();
+  
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final ScrollController _scrollController = ScrollController();
   Timer? _hideTimer;
   List<Map<String, String>> messages = [];
   bool _isAiTyping = false; 
 
+  // ESTADOS DOS MODOS TERMINAL
+  bool _isRhymeMode = false;
+  bool _isComporMode = false;
+  bool _isListarMode = false;
+  bool _isMarketingMode = false;
+
+  int _currentSuggestionIndex = 0;
+
   @override
   void initState() {
     super.initState();
+    _inicializarConfiguracoes();
     _iniciarFluxoBemVindo();
+
+    // Ouvinte para sugestões de rima conforme escreve
+    _messageController.addListener(() {
+      final text = _messageController.text;
+      
+      // Lógica de busca automática ao digitar espaço
+      if (text.isNotEmpty && text.endsWith(" ")) {
+        final words = text.trim().split(" ");
+        if (words.isNotEmpty) {
+          final lastWord = words.last;
+          if (lastWord.length > 2) {
+            _rimasController.buscarSugestao(lastWord);
+          }
+        }
+      }
+      
+      // Sincroniza o progresso visual do termômetro enquanto digita
+      _rimasController.onTextChanged(text);
+    });
   }
 
-  // Widget para mostrar o status da conta dinamicamente
+  Color _getActiveColor() {
+    if (_isRhymeMode) return Colors.greenAccent;
+    if (_isComporMode) return Colors.blueAccent;
+    if (_isListarMode) return Colors.orangeAccent;
+    if (_isMarketingMode) return Colors.yellowAccent;
+    return Colors.purpleAccent;
+  }
+
+  String _getActiveStatusText() {
+    if (_isRhymeMode) return "RHYME MODE";
+    if (_isComporMode) return "COMPOSING MODE";
+    if (_isListarMode) return "LIST MODE";
+    if (_isMarketingMode) return "MARKETING MODE";
+    return "FREE";
+  }
+
+  void _inicializarConfiguracoes() {
+    try {
+      // Garante que o controller comece limpo ou com dados iniciais
+      _rimasController.atualizarGamificacao(0);
+    } catch (e) {
+      debugPrint("Erro setup inicial: $e");
+    }
+  }
+
   Widget _buildStatusBadge() {
     return ListenableBuilder(
       listenable: _rimasController,
       builder: (context, child) {
-        String statusText = "FREE";
-        Color statusColor = Colors.grey;
+        bool anyMode = _isRhymeMode || _isComporMode || _isListarMode || _isMarketingMode;
+        String statusText = anyMode ? _getActiveStatusText() : "FREE";
+        Color statusColor = anyMode ? _getActiveColor() : Colors.purpleAccent;
 
-        if (_rimasController.userApiKey == "VERSIN-PRO-TRIAL-2026-FREE") {
-          statusText = "PRO TRIAL";
-          statusColor = Colors.cyanAccent;
-        } else if (_rimasController.userApiKey != null && _rimasController.userApiKey!.isNotEmpty) {
+        final key = _rimasController.userApiKey;
+        if (!anyMode && key != null && key.isNotEmpty && !key.contains("FREE")) {
           statusText = "API PRIVADA";
           statusColor = Colors.greenAccent;
         }
@@ -46,7 +101,7 @@ class _ChatPageState extends State<ChatPage> {
         return Text(
           statusText,
           style: TextStyle(
-            color: statusColor.withOpacity(0.6),
+            color: statusColor.withOpacity(0.8),
             fontSize: 10,
             fontWeight: FontWeight.bold,
             letterSpacing: 1.5,
@@ -67,25 +122,23 @@ class _ChatPageState extends State<ChatPage> {
           _isAiTyping = true; 
         });
 
-        Timer(const Duration(seconds: 4), () {
+        Timer(const Duration(seconds: 3), () {
           if (mounted && messages.length == 1) {
             setState(() {
               messages.add({
                 "role": "assistant",
-                "content": "Salve! Sou o Versin, seu mentor de composição. 🎤\n\n"
-                           "O que vamos compor hoje? **Trap**, **Funk**, **Emotrap**, **Sertanejo** ou **Samba**?"
+                "content": "Salve! Sou o Versin, seu mentor de composição. 🎤\n\nEscolha um estilo: **Trap**, **Funk**, **Emotrap**, **Rap**."
               });
             });
             _scrollToBottom();
 
-            Timer(const Duration(seconds: 4), () {
+            Timer(const Duration(seconds: 3), () {
               if (mounted && messages.length == 2) {
                 setState(() {
                   _isAiTyping = false; 
                   messages.add({
                     "role": "assistant",
-                    "content": "Escolha um e me mande um resumo (mínimo **10 linhas**) "
-                               "do que você está sentindo para a gente organizar essas ideias."
+                    "content": "Mande um resumo do que você está sentindo (mínimo **10 linhas**) para organizarmos as ideias."
                   });
                 });
                 _scrollToBottom();
@@ -108,11 +161,10 @@ class _ChatPageState extends State<ChatPage> {
 
   void _startHideTimer() {
     _hideTimer?.cancel();
-    _hideTimer = Timer(const Duration(seconds: 5), () {
-      if (mounted && _rimasController.sugestao.isNotEmpty) {
-        setState(() {
-          _rimasController.limparSugestao();
-        });
+    _hideTimer = Timer(const Duration(seconds: 10), () {
+      if (mounted && _rimasController.listaSugestoes.isNotEmpty) {
+        _rimasController.limparSugestao();
+        _currentSuggestionIndex = 0;
       }
     });
   }
@@ -129,9 +181,46 @@ class _ChatPageState extends State<ChatPage> {
     });
   }
 
+  void _resetModes() {
+    setState(() {
+      _isRhymeMode = false;
+      _isComporMode = false;
+      _isListarMode = false;
+      _isMarketingMode = false;
+    });
+  }
+
   void _sendMessage() async {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
+
+    // COMANDOS DE MODO
+    if (text.startsWith("/desligarmodo")) {
+      _resetModes();
+      _addSystemMessage("> **SISTEMA RESETADO.** Voltando ao modo padrão.");
+      return;
+    }
+
+    if (text.toLowerCase() == "/modorima") {
+      _resetModes();
+      setState(() => _isRhymeMode = true);
+      _addSystemMessage("> **MODO RIMA ATIVADO.**\n\nFoco em fonética e rimas multissilábicas.");
+      return;
+    }
+
+    if (text.toLowerCase() == "/modocompor") {
+      _resetModes();
+      setState(() => _isComporMode = true);
+      _addSystemMessage("> **MODO COMPOR ATIVADO.**\n\nAnálise de estrutura e storytelling.");
+      return;
+    }
+
+    if (text.toLowerCase() == "/modolistar") {
+      _resetModes();
+      setState(() => _isListarMode = true);
+      _addSystemMessage("> **MODO LISTAR ATIVADO.**\n\nVerificando biblioteca de rimas salvas...");
+      return;
+    }
 
     if (text.startsWith("/list")) {
       final conteudo = text.replaceFirst("/list", "").trim();
@@ -142,6 +231,7 @@ class _ChatPageState extends State<ChatPage> {
         }
       }
       _messageController.clear();
+      // Notifica o Drawer que a lista mudou
       return;
     }
     
@@ -153,7 +243,6 @@ class _ChatPageState extends State<ChatPage> {
     });
     
     _scrollToBottom();
-    
     final aiResponse = await _rimasController.fetchAiResponse(text);
 
     if (mounted) {
@@ -165,152 +254,106 @@ class _ChatPageState extends State<ChatPage> {
     }
   }
 
+  void _addSystemMessage(String content) {
+    setState(() {
+      messages.add({"role": "assistant", "content": content});
+      _messageController.clear();
+    });
+    _scrollToBottom();
+  }
+
   @override
   Widget build(BuildContext context) {
     final bottomPadding = MediaQuery.of(context).viewInsets.bottom;
+    final activeColor = _getActiveColor();
 
     return Scaffold(
       key: _scaffoldKey,
       backgroundColor: const Color(0xFF0F0F0F),
+      // CORREÇÃO: Passando a instância que contém os dados reais para o Drawer
       drawer: VersinDrawer(
-        rimasController: _rimasController,
+        rimasController: _rimasController, 
         onNewChat: () {
           setState(() {
             messages.clear();
             _isAiTyping = false;
+            _resetModes();
+            _rimasController.atualizarGamificacao(0);
           });
           _iniciarFluxoBemVindo();
         },
       ),
       body: Stack(
         children: [
-          // Título Centralizado + Badge de Status
           Positioned(
-            top: 50,
-            left: 0,
-            right: 0,
+            top: 50, left: 0, right: 0,
             child: Column(
               children: [
-                Text(
-                  "Versin",
-                  style: TextStyle(
-                    color: Colors.purpleAccent.withOpacity(0.8),
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 2,
-                  ),
-                ),
+                Text("Versin", style: TextStyle(color: activeColor.withOpacity(0.8), fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: 2)),
                 const SizedBox(height: 2),
                 _buildStatusBadge(),
+                const SizedBox(height: 10),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: ListenableBuilder(
+                    listenable: _rimasController,
+                    builder: (context, _) => TermometroFeedback(
+                      progressoEstrelas: _rimasController.progressoEstrelas,
+                      progressoFogos: _rimasController.progressoFogos,
+                      feedbackMentor: _rimasController.feedbackMentor,
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
-          // Botão do Menu
           Positioned(
-            top: 45,
-            left: 15,
+            top: 45, left: 15,
             child: IconButton(
-              icon: const Icon(Icons.menu_rounded, color: Colors.purpleAccent, size: 32),
-              onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+              icon: Icon(Icons.menu_rounded, color: activeColor, size: 32), 
+              onPressed: () => _scaffoldKey.currentState?.openDrawer()
             ),
           ),
-          // Área das Mensagens
           Positioned.fill(
-            top: 110, // Aumentado um pouco para acomodar o badge
-            bottom: 120 + bottomPadding, 
+            top: 190, bottom: 140 + bottomPadding, 
             child: messages.isEmpty ? const ChatWelcomeCard() : _buildMessageList(),
           ),
-          // Barra de Input e Sugestão
           Positioned(
             bottom: bottomPadding + 15,
-            left: 15,
-            right: 15,
+            left: 15, right: 15,
             child: Column(
               mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 ListenableBuilder(
                   listenable: _rimasController,
                   builder: (context, child) {
-                    if (_rimasController.sugestao.isNotEmpty && !(_hideTimer?.isActive ?? false)) {
-                       _startHideTimer();
-                    }
-                    double offsetX = (_messageController.text.length * 8.0).clamp(0.0, MediaQuery.of(context).size.width * 0.6);
+                    final rimas = _rimasController.listaSugestoes;
+                    if (rimas.isNotEmpty) _startHideTimer();
                     
                     return AnimatedOpacity(
-                      opacity: (_rimasController.sugestao.isNotEmpty || _rimasController.carregando) ? 1.0 : 0.0,
+                      opacity: (rimas.isNotEmpty || _rimasController.carregando) ? 1.0 : 0.0,
                       duration: const Duration(milliseconds: 300),
-                      child: Container(
-                        padding: EdgeInsets.only(left: offsetX),
-                        child: AiSuggestionBalloon(
-                          suggestion: _rimasController.sugestao,
-                          isLoading: _rimasController.carregando,
-                          onTap: () {
-                            setState(() {
-                              final currentText = _messageController.text;
-                              _messageController.text = "$currentText ${_rimasController.sugestao} ".trim();
-                              _messageController.selection = TextSelection.fromPosition(
-                                TextPosition(offset: _messageController.text.length),
-                              );
-                              _rimasController.aceitarSugestao();
-                              _hideTimer?.cancel();
-                            });
-                          },
-                        ),
-                      ),
+                      child: (rimas.isNotEmpty || _rimasController.carregando) 
+                        ? AiSuggestionBalloon(
+                            suggestion: _rimasController.carregando ? "..." : rimas[_currentSuggestionIndex],
+                            isLoading: _rimasController.carregando,
+                            onDismiss: () => _rimasController.removerSugestaoDaLista(rimas[_currentSuggestionIndex]),
+                            onNext: rimas.length > 1 ? () => setState(() => _currentSuggestionIndex = (_currentSuggestionIndex + 1) % rimas.length) : null,
+                            onPrevious: rimas.length > 1 ? () => setState(() => _currentSuggestionIndex = (_currentSuggestionIndex - 1 + rimas.length) % rimas.length) : null,
+                            onTap: () {
+                              final rima = rimas[_currentSuggestionIndex];
+                              final text = _messageController.text;
+                              _messageController.text = "$text $rima ".trimLeft();
+                              _messageController.selection = TextSelection.fromPosition(TextPosition(offset: _messageController.text.length));
+                              _rimasController.registrarRimaUsada(rima);
+                            },
+                          )
+                        : const SizedBox.shrink(),
                     );
                   },
                 ),
                 const SizedBox(height: 10),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1A1A1A),
-                    borderRadius: BorderRadius.circular(22),
-                    border: Border.all(color: Colors.white.withOpacity(0.08)),
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _messageController,
-                          keyboardType: TextInputType.multiline,
-                          maxLines: 5, 
-                          minLines: 1,
-                          textInputAction: TextInputAction.newline,
-                          onChanged: (val) {
-                            _rimasController.onTextChanged(val);
-                            setState(() {}); 
-                            if (val.isEmpty) _rimasController.limparSugestao();
-                          },
-                          style: const TextStyle(color: Colors.white, fontSize: 16),
-                          decoration: const InputDecoration(
-                            hintText: "Manda o sentimento...",
-                            hintStyle: TextStyle(color: Colors.grey, fontSize: 15),
-                            border: InputBorder.none,
-                            contentPadding: EdgeInsets.symmetric(vertical: 12),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 6.0),
-                        child: GestureDetector(
-                          onTap: _sendMessage,
-                          child: Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: const BoxDecoration(
-                              color: Colors.purpleAccent, 
-                              shape: BoxShape.circle
-                            ),
-                            child: const Icon(Icons.send_rounded, color: Colors.white, size: 20),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                _buildInputArea(activeColor),
               ],
             ),
           ),
@@ -319,39 +362,57 @@ class _ChatPageState extends State<ChatPage> {
     );
   }
 
+  Widget _buildInputArea(Color activeColor) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1A1A), 
+        borderRadius: BorderRadius.circular(22), 
+        border: Border.all(color: activeColor.withOpacity(0.3))
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _messageController,
+              keyboardType: TextInputType.multiline,
+              maxLines: 5, minLines: 1,
+              style: TextStyle(color: activeColor, fontSize: 16),
+              decoration: InputDecoration(
+                hintText: _isRhymeMode ? "Buscar rima..." : "Manda o sentimento...", 
+                hintStyle: const TextStyle(color: Colors.grey, fontSize: 15), 
+                border: InputBorder.none, 
+                contentPadding: const EdgeInsets.symmetric(vertical: 12)
+              ),
+            ),
+          ),
+          IconButton(
+            icon: Icon(Icons.send_rounded, color: activeColor),
+            onPressed: _sendMessage,
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildMessageList() {
+    final activeColor = _getActiveColor();
     return ListView.builder(
       controller: _scrollController,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
       itemCount: messages.length + (_isAiTyping ? 1 : 0),
       itemBuilder: (context, index) {
-        // RESGATE DO CARREGAMENTO: Versin está digitando...
-        if (index == messages.length && _isAiTyping) {
+        if (index == messages.length) {
           return Padding(
             padding: const EdgeInsets.symmetric(vertical: 12.0),
-            child: Row(
-              children: [
-                const SizedBox(
-                  width: 12,
-                  height: 12,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.purpleAccent),
-                ),
-                const SizedBox(width: 10),
-                Text(
-                  "Versin está digitando...",
-                  style: TextStyle(
-                    color: Colors.purpleAccent.withOpacity(0.7), 
-                    fontSize: 13, 
-                    fontStyle: FontStyle.italic
-                  ),
-                ),
-              ],
-            ),
+            child: Row(children: [SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2, color: activeColor)), const SizedBox(width: 10), Text("Versin analisando...", style: TextStyle(color: activeColor.withOpacity(0.7), fontSize: 13))]),
           );
         }
 
         final message = messages[index];
         final isUser = message['role'] == 'user';
+        final content = message['content'] ?? "";
 
         return Align(
           alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
@@ -364,18 +425,12 @@ class _ChatPageState extends State<ChatPage> {
               borderRadius: BorderRadius.circular(18),
             ),
             child: isUser 
-              ? Text(
-                  message['content'] ?? "",
-                  style: const TextStyle(color: Colors.white, fontSize: 15, height: 1.4),
-                )
+              ? Text(content, style: const TextStyle(color: Colors.white, fontSize: 15))
               : MarkdownBody(
-                  data: message['content'] ?? "",
-                  shrinkWrap: true,
+                  data: content,
                   styleSheet: MarkdownStyleSheet(
-                    p: const TextStyle(color: Colors.white70, fontSize: 16, height: 1.4, fontFamily: 'monospace'),
-                    strong: const TextStyle(color: Colors.purpleAccent, fontWeight: FontWeight.bold),
-                    listBullet: const TextStyle(color: Colors.purpleAccent),
-                    blockSpacing: 10,
+                    p: TextStyle(color: activeColor.withOpacity(0.9), fontSize: 16, fontFamily: 'monospace'),
+                    strong: TextStyle(color: activeColor, fontWeight: FontWeight.bold),
                   ),
                 ),
           ),

@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:versin/features/rimas/presentation/controller/rimas_controller.dart';
-import 'package:versin/features/rimas/presentation/pages/vocabulario_page.dart';
-import 'package:versin/features/rimas/presentation/pages/settings_page.dart';
+import 'package:versin/features/rimas/presentation/pages/drawer/vocabulario_page.dart';
+import 'package:versin/features/rimas/presentation/pages/drawer/settings/settings_page.dart';
+import 'package:versin/features/rimas/presentation/pages/drawer/how_to_use_page.dart'; // Importação atualizada
 
 class VersinDrawer extends StatelessWidget {
   final VoidCallback onNewChat;
@@ -37,7 +38,6 @@ class VersinDrawer extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  // LISTRA ROXA (PURPLE) NO HEADER
                   Container(
                     height: 1.5,
                     width: double.infinity,
@@ -82,6 +82,21 @@ class VersinDrawer extends StatelessWidget {
             },
           ),
 
+          // HOW TO USE (Título atualizado, conteúdo em PT-BR)
+          ListTile(
+            leading: const Icon(Icons.help_outline_rounded, color: Colors.blueAccent),
+            title: const Text("Como usar?", style: TextStyle(color: Colors.white, fontSize: 14)),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const HowToUsePage(), // Classe atualizada
+                ),
+              );
+            },
+          ),
+
           // DICIONÁRIO / VOCABULÁRIO
           ListTile(
             leading: const Icon(Icons.terminal_rounded, color: Colors.purpleAccent),
@@ -100,7 +115,7 @@ class VersinDrawer extends StatelessWidget {
             },
           ),
 
-          // CONFIGURAÇÕES (CORRIGIDO: Passando o controller e removendo o const)
+          // CONFIGURAÇÕES
           ListTile(
             leading: const Icon(Icons.settings_outlined, color: Colors.white70),
             title: const Text("Configurações", style: TextStyle(color: Colors.white, fontSize: 14)),
@@ -109,7 +124,6 @@ class VersinDrawer extends StatelessWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  // Removemos o 'const' aqui pois a SettingsPage agora recebe dados dinâmicos
                   builder: (context) => SettingsPage(controller: rimasController),
                 ),
               );
@@ -124,7 +138,6 @@ class VersinDrawer extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // DIVISOR ROXO (PURPLE) NO RODAPÉ
                 const Divider(color: Colors.purpleAccent, thickness: 1), 
                 const SizedBox(height: 10),
                 Row(

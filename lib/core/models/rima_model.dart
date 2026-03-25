@@ -1,10 +1,12 @@
 class Rima {
   final String palavra;
   bool isPrioridade;
+  final String origem; // NOVO: "usuario" ou "versin"
 
   Rima({
-    required this.palavra, 
+    required this.palavra,
     this.isPrioridade = false,
+    this.origem = "usuario", // Por padrão, o que você adiciona é seu
   });
 
   // Converte um JSON/Map vindo do Backend para o objeto Rima
@@ -12,6 +14,7 @@ class Rima {
     return Rima(
       palavra: map['palavra'] ?? '',
       isPrioridade: map['isPrioridade'] ?? false,
+      origem: map['origem'] ?? 'usuario', // O backend dirá se a rima é dele
     );
   }
 
@@ -20,10 +23,17 @@ class Rima {
     return {
       'palavra': palavra,
       'isPrioridade': isPrioridade,
+      'origem': origem,
     };
   }
 
-  // Útil para depuração no console do Linux/VS Code
+  // Identifica visualmente a procedência para o Mentor Sincero
+  String get mensagemOrigem {
+    return origem == "versin" 
+      ? "Esta rima foi sugerida pelo Versin" 
+      : "Esta rima foi configurada por você";
+  }
+
   @override
-  String toString() => 'Rima(palavra: $palavra, prioridade: $isPrioridade)';
+  String toString() => 'Rima(palavra: $palavra, prioridade: $isPrioridade, origem: $origem)';
 }

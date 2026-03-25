@@ -1,21 +1,21 @@
 import os
 import uvicorn
 import google.generativeai as genai
+import json
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Dict
 from dotenv import load_dotenv
 from groq import Groq
 from datetime import datetime
 
 load_dotenv()
 
-# CONFIGURAÇÕES DE API PADRÃO (SERVIDOR)
+# CONFIGURAÇÕES DE API
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-# Cliente padrão para usuários FREE
 client_groq_default = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
 
 if GEMINI_API_KEY:
@@ -24,11 +24,7 @@ if GEMINI_API_KEY:
 else:
     gemini_model = None
 
-app = FastAPI(title="Versin AI Pro")
-
-# --- GESTÃO DE COTAS (MEMÓRIA) ---
-user_quotas = {} 
-LIMITE_DIARIO_FREE = 50 
+app = FastAPI(title="Versin AI Pro - Estúdio")
 
 app.add_middleware(
     CORSMiddleware,
@@ -38,7 +34,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- MODELOS DE DADOS ---
 class RequestData(BaseModel):
     texto_usuario: str
     lista_rimas: List[str]
@@ -50,110 +45,149 @@ class ChatRequest(BaseModel):
     lista_atual: Optional[List[str]] = []
     api_key_privada: Optional[str] = None
 
-# --- FUNÇÃO AUXILIAR DE VELOCIDADE (O SEGREDO) ---
 def get_groq_client(user_key: Optional[str]):
-    """
-    Se o usuário mandar uma chave, criamos um cliente instantâneo (Jato).
-    Se não, usamos o cliente padrão do servidor (Busão).
-    """
     if user_key and user_key.strip():
-        # Se for a chave de Trial, usamos a nossa do servidor, mas com prioridade
         if user_key == "VERSIN-PRO-TRIAL-2026-FREE":
             return client_groq_default
         return Groq(api_key=user_key)
     return client_groq_default
 
-# --- ROTA DE RIMA (BALÃO DE SUGESTÃO) ---
+# --- LÓGICA DE MODOS DINÂMICOS ---
+def definir_comportamento(mensagem: str, lista_rimas: List[str]) -> str:
+    msg = mensagem.lower()
+    
+    # MODO RIMA
+    if "/modorima" in msg:
+        return (
+            "Você está no MODO RIMA. Seu único objetivo é encontrar rimas perfeitas, multissilábicas e raras. "
+            f"Base de rimas do artista: {lista_rimas}. "
+            "Sempre que o usuário mandar uma palavra ou frase, retorne uma lista formatada de rimas. "
+            "Seja técnico sobre a terminação das palavras (ex: rimas agudas, graves). "
+            "Incentive o uso do botão '+' para salvar."
+        )
+    
+    # MODO COMPOR
+    elif "/modocompor" in msg:
+        return (
+            "Você está no MODO COMPOR. Foque 100% na estrutura da letra (Verso, Refrão, Bridge). "
+            "Analise a métrica (contagem de sílabas poéticas) e o flow. "
+            "Sugira variações de cadência e ajude a organizar a história da letra. "
+            "Seja um mestre da escrita criativa e técnica."
+        )
+    
+    # MODO LISTAR
+    elif "/modolistar" in msg:
+        return (
+            "Você está no MODO LISTAR. Organize o vocabulário do artista. "
+            f"Lista atual: {lista_rimas}. "
+            "Separe as rimas por 'Prioridade Máxima' (as mais complexas) e 'Lista Total'. "
+            "Dê sugestões de como combinar palavras dessa lista para criar punchlines."
+        )
+    
+    # MODO MARKETING
+    elif "/modomarketing" in msg:
+        return (
+            "Você é a Especialista em Marketing para Artistas Independentes. "
+            "Foque em: retenção de ouvintes, algoritmos do Spotify/TikTok e branding visual. "
+            "Dê estratégias GRÁTIS (trends, networking, Reels) e PAGAS (Tráfego pago, editais). "
+            "Seja estratégica, direta e mostre como converter seguidor em fã real."
+        )
+    
+    # MODO PADRÃO (MENTOR SINCERO, TÉCNICO E DETALHISTA)
+    else:
+        return (
+            "Você é o Versin, Mentor de Elite de Trap, Rap e Funk, e Engenheiro de Mixagem experiente. "
+            "Sua missão é transformar rascunhos em hits de impacto profissional através de uma mentoria sincera e detalhista.\n\n"
+            
+            "REGRAS DE REPERTÓRIO ({lista_rimas}):\n"
+            "1. Se a {lista_rimas} estiver VAZIA: Avise que a biblioteca está limpa e peça permissão para sugerir rimas novas.\n"
+            "2. Se a {lista_rimas} tiver conteúdo: Selecione APENAS as 3 rimas que melhor se encaixam no contexto da letra atual. Nunca envie a lista completa para não poluir o chat.\n"
+            "3. Mix de Sugestões: Se o artista permitir rimas novas, envie no máximo: [3 rimas da lista dele + 3 rimas inéditas do Versin].\n"
+            "4. Respeite a decisão: Se ele quiser manter apenas as dele, não sugira nada de fora. Se ele quiser apenas novas, ignore a lista salva.\n\n"
+
+            "DIRETRIZES DE ORIENTAÇÃO PARA FINALIZAÇÃO:\n"
+            "1. ANÁLISE DE IMPACTO E CLICHÊS: Identifique rimas óbvias e sugira 'Rimas Ricas' ou 'Internas'. Explique por que a troca deixa o verso mais 'caro'.\n\n"
+            
+            "2. CADÊNCIA E MÉTRICA: Analise se os versos cabem no compasso 4/4. Sugira cortes de conectivos (que, e, então) para o flow não atropelar e o silêncio criar o groove.\n\n"
+            
+            "3. ESTRUTURA DA MÚSICA: Verifique se falta Intro, Ponte ou Refrão. No refrão, priorize rimas com vogais abertas (A, O) para maior impacto sonoro.\n\n"
+            
+            "4. ENGENHARIA FL STUDIO (SIMPLICIDADE): Explique mixagem com analogias reais. Ex: 'O Reverb é como cantar no banheiro: dá espaço, mas se exagerar, vira uma bagunça de eco'.\n\n"
+            
+            "5. O VEREDITO DO MENTOR: Se a letra estiver pronta para o estúdio, mande um 'ESSE É O HIT!'. Caso contrário, dê uma nota de 1 a 10 (Nível de Fogo) e aponte o erro fatal."
+        )
+# --- ROTA DE RIMA (AVALIAÇÃO) ---
 @app.post("/processar")
 async def processar_versin(data: RequestData):
     try:
-        if not data.texto_usuario.strip() or not data.lista_rimas:
-            return {"resultado": ""}
+        t = data.texto_usuario.strip()
+        if not t or len(t) < 1: # Reduzi para 1 para aceitar buscas rápidas
+            return {"resultado": "NENHUMA", "nivel_impacto": 0, "motivo_feedback": "Aqueça a caneta..."}
 
         client = get_groq_client(data.api_key_privada)
-        if not client:
-            raise HTTPException(status_code=500, detail="Groq não configurado")
-
-        # No modo rima, usamos o modelo mais rápido (8b) para o balão não travar
         model_to_use = "llama-3.1-8b-instant" 
         
         system_instructions = (
-            "Você é um consultor de rimas fonéticas de música urbana. "
-            f"Escolha UMA palavra desta lista: {data.lista_rimas}. "
-            "REGRAS: Rime com a última palavra do usuário. Faça sentido. "
-            "Responda APENAS a palavra ou NENHUMA."
+            "Você é um motor de busca de rimas. "
+            "Retorne APENAS JSON: {'resultado': 'palavra', 'nivel_impacto': 1_a_6, 'motivo_feedback': '...'}. "
+            f"Contexto: {data.lista_rimas}."
         )
 
         completion = client.chat.completions.create(
             model=model_to_use, 
             messages=[
                 {"role": "system", "content": system_instructions},
-                {"role": "user", "content": f"Contexto: '{data.texto_usuario}'"}
+                {"role": "user", "content": f"Busque rima para: '{t}'"}
             ],
-            temperature=0.1, # Menor temperatura = mais rápido e certeiro
-            max_tokens=10,
-            timeout=2.0 # Timeout curto para não travar o Flutter
+            temperature=0.2,
+            response_format={"type": "json_object"},
+            max_tokens=150
         )
 
-        resultado = completion.choices[0].message.content.strip().replace('"', '').replace('.', '')
-        return {"resultado": "NENHUMA" if "NENHUMA" in resultado.upper() else resultado}
-    except Exception as e:
-        print(f"ERRO RIMA: {str(e)}")
-        return {"resultado": ""}
+        res = json.loads(completion.choices[0].message.content)
+        return res
+    except Exception:
+        return {"resultado": "NENHUMA", "nivel_impacto": 1, "motivo_feedback": "Processando..."}
 
-# --- ROTA DE CHAT (MENTOR) ---
+# --- ROTA DE CHAT (MODOS INTEGRADOS) ---
 @app.post("/chat")
 async def chat_versin(data: ChatRequest):
     try:
-        # 1. VERIFICAÇÃO DE COTAS (Ignorada no PRO TRIAL ou PRIVADA)
-        is_pro = data.api_key_privada is not None and data.api_key_privada.strip() != ""
-        
-        if not is_pro:
-            hoje = datetime.now().strftime("%Y-%m-%d")
-            u_id = data.user_id if data.user_id else "anon"
-            quota_key = f"{u_id}_{hoje}"
-            count = user_quotas.get(quota_key, 0)
-            
-            if count >= LIMITE_DIARIO_FREE:
-                return {
-                    "role": "assistant", 
-                    "content": "⚠️ **Limite Diário Atingido**. No modo **FREE** você tem 50 mensagens. Ative o **PRO TRIAL** ou use sua **API Key**."
-                }
-            user_quotas[quota_key] = count + 1
-
-        # 2. SELEÇÃO DE CLIENTE
+        is_pro = bool(data.api_key_privada and data.api_key_privada.strip())
         client = get_groq_client(data.api_key_privada)
-        
-        # Se for Pro/Privada usamos o modelo forte (70b), se for Free usamos o 8b pra economizar
         model_chat = "llama-3.3-70b-versatile" if is_pro else "llama-3.1-8b-instant"
 
-        system_behavior = (
-            "Você é o Versin, Mentor de Trap/Rap. Analise o sentimento e o flow. "
-            f"Vocabulário do artista: {data.lista_atual}. "
-            "Estilo: Curto, direto, gírias de estúdio, **negrito** em termos técnicos."
+        # Define o comportamento com base na mensagem (Comandos de modo)
+        system_behavior = definir_comportamento(data.message, data.lista_atual)
+        
+        # Adiciona a regra universal do JSON
+        system_behavior += (
+            " Retorne APENAS JSON: {"
+            "'content': 'resposta_em_markdown', "
+            "'nivel_impacto': 1_a_6, "
+            "'motivo_feedback': 'feedback_curto_para_o_termometro'"
+            "}. Níveis: 1-2 (Ok), 3-4 (Interessante), 5-6 (Master/Marketing-Ouro)."
         )
 
-        try:
-            completion = client.chat.completions.create(
-                model=model_chat,
-                messages=[{"role": "system", "content": system_behavior}, {"role": "user", "content": data.message}],
-                temperature=0.7,
-                max_tokens=800,
-                timeout=10.0
-            )
-            return {"role": "assistant", "content": completion.choices[0].message.content.strip()}
+        completion = client.chat.completions.create(
+            model=model_chat,
+            messages=[{"role": "system", "content": system_behavior}, {"role": "user", "content": data.message}],
+            temperature=0.7,
+            response_format={"type": "json_object"},
+            max_tokens=1000
+        )
         
-        except Exception as e:
-            # Fallback para Gemini apenas se não houver chave privada dando erro
-            if not is_pro and gemini_model:
-                response = gemini_model.generate_content(f"Aja como Versin Mentor. {system_behavior}. Usuário: {data.message}")
-                return {"role": "assistant", "content": response.text}
-            return {"role": "assistant", "content": f"Erro na conexão (IA): {str(e)}"}
+        res_json = json.loads(completion.choices[0].message.content)
+        return {
+            "role": "assistant", 
+            "content": res_json.get("content", ""),
+            "nivel_impacto": res_json.get("nivel_impacto", 1),
+            "motivo_feedback": res_json.get("motivo_feedback", "Versin em modo dinâmico.")
+        }
 
     except Exception as e:
         print(f"ERRO CHAT: {str(e)}")
-        return {"role": "assistant", "content": "Erro crítico no **backend**."}
+        return {"role": "assistant", "content": "Erro no cérebro do Versin.", "nivel_impacto": 1, "motivo_feedback": "Erro."}
 
 if __name__ == "__main__":
-    # Roda em 0.0.0.0 para aceitar conexões externas (celular na mesma rede)
     uvicorn.run(app, host="0.0.0.0", port=8000)

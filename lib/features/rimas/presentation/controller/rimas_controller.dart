@@ -39,8 +39,8 @@ class RimasController extends ChangeNotifier {
   List<Rima> vocabulario = [
     Rima(palavra: "plano", isPrioridade: true),
     Rima(palavra: "insano"),
-    Rima(palavra: "tango", isPrioridade: true),
-    Rima(palavra: "cano"),
+    Rima(palavra: "mano", isPrioridade: true),
+    
   ];
 
   bool get isProActive => _userApiKey != null && _userApiKey!.isNotEmpty;

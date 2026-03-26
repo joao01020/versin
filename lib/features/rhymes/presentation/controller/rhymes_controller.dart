@@ -19,10 +19,10 @@ class RhymesController extends ChangeNotifier {
   bool _isLoading = false;
   bool get isLoading => _isLoading;
 
-  // --- ESTADO DA GAMIFICAÇÃO (GRADUAL) ---
+  // --- ESTADO DA GAMIFICAÇÃO (DINÂMICO) ---
   double starProgress = 0.0; 
   double fireProgress = 0.0;    
-  String mentorFeedback = "Solte a sua primeira rima...";
+  String mentorFeedback = "Ouvindo sua frequência..."; // Início neutro para a IA assumir
 
   // --- CONFIGURAÇÕES DE ESTILO (Sincronizadas com RhymeLevelPage) ---
   String currentGenre = 'Automático';
@@ -74,7 +74,7 @@ class RhymesController extends ChangeNotifier {
     notifyListeners();
   }
 
-  // --- LÓGICA DE EVOLUÇÃO (TERMÔMETRO DE FOGO) ---
+  // --- LÓGICA DE EVOLUÇÃO (IA ADAPTATIVA) ---
   void updateGamification(dynamic rawLevel, {String? reason}) {
     int level = 0;
     if (rawLevel is int) {
@@ -83,20 +83,21 @@ class RhymesController extends ChangeNotifier {
       level = int.tryParse(rawLevel) ?? 0;
     }
 
+    // A IA agora define o mentorFeedback via 'reason' (feedback_reason do backend)
     if (level <= 0) {
       starProgress = 0.0; 
       fireProgress = 0.0;
-      mentorFeedback = "O estúdio está silencioso...";
+      mentorFeedback = reason ?? "O estúdio está silencioso...";
     } 
     else if (level >= 1 && level <= 3) {
       fireProgress = 0.0;
       starProgress = level.toDouble();
-      mentorFeedback = reason ?? "O flow está encaixando!";
+      mentorFeedback = reason ?? "Analisando métrica e flow...";
     } 
     else if (level >= 4) {
       starProgress = 0.0; 
       fireProgress = (level - 3).toDouble().clamp(0.0, 3.0);
-      mentorFeedback = reason ?? "NÍVEL MÁXIMO! 🚀 Hit detectado.";
+      mentorFeedback = reason ?? "Sua linha atingiu o pico de impacto! 🔥";
     }
     notifyListeners();
   }
@@ -146,6 +147,7 @@ class RhymesController extends ChangeNotifier {
             _suggestionsList = (res == "NENHUMA" || res.isEmpty) ? [] : [res];
           }
           
+          // Sincroniza a gamificação com o feedback textual dinâmico da IA
           updateGamification(data['impact_level'], reason: data['feedback_reason']);
         }
       } catch (e) {
@@ -174,7 +176,7 @@ class RhymesController extends ChangeNotifier {
     notifyListeners();
   }
 
-  // --- CHAT COM MENTOR ---
+  // --- CHAT COM MENTOR (Feedback pós-resposta) ---
   Future<Map<String, String>> fetchAiResponse(String message) async {
     _isLoading = true;
     notifyListeners();
@@ -196,6 +198,7 @@ class RhymesController extends ChangeNotifier {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
+        // Atualiza o mentor e o termômetro baseado na última interação do chat
         updateGamification(data['impact_level'], reason: data['feedback_reason']);
         return {
           "role": "assistant", 

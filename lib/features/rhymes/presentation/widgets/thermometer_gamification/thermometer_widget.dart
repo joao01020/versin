@@ -14,42 +14,56 @@ class ThermometerFeedback extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Se o progresso de fogos começou, as estrelas são ocultadas
+    // Se o progresso de fogos começou (acima do nível 3), as estrelas são ocultadas
     bool isFirePhase = fireProgress > 0.1;
 
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
       decoration: BoxDecoration(
         color: Colors.black.withOpacity(0.4),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white10),
+        borderRadius: BorderRadius.circular(25),
+        border: Border.all(color: Colors.white.withOpacity(0.05), width: 0.5),
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Row(
+            mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             children: isFirePhase 
-              ? List.generate(3, (index) => _GradualIcon(
-                  icon: Icons.local_fire_department,
-                  percentage: (fireProgress - index).clamp(0.0, 1.0),
-                  color: Colors.deepOrangeAccent,
-                  isAnimating: (fireProgress - index) > 0.0 && (fireProgress - index) <= 1.0,
-                ))
-              : List.generate(3, (index) => _GradualIcon(
-                  icon: Icons.star,
-                  percentage: (starProgress - index).clamp(0.0, 1.0),
-                  color: Colors.yellowAccent,
-                  isAnimating: false,
-                )),
+              ? List.generate(3, (index) {
+                  double iconProgress = (fireProgress - index).clamp(0.0, 1.0);
+                  return _GradualIcon(
+                    icon: Icons.local_fire_department_rounded,
+                    percentage: iconProgress,
+                    color: Colors.orangeAccent,
+                    isAnimating: iconProgress > 0.1,
+                  );
+                })
+              : List.generate(3, (index) {
+                  double iconProgress = (starProgress - index).clamp(0.0, 1.0);
+                  return _GradualIcon(
+                    icon: Icons.star_rounded,
+                    percentage: iconProgress,
+                    color: Colors.purpleAccent,
+                    isAnimating: false,
+                  );
+                }),
           ),
-          const SizedBox(height: 8),
-          Text(
-            mentorFeedback,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: Colors.white70, 
-              fontSize: 12, 
-              fontStyle: FontStyle.italic
+          const SizedBox(height: 10),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 300),
+            child: Text(
+              mentorFeedback.toUpperCase(),
+              key: ValueKey<String>(mentorFeedback),
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: isFirePhase ? Colors.orangeAccent : Colors.white70, 
+                fontSize: 11, 
+                fontWeight: FontWeight.bold,
+                letterSpacing: 0.8,
+                fontFamily: 'monospace', // Estilo terminal para combinar com o Versin
+              ),
             ),
           ),
         ],
@@ -76,18 +90,20 @@ class _GradualIcon extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4),
       child: ShaderMask(
+        blendMode: BlendMode.srcIn,
         shaderCallback: (rect) {
           return LinearGradient(
             begin: Alignment.bottomCenter,
             end: Alignment.topCenter,
             stops: [percentage, percentage],
-            colors: [color, Colors.white10], // Cor preenchida e cor vazia
+            colors: [color, Colors.white.withOpacity(0.1)], // Preenchido vs Vazio
           ).createShader(rect);
         },
         child: Icon(
           icon,
-          size: 30,
-          color: Colors.white, // O ShaderMask aplica a cor por cima
+          size: 28,
+          // Cor base branca para o ShaderMask processar
+          color: Colors.white, 
         ),
       ),
     );

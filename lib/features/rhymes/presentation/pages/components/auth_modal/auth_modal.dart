@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 // Chamada via package para o modal de opções
-import 'package:versin/features/rimas/presentation/pages/components/auth_modal/auth_options_modal.dart';
+import 'package:versin/features/rhymes/presentation/pages/components/auth_modal/auth_options_modal.dart';
 
 class AuthModal extends StatefulWidget {
   const AuthModal({super.key});

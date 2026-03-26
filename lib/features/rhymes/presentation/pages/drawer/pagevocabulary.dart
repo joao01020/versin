@@ -2,7 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:versin/features/rimas/presentation/controller/rhymes_controller.dart';
+import 'package:versin/features/rhymes/presentation/controller/rhymes_controller.dart';
 import 'package:versin/core/models/rhyme_model.dart';
 
 class VocabularioPage extends StatefulWidget {

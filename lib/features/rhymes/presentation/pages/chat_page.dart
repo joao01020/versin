@@ -1,28 +1,28 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'; // Import necessário para verificar sessão
-import 'package:versin/features/rimas/presentation/widgets/chat_welcome_card.dart';
-import 'package:versin/features/rimas/presentation/widgets/versin_drawer.dart';
-import 'package:versin/features/rimas/presentation/widgets/ai_suggestion/ai_suggestion_balloon.dart';
-import 'package:versin/features/rimas/presentation/controller/rhymes_controller.dart';
-import 'package:versin/features/rimas/presentation/widgets/thermometer_gamification/thermometer_widget.dart';
-import 'package:versin/features/rimas/presentation/widgets/chat_input_area.dart';
-import 'package:versin/features/rimas/presentation/widgets/chat_message_bubble.dart';
-import 'package:versin/features/rimas/presentation/utils/command_handler.dart'; 
+import 'package:versin/features/rhymes/presentation/widgets/chat_welcome_card.dart';
+import 'package:versin/features/rhymes/presentation/widgets/versin_drawer.dart';
+import 'package:versin/features/rhymes/presentation/widgets/ai_suggestion/ai_suggestion_balloon.dart';
+import 'package:versin/features/rhymes/presentation/controller/rhymes_controller.dart';
+import 'package:versin/features/rhymes/presentation/widgets/thermometer_gamification/thermometer_widget.dart';
+import 'package:versin/features/rhymes/presentation/widgets/chat_input_area.dart';
+import 'package:versin/features/rhymes/presentation/widgets/chat_message_bubble.dart';
+import 'package:versin/features/rhymes/presentation/utils/command_handler.dart'; 
 
 // Importações dos novos componentes modulares
-import 'package:versin/features/rimas/presentation/pages/components/terminal_mode/chat_header.dart';
-import 'package:versin/features/rimas/presentation/pages/components/chat_list_view.dart';
-import 'package:versin/features/rimas/presentation/pages/components/chat_command_overlay/chat_command_overlay.dart';
-import 'package:versin/features/rimas/presentation/pages/components/chat_bottom_bar.dart';
+import 'package:versin/features/rhymes/presentation/pages/components/terminal_mode/chat_header.dart';
+import 'package:versin/features/rhymes/presentation/pages/components/chat_list_view.dart';
+import 'package:versin/features/rhymes/presentation/pages/components/chat_command_overlay/chat_command_overlay.dart';
+import 'package:versin/features/rhymes/presentation/pages/components/chat_bottom_bar.dart';
 // Import do novo componente de inicialização
-import 'package:versin/features/rimas/presentation/pages/components/chat_initializer/chat_initializer.dart';
+import 'package:versin/features/rhymes/presentation/pages/components/chat_initializer/chat_initializer.dart';
 // Import Modular do Modal de Autenticação
-import 'package:versin/features/rimas/presentation/pages/components/auth_modal/auth_modal.dart';
+import 'package:versin/features/rhymes/presentation/pages/components/auth_modal/auth_modal.dart';
 
 // NOVOS IMPORTS DE STORAGE E USUÁRIO (Caminhos definitivos)
-import 'package:versin/features/rimas/data/datasources/supabase_storage_service.dart';
-import 'package:versin/features/rimas/data/datasources/user/user_service.dart';
+import 'package:versin/features/rhymes/data/datasources/supabase_storage_service.dart';
+import 'package:versin/features/rhymes/data/datasources/user/user_service.dart';
 
 class ChatPage extends StatefulWidget {
   const ChatPage({super.key});

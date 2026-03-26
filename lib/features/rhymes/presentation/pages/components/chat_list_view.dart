@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-// Importes corrigidos para apontar para a pasta de widgets global da feature
-import 'package:versin/features/rimas/presentation/widgets/chat_welcome_card.dart';
-import 'package:versin/features/rimas/presentation/widgets/chat_message_bubble.dart';
+import 'package:versin/features/rhymes/presentation/widgets/chat_welcome_card.dart';
+import 'package:versin/features/rhymes/presentation/widgets/chat_message_bubble.dart';
 
 class ChatListView extends StatelessWidget {
   final bool isInitializing;

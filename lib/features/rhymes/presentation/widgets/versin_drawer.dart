@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:versin/features/rimas/presentation/controller/rhymes_controller.dart';
-import 'package:versin/features/rimas/presentation/pages/drawer/pagevocabulary.dart'; // Nome do arquivo sincronizado
-import 'package:versin/features/rimas/presentation/pages/drawer/settings/settings_page.dart';
-import 'package:versin/features/rimas/presentation/pages/drawer/how_to_use_page.dart'; // Importação atualizada
+import 'package:versin/features/rhymes/presentation/controller/rhymes_controller.dart';
+import 'package:versin/features/rhymes/presentation/pages/drawer/pagevocabulary.dart'; // Nome do arquivo sincronizado
+import 'package:versin/features/rhymes/presentation/pages/drawer/settings/settings_page.dart';
+import 'package:versin/features/rhymes/presentation/pages/drawer/how_to_use_page.dart'; // Importação atualizada
 
 class VersinDrawer extends StatelessWidget {
   final VoidCallback onNewChat;

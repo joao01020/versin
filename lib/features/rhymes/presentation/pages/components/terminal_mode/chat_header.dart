@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:versin/features/rimas/presentation/controller/rhymes_controller.dart';
-import 'package:versin/features/rimas/presentation/widgets/thermometer_gamification/thermometer_widget.dart';
+import 'package:versin/features/rhymes/presentation/controller/rhymes_controller.dart';
+import 'package:versin/features/rhymes/presentation/widgets/thermometer_gamification/thermometer_widget.dart';
 
 class ChatHeader extends StatelessWidget {
   final Color activeColor;

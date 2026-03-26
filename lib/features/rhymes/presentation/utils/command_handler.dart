@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:versin/features/rimas/presentation/controller/rhymes_controller.dart';
+import 'package:versin/features/rhymes/presentation/controller/rhymes_controller.dart';
 
 class CommandHandler {
-  final RhymesController rhymesController; // Variável em inglês conforme o novo padrão
+  final RhymesController rhymesController; 
   final Function(String) onSystemMessage;
   final VoidCallback onClearChat;
   final Function({bool? rhyme, bool? compose, bool? list, bool? marketing}) onUpdateModes;

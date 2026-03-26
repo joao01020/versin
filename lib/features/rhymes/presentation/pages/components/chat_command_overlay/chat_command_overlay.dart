@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:versin/features/rimas/presentation/utils/command_handler.dart';
+import 'package:versin/features/rhymes/presentation/utils/command_handler.dart';
 
 class ChatCommandOverlay extends StatelessWidget {
   final CommandHandler commandHandler;

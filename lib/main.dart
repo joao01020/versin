@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'; 
 import 'package:flutter_dotenv/flutter_dotenv.dart'; // Import necessário para o .env
-import 'package:versin/features/rimas/presentation/pages/chat_page.dart';
+import 'package:versin/features/rhymes/presentation/pages/chat_page.dart';
 
 void main() async {
   // 1. Garante que os widgets do Flutter estejam inicializados antes de rodar o app

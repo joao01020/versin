@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 // Import via package para o formulário de email
-import 'package:versin/features/rimas/presentation/pages/components/auth_modal/auth_modal_email/email_auth_form.dart';
+import 'package:versin/features/rhymes/presentation/pages/components/auth_modal/auth_modal_email/email_auth_form.dart';
 
 class AuthOptionsModal extends StatelessWidget {
   const AuthOptionsModal({super.key});

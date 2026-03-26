@@ -1,6 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 // Importação absoluta - substitui o '../models' que estava falhando
-import 'package:versin/features/rimas/data/models/author_hash.dart';
+import 'package:versin/features/rhymes/data/models/author_hash.dart';
 
 class SupabaseStorageService {
   final _supabase = Supabase.instance.client;

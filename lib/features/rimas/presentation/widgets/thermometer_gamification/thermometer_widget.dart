@@ -1,21 +1,21 @@
 import 'package:flutter/material.dart';
 
-class TermometroFeedback extends StatelessWidget {
-  final double progressoEstrelas; // 0.0 a 3.0 (ex: 1.5 preenche uma estrela e meia)
-  final double progressoFogos;    // 0.0 a 3.0
-  final String feedbackMentor;
+class ThermometerFeedback extends StatelessWidget {
+  final double starProgress; // 0.0 a 3.0 (ex: 1.5 preenche uma estrela e meia)
+  final double fireProgress; // 0.0 a 3.0
+  final String mentorFeedback;
 
-  const TermometroFeedback({
+  const ThermometerFeedback({
     super.key,
-    required this.progressoEstrelas,
-    required this.progressoFogos,
-    required this.feedbackMentor,
+    required this.starProgress,
+    required this.fireProgress,
+    required this.mentorFeedback,
   });
 
   @override
   Widget build(BuildContext context) {
-    // Se o progresso de fogos começou, escondemos as estrelas
-    bool faseFogo = progressoFogos > 0.1;
+    // Se o progresso de fogos começou, as estrelas são ocultadas
+    bool isFirePhase = fireProgress > 0.1;
 
     return Container(
       padding: const EdgeInsets.all(12),
@@ -28,25 +28,29 @@ class TermometroFeedback extends StatelessWidget {
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
-            children: faseFogo 
-              ? List.generate(3, (index) => _IconeGradual(
+            children: isFirePhase 
+              ? List.generate(3, (index) => _GradualIcon(
                   icon: Icons.local_fire_department,
-                  percentual: (progressoFogos - index).clamp(0.0, 1.0),
-                  cor: Colors.deepOrangeAccent,
-                  animar: (progressoFogos - index) > 0.0 && (progressoFogos - index) <= 1.0,
+                  percentage: (fireProgress - index).clamp(0.0, 1.0),
+                  color: Colors.deepOrangeAccent,
+                  isAnimating: (fireProgress - index) > 0.0 && (fireProgress - index) <= 1.0,
                 ))
-              : List.generate(3, (index) => _IconeGradual(
+              : List.generate(3, (index) => _GradualIcon(
                   icon: Icons.star,
-                  percentual: (progressoEstrelas - index).clamp(0.0, 1.0),
-                  cor: Colors.yellowAccent,
-                  animar: false,
+                  percentage: (starProgress - index).clamp(0.0, 1.0),
+                  color: Colors.yellowAccent,
+                  isAnimating: false,
                 )),
           ),
           const SizedBox(height: 8),
           Text(
-            feedbackMentor,
+            mentorFeedback,
             textAlign: TextAlign.center,
-            style: const TextStyle(color: Colors.white70, fontSize: 12, fontStyle: FontStyle.italic),
+            style: const TextStyle(
+              color: Colors.white70, 
+              fontSize: 12, 
+              fontStyle: FontStyle.italic
+            ),
           ),
         ],
       ),
@@ -54,17 +58,17 @@ class TermometroFeedback extends StatelessWidget {
   }
 }
 
-class _IconeGradual extends StatelessWidget {
+class _GradualIcon extends StatelessWidget {
   final IconData icon;
-  final double percentual; // 0.0 a 1.0
-  final Color cor;
-  final bool animar;
+  final double percentage; // 0.0 a 1.0
+  final Color color;
+  final bool isAnimating;
 
-  const _IconeGradual({
+  const _GradualIcon({
     required this.icon,
-    required this.percentual,
-    required this.cor,
-    this.animar = false,
+    required this.percentage,
+    required this.color,
+    this.isAnimating = false,
   });
 
   @override
@@ -76,14 +80,14 @@ class _IconeGradual extends StatelessWidget {
           return LinearGradient(
             begin: Alignment.bottomCenter,
             end: Alignment.topCenter,
-            stops: [percentual, percentual],
-            colors: [cor, Colors.white10], // Cor de preenchimento e cor de fundo (vazio)
+            stops: [percentage, percentage],
+            colors: [color, Colors.white10], // Cor preenchida e cor vazia
           ).createShader(rect);
         },
         child: Icon(
           icon,
           size: 30,
-          color: Colors.white, // O ShaderMask vai substituir essa cor
+          color: Colors.white, // O ShaderMask aplica a cor por cima
         ),
       ),
     );

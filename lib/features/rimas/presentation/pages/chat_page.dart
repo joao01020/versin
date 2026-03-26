@@ -4,14 +4,14 @@ import 'package:supabase_flutter/supabase_flutter.dart'; // Import necessário p
 import 'package:versin/features/rimas/presentation/widgets/chat_welcome_card.dart';
 import 'package:versin/features/rimas/presentation/widgets/versin_drawer.dart';
 import 'package:versin/features/rimas/presentation/widgets/ai_suggestion/ai_suggestion_balloon.dart';
-import 'package:versin/features/rimas/presentation/controller/rimas_controller.dart';
+import 'package:versin/features/rimas/presentation/controller/rhymes_controller.dart';
 import 'package:versin/features/rimas/presentation/widgets/thermometer_gamification/thermometer_widget.dart';
 import 'package:versin/features/rimas/presentation/widgets/chat_input_area.dart';
 import 'package:versin/features/rimas/presentation/widgets/chat_message_bubble.dart';
 import 'package:versin/features/rimas/presentation/utils/command_handler.dart'; 
 
 // Importações dos novos componentes modulares
-import 'package:versin/features/rimas/presentation/pages/components/modosterminal/chat_header.dart';
+import 'package:versin/features/rimas/presentation/pages/components/terminal_mode/chat_header.dart';
 import 'package:versin/features/rimas/presentation/pages/components/chat_list_view.dart';
 import 'package:versin/features/rimas/presentation/pages/components/chat_command_overlay/chat_command_overlay.dart';
 import 'package:versin/features/rimas/presentation/pages/components/chat_bottom_bar.dart';
@@ -32,7 +32,7 @@ class ChatPage extends StatefulWidget {
 
 class _ChatPageState extends State<ChatPage> {
   final _messageController = TextEditingController();
-  final RimasController _rimasController = RimasController();
+  final RhymesController _rhymesController = RhymesController();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final ScrollController _scrollController = ScrollController();
   
@@ -50,8 +50,8 @@ class _ChatPageState extends State<ChatPage> {
   bool _showCommandMenu = false;
 
   bool _isRhymeMode = false;
-  bool _isComporMode = false;
-  bool _isListarMode = false;
+  bool _isComposeMode = false;
+  bool _isListMode = false;
   bool _isMarketingMode = false;
   int _currentSuggestionIndex = 0;
 
@@ -63,20 +63,20 @@ class _ChatPageState extends State<ChatPage> {
     super.initState();
     
     _commandHandler = CommandHandler(
-      rimasController: _rimasController,
+      rhymesController: _rhymesController,
       onSystemMessage: _addSystemMessage,
       onClearChat: () => setState(() => messages.clear()),
-      onUpdateModes: ({rhyme, compor, listar, marketing}) {
+      onUpdateModes: ({rhyme, compose, list, marketing}) {
         setState(() {
           if (rhyme != null) _isRhymeMode = rhyme;
-          if (compor != null) _isComporMode = compor;
-          if (listar != null) _isListarMode = listar;
+          if (compose != null) _isComposeMode = compose;
+          if (list != null) _isListMode = list;
           if (marketing != null) _isMarketingMode = marketing;
         });
       },
     );
 
-    _rimasController.atualizarGamificacao(0);
+    _rhymesController.updateGamification(0);
     _setupMessageListener();
     
     // Verificação de sessão existente e escuta de eventos
@@ -87,7 +87,7 @@ class _ChatPageState extends State<ChatPage> {
     ChatInitializer.run(
       mounted: mounted,
       onLoadingStatusChanged: (status) => setState(() => _isInitializing = status),
-      onStartWelcomeFlow: _iniciarFluxoBemVindo,
+      onStartWelcomeFlow: _startWelcomeFlow,
     );
 
     // DISPARO DO TIMER INTELIGENTE (35 Segundos)
@@ -135,7 +135,7 @@ class _ChatPageState extends State<ChatPage> {
             const SizedBox(height: 20),
             TextField(
               style: const TextStyle(color: Colors.white),
-              decoration: InputDecoration(labelText: "Username", labelStyle: const TextStyle(color: Colors.purpleAccent), filled: true, fillColor: Colors.white10, border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none)),
+              decoration: InputDecoration(labelText: "Usuário", labelStyle: const TextStyle(color: Colors.purpleAccent), filled: true, fillColor: Colors.white10, border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none)),
             ),
             const SizedBox(height: 12),
             TextField(
@@ -168,7 +168,7 @@ class _ChatPageState extends State<ChatPage> {
     });
   }
 
-  void _iniciarFluxoBemVindo() {
+  void _startWelcomeFlow() {
     ChatInitializer.welcomeFlow(
       mounted: mounted,
       messages: messages,
@@ -185,22 +185,22 @@ class _ChatPageState extends State<ChatPage> {
       if (text.isNotEmpty && text.endsWith(" ")) {
         final words = text.trim().split(" ");
         if (words.isNotEmpty && words.last.length > 2) {
-          _rimasController.buscarSugestao(words.last);
+          _rhymesController.searchSuggestion(words.last);
         }
       }
-      _rimasController.onTextChanged(text);
+      _rhymesController.onTextChanged(text);
     });
   }
 
   Color _getActiveColor() {
     if (_isRhymeMode) return Colors.greenAccent;
-    if (_isComporMode) return Colors.blueAccent;
-    if (_isListarMode) return Colors.orangeAccent;
+    if (_isComposeMode) return Colors.blueAccent;
+    if (_isListMode) return Colors.orangeAccent;
     if (_isMarketingMode) return Colors.yellowAccent;
     return Colors.purpleAccent;
   }
 
-  void _favoritarUltimaResposta() async {
+  void _favoriteLastResponse() async {
     if (messages.length >= 2) {
       final lastUserQuery = messages[messages.length - 2]['content'] ?? "";
       final lastAiResponse = messages.last['content'] ?? "";
@@ -215,7 +215,7 @@ class _ChatPageState extends State<ChatPage> {
     if (text.isEmpty) return;
 
     if (text == "/fav") {
-      _favoritarUltimaResposta();
+      _favoriteLastResponse();
       _messageController.clear();
       return;
     }
@@ -229,12 +229,12 @@ class _ChatPageState extends State<ChatPage> {
     setState(() {
       messages.add({"role": "user", "content": text});
       _messageController.clear();
-      _rimasController.limparSugestao();
+      _rhymesController.clearSuggestions();
       _isAiTyping = true;
     });
     _scrollToBottom();
 
-    final aiResponse = await _rimasController.fetchAiResponse(text);
+    final aiResponse = await _rhymesController.fetchAiResponse(text);
 
     if (mounted) {
       setState(() { _isAiTyping = false; messages.add(aiResponse); });
@@ -266,16 +266,16 @@ class _ChatPageState extends State<ChatPage> {
       key: _scaffoldKey,
       backgroundColor: const Color(0xFF0F0F0F),
       drawer: VersinDrawer(
-        rimasController: _rimasController, 
+        rhymesController: _rhymesController, 
         onNewChat: () {
           setState(() { 
             messages.clear(); 
-            _isRhymeMode = false; _isComporMode = false; 
-            _isListarMode = false; _isMarketingMode = false;
+            _isRhymeMode = false; _isComposeMode = false; 
+            _isListMode = false; _isMarketingMode = false;
             _isInitializing = false; 
-            _rimasController.atualizarGamificacao(0);
+            _rhymesController.updateGamification(0);
           });
-          _iniciarFluxoBemVindo();
+          _startWelcomeFlow();
         }
       ),
       body: Stack(
@@ -284,10 +284,10 @@ class _ChatPageState extends State<ChatPage> {
             top: 50, left: 0, right: 0,
             child: ChatHeader(
               activeColor: activeColor,
-              rimasController: _rimasController,
+              rhymesController: _rhymesController, // Corrigido para rhymesController
               isRhymeMode: _isRhymeMode,
-              isComporMode: _isComporMode,
-              isListarMode: _isListarMode,
+              isComposeMode: _isComposeMode,
+              isListMode: _isListMode,
               isMarketingMode: _isMarketingMode,
             ),
           ),
@@ -322,7 +322,7 @@ class _ChatPageState extends State<ChatPage> {
                 ),
                 ChatBottomBar(
                   messageController: _messageController,
-                  rimasController: _rimasController,
+                  rhymesController: _rhymesController, // Corrigido para rhymesController
                   activeColor: activeColor,
                   isRhymeMode: _isRhymeMode,
                   onSend: _sendMessage,
@@ -342,7 +342,7 @@ class _ChatPageState extends State<ChatPage> {
     _authSubscription?.cancel();
     _authModalTimer?.cancel();
     _messageController.dispose(); 
-    _rimasController.dispose(); 
+    _rhymesController.dispose(); 
     _scrollController.dispose();
     super.dispose();
   }

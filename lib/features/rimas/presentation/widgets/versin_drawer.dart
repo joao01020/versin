@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:versin/features/rimas/presentation/controller/rimas_controller.dart';
-import 'package:versin/features/rimas/presentation/pages/drawer/vocabulario_page.dart';
+import 'package:versin/features/rimas/presentation/controller/rhymes_controller.dart';
+import 'package:versin/features/rimas/presentation/pages/drawer/pagevocabulary.dart'; // Nome do arquivo sincronizado
 import 'package:versin/features/rimas/presentation/pages/drawer/settings/settings_page.dart';
 import 'package:versin/features/rimas/presentation/pages/drawer/how_to_use_page.dart'; // Importação atualizada
 
 class VersinDrawer extends StatelessWidget {
   final VoidCallback onNewChat;
-  final RimasController rimasController;
+  final RhymesController rhymesController;
 
   const VersinDrawer({
     super.key,
     required this.onNewChat,
-    required this.rimasController,
+    required this.rhymesController,
   });
 
   @override
@@ -109,7 +109,7 @@ class VersinDrawer extends StatelessWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => VocabularioPage(controller: rimasController),
+                  builder: (context) => VocabularioPage(controller: rhymesController),
                 ),
               );
             },
@@ -124,7 +124,7 @@ class VersinDrawer extends StatelessWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => SettingsPage(controller: rimasController),
+                  builder: (context) => SettingsPage(controller: rhymesController),
                 ),
               );
             },

@@ -1,22 +1,21 @@
 import 'package:flutter/material.dart';
-import 'package:versin/features/rimas/presentation/controller/rimas_controller.dart';
-// Importes corrigidos
+import 'package:versin/features/rimas/presentation/controller/rhymes_controller.dart';
 import 'package:versin/features/rimas/presentation/widgets/ai_suggestion/ai_suggestion_balloon.dart';
 import 'package:versin/features/rimas/presentation/widgets/chat_input_area.dart';
 
 class ChatBottomBar extends StatelessWidget {
   final TextEditingController messageController;
-  final RimasController rimasController;
+  final RhymesController rhymesController;
   final Color activeColor;
   final bool isRhymeMode;
   final VoidCallback onSend;
   final int currentSuggestionIndex;
-  final Function(int) onUpdateSuggestionIndex; // Nome corrigido aqui
+  final Function(int) onUpdateSuggestionIndex;
 
   const ChatBottomBar({
     super.key,
     required this.messageController,
-    required this.rimasController,
+    required this.rhymesController,
     required this.activeColor,
     required this.isRhymeMode,
     required this.onSend,
@@ -43,27 +42,35 @@ class ChatBottomBar extends StatelessWidget {
 
   Widget _buildSuggestionBalloon() {
     return ListenableBuilder(
-      listenable: rimasController,
+      listenable: rhymesController,
       builder: (context, _) {
-        final rimas = rimasController.listaSugestoes;
+        // Sincronizado com: List<String> get suggestionsList
+        final rimas = rhymesController.suggestionsList; 
         if (rimas.isEmpty) return const SizedBox.shrink();
 
+        // Garante que o índice não estoure a lista se ela diminuir
+        final safeIndex = currentSuggestionIndex >= rimas.length ? 0 : currentSuggestionIndex;
+
         return AiSuggestionBalloon(
-          suggestion: rimas[currentSuggestionIndex],
-          isLoading: rimasController.carregando,
+          suggestion: rimas[safeIndex],
+          isLoading: rhymesController.isLoading, // Sincronizado com: bool get isLoading
           onTap: () {
             messageController.text =
-                "${messageController.text} ${rimas[currentSuggestionIndex]} "
+                "${messageController.text} ${rimas[safeIndex]} "
                     .trimLeft();
             messageController.selection = TextSelection.fromPosition(
               TextPosition(offset: messageController.text.length),
             );
-            rimasController.registrarRimaUsada(rimas[currentSuggestionIndex]);
+            // Sincronizado com: void registerUsedRhyme(String rhyme)
+            rhymesController.registerUsedRhyme(rimas[safeIndex]);
           },
           onNext: rimas.length > 1
-              ? () => onUpdateSuggestionIndex((currentSuggestionIndex + 1) % rimas.length)
+              ? () {
+                  final nextIndex = (safeIndex + 1) % rimas.length;
+                  onUpdateSuggestionIndex(nextIndex); // Removido toInt() pois length é int
+                }
               : null,
-          onDismiss: () => rimasController.limparSugestao(),
+          onDismiss: () => rhymesController.clearSuggestions(), // Sincronizado com: void clearSuggestions()
         );
       },
     );

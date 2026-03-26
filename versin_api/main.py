@@ -34,16 +34,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Sincronizado com RhymesController.dart (onTextChanged)
 class RequestData(BaseModel):
-    texto_usuario: str
-    lista_rimas: List[str]
-    api_key_privada: Optional[str] = None
+    user_text: str
+    rhyme_list: List[str]
+    private_api_key: Optional[str] = None
+    style_config: Optional[Dict] = {}
 
+# Sincronizado com RhymesController.dart (fetchAiResponse)
 class ChatRequest(BaseModel):
     user_id: Optional[str] = "default_user"
     message: str
-    lista_atual: Optional[List[str]] = []
-    api_key_privada: Optional[str] = None
+    current_list: Optional[List[str]] = []
+    private_api_key: Optional[str] = None
+    style_config: Optional[Dict] = {}
 
 def get_groq_client(user_key: Optional[str]):
     if user_key and user_key.strip():
@@ -116,21 +120,22 @@ def definir_comportamento(mensagem: str, lista_rimas: List[str]) -> str:
             
             "5. O VEREDITO DO MENTOR: Se a letra estiver pronta para o estúdio, mande um 'ESSE É O HIT!'. Caso contrário, dê uma nota de 1 a 10 (Nível de Fogo) e aponte o erro fatal."
         )
+
 # --- ROTA DE RIMA (AVALIAÇÃO) ---
 @app.post("/processar")
 async def processar_versin(data: RequestData):
     try:
-        t = data.texto_usuario.strip()
-        if not t or len(t) < 1: # Reduzi para 1 para aceitar buscas rápidas
-            return {"resultado": "NENHUMA", "nivel_impacto": 0, "motivo_feedback": "Aqueça a caneta..."}
+        t = data.user_text.strip()
+        if not t or len(t) < 1:
+            return {"result": "NENHUMA", "impact_level": 0, "feedback_reason": "Aqueça a caneta..."}
 
-        client = get_groq_client(data.api_key_privada)
+        client = get_groq_client(data.private_api_key)
         model_to_use = "llama-3.1-8b-instant" 
         
         system_instructions = (
-            "Você é um motor de busca de rimas. "
-            "Retorne APENAS JSON: {'resultado': 'palavra', 'nivel_impacto': 1_a_6, 'motivo_feedback': '...'}. "
-            f"Contexto: {data.lista_rimas}."
+            "Você é um motor de busca de rimas para Trap/Rap. "
+            "Retorne APENAS JSON: {'result': 'palavra', 'impact_level': 1_a_6, 'feedback_reason': '...'}. "
+            f"Use o vocabulário do artista se possível: {data.rhyme_list}."
         )
 
         completion = client.chat.completions.create(
@@ -146,26 +151,25 @@ async def processar_versin(data: RequestData):
 
         res = json.loads(completion.choices[0].message.content)
         return res
-    except Exception:
-        return {"resultado": "NENHUMA", "nivel_impacto": 1, "motivo_feedback": "Processando..."}
+    except Exception as e:
+        print(f"ERRO PROCESSAR: {e}")
+        return {"result": "NENHUMA", "impact_level": 1, "feedback_reason": "Processando..."}
 
 # --- ROTA DE CHAT (MODOS INTEGRADOS) ---
 @app.post("/chat")
 async def chat_versin(data: ChatRequest):
     try:
-        is_pro = bool(data.api_key_privada and data.api_key_privada.strip())
-        client = get_groq_client(data.api_key_privada)
+        is_pro = bool(data.private_api_key and data.private_api_key.strip())
+        client = get_groq_client(data.private_api_key)
         model_chat = "llama-3.3-70b-versatile" if is_pro else "llama-3.1-8b-instant"
 
-        # Define o comportamento com base na mensagem (Comandos de modo)
-        system_behavior = definir_comportamento(data.message, data.lista_atual)
+        system_behavior = definir_comportamento(data.message, data.current_list)
         
-        # Adiciona a regra universal do JSON
         system_behavior += (
             " Retorne APENAS JSON: {"
             "'content': 'resposta_em_markdown', "
-            "'nivel_impacto': 1_a_6, "
-            "'motivo_feedback': 'feedback_curto_para_o_termometro'"
+            "'impact_level': 1_a_6, "
+            "'feedback_reason': 'feedback_curto_para_o_termometro'"
             "}. Níveis: 1-2 (Ok), 3-4 (Interessante), 5-6 (Master/Marketing-Ouro)."
         )
 
@@ -181,13 +185,13 @@ async def chat_versin(data: ChatRequest):
         return {
             "role": "assistant", 
             "content": res_json.get("content", ""),
-            "nivel_impacto": res_json.get("nivel_impacto", 1),
-            "motivo_feedback": res_json.get("motivo_feedback", "Versin em modo dinâmico.")
+            "impact_level": res_json.get("impact_level", 1),
+            "feedback_reason": res_json.get("feedback_reason", "Versin em modo dinâmico.")
         }
 
     except Exception as e:
         print(f"ERRO CHAT: {str(e)}")
-        return {"role": "assistant", "content": "Erro no cérebro do Versin.", "nivel_impacto": 1, "motivo_feedback": "Erro."}
+        return {"role": "assistant", "content": "Erro no cérebro do Versin.", "impact_level": 1, "feedback_reason": "Erro."}
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

@@ -1,36 +1,37 @@
 import 'package:flutter/material.dart';
-import 'package:versin/features/rimas/presentation/controller/rimas_controller.dart';
+import 'package:versin/features/rimas/presentation/controller/rhymes_controller.dart';
 import 'package:versin/features/rimas/presentation/widgets/thermometer_gamification/thermometer_widget.dart';
 
 class ChatHeader extends StatelessWidget {
   final Color activeColor;
-  final RimasController rimasController;
-  final bool isRhymeMode, isComporMode, isListarMode, isMarketingMode;
+  final RhymesController rhymesController;
+  final bool isRhymeMode, isComposeMode, isListMode, isMarketingMode;
 
   const ChatHeader({
     super.key,
     required this.activeColor,
-    required this.rimasController,
+    required this.rhymesController,
     required this.isRhymeMode,
-    required this.isComporMode,
-    required this.isListarMode,
+    required this.isComposeMode,
+    required this.isListMode,
     required this.isMarketingMode,
   });
 
   @override
   Widget build(BuildContext context) {
-    String modeText = "FREE MODE";
-    if (isRhymeMode) modeText = "RHYME MODE";
-    else if (isComporMode) modeText = "COMPOR MODE";
-    else if (isListarMode) modeText = "LISTAR MODE";
-    else if (isMarketingMode) modeText = "MARKETING MODE";
+    // Texto do modo exibido no cabeçalho (Interface em Português)
+    String modeText = "MODO LIVRE";
+    if (isRhymeMode) modeText = "MODO RIMA";
+    else if (isComposeMode) modeText = "MODO COMPOR";
+    else if (isListMode) modeText = "MODO LISTAR";
+    else if (isMarketingMode) modeText = "MODO MARKETING";
 
     return Column(
       children: [
-        Text(
+        const Text(
           "Versin",
           style: TextStyle(
-            color: activeColor.withOpacity(0.8),
+            color: Colors.white,
             fontSize: 22,
             fontWeight: FontWeight.bold,
             letterSpacing: 2,
@@ -49,11 +50,12 @@ class ChatHeader extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: ListenableBuilder(
-            listenable: rimasController,
-            builder: (context, _) => TermometroFeedback(
-              progressoEstrelas: rimasController.progressoEstrelas,
-              progressoFogos: rimasController.progressoFogos,
-              feedbackMentor: rimasController.feedbackMentor,
+            listenable: rhymesController,
+            builder: (context, _) => ThermometerFeedback(
+              // Variáveis em inglês sincronizadas com o RhymesController e o Widget de Termômetro
+              starProgress: rhymesController.starProgress,
+              fireProgress: rhymesController.fireProgress,
+              mentorFeedback: rhymesController.mentorFeedback,
             ),
           ),
         ),

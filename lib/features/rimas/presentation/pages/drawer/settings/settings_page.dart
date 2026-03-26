@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart'; // Para abrir o AI Studio
-import 'package:versin/features/rimas/presentation/controller/rimas_controller.dart';
+import 'package:versin/features/rimas/presentation/controller/rhymes_controller.dart';
 import 'package:versin/features/rimas/presentation/pages/drawer/ai_memory_page.dart';
 import 'package:versin/features/rimas/presentation/pages/drawer/rhyme_level_page.dart';
 
 class SettingsPage extends StatefulWidget {
-  final RimasController controller; // Passando o controller para salvar a chave
+  final RhymesController controller; // Passando o controller para salvar a chave
   const SettingsPage({super.key, required this.controller});
 
   @override
-  State<SettingsPage> createState() => _SettingsPageState();
+  State<SettingsPage> createState() => PageSettings();
 }
 
-class _SettingsPageState extends State<SettingsPage> {
+class PageSettings extends State<SettingsPage> {
   final _keyController = TextEditingController();
 
   @override
@@ -23,7 +23,7 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   // Função para abrir o link do Google AI Studio
-  Future<void> _abrirGoogleStudio() async {
+  Future<void> _openGoogleStudio() async {
     final Uri url = Uri.parse('https://aistudio.google.com/');
     if (!await launchUrl(url)) {
       throw Exception('Não foi possível abrir o link');
@@ -146,7 +146,7 @@ class _SettingsPageState extends State<SettingsPage> {
           _stepText("3. O Versin não lucra nada com isso, é sua ponte direta com a IA."),
           const SizedBox(height: 10),
           GestureDetector(
-            onTap: _abrirGoogleStudio,
+            onTap: _openGoogleStudio,
             child: const Text("👉 Abrir Google AI Studio", 
               style: TextStyle(color: Colors.blueAccent, fontSize: 12, decoration: TextDecoration.underline)),
           ),

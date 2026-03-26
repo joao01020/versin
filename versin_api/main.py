@@ -9,6 +9,7 @@ from typing import List, Optional, Dict
 from dotenv import load_dotenv
 from groq import Groq
 from datetime import datetime
+from functools import lru_cache
 
 load_dotenv()
 
@@ -56,104 +57,95 @@ def get_groq_client(user_key: Optional[str]):
         return Groq(api_key=user_key)
     return client_groq_default
 
+# --- SISTEMA DE CACHE INTELIGENTE ---
+@lru_cache(maxsize=2048)
+def buscar_rima_na_ia_cached(texto_usuario, rimas_str, api_key_hash):
+    """
+    api_key_hash serve para diferenciar o cache entre usuários PRO e FREE
+    sem expor a chave real na assinatura da função de cache.
+    """
+    client = get_groq_client(GROQ_API_KEY if api_key_hash == "DEFAULT" else api_key_hash)
+    
+    system_instructions = (
+        "Você é um motor de busca de rimas e crítico de métrica para Trap/Rap. "
+        "Retorne APENAS JSON: {"
+        "'result': ['rima1', 'rima2', 'rima3'], "
+        "'impact_level': 1_a_6, "
+        "'feedback_reason': 'comentário_curto_técnico_e_ácido'"
+        "}. "
+        f"No feedback_reason, seja dinâmico. Base de rimas: {rimas_str}."
+    )
+
+    completion = client.chat.completions.create(
+        model="llama-3.1-8b-instant", 
+        messages=[
+            {"role": "system", "content": system_instructions},
+            {"role": "user", "content": f"Texto atual: '{texto_usuario}'"}
+        ],
+        temperature=0.3,
+        response_format={"type": "json_object"},
+        max_tokens=150
+    )
+    return completion.choices[0].message.content
+
 # --- LÓGICA DE MODOS DINÂMICOS ---
 def definir_comportamento(mensagem: str, lista_rimas: List[str]) -> str:
     msg = mensagem.lower()
     
-    # MODO RIMA
     if "/modorima" in msg:
         return (
-            "Você está no MODO RIMA. Seu único objetivo é encontrar rimas perfeitas, multissilábicas e raras. "
-            f"Base de rimas do artista: {lista_rimas}. "
-            "Sempre que o usuário mandar uma palavra ou frase, retorne uma lista formatada de rimas. "
-            "Seja técnico sobre a terminação das palavras (ex: rimas agudas, graves). "
-            "Incentive o uso do botão '+' para salvar."
+            "MODO RIMA ATIVO. Objetivo: Rimas raras e multissilábicas. "
+            f"Biblioteca do artista: {lista_rimas}. "
+            "Feedback: Analise a sonoridade técnica. Incentive o save no '+'."
         )
-    
-    # MODO COMPOR
     elif "/modocompor" in msg:
         return (
-            "Você está no MODO COMPOR. Foque 100% na estrutura da letra (Verso, Refrão, Bridge). "
-            "Analise a métrica (contagem de sílabas poéticas) e o flow. "
-            "Sugira variações de cadência e ajude a organizar a história da letra. "
-            "Seja um mestre da escrita criativa e técnica."
+            "MODO COMPOR ATIVO. Foco: Estrutura, métrica e flow. "
+            "Feedback: Diga se o verso está pesado ou se atropela o compasso."
         )
-    
-    # MODO LISTAR
     elif "/modolistar" in msg:
         return (
-            "Você está no MODO LISTAR. Organize o vocabulário do artista. "
-            f"Lista atual: {lista_rimas}. "
-            "Separe as rimas por 'Prioridade Máxima' (as mais complexas) e 'Lista Total'. "
-            "Dê sugestões de como combinar palavras dessa lista para criar punchlines."
+            "MODO LISTAR ATIVO. Foco: Curadoria de vocabulário. "
+            f"Lista atual: {lista_rimas}. Feedback: Destaque a rima mais 'cara'."
         )
-    
-    # MODO MARKETING
     elif "/modomarketing" in msg:
         return (
-            "Você é a Especialista em Marketing para Artistas Independentes. "
-            "Foque em: retenção de ouvintes, algoritmos do Spotify/TikTok e branding visual. "
-            "Dê estratégias GRÁTIS (trends, networking, Reels) e PAGAS (Tráfego pago, editais). "
-            "Seja estratégica, direta e mostre como converter seguidor em fã real."
+            "MODO MARKETING ATIVO. Foco: Viralização e Branding. "
+            "Feedback: Avalie o potencial de 'trend' do verso para TikTok/Reels."
         )
-    
-    # MODO PADRÃO (MENTOR SINCERO, TÉCNICO E DETALHISTA)
     else:
         return (
-            "Você é o Versin, Mentor de Elite de Trap, Rap e Funk, e Engenheiro de Mixagem experiente. "
-            "Sua missão é transformar rascunhos em hits de impacto profissional através de uma mentoria sincera e detalhista.\n\n"
-            
-            "REGRAS DE REPERTÓRIO ({lista_rimas}):\n"
-            "1. Se a {lista_rimas} estiver VAZIA: Avise que a biblioteca está limpa e peça permissão para sugerir rimas novas.\n"
-            "2. Se a {lista_rimas} tiver conteúdo: Selecione APENAS as 3 rimas que melhor se encaixam no contexto da letra atual. Nunca envie a lista completa para não poluir o chat.\n"
-            "3. Mix de Sugestões: Se o artista permitir rimas novas, envie no máximo: [3 rimas da lista dele + 3 rimas inéditas do Versin].\n"
-            "4. Respeite a decisão: Se ele quiser manter apenas as dele, não sugira nada de fora. Se ele quiser apenas novas, ignore a lista salva.\n\n"
-
-            "DIRETRIZES DE ORIENTAÇÃO PARA FINALIZAÇÃO:\n"
-            "1. ANÁLISE DE IMPACTO E CLICHÊS: Identifique rimas óbvias e sugira 'Rimas Ricas' ou 'Internas'. Explique por que a troca deixa o verso mais 'caro'.\n\n"
-            
-            "2. CADÊNCIA E MÉTRICA: Analise se os versos cabem no compasso 4/4. Sugira cortes de conectivos (que, e, então) para o flow não atropelar e o silêncio criar o groove.\n\n"
-            
-            "3. ESTRUTURA DA MÚSICA: Verifique se falta Intro, Ponte ou Refrão. No refrão, priorize rimas com vogais abertas (A, O) para maior impacto sonoro.\n\n"
-            
-            "4. ENGENHARIA FL STUDIO (SIMPLICIDADE): Explique mixagem com analogias reais. Ex: 'O Reverb é como cantar no banheiro: dá espaço, mas se exagerar, vira uma bagunça de eco'.\n\n"
-            
-            "5. O VEREDITO DO MENTOR: Se a letra estiver pronta para o estúdio, mande um 'ESSE É O HIT!'. Caso contrário, dê uma nota de 1 a 10 (Nível de Fogo) e aponte o erro fatal."
+            "Você é o Versin, Mentor de Elite. Seja sincero, técnico e detalhista.\n"
+            f"Use a biblioteca {lista_rimas} como base.\n"
+            "Analise impacto, clichês e flow (compasso 4/4). Use analogias de FL Studio."
         )
 
-# --- ROTA DE RIMA (AVALIAÇÃO) ---
+# --- ROTA DE RIMA (AVALIAÇÃO COM CACHE) ---
 @app.post("/processar")
 async def processar_versin(data: RequestData):
     try:
-        t = data.user_text.strip()
+        t = data.user_text.strip().lower()
         if not t or len(t) < 1:
-            return {"result": "NENHUMA", "impact_level": 0, "feedback_reason": "Aqueça a caneta..."}
+            return {"result": [], "impact_level": 0, "feedback_reason": "Aguardando escrita..."}
 
-        client = get_groq_client(data.private_api_key)
-        model_to_use = "llama-3.1-8b-instant" 
+        # Identificador de cache para não misturar chaves privadas
+        key_id = data.private_api_key if data.private_api_key else "DEFAULT"
+        rimas_str = ",".join(data.rhyme_list) if data.rhyme_list else ""
         
-        system_instructions = (
-            "Você é um motor de busca de rimas para Trap/Rap. "
-            "Retorne APENAS JSON: {'result': 'palavra', 'impact_level': 1_a_6, 'feedback_reason': '...'}. "
-            f"Use o vocabulário do artista se possível: {data.rhyme_list}."
-        )
-
-        completion = client.chat.completions.create(
-            model=model_to_use, 
-            messages=[
-                {"role": "system", "content": system_instructions},
-                {"role": "user", "content": f"Busque rima para: '{t}'"}
-            ],
-            temperature=0.2,
-            response_format={"type": "json_object"},
-            max_tokens=150
-        )
-
-        res = json.loads(completion.choices[0].message.content)
+        # Busca no Cache ou na IA
+        conteudo_ia = buscar_rima_na_ia_cached(t, rimas_str, key_id)
+        res = json.loads(conteudo_ia)
+        
+        # Garantia de lista para o Flutter
+        if isinstance(res.get('result'), str):
+            res['result'] = [res['result']]
+        elif res.get('result') is None:
+            res['result'] = []
+            
         return res
     except Exception as e:
-        print(f"ERRO PROCESSAR: {e}")
-        return {"result": "NENHUMA", "impact_level": 1, "feedback_reason": "Processando..."}
+        print(f"ERRO NO PROCESSAMENTO: {e}")
+        return {"result": [], "impact_level": 1, "feedback_reason": "Sintonizando..."}
 
 # --- ROTA DE CHAT (MODOS INTEGRADOS) ---
 @app.post("/chat")
@@ -164,13 +156,12 @@ async def chat_versin(data: ChatRequest):
         model_chat = "llama-3.3-70b-versatile" if is_pro else "llama-3.1-8b-instant"
 
         system_behavior = definir_comportamento(data.message, data.current_list)
-        
         system_behavior += (
             " Retorne APENAS JSON: {"
             "'content': 'resposta_em_markdown', "
             "'impact_level': 1_a_6, "
-            "'feedback_reason': 'feedback_curto_para_o_termometro'"
-            "}. Níveis: 1-2 (Ok), 3-4 (Interessante), 5-6 (Master/Marketing-Ouro)."
+            "'feedback_reason': 'comentário_curto_termômetro'"
+            "}. Níveis: 1-2 (Ok), 3-4 (Bom), 5-6 (Hit/Ouro)."
         )
 
         completion = client.chat.completions.create(
@@ -186,12 +177,13 @@ async def chat_versin(data: ChatRequest):
             "role": "assistant", 
             "content": res_json.get("content", ""),
             "impact_level": res_json.get("impact_level", 1),
-            "feedback_reason": res_json.get("feedback_reason", "Versin em modo dinâmico.")
+            "feedback_reason": res_json.get("feedback_reason", "Análise Versin.")
         }
 
     except Exception as e:
-        print(f"ERRO CHAT: {str(e)}")
-        return {"role": "assistant", "content": "Erro no cérebro do Versin.", "impact_level": 1, "feedback_reason": "Erro."}
+        print(f"ERRO NO CHAT: {str(e)}")
+        return {"role": "assistant", "content": "Erro na conexão cerebral.", "impact_level": 1, "feedback_reason": "Erro."}
 
 if __name__ == "__main__":
+    # Rodar com uvicorn localmente (para produção use gunicorn)
     uvicorn.run(app, host="0.0.0.0", port=8000)

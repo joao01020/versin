@@ -9,6 +9,7 @@ import 'package:versin/core/models/rhyme_model.dart';
 class RhymesController extends ChangeNotifier {
   Timer? _debounce;
   final String _baseUrl = "https://versin.onrender.com"; 
+  final _supabase = Supabase.instance.client;
 
   // --- ESTADO DO CHAT E SUGESTÕES ---
   List<String> _suggestionsList = [];
@@ -41,11 +42,8 @@ class RhymesController extends ChangeNotifier {
   String? _userApiKey = "VERSIN-PRO-TRIAL-2026-FREE"; 
   String? get userApiKey => _userApiKey; 
 
-  List<Rhyme> vocabulary = [
-    Rhyme(word: "plano", isPriority: true),
-    Rhyme(word: "insano"),
-    Rhyme(word: "mano", isPriority: true),
-  ];
+  // Inicia vazio para o Onboarding dinâmico
+  List<Rhyme> vocabulary = [];
 
   bool get isProActive => _userApiKey != null && _userApiKey!.isNotEmpty;
 
@@ -77,10 +75,10 @@ class RhymesController extends ChangeNotifier {
 
   // --- SINCRONIZAÇÃO COM SUPABASE ---
   Future<void> carregarDadosUsuario() async {
-    final user = Supabase.instance.client.auth.currentUser;
+    final user = _supabase.auth.currentUser;
     if (user != null) {
       try {
-        final data = await Supabase.instance.client
+        final data = await _supabase
             .from('profiles')
             .select('rimas_usadas')
             .eq('id', user.id)
@@ -97,15 +95,44 @@ class RhymesController extends ChangeNotifier {
   Future<void> _incrementarUso() async {
     _rimasUsadas++;
     notifyListeners();
-    final user = Supabase.instance.client.auth.currentUser;
+    final user = _supabase.auth.currentUser;
     if (user != null) {
-      await Supabase.instance.client
+      await _supabase
           .from('profiles')
           .update({'rimas_usadas': _rimasUsadas})
           .eq('id', user.id);
     }
   }
 
+  // NOVO: Busca as rimas em alta no ranking global para o Onboarding (Ponto 1)
+  Future<List<Map<String, dynamic>>> fetchTrendingWords() async {
+    try {
+      final response = await _supabase
+          .from('global_word_ranking')
+          .select('word, score')
+          .order('score', ascending: false)
+          .limit(6);
+      
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      debugPrint("⚠️ Erro ao buscar trending words: $e");
+      return [];
+    }
+  }
+
+  // NOVO: Incrementa o score de uma rima no ranking global via RPC
+  Future<void> incrementWordScore(String word) async {
+    try {
+      await _supabase.rpc('increment_word_score', params: {
+        'word_param': word.toLowerCase().trim(),
+      });
+      debugPrint("🔥 Score incrementado globalmente para: $word");
+    } catch (e) {
+      debugPrint("❌ Erro ao incrementar score: $e");
+    }
+  }
+
+  // ATUALIZADO: Foca em RECOMENDAR rimas e completar versos em vez de apenas julgar
   void updateGamification(dynamic rawLevel, {String? reason}) {
     int level = 0;
     if (rawLevel is int) {
@@ -119,15 +146,21 @@ class RhymesController extends ChangeNotifier {
       fireProgress = 0.0;
       mentorFeedback = reason ?? "O estúdio está silencioso...";
     } 
-    else if (level >= 1 && level <= 3) {
-      fireProgress = 0.0;
-      starProgress = level.toDouble();
-      mentorFeedback = reason ?? "Analisando métrica e flow...";
-    } 
-    else if (level >= 4) {
-      starProgress = 0.0; 
-      fireProgress = (level - 3).toDouble().clamp(0.0, 3.0);
-      mentorFeedback = reason ?? "Sua linha atingiu o pico de impacto! 🔥";
+    else {
+      if (level >= 1 && level <= 3) {
+        fireProgress = 0.0;
+        starProgress = level.toDouble();
+      } else if (level >= 4) {
+        starProgress = 0.0; 
+        fireProgress = (level - 3).toDouble().clamp(0.0, 3.0);
+      }
+      
+      if (_suggestionsList.isNotEmpty) {
+        String baseSuggestion = _suggestionsList.take(3).join(", ");
+        mentorFeedback = "Pensei em completar com: $baseSuggestion... ou seguir por '$reason'";
+      } else {
+        mentorFeedback = reason ?? "Analisando métrica e flow...";
+      }
     }
     notifyListeners();
   }
@@ -138,11 +171,15 @@ class RhymesController extends ChangeNotifier {
 
     if (t.isEmpty) {
       _suggestionsList = [];
+      mentorFeedback = "O estúdio está silencioso...";
       notifyListeners();
       return;
     }
 
-    int duration = isProActive ? 300 : 700; 
+    mentorFeedback = "...";
+    notifyListeners();
+
+    int duration = isProActive ? 400 : 800; 
 
     _debounce = Timer(Duration(milliseconds: duration), () async {
       _isLoading = true;
@@ -186,6 +223,28 @@ class RhymesController extends ChangeNotifier {
         notifyListeners();
       }
     });
+  }
+
+  Future<String?> addSuggestedRhyme(String word) async {
+    final user = _supabase.auth.currentUser;
+    String p = word.trim().toLowerCase();
+    
+    if (p.isNotEmpty && !vocabulary.any((r) => r.word == p)) {
+      vocabulary.insert(0, Rhyme(word: p, isPriority: false));
+      _suggestionsList.remove(word);
+      notifyListeners();
+
+      if (user != null) {
+        try {
+          await _supabase.from('user_vocabulary').insert({
+            'word': p,
+            'profile_id': user.id,
+          });
+        } catch (e) { debugPrint("Erro ao salvar: $e"); }
+      }
+      return word; 
+    }
+    return null;
   }
 
   void registerUsedRhyme(String rhyme) {

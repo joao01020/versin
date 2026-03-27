@@ -95,7 +95,7 @@ class AiSuggestionBalloon extends StatelessWidget {
                     child: const Icon(Icons.chevron_right, size: 20, color: Colors.black54),
                   ),
 
-                // Botão de Comando (+) - Para sugerir rimas no prompt
+                // Botão de Comando (+) - Só aparece se onAddCommand não for nulo
                 if (onAddCommand != null)
                   GestureDetector(
                     onTap: onAddCommand,

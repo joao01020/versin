@@ -2,12 +2,13 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:supabase_flutter/supabase_flutter.dart'; // Import necessário para o limite de uso
 import 'package:versin/core/models/rhyme_model.dart';
 
 // Controller principal das rimas e lógica de gamificação
 class RhymesController extends ChangeNotifier {
   Timer? _debounce;
-  final String _baseUrl = "http://127.0.0.1:8000";
+  final String _baseUrl = "https://versin.onrender.com"; // Atualizado para o Render
 
   // --- ESTADO DO CHAT E SUGESTÕES ---
   List<String> _suggestionsList = [];
@@ -23,6 +24,12 @@ class RhymesController extends ChangeNotifier {
   double starProgress = 0.0; 
   double fireProgress = 0.0;    
   String mentorFeedback = "Ouvindo sua frequência..."; // Início neutro para a IA assumir
+
+  // --- ESTADO DO LIMITE BETA ---
+  int _rimasUsadas = 0;
+  int _limiteDiario = 20;
+  int get rimasUsadas => _rimasUsadas;
+  bool get temSaldo => _rimasUsadas < _limiteDiario;
 
   // --- CONFIGURAÇÕES DE ESTILO (Sincronizadas com RhymeLevelPage) ---
   String currentGenre = 'Automático';
@@ -74,6 +81,38 @@ class RhymesController extends ChangeNotifier {
     notifyListeners();
   }
 
+  // --- SINCRONIZAÇÃO COM SUPABASE (BETA) ---
+  Future<void> carregarDadosUsuario() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user != null) {
+      try {
+        final data = await Supabase.instance.client
+            .from('profiles')
+            .select('rimas_usadas, limite_diario')
+            .eq('id', user.id)
+            .single();
+        
+        _rimasUsadas = data['rimas_usadas'] ?? 0;
+        _limiteDiario = data['limite_diario'] ?? 20;
+        notifyListeners();
+      } catch (e) {
+        debugPrint("Erro ao carregar perfil: $e");
+      }
+    }
+  }
+
+  Future<void> _incrementarUso() async {
+    _rimasUsadas++;
+    notifyListeners();
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user != null) {
+      await Supabase.instance.client
+          .from('profiles')
+          .update({'rimas_usadas': _rimasUsadas})
+          .eq('id', user.id);
+    }
+  }
+
   // --- LÓGICA DE EVOLUÇÃO (IA ADAPTATIVA) ---
   void updateGamification(dynamic rawLevel, {String? reason}) {
     int level = 0;
@@ -83,7 +122,6 @@ class RhymesController extends ChangeNotifier {
       level = int.tryParse(rawLevel) ?? 0;
     }
 
-    // A IA agora define o mentorFeedback via 'reason' (feedback_reason do backend)
     if (level <= 0) {
       starProgress = 0.0; 
       fireProgress = 0.0;
@@ -116,12 +154,14 @@ class RhymesController extends ChangeNotifier {
     int duration = isProActive ? 300 : 700; 
 
     _debounce = Timer(Duration(milliseconds: duration), () async {
+      if (!temSaldo) return; // Trava silenciosa no onTextChanged
+
       _isLoading = true;
       notifyListeners();
 
       try {
         final response = await http.post(
-          Uri.parse('$_baseUrl/processar'),
+          Uri.parse('$_baseUrl/process'), // Ajustado para a rota correta do Render
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode({
             'user_text': t,
@@ -135,7 +175,7 @@ class RhymesController extends ChangeNotifier {
               'vocal_style': currentVocalStyle,
             }
           }),
-        ).timeout(const Duration(seconds: 4));
+        ).timeout(const Duration(seconds: 30)); // Timeout maior para o Render acordar
 
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
@@ -147,8 +187,8 @@ class RhymesController extends ChangeNotifier {
             _suggestionsList = (res == "NENHUMA" || res.isEmpty) ? [] : [res];
           }
           
-          // Sincroniza a gamificação com o feedback textual dinâmico da IA
           updateGamification(data['impact_level'], reason: data['feedback_reason']);
+          _incrementarUso(); // Registra o uso no Beta
         }
       } catch (e) {
         debugPrint("Erro Versin Processar: $e");
@@ -178,6 +218,8 @@ class RhymesController extends ChangeNotifier {
 
   // --- CHAT COM MENTOR (Feedback pós-resposta) ---
   Future<Map<String, String>> fetchAiResponse(String message) async {
+    if (!temSaldo) return {"role": "assistant", "content": "Limite diário atingido."};
+    
     _isLoading = true;
     notifyListeners();
     try {
@@ -194,12 +236,12 @@ class RhymesController extends ChangeNotifier {
             'subgenre': currentSubGenre,
           }
         }),
-      ).timeout(const Duration(seconds: 15));
+      ).timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        // Atualiza o mentor e o termômetro baseado na última interação do chat
         updateGamification(data['impact_level'], reason: data['feedback_reason']);
+        _incrementarUso(); // Registra o uso no Beta
         return {
           "role": "assistant", 
           "content": data['content'] ?? ""

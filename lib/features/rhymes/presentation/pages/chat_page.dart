@@ -99,6 +99,8 @@ class _ChatPageState extends State<ChatPage> {
     final session = Supabase.instance.client.auth.currentSession;
     if (session != null) {
       _authModalTimer?.cancel();
+      // Sincroniza os limites do banco de dados com o Controller
+      _rhymesController.carregarDadosUsuario();
     }
   }
 
@@ -108,13 +110,22 @@ class _ChatPageState extends State<ChatPage> {
       final event = data.event;
       final session = data.session;
 
+      // ATUALIZAÇÃO: Redirecionamento e limpeza de modais no Login
       if (event == AuthChangeEvent.signedIn && session != null) {
         _authModalTimer?.cancel(); 
+        
+        // Sincroniza o limite de rimas assim que logar
+        _rhymesController.carregarDadosUsuario();
+
         // Remove qualquer modal aberto (AuthModal ou AuthOptionsModal)
-        if (mounted && Navigator.canPop(context)) {
-          Navigator.of(context, rootNavigator: true).pop();
+        if (mounted) {
+           Navigator.of(context, rootNavigator: true).popUntil((route) => route.isFirst);
         }
         _showProfileSetupModal(); // Abre o formulário de Username/Carteira
+      }
+      
+      if (event == AuthChangeEvent.signedOut) {
+        _startAuthTimer(); // Reinicia o timer se o usuário sair
       }
     });
   }
@@ -157,6 +168,7 @@ class _ChatPageState extends State<ChatPage> {
 
   // Lógica modular: Verifica se o usuário está logado antes de exibir
   void _startAuthTimer() {
+    _authModalTimer?.cancel(); // Limpa timer anterior se houver
     _authModalTimer = Timer(const Duration(seconds: 35), () {
       if (!mounted) return;
 
@@ -182,6 +194,8 @@ class _ChatPageState extends State<ChatPage> {
     _messageController.addListener(() {
       final text = _messageController.text;
       setState(() => _showCommandMenu = text.startsWith("/"));
+      
+      // Validação de espaço para sugestão rápida
       if (text.isNotEmpty && text.endsWith(" ")) {
         final words = text.trim().split(" ");
         if (words.isNotEmpty && words.last.length > 2) {
@@ -213,6 +227,13 @@ class _ChatPageState extends State<ChatPage> {
   void _sendMessage() async {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
+
+    // ATUALIZAÇÃO: Verificação de Limite Beta antes de enviar
+    if (!_rhymesController.temSaldo) {
+      _addSystemMessage("🚫 Limite diário atingido (${_rhymesController.rimasUsadas}/20). O Versin Beta reseta suas rimas a cada 24h.");
+      _messageController.clear();
+      return;
+    }
 
     if (text == "/fav") {
       _favoriteLastResponse();
@@ -284,7 +305,7 @@ class _ChatPageState extends State<ChatPage> {
             top: 50, left: 0, right: 0,
             child: ChatHeader(
               activeColor: activeColor,
-              rhymesController: _rhymesController, // Corrigido para rhymesController
+              rhymesController: _rhymesController, 
               isRhymeMode: _isRhymeMode,
               isComposeMode: _isComposeMode,
               isListMode: _isListMode,
@@ -296,6 +317,19 @@ class _ChatPageState extends State<ChatPage> {
             child: IconButton(
               icon: Icon(Icons.menu_rounded, color: activeColor, size: 32),
               onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+            ),
+          ),
+          // ATUALIZAÇÃO: Pequeno indicador de rimas restantes (Feedback do Beta)
+          Positioned(
+            top: 105, right: 20,
+            child: AnimatedBuilder(
+              animation: _rhymesController,
+              builder: (context, _) {
+                return Text(
+                  "BETA: ${20 - _rhymesController.rimasUsadas} rimas",
+                  style: TextStyle(color: activeColor.withOpacity(0.6), fontSize: 10, fontWeight: FontWeight.bold),
+                );
+              }
             ),
           ),
           Positioned.fill(
@@ -322,7 +356,7 @@ class _ChatPageState extends State<ChatPage> {
                 ),
                 ChatBottomBar(
                   messageController: _messageController,
-                  rhymesController: _rhymesController, // Corrigido para rhymesController
+                  rhymesController: _rhymesController, 
                   activeColor: activeColor,
                   isRhymeMode: _isRhymeMode,
                   onSend: _sendMessage,

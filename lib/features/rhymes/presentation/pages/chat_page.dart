@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart'; // Import necessário para verificar sessão
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:versin/features/rhymes/presentation/widgets/chat_welcome_card.dart';
 import 'package:versin/features/rhymes/presentation/widgets/versin_drawer.dart';
 import 'package:versin/features/rhymes/presentation/widgets/ai_suggestion/ai_suggestion_balloon.dart';
@@ -10,17 +10,13 @@ import 'package:versin/features/rhymes/presentation/widgets/chat_input_area.dart
 import 'package:versin/features/rhymes/presentation/widgets/chat_message_bubble.dart';
 import 'package:versin/features/rhymes/presentation/utils/command_handler.dart'; 
 
-// Importações dos novos componentes modulares
 import 'package:versin/features/rhymes/presentation/pages/components/terminal_mode/chat_header.dart';
 import 'package:versin/features/rhymes/presentation/pages/components/chat_list_view.dart';
 import 'package:versin/features/rhymes/presentation/pages/components/chat_command_overlay/chat_command_overlay.dart';
 import 'package:versin/features/rhymes/presentation/pages/components/chat_bottom_bar.dart';
-// Import do novo componente de inicialização
 import 'package:versin/features/rhymes/presentation/pages/components/chat_initializer/chat_initializer.dart';
-// Import Modular do Modal de Autenticação
 import 'package:versin/features/rhymes/presentation/pages/components/auth_modal/auth_modal.dart';
 
-// NOVOS IMPORTS DE STORAGE E USUÁRIO (Caminhos definitivos)
 import 'package:versin/features/rhymes/data/datasources/supabase_storage_service.dart';
 import 'package:versin/features/rhymes/data/datasources/user/user_service.dart';
 
@@ -36,13 +32,12 @@ class _ChatPageState extends State<ChatPage> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final ScrollController _scrollController = ScrollController();
   
-  // Instâncias dos Services de Dados
   final SupabaseStorageService _storageService = SupabaseStorageService();
   final UserService _userService = UserService();
   
   late CommandHandler _commandHandler; 
-  Timer? _authModalTimer; // Timer para o modal modular
-  StreamSubscription<AuthState>? _authSubscription; // Escuta o login em tempo real
+  Timer? _authModalTimer; 
+  StreamSubscription<AuthState>? _authSubscription; 
   
   List<Map<String, String>> messages = [];
   bool _isAiTyping = false; 
@@ -55,7 +50,6 @@ class _ChatPageState extends State<ChatPage> {
   bool _isMarketingMode = false;
   int _currentSuggestionIndex = 0;
 
-  // Nome do usuário logado (ex: joao01020)
   final String _currentUsername = "joao01020"; 
 
   @override
@@ -78,59 +72,47 @@ class _ChatPageState extends State<ChatPage> {
 
     _rhymesController.updateGamification(0);
     _setupMessageListener();
-    
-    // Verificação de sessão existente e escuta de eventos
     _checkInitialSession();
     _setupAuthListener(); 
     
-    // CHAMADA DA INICIALIZAÇÃO EXTERNA
     ChatInitializer.run(
       mounted: mounted,
       onLoadingStatusChanged: (status) => setState(() => _isInitializing = status),
       onStartWelcomeFlow: _startWelcomeFlow,
     );
 
-    // DISPARO DO TIMER INTELIGENTE (35 Segundos)
     _startAuthTimer();
   }
 
-  // Verifica se já existe um usuário logado ao abrir a página
   void _checkInitialSession() {
     final session = Supabase.instance.client.auth.currentSession;
     if (session != null) {
       _authModalTimer?.cancel();
-      // Sincroniza os limites do banco de dados com o Controller
       _rhymesController.carregarDadosUsuario();
     }
   }
 
-  // Escuta mudanças de autenticação (Deep Link do e-mail)
   void _setupAuthListener() {
     _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((data) {
       final event = data.event;
       final session = data.session;
 
-      // ATUALIZAÇÃO: Redirecionamento e limpeza de modais no Login
       if (event == AuthChangeEvent.signedIn && session != null) {
         _authModalTimer?.cancel(); 
-        
-        // Sincroniza o limite de rimas assim que logar
         _rhymesController.carregarDadosUsuario();
 
-        // Remove qualquer modal aberto (AuthModal ou AuthOptionsModal)
         if (mounted) {
            Navigator.of(context, rootNavigator: true).popUntil((route) => route.isFirst);
         }
-        _showProfileSetupModal(); // Abre o formulário de Username/Carteira
+        _showProfileSetupModal(); 
       }
       
       if (event == AuthChangeEvent.signedOut) {
-        _startAuthTimer(); // Reinicia o timer se o usuário sair
+        _startAuthTimer(); 
       }
     });
   }
 
-  // Modal automático para novos usuários autenticados via Magic Link
   void _showProfileSetupModal() {
     showDialog(
       context: context,
@@ -166,14 +148,11 @@ class _ChatPageState extends State<ChatPage> {
     );
   }
 
-  // Lógica modular: Verifica se o usuário está logado antes de exibir
   void _startAuthTimer() {
-    _authModalTimer?.cancel(); // Limpa timer anterior se houver
+    _authModalTimer?.cancel(); 
     _authModalTimer = Timer(const Duration(seconds: 35), () {
       if (!mounted) return;
-
       final currentUser = Supabase.instance.client.auth.currentUser;
-      
       if (currentUser == null) {
         AuthModal.show(context);
       }
@@ -195,7 +174,6 @@ class _ChatPageState extends State<ChatPage> {
       final text = _messageController.text;
       setState(() => _showCommandMenu = text.startsWith("/"));
       
-      // Validação de espaço para sugestão rápida
       if (text.isNotEmpty && text.endsWith(" ")) {
         final words = text.trim().split(" ");
         if (words.isNotEmpty && words.last.length > 2) {
@@ -227,13 +205,6 @@ class _ChatPageState extends State<ChatPage> {
   void _sendMessage() async {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
-
-    // ATUALIZAÇÃO: Verificação de Limite Beta antes de enviar
-    if (!_rhymesController.temSaldo) {
-      _addSystemMessage("🚫 Limite diário atingido (${_rhymesController.rimasUsadas}/20). O Versin Beta reseta suas rimas a cada 24h.");
-      _messageController.clear();
-      return;
-    }
 
     if (text == "/fav") {
       _favoriteLastResponse();
@@ -317,19 +288,6 @@ class _ChatPageState extends State<ChatPage> {
             child: IconButton(
               icon: Icon(Icons.menu_rounded, color: activeColor, size: 32),
               onPressed: () => _scaffoldKey.currentState?.openDrawer(),
-            ),
-          ),
-          // ATUALIZAÇÃO: Pequeno indicador de rimas restantes (Feedback do Beta)
-          Positioned(
-            top: 105, right: 20,
-            child: AnimatedBuilder(
-              animation: _rhymesController,
-              builder: (context, _) {
-                return Text(
-                  "BETA: ${20 - _rhymesController.rimasUsadas} rimas",
-                  style: TextStyle(color: activeColor.withOpacity(0.6), fontSize: 10, fontWeight: FontWeight.bold),
-                );
-              }
             ),
           ),
           Positioned.fill(

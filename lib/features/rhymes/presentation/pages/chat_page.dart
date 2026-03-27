@@ -20,6 +20,10 @@ import 'package:versin/features/rhymes/presentation/pages/components/auth_modal/
 import 'package:versin/features/rhymes/data/datasources/supabase_storage_service.dart';
 import 'package:versin/features/rhymes/data/datasources/user/user_service.dart';
 
+// Importações dos novos componentes de responsabilidade
+import 'package:versin/features/rhymes/presentation/pages/components/timeline/versin_timeline.dart';
+import 'package:versin/features/rhymes/data/datasources/utils/hash_helper.dart';
+
 class ChatPage extends StatefulWidget {
   const ChatPage({super.key});
   @override
@@ -39,7 +43,7 @@ class _ChatPageState extends State<ChatPage> {
   Timer? _authModalTimer; 
   StreamSubscription<AuthState>? _authSubscription; 
   
-  List<Map<String, String>> messages = [];
+  List<Map<String, dynamic>> messages = [];
   bool _isAiTyping = false; 
   bool _isInitializing = true; 
   bool _showCommandMenu = false;
@@ -50,7 +54,14 @@ class _ChatPageState extends State<ChatPage> {
   bool _isMarketingMode = false;
   int _currentSuggestionIndex = 0;
 
-  final String _currentUsername = "joao01020"; 
+  // LÓGICA DE PROGRESSÃO REAL VERSIN
+  int _currentStep = 1; 
+  double _stepProgress = 0.0;
+  final String _currentUsername = "joao01020";
+  final String _userWallet = "0x7a...versin"; // Exemplo vindo do perfil
+
+  // NOVO: Lista para armazenar as palavras reais do banco
+  List<Map<String, dynamic>> _trendingWords = [];
 
   @override
   void initState() {
@@ -75,13 +86,26 @@ class _ChatPageState extends State<ChatPage> {
     _checkInitialSession();
     _setupAuthListener(); 
     
-    ChatInitializer.run(
-      mounted: mounted,
-      onLoadingStatusChanged: (status) => setState(() => _isInitializing = status),
-      onStartWelcomeFlow: _startWelcomeFlow,
-    );
+    // NOVO: Carregar dados reais antes de liberar o initializer
+    _loadInitialData();
 
     _startAuthTimer();
+  }
+
+  // NOVO: Busca dados reais para o Ponto 1 do ranking global
+  Future<void> _loadInitialData() async {
+    final words = await _rhymesController.fetchTrendingWords();
+    if (mounted) {
+      setState(() {
+        _trendingWords = words;
+      });
+      
+      ChatInitializer.run(
+        mounted: mounted,
+        onLoadingStatusChanged: (status) => setState(() => _isInitializing = status),
+        onStartWelcomeFlow: _startWelcomeFlow,
+      );
+    }
   }
 
   void _checkInitialSession() {
@@ -124,17 +148,7 @@ class _ChatPageState extends State<ChatPage> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text("Autenticação concluída! Defina seu usuário e carteira para registrar suas rimas.", style: TextStyle(color: Colors.grey, fontSize: 14)),
-            const SizedBox(height: 20),
-            TextField(
-              style: const TextStyle(color: Colors.white),
-              decoration: InputDecoration(labelText: "Usuário", labelStyle: const TextStyle(color: Colors.purpleAccent), filled: true, fillColor: Colors.white10, border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none)),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              style: const TextStyle(color: Colors.white),
-              decoration: InputDecoration(labelText: "Carteira (0x...)", labelStyle: const TextStyle(color: Colors.purpleAccent), filled: true, fillColor: Colors.white10, border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none)),
-            ),
+            const Text("Autenticação concluída!", style: TextStyle(color: Colors.grey, fontSize: 14)),
           ],
         ),
         actions: [
@@ -163,9 +177,21 @@ class _ChatPageState extends State<ChatPage> {
     ChatInitializer.welcomeFlow(
       mounted: mounted,
       messages: messages,
-      addMessage: (content) => setState(() => messages.add({"role": "assistant", "content": content})),
+      addMessage: (content, {Widget? customWidget}) => setState(() {
+        messages.add({"role": "assistant", "content": content, "customWidget": customWidget});
+      }),
       setAiTyping: (typing) => setState(() => _isAiTyping = typing),
       scrollToBottom: _scrollToBottom,
+      userRhymes: _rhymesController.vocabulary.map((e) => e.word.toString()).toList(), 
+      onProgressUpdate: (step, progress) => setState(() {
+        _currentStep = step;
+        _stepProgress = progress;
+      }),
+      // ATUALIZADO: Passando os parâmetros que faltavam para dados reais
+      globalTrendingWords: _trendingWords,
+      onWordSelected: (word) {
+        _rhymesController.incrementWordScore(word);
+      },
     );
   }
 
@@ -174,14 +200,50 @@ class _ChatPageState extends State<ChatPage> {
       final text = _messageController.text;
       setState(() => _showCommandMenu = text.startsWith("/"));
       
-      if (text.isNotEmpty && text.endsWith(" ")) {
-        final words = text.trim().split(" ");
-        if (words.isNotEmpty && words.last.length > 2) {
-          _rhymesController.searchSuggestion(words.last);
+      // MONITORAMENTO REAL PONTO 2: EXPRESSÃO (MÍNIMO 5 LINHAS)
+      if (_currentStep == 2) {
+        int lines = text.split('\n').where((l) => l.trim().isNotEmpty).length;
+        double progress = (lines / 5).clamp(0.0, 1.0);
+        setState(() => _stepProgress = progress);
+        
+        if (progress >= 1.0) {
+          _completeStep(2); // Avança para o Ponto 3 (Flow)
         }
       }
+
       _rhymesController.onTextChanged(text);
     });
+  }
+
+  void _completeStep(int step) {
+    setState(() {
+      _currentStep = step + 1;
+      _stepProgress = 0.0;
+    });
+    
+    if (_currentStep == 4) {
+      ChatInitializer.startStructureStep(
+        addMessage: _addAiMessageWithWidget,
+        onProgressUpdate: (s, p) => setState(() { _currentStep = s; _stepProgress = p; }),
+        scrollToBottom: _scrollToBottom,
+        activeColor: _getActiveColor(),
+      );
+    }
+  }
+
+  void _addAiMessageWithWidget(String content, {Widget? customWidget}) {
+    setState(() => messages.add({"role": "assistant", "content": content, "customWidget": customWidget}));
+    _scrollToBottom();
+  }
+
+  void _onAddSuggestedRhyme(String word) async {
+    final completedWord = await _rhymesController.addSuggestedRhyme(word);
+    if (completedWord != null) {
+      setState(() {
+        _messageController.text = "${_messageController.text.trim()} $completedWord ";
+        _messageController.selection = TextSelection.fromPosition(TextPosition(offset: _messageController.text.length));
+      });
+    }
   }
 
   Color _getActiveColor() {
@@ -192,25 +254,71 @@ class _ChatPageState extends State<ChatPage> {
     return Colors.purpleAccent;
   }
 
-  void _favoriteLastResponse() async {
-    if (messages.length >= 2) {
-      final lastUserQuery = messages[messages.length - 2]['content'] ?? "";
-      final lastAiResponse = messages.last['content'] ?? "";
-      
-      await _userService.saveToFavorites(_currentUsername, lastUserQuery, lastAiResponse);
-      _addSystemMessage("⭐ Rima favoritada no seu histórico do Versin Genesis.");
-    }
+  // BOTÃO DE FINALIZAÇÃO E GERAÇÃO DE HASH (PONTO 6)
+  void _finalizeLyric() {
+    final fullLyric = messages.where((m) => m['role'] == 'user').map((m) => m['content']).join("\n");
+    final lyricHash = HashHelper.generateVersinHash(
+      lyric: fullLyric,
+      userWallet: _userWallet,
+      username: _currentUsername,
+    );
+
+    setState(() {
+      _currentStep = 6;
+      _stepProgress = 1.0;
+    });
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF0F0F0F),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(30))),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.verified_user, color: Colors.greenAccent, size: 60),
+            const SizedBox(height: 16),
+            const Text("LETRA FINALIZADA", style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Text("Hash de Autoria: ${HashHelper.formatShortHash(lyricHash)}", style: const TextStyle(color: Colors.grey)),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.white10),
+                    onPressed: () {}, 
+                    icon: const Icon(Icons.share, color: Colors.white),
+                    label: const Text("COMPARTILHAR", style: TextStyle(color: Colors.white)),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.purpleAccent),
+                    onPressed: () {
+                      _storageService.saveLyric(fullLyric, lyricHash);
+                      Navigator.pop(context);
+                      _addSystemMessage("✅ Letra salva e assinada no Versin Genesis.");
+                    },
+                    icon: const Icon(Icons.save, color: Colors.black),
+                    label: const Text("SALVAR", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
   }
 
   void _sendMessage() async {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
-
-    if (text == "/fav") {
-      _favoriteLastResponse();
-      _messageController.clear();
-      return;
-    }
 
     if (_commandHandler.handle(text)) {
       _messageController.clear();
@@ -221,7 +329,6 @@ class _ChatPageState extends State<ChatPage> {
     setState(() {
       messages.add({"role": "user", "content": text});
       _messageController.clear();
-      _rhymesController.clearSuggestions();
       _isAiTyping = true;
     });
     _scrollToBottom();
@@ -231,12 +338,13 @@ class _ChatPageState extends State<ChatPage> {
     if (mounted) {
       setState(() { _isAiTyping = false; messages.add(aiResponse); });
       _scrollToBottom();
+      // Se estiver no ponto 5, preenche conforme a IA sugere caminhos
+      if (_currentStep == 5) setState(() => _stepProgress += 0.2);
     }
   }
 
   void _addSystemMessage(String content) {
     setState(() => messages.add({"role": "assistant", "content": content}));
-    _messageController.clear();
     _scrollToBottom();
   }
 
@@ -262,10 +370,7 @@ class _ChatPageState extends State<ChatPage> {
         onNewChat: () {
           setState(() { 
             messages.clear(); 
-            _isRhymeMode = false; _isComposeMode = false; 
-            _isListMode = false; _isMarketingMode = false;
-            _isInitializing = false; 
-            _rhymesController.updateGamification(0);
+            _currentStep = 1; _stepProgress = 0.0;
           });
           _startWelcomeFlow();
         }
@@ -273,7 +378,15 @@ class _ChatPageState extends State<ChatPage> {
       body: Stack(
         children: [
           Positioned(
-            top: 50, left: 0, right: 0,
+            top: 40, left: 0, right: 0,
+            child: VersinTimeline(
+              currentStep: _currentStep,
+              stepProgress: _stepProgress,
+              activeColor: activeColor,
+            ),
+          ),
+          Positioned(
+            top: 100, left: 0, right: 0,
             child: ChatHeader(
               activeColor: activeColor,
               rhymesController: _rhymesController, 
@@ -284,14 +397,14 @@ class _ChatPageState extends State<ChatPage> {
             ),
           ),
           Positioned(
-            top: 45, left: 15,
+            top: 95, left: 15,
             child: IconButton(
               icon: Icon(Icons.menu_rounded, color: activeColor, size: 32),
               onPressed: () => _scaffoldKey.currentState?.openDrawer(),
             ),
           ),
           Positioned.fill(
-            top: 190, bottom: 140 + bottomPadding, 
+            top: 240, bottom: 140 + bottomPadding, 
             child: ChatListView(
               isInitializing: _isInitializing,
               messages: messages,
@@ -300,6 +413,17 @@ class _ChatPageState extends State<ChatPage> {
               activeColor: activeColor,
             ),
           ),
+          // BOTÃO DE FINALIZAÇÃO DINÂMICO (APARECE NO PONTO 5/6)
+          if (_currentStep >= 5)
+            Positioned(
+              bottom: bottomPadding + 110, right: 20,
+              child: FloatingActionButton.extended(
+                backgroundColor: Colors.greenAccent,
+                onPressed: _finalizeLyric,
+                label: const Text("FINALIZAR", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                icon: const Icon(Icons.check_circle, color: Colors.black),
+              ),
+            ),
           Positioned(
             bottom: bottomPadding + 15, left: 15, right: 15,
             child: Column(
@@ -320,6 +444,7 @@ class _ChatPageState extends State<ChatPage> {
                   onSend: _sendMessage,
                   currentSuggestionIndex: _currentSuggestionIndex,
                   onUpdateSuggestionIndex: (index) => setState(() => _currentSuggestionIndex = index),
+                  onAddRhyme: _onAddSuggestedRhyme, 
                 ),
               ],
             ),

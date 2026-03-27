@@ -4,7 +4,7 @@ import 'package:versin/features/rhymes/presentation/widgets/chat_message_bubble.
 
 class ChatListView extends StatelessWidget {
   final bool isInitializing;
-  final List<Map<String, String>> messages;
+  final List<Map<String, dynamic>> messages;
   final bool isAiTyping;
   final ScrollController scrollController;
   final Color activeColor;
@@ -36,9 +36,28 @@ class ChatListView extends StatelessWidget {
         if (index == messages.length) {
           return _buildTypingIndicator(activeColor);
         }
-        return ChatMessageBubble(
-          message: messages[index],
-          activeColor: activeColor,
+
+        final message = messages[index];
+        
+        // CORREÇÃO: Verificação segura para saber se o campo realmente contém um Widget
+        final dynamic customData = message['customWidget'];
+        final Widget? customWidget = (customData is Widget) ? customData : null;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ChatMessageBubble(
+              // Convertemos os valores para String para o Bubble, exceto campos complexos
+              message: message.map((k, v) => MapEntry(k, v is String ? v : v.toString())),
+              activeColor: activeColor,
+            ),
+            // Só renderiza se for de fato um Widget, evitando o erro de cast
+            if (customWidget != null) 
+              Padding(
+                padding: const EdgeInsets.only(left: 45, top: 8, bottom: 12),
+                child: customWidget,
+              ),
+          ],
         );
       },
     );

@@ -7,7 +7,7 @@ import 'package:versin/core/models/rhyme_model.dart';
 // Controller principal das rimas e lógica de gamificação
 class RhymesController extends ChangeNotifier {
   Timer? _debounce;
-  final String _baseUrl = "http://127.0.0.1:8000";
+  final String _baseUrl = "https://versin.onrender.com";
 
   // --- ESTADO DO CHAT E SUGESTÕES ---
   List<String> _suggestionsList = [];
@@ -121,7 +121,7 @@ class RhymesController extends ChangeNotifier {
 
       try {
         final response = await http.post(
-          Uri.parse('$_baseUrl/processar'),
+          Uri.parse('$_baseUrl/process'),
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode({
             'user_text': t,
@@ -135,7 +135,7 @@ class RhymesController extends ChangeNotifier {
               'vocal_style': currentVocalStyle,
             }
           }),
-        ).timeout(const Duration(seconds: 4));
+        ).timeout(const Duration(seconds: 30));
 
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
@@ -194,7 +194,7 @@ class RhymesController extends ChangeNotifier {
             'subgenre': currentSubGenre,
           }
         }),
-      ).timeout(const Duration(seconds: 15));
+      ).timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);

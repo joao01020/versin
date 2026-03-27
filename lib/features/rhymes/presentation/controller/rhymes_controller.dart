@@ -8,7 +8,11 @@ import 'package:versin/core/models/rhyme_model.dart';
 // Controller principal das rimas e lógica de gamificação
 class RhymesController extends ChangeNotifier {
   Timer? _debounce;
+<<<<<<< HEAD
   final String _baseUrl = "https://versin.onrender.com"; // Atualizado para o Render
+=======
+  final String _baseUrl = "https://versin.onrender.com";
+>>>>>>> origin/main
 
   // --- ESTADO DO CHAT E SUGESTÕES ---
   List<String> _suggestionsList = [];
@@ -161,7 +165,11 @@ class RhymesController extends ChangeNotifier {
 
       try {
         final response = await http.post(
+<<<<<<< HEAD
           Uri.parse('$_baseUrl/process'), // Ajustado para a rota correta do Render
+=======
+          Uri.parse('$_baseUrl/process'),
+>>>>>>> origin/main
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode({
             'user_text': t,

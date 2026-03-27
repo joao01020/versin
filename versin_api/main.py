@@ -121,7 +121,7 @@ def definir_comportamento(mensagem: str, lista_rimas: List[str]) -> str:
         )
 
 # --- ROTA DE RIMA (AVALIAÇÃO COM CACHE) ---
-@app.post("/processar")
+@app.post("/process")
 async def processar_versin(data: RequestData):
     try:
         t = data.user_text.strip().lower()

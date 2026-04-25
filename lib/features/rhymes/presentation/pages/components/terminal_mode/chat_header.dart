@@ -21,10 +21,15 @@ class ChatHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     // Texto do modo exibido no cabeçalho (Interface em Português)
     String modeText = "MODO LIVRE";
-    if (isRhymeMode) modeText = "MODO RIMA";
-    else if (isComposeMode) modeText = "MODO COMPOR";
-    else if (isListMode) modeText = "MODO LISTAR";
-    else if (isMarketingMode) modeText = "MODO MARKETING";
+    if (isRhymeMode) {
+      modeText = "MODO RIMA";
+    } else if (isComposeMode) {
+      modeText = "MODO COMPOR";
+    } else if (isListMode) {
+      modeText = "MODO LISTAR";
+    } else if (isMarketingMode) {
+      modeText = "MODO MARKETING";
+    }
 
     return Column(
       children: [
@@ -52,10 +57,11 @@ class ChatHeader extends StatelessWidget {
           child: ListenableBuilder(
             listenable: rhymesController,
             builder: (context, _) => ThermometerFeedback(
-              // Variáveis em inglês sincronizadas com o RhymesController e o Widget de Termômetro
+              // Variáveis sincronizadas com o RhymesController
               starProgress: rhymesController.starProgress,
               fireProgress: rhymesController.fireProgress,
-              mentorFeedback: rhymesController.mentorFeedback,
+              // Fornecendo o parâmetro obrigatório que faltava
+              feedbackText: rhymesController.currentFeedback,
             ),
           ),
         ),

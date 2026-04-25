@@ -29,7 +29,7 @@ class VersinDrawer extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    "Genesis V1.0.2",
+                    "Genesis V1.0.1",
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 20,
@@ -82,6 +82,26 @@ class VersinDrawer extends StatelessWidget {
             },
           ),
 
+          // HISTÓRICO (Botão solicitado)
+          ListTile(
+            leading: const Icon(Icons.history_rounded, color: Colors.orangeAccent),
+            title: const Text("Histórico", style: TextStyle(color: Colors.white, fontSize: 14)),
+            onTap: () {
+              // Navegação para histórico (conforme sua lógica de letras salvas)
+              Navigator.pop(context);
+            },
+          ),
+
+          // VITRINE (Botão solicitado)
+          ListTile(
+            leading: const Icon(Icons.auto_awesome_mosaic_rounded, color: Colors.greenAccent),
+            title: const Text("Vitrine", style: TextStyle(color: Colors.white, fontSize: 14)),
+            onTap: () {
+              // Navegação para a página de vitrine/obras públicas
+              Navigator.pop(context);
+            },
+          ),
+
           // HOW TO USE (Título atualizado, conteúdo em PT-BR)
           ListTile(
             leading: const Icon(Icons.help_outline_rounded, color: Colors.blueAccent),
@@ -97,11 +117,21 @@ class VersinDrawer extends StatelessWidget {
             },
           ),
 
+          // AJUDA (Botão solicitado)
+          ListTile(
+            leading: const Icon(Icons.support_agent_rounded, color: Colors.redAccent),
+            title: const Text("Ajuda & Suporte", style: TextStyle(color: Colors.white, fontSize: 14)),
+            onTap: () {
+              // Navegação para suporte ou FAQ rápido
+              Navigator.pop(context);
+            },
+          ),
+
           // DICIONÁRIO / VOCABULÁRIO
           ListTile(
             leading: const Icon(Icons.terminal_rounded, color: Colors.purpleAccent),
             title: const Text(
-              "Dicionário / Vocabulário",
+              "Minha lista",
               style: TextStyle(color: Colors.white, fontSize: 14),
             ),
             onTap: () {
@@ -152,7 +182,7 @@ class VersinDrawer extends StatelessWidget {
                     ),
                     const SizedBox(width: 10),
                     const Text(
-                      "Versin V1.0.2 Genesis",
+                      "Versin V1.0.1 Genesis VERSÃO ALFA",
                       style: TextStyle(
                         color: Colors.grey, 
                         fontSize: 10, 

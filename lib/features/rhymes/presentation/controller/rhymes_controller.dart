@@ -5,10 +5,9 @@ import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:versin/core/models/rhyme_model.dart';
 
-// Controller principal das rimas e lógica de gamificação
 class RhymesController extends ChangeNotifier {
   Timer? _debounce;
-  final String _baseUrl = "https://versin.onrender.com"; 
+  final String _baseUrl = "https://versin.onrender.com";
   final _supabase = Supabase.instance.client;
 
   // --- ESTADO DO CHAT E SUGESTÕES ---
@@ -20,15 +19,15 @@ class RhymesController extends ChangeNotifier {
   bool _isLoading = false;
   bool get isLoading => _isLoading;
 
-  // --- ESTADO DA GAMIFICAÇÃO (DINÂMICO) ---
-  double starProgress = 0.0; 
-  double fireProgress = 0.0;    
-  String mentorFeedback = "Ouvindo sua frequência..."; 
+  // --- ESTADO DA GAMIFICAÇÃO ---
+  double starProgress = 0.0;
+  double fireProgress = 0.0;
+  String currentFeedback = "Comece a escrever para validar sua letra...";
 
-  // --- ESTADO DE USO (Livre de bloqueios) ---
+  // --- ESTADO DE USO ---
   int _rimasUsadas = 0;
   int get rimasUsadas => _rimasUsadas;
-  bool get temSaldo => true; // Sempre liberado
+  bool get temSaldo => true;
 
   // --- CONFIGURAÇÕES DE ESTILO ---
   String currentGenre = 'Automático';
@@ -38,11 +37,10 @@ class RhymesController extends ChangeNotifier {
   String currentVocalStyle = 'Automático';
   bool shareDictionary = false;
 
-  final String _userId = "user_dev_01"; 
-  String? _userApiKey = "VERSIN-PRO-TRIAL-2026-FREE"; 
-  String? get userApiKey => _userApiKey; 
+  final String _userId = "user_dev_01";
+  String? _userApiKey = "VERSIN-PRO-TRIAL-2026-FREE";
+  String? get userApiKey => _userApiKey;
 
-  // Inicia vazio para o Onboarding dinâmico
   List<Rhyme> vocabulary = [];
 
   bool get isProActive => _userApiKey != null && _userApiKey!.isNotEmpty;
@@ -73,6 +71,105 @@ class RhymesController extends ChangeNotifier {
     notifyListeners();
   }
 
+  // --- LÓGICA DE GAMIFICAÇÃO LOCAL ULTRA AVANÇADA (SEM EMOJIS) ---
+  void _processarProgressoTecnico(String texto) {
+    if (texto.trim().isEmpty) {
+      starProgress = 0.0;
+      fireProgress = 0.0;
+      currentFeedback = "Comece a escrever para validar sua letra...";
+      notifyListeners();
+      return;
+    }
+
+    final String t = texto.toUpperCase();
+    final List<String> linhasRaw = texto.split('\n').where((l) => l.trim().isNotEmpty).toList();
+    final List<String> palavras = t.split(RegExp(r'\s+')).where((p) => p.length > 2).toList();
+    
+    int caracteres = texto.trim().length;
+    int rimasNoVocabulario = vocabulary.length;
+    int totalLinhas = linhasRaw.length;
+
+    // 1. Analisador de Diversidade e Complexidade
+    Set<String> palavrasUnicas = palavras.toSet();
+    double diversidadeLexica = palavras.isEmpty ? 0 : palavrasUnicas.length / palavras.length;
+    int palavrasLargas = palavrasUnicas.where((p) => p.length > 9).length;
+
+    // 2. Analisador de Flow (Consistência de tamanho de linha)
+    double varianciaFlow = 0;
+    if (totalLinhas > 2) {
+      List<int> tamanhos = linhasRaw.map((l) => l.length).toList();
+      int media = tamanhos.reduce((a, b) => a + b) ~/ totalLinhas;
+      varianciaFlow = tamanhos.where((l) => (l - media).abs() < 15).length / totalLinhas;
+    }
+
+    // 3. Detecção de Punchlines e Impacto
+    int punchlines = t.allMatches("!").length + t.allMatches("\\?").length;
+    bool temRimaInterna = false;
+    for (var linha in linhasRaw) {
+      List<String> pLinha = linha.split(" ");
+      if (pLinha.length > 4) {
+        // Checa rimas simples no meio da linha (mesmo sufixo)
+        String p2 = pLinha[1].toLowerCase();
+        String p4 = pLinha[3].toLowerCase();
+        if (p2.length > 3 && p4.length > 3 && p2.substring(p2.length - 2) == p4.substring(p4.length - 2)) {
+          temRimaInterna = true;
+        }
+      }
+    }
+
+    // --- CÁLCULO DE ESTRELAS (MÉTRICA E LÍRICA) ---
+    if ((rimasNoVocabulario >= 15 || totalLinhas >= 20) && diversidadeLexica > 0.55) {
+      starProgress = 3.0;
+      currentFeedback = "Nivel Maximo! Vocabulario de mestre e lirica impecavel.";
+    } else if ((rimasNoVocabulario >= 8 || totalLinhas >= 10) && palavrasLargas >= 3) {
+      starProgress = 2.0;
+      currentFeedback = "Evolucao nitida. Voce esta construindo frases mais complexas.";
+    } else if (caracteres >= 60 || totalLinhas >= 4) {
+      starProgress = 1.0;
+      currentFeedback = "Fundamentos solidos. Continue expandindo as estrofes.";
+    } else {
+      starProgress = 0.5;
+      currentFeedback = "Escrevendo... O sistema esta analisando seu flow.";
+    }
+
+    // --- CÁLCULO DE FOGO (ESTRUTURA E PERFORMANCE) ---
+    int firePoints = 0;
+    
+    // Pontos por Estrutura Identificada
+    bool temEstrutura = t.contains("INTRO") || t.contains("REFRÃO") || t.contains("REFRAO") || t.contains("FINAL");
+    if (temEstrutura) firePoints++;
+
+    // Pontos por Flow e Metrica
+    if (varianciaFlow > 0.7 && totalLinhas >= 8) firePoints++;
+
+    // Pontos por Punchlines e Rimas Internas
+    if (punchlines >= 2 || temRimaInterna) firePoints++;
+
+    if (caracteres > 150 && firePoints > 0) {
+      fireProgress = firePoints.toDouble().clamp(0.0, 3.0);
+      starProgress = 0.0; // Prioridade estética para o fogo
+
+      if (fireProgress == 3.0) {
+        currentFeedback = "HIT DETECTADO! Metrica perfeita e estrutura profissional.";
+      } else if (fireProgress == 2.0) {
+        currentFeedback = "Flow constante. A cadencia da sua letra esta excelente.";
+      } else {
+        currentFeedback = "Calor aumentando. Sua estrutura esta ganhando peso.";
+      }
+    } else {
+      fireProgress = 0.0;
+    }
+
+    // Alertas de Qualidade
+    if (palavras.length > 15 && diversidadeLexica < 0.35) {
+      currentFeedback = "Alerta: Repeticao alta detectada. Isso pode cansar o ouvinte.";
+    } else if (totalLinhas > 4 && varianciaFlow < 0.3) {
+      currentFeedback = "Dica: Suas linhas estao com tamanhos muito diferentes (quebra de flow).";
+    }
+
+    notifyListeners();
+  }
+
   // --- SINCRONIZAÇÃO COM SUPABASE ---
   Future<void> carregarDadosUsuario() async {
     final user = _supabase.auth.currentUser;
@@ -83,7 +180,7 @@ class RhymesController extends ChangeNotifier {
             .select('rimas_usadas')
             .eq('id', user.id)
             .single();
-        
+
         _rimasUsadas = data['rimas_usadas'] ?? 0;
         notifyListeners();
       } catch (e) {
@@ -104,7 +201,6 @@ class RhymesController extends ChangeNotifier {
     }
   }
 
-  // NOVO: Busca as rimas em alta no ranking global para o Onboarding (Ponto 1)
   Future<List<Map<String, dynamic>>> fetchTrendingWords() async {
     try {
       final response = await _supabase
@@ -112,58 +208,25 @@ class RhymesController extends ChangeNotifier {
           .select('word, score')
           .order('score', ascending: false)
           .limit(6);
-      
+
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
-      debugPrint("⚠️ Erro ao buscar trending words: $e");
+      debugPrint("Erro ao buscar trending words: $e");
       return [];
     }
   }
 
-  // NOVO: Incrementa o score de uma rima no ranking global via RPC
   Future<void> incrementWordScore(String word) async {
     try {
       await _supabase.rpc('increment_word_score', params: {
         'word_param': word.toLowerCase().trim(),
       });
-      debugPrint("🔥 Score incrementado globalmente para: $word");
     } catch (e) {
-      debugPrint("❌ Erro ao incrementar score: $e");
+      debugPrint("Erro ao incrementar score: $e");
     }
   }
 
-  // ATUALIZADO: Foca em RECOMENDAR rimas e completar versos em vez de apenas julgar
-  void updateGamification(dynamic rawLevel, {String? reason}) {
-    int level = 0;
-    if (rawLevel is int) {
-      level = rawLevel;
-    } else if (rawLevel is String) {
-      level = int.tryParse(rawLevel) ?? 0;
-    }
-
-    if (level <= 0) {
-      starProgress = 0.0; 
-      fireProgress = 0.0;
-      mentorFeedback = reason ?? "O estúdio está silencioso...";
-    } 
-    else {
-      if (level >= 1 && level <= 3) {
-        fireProgress = 0.0;
-        starProgress = level.toDouble();
-      } else if (level >= 4) {
-        starProgress = 0.0; 
-        fireProgress = (level - 3).toDouble().clamp(0.0, 3.0);
-      }
-      
-      if (_suggestionsList.isNotEmpty) {
-        String baseSuggestion = _suggestionsList.take(3).join(", ");
-        mentorFeedback = "Pensei em completar com: $baseSuggestion... ou seguir por '$reason'";
-      } else {
-        mentorFeedback = reason ?? "Analisando métrica e flow...";
-      }
-    }
-    notifyListeners();
-  }
+  void updateGamification(dynamic rawLevel) {}
 
   void onTextChanged(String text) {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
@@ -171,15 +234,16 @@ class RhymesController extends ChangeNotifier {
 
     if (t.isEmpty) {
       _suggestionsList = [];
-      mentorFeedback = "O estúdio está silencioso...";
+      starProgress = 0.0;
+      fireProgress = 0.0;
+      currentFeedback = "Comece a escrever para avaliarmos sua letra...";
       notifyListeners();
       return;
     }
 
-    mentorFeedback = "...";
-    notifyListeners();
+    _processarProgressoTecnico(text);
 
-    int duration = isProActive ? 400 : 800; 
+    int duration = isProActive ? 400 : 800;
 
     _debounce = Timer(Duration(milliseconds: duration), () async {
       _isLoading = true;
@@ -205,7 +269,7 @@ class RhymesController extends ChangeNotifier {
 
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
-          
+
           if (data['result'] is List) {
             _suggestionsList = List<String>.from(data['result']);
           } else {
@@ -213,7 +277,6 @@ class RhymesController extends ChangeNotifier {
             _suggestionsList = (res == "NENHUMA" || res.isEmpty) ? [] : [res];
           }
           
-          updateGamification(data['impact_level'], reason: data['feedback_reason']);
           _incrementarUso();
         }
       } catch (e) {
@@ -228,10 +291,12 @@ class RhymesController extends ChangeNotifier {
   Future<String?> addSuggestedRhyme(String word) async {
     final user = _supabase.auth.currentUser;
     String p = word.trim().toLowerCase();
-    
+
     if (p.isNotEmpty && !vocabulary.any((r) => r.word == p)) {
       vocabulary.insert(0, Rhyme(word: p, isPriority: false));
       _suggestionsList.remove(word);
+      
+      _processarProgressoTecnico(p); 
       notifyListeners();
 
       if (user != null) {
@@ -240,9 +305,11 @@ class RhymesController extends ChangeNotifier {
             'word': p,
             'profile_id': user.id,
           });
-        } catch (e) { debugPrint("Erro ao salvar: $e"); }
+        } catch (e) {
+          debugPrint("Erro ao salvar: $e");
+        }
       }
-      return word; 
+      return word;
     }
     return null;
   }
@@ -284,16 +351,15 @@ class RhymesController extends ChangeNotifier {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        updateGamification(data['impact_level'], reason: data['feedback_reason']);
         _incrementarUso();
         return {
-          "role": "assistant", 
+          "role": "assistant",
           "content": data['content'] ?? ""
         };
       }
-      return {"role": "assistant", "content": "Erro no servidor do estúdio."};
+      return {"role": "assistant", "content": "Erro no servidor do estudio."};
     } catch (e) {
-      return {"role": "assistant", "content": "Erro de conexão com o Versin."};
+      return {"role": "assistant", "content": "Erro de conexao com o Versin."};
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -323,8 +389,8 @@ class RhymesController extends ChangeNotifier {
   }
 
   @override
-  void dispose() { 
-    _debounce?.cancel(); 
-    super.dispose(); 
+  void dispose() {
+    _debounce?.cancel();
+    super.dispose();
   }
 }

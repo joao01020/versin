@@ -35,20 +35,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Sincronizado com RhymesController.dart (onTextChanged)
+# Sincronizado com RhymesController.dart
 class RequestData(BaseModel):
     user_text: str
     rhyme_list: List[str]
     private_api_key: Optional[str] = None
     style_config: Optional[Dict] = {}
 
-# Sincronizado com RhymesController.dart (fetchAiResponse)
+# Sincronizado com RhymesController.dart
 class ChatRequest(BaseModel):
     user_id: Optional[str] = "default_user"
     message: str
     current_list: Optional[List[str]] = []
     private_api_key: Optional[str] = None
     style_config: Optional[Dict] = {}
+    rhyme_inventory_count: Optional[int] = 0
+    rhyme_inventory_limit: Optional[int] = 100
 
 def get_groq_client(user_key: Optional[str]):
     if user_key and user_key.strip():
@@ -60,20 +62,16 @@ def get_groq_client(user_key: Optional[str]):
 # --- SISTEMA DE CACHE INTELIGENTE ---
 @lru_cache(maxsize=2048)
 def buscar_rima_na_ia_cached(texto_usuario, rimas_str, api_key_hash):
-    """
-    api_key_hash serve para diferenciar o cache entre usuários PRO e FREE
-    sem expor a chave real na assinatura da função de cache.
-    """
     client = get_groq_client(GROQ_API_KEY if api_key_hash == "DEFAULT" else api_key_hash)
     
     system_instructions = (
-        "Você é um motor de busca de rimas e crítico de métrica para Trap/Rap. "
+        "Você é um motor de busca de rimas para Trap/Rap. "
         "Retorne APENAS JSON: {"
         "'result': ['rima1', 'rima2', 'rima3'], "
         "'impact_level': 1_a_6, "
-        "'feedback_reason': 'comentário_curto_técnico_e_ácido'"
+        "'feedback_reason': 'comentário_técnico_curto'"
         "}. "
-        f"No feedback_reason, seja dinâmico. Base de rimas: {rimas_str}."
+        f"Base de rimas: {rimas_str}."
     )
 
     completion = client.chat.completions.create(
@@ -89,19 +87,27 @@ def buscar_rima_na_ia_cached(texto_usuario, rimas_str, api_key_hash):
     return completion.choices[0].message.content
 
 # --- LÓGICA DE MODOS DINÂMICOS ---
-def definir_comportamento(mensagem: str, lista_rimas: List[str]) -> str:
+def definir_comportamento(mensagem: str, lista_rimas: List[str], inventory_count: int = 0, inventory_limit: int = 100) -> str:
     msg = mensagem.lower()
+    slots_available = inventory_limit - inventory_count
     
     if "/modorima" in msg:
         return (
-            "MODO RIMA ATIVO. Objetivo: Rimas raras e multissilábicas. "
-            f"Biblioteca do artista: {lista_rimas}. "
-            "Feedback: Analise a sonoridade técnica. Incentive o save no '+'."
+            "--- MODO EXTRAÇÃO DE RIMAS ---"
+            "VOCÊ É UM BANCO DE DADOS. NÃO CONVERSE. NÃO DÊ DICAS."
+            "REGRAS:"
+            "1. Retorne rimas para a palavra solicitada no formato: [WORD:palavra] --> definição_curta."
+            "2. A definição deve ter no máximo 6 palavras."
+            "3. Se o usuário falar algo fora de rimas, responda: '[ERROR: Apenas rimas].'"
+            "\nEXEMPLO: [WORD:Arroz] --> Cereal básico da alimentação humana."
+            f"\nSTATUS: {inventory_count}/{inventory_limit}."
+        
         )
     elif "/modocompor" in msg:
         return (
             "MODO COMPOR ATIVO. Foco: Estrutura, métrica e flow. "
-            "Feedback: Diga se o verso está pesado ou se atropela o compasso."
+            f"Status do Inventário: {inventory_count}/{inventory_limit}. "
+            "Aqui você pode ser o mentor técnico. Use [WORD:palavra] para sugerir rimas que podem ser salvas."
         )
     elif "/modolistar" in msg:
         return (
@@ -110,14 +116,19 @@ def definir_comportamento(mensagem: str, lista_rimas: List[str]) -> str:
         )
     elif "/modomarketing" in msg:
         return (
-            "MODO MARKETING ATIVO. Foco: Viralização e Branding. "
-            "Feedback: Avalie o potencial de 'trend' do verso para TikTok/Reels."
+            "MODO MARKETING ATIVO. Foco: Viralização e Branding."
         )
     else:
         return (
-            "Você é o Versin, Mentor de Elite. Seja sincero, técnico e detalhista.\n"
-            f"Use a biblioteca {lista_rimas} como base.\n"
-            "Analise impacto, clichês e flow (compasso 4/4). Use analogias de FL Studio."
+            "Você é o Versin, Mentor de Elite. Use [WORD:palavra] para sugerir rimas interativas.\n"
+            "PROCESSO CRIATIVO (6 PONTOS):\n"
+            "PONTO 1 (Rimas): Analise e sugira variações.\n"
+            "PONTO 2 (Expressão): Analise carga emocional.\n"
+            "PONTO 3 (Flow): Oriente cadência.\n"
+            "PONTO 4 (Arquitetura): Blocos de construção.\n"
+            "PONTO 5 (Assistência): Fine-tuning.\n"
+            "PONTO 6 (Finalização): Assinatura digital e exportação para nuvem.\n"
+            f"Use a biblioteca {lista_rimas} como base."
         )
 
 # --- ROTA DE RIMA (AVALIAÇÃO COM CACHE) ---
@@ -128,15 +139,12 @@ async def processar_versin(data: RequestData):
         if not t or len(t) < 1:
             return {"result": [], "impact_level": 0, "feedback_reason": "Aguardando escrita..."}
 
-        # Identificador de cache para não misturar chaves privadas
         key_id = data.private_api_key if data.private_api_key else "DEFAULT"
         rimas_str = ",".join(data.rhyme_list) if data.rhyme_list else ""
         
-        # Busca no Cache ou na IA
         conteudo_ia = buscar_rima_na_ia_cached(t, rimas_str, key_id)
         res = json.loads(conteudo_ia)
         
-        # Garantia de lista para o Flutter
         if isinstance(res.get('result'), str):
             res['result'] = [res['result']]
         elif res.get('result') is None:
@@ -155,7 +163,13 @@ async def chat_versin(data: ChatRequest):
         client = get_groq_client(data.private_api_key)
         model_chat = "llama-3.3-70b-versatile" if is_pro else "llama-3.1-8b-instant"
 
-        system_behavior = definir_comportamento(data.message, data.current_list)
+        system_behavior = definir_comportamento(
+            data.message, 
+            data.current_list, 
+            inventory_count=data.rhyme_inventory_count, 
+            inventory_limit=data.rhyme_inventory_limit
+        )
+        
         system_behavior += (
             " Retorne APENAS JSON: {"
             "'content': 'resposta_em_markdown', "
@@ -177,7 +191,8 @@ async def chat_versin(data: ChatRequest):
             "role": "assistant", 
             "content": res_json.get("content", ""),
             "impact_level": res_json.get("impact_level", 1),
-            "feedback_reason": res_json.get("feedback_reason", "Análise Versin.")
+            "feedback_reason": res_json.get("feedback_reason", "Análise Versin."),
+            "inventory_status": f"{data.rhyme_inventory_count}/{data.rhyme_inventory_limit}"
         }
 
     except Exception as e:
@@ -185,5 +200,4 @@ async def chat_versin(data: ChatRequest):
         return {"role": "assistant", "content": "Erro na conexão cerebral.", "impact_level": 1, "feedback_reason": "Erro."}
 
 if __name__ == "__main__":
-    # Rodar com uvicorn localmente (para produção use gunicorn)
     uvicorn.run(app, host="0.0.0.0", port=8000)

@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart'; // Para abrir o AI Studio
+import 'package:url_launcher/url_launcher.dart'; 
+import 'package:supabase_flutter/supabase_flutter.dart'; // Importado para o logout
 import 'package:versin/features/rhymes/presentation/controller/rhymes_controller.dart';
 import 'package:versin/features/rhymes/presentation/pages/drawer/ai_memory/ai_memory_page.dart';
 import 'package:versin/features/rhymes/presentation/pages/drawer/rhyme_level/rhyme_level_page.dart';
 
 class SettingsPage extends StatefulWidget {
-  final RhymesController controller; // Passando o controller para salvar a chave
+  final RhymesController controller; 
   const SettingsPage({super.key, required this.controller});
 
   @override
@@ -18,11 +19,25 @@ class PageSettings extends State<SettingsPage> {
   @override
   void initState() {
     super.initState();
-    // Se quiser carregar a chave atual no campo ao abrir
-    // _keyController.text = widget.controller.userApiKey ?? "";
   }
 
-  // Função para abrir o link do Google AI Studio
+  // Função para deslogar do Supabase
+  Future<void> _handleSignOut() async {
+    try {
+      await Supabase.instance.client.auth.signOut();
+      if (mounted) {
+        // Remove todas as telas e volta para a raiz (onde o listener do main.dart vai agir)
+        Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Erro ao sair: $e"), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
   Future<void> _openGoogleStudio() async {
     final Uri url = Uri.parse('https://aistudio.google.com/');
     if (!await launchUrl(url)) {
@@ -50,7 +65,7 @@ class PageSettings extends State<SettingsPage> {
           
           const SizedBox(height: 20),
           _buildSectionTitle("Versin Pro & Autonomia"),
-          _buildProCard(), // O novo card explicativo
+          _buildProCard(), 
           
           const SizedBox(height: 15),
           Padding(
@@ -104,7 +119,7 @@ class PageSettings extends State<SettingsPage> {
           const SizedBox(height: 40),
           Center(
             child: TextButton(
-              onPressed: () {},
+              onPressed: _handleSignOut, // BOTÃO AGORA FUNCIONAL
               child: const Text("Sair da Conta", style: TextStyle(color: Colors.redAccent)),
             ),
           )
@@ -113,7 +128,6 @@ class PageSettings extends State<SettingsPage> {
     );
   }
 
-  // Card com o tutorial e a lógica que você pediu
   Widget _buildProCard() {
     return Container(
       padding: const EdgeInsets.all(16),

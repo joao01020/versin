@@ -1,8 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:versin/features/rhymes/presentation/controller/rhymes_controller.dart';
-import 'package:versin/features/rhymes/presentation/pages/drawer/pagevocabulary.dart'; // Nome do arquivo sincronizado
+import 'package:versin/features/rhymes/presentation/pages/drawer/vocabulary/pagevocabulary.dart';
 import 'package:versin/features/rhymes/presentation/pages/drawer/settings/settings_page.dart';
-import 'package:versin/features/rhymes/presentation/pages/drawer/how_to_use_page.dart'; // Importação atualizada
+import 'package:versin/features/rhymes/presentation/pages/drawer/how_to_use_page.dart';
+
+// Importações atualizadas com o caminho completo (Package) e subpastas
+import 'package:versin/features/rhymes/presentation/pages/drawer/match/match_page.dart';
+import 'package:versin/features/rhymes/presentation/pages/drawer/history/history_page.dart';
+import 'package:versin/features/rhymes/presentation/pages/drawer/showcase/showcase_page.dart';
+import 'package:versin/features/rhymes/presentation/pages/drawer/support/support_page.dart';
 
 class VersinDrawer extends StatelessWidget {
   final VoidCallback onNewChat;
@@ -21,7 +27,7 @@ class VersinDrawer extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // HEADER: GENESIS V1.0.2
+          // HEADER: GENESIS V1.0.1
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20.0, 30.0, 20.0, 10.0),
@@ -82,27 +88,43 @@ class VersinDrawer extends StatelessWidget {
             },
           ),
 
-          // HISTÓRICO (Botão solicitado)
           ListTile(
             leading: const Icon(Icons.history_rounded, color: Colors.orangeAccent),
             title: const Text("Histórico", style: TextStyle(color: Colors.white, fontSize: 14)),
             onTap: () {
-              // Navegação para histórico (conforme sua lógica de letras salvas)
               Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const HistoryPage()),
+              );
             },
           ),
 
-          // VITRINE (Botão solicitado)
           ListTile(
             leading: const Icon(Icons.auto_awesome_mosaic_rounded, color: Colors.greenAccent),
             title: const Text("Vitrine", style: TextStyle(color: Colors.white, fontSize: 14)),
             onTap: () {
-              // Navegação para a página de vitrine/obras públicas
               Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const ShowcasePage()),
+              );
             },
           ),
 
-          // HOW TO USE (Título atualizado, conteúdo em PT-BR)
+          // --- VERSIN MATCH: ARTISTAS & BEATMAKERS ---
+          ListTile(
+            leading: const Icon(Icons.compare_arrows_rounded, color: Colors.pinkAccent),
+            title: const Text("Versin Match", style: TextStyle(color: Colors.white, fontSize: 14)),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const MatchPage()),
+              );
+            },
+          ),
+
           ListTile(
             leading: const Icon(Icons.help_outline_rounded, color: Colors.blueAccent),
             title: const Text("Como usar?", style: TextStyle(color: Colors.white, fontSize: 14)),
@@ -110,20 +132,20 @@ class VersinDrawer extends StatelessWidget {
               Navigator.pop(context);
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (context) => const HowToUsePage(), // Classe atualizada
-                ),
+                MaterialPageRoute(builder: (context) => const HowToUsePage()),
               );
             },
           ),
 
-          // AJUDA (Botão solicitado)
           ListTile(
             leading: const Icon(Icons.support_agent_rounded, color: Colors.redAccent),
             title: const Text("Ajuda & Suporte", style: TextStyle(color: Colors.white, fontSize: 14)),
             onTap: () {
-              // Navegação para suporte ou FAQ rápido
               Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const SupportPage()),
+              );
             },
           ),
 
@@ -182,7 +204,7 @@ class VersinDrawer extends StatelessWidget {
                     ),
                     const SizedBox(width: 10),
                     const Text(
-                      "Versin V1.0.1 Genesis VERSÃO ALFA",
+                      "VERSÃO ALFA",
                       style: TextStyle(
                         color: Colors.grey, 
                         fontSize: 10, 

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:versin/features/rhymes/presentation/controller/rhymes_controller.dart';
 import 'package:versin/features/rhymes/presentation/widgets/ai_suggestion/ai_suggestion_balloon.dart';
-import 'package:versin/features/rhymes/presentation/widgets/chat_input_area.dart';
+import 'package:versin/features/rhymes/presentation/widgets/chat/chat_input_area.dart';
 
 class ChatBottomBar extends StatelessWidget {
   final TextEditingController messageController;

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart'; // Para abrir o AI Studio
 import 'package:versin/features/rhymes/presentation/controller/rhymes_controller.dart';
-import 'package:versin/features/rhymes/presentation/pages/drawer/ai_memory_page.dart';
-import 'package:versin/features/rhymes/presentation/pages/drawer/rhyme_level_page.dart';
+import 'package:versin/features/rhymes/presentation/pages/drawer/ai_memory/ai_memory_page.dart';
+import 'package:versin/features/rhymes/presentation/pages/drawer/rhyme_level/rhyme_level_page.dart';
 
 class SettingsPage extends StatefulWidget {
   final RhymesController controller; // Passando o controller para salvar a chave

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:versin/features/rhymes/presentation/controller/rhymes_controller.dart';
 import 'package:versin/features/rhymes/presentation/pages/drawer/vocabulary/pagevocabulary.dart';
 import 'package:versin/features/rhymes/presentation/pages/drawer/settings/settings_page.dart';
-import 'package:versin/features/rhymes/presentation/pages/drawer/how_to_use_page.dart';
+import 'package:versin/features/rhymes/presentation/pages/drawer/how_to_use/how_to_use_page.dart';
 
 // Importações atualizadas com o caminho completo (Package) e subpastas
 import 'package:versin/features/rhymes/presentation/pages/drawer/match/match_page.dart';

@@ -1,19 +1,19 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:versin/features/rhymes/presentation/widgets/chat_welcome_card.dart';
-import 'package:versin/features/rhymes/presentation/widgets/versin_drawer.dart';
+import 'package:versin/features/rhymes/presentation/widgets/chat/welcome_card/chat_welcome_card.dart';
+import 'package:versin/features/rhymes/presentation/widgets/versin_drawer/versin_drawer.dart';
 import 'package:versin/features/rhymes/presentation/widgets/ai_suggestion/ai_suggestion_balloon.dart';
 import 'package:versin/features/rhymes/presentation/controller/rhymes_controller.dart';
 import 'package:versin/features/rhymes/presentation/widgets/thermometer_gamification/thermometer_widget.dart';
-import 'package:versin/features/rhymes/presentation/widgets/chat_input_area.dart';
-import 'package:versin/features/rhymes/presentation/widgets/chat_message_bubble.dart';
+import 'package:versin/features/rhymes/presentation/widgets/chat/chat_input_area.dart';
+import 'package:versin/features/rhymes/presentation/widgets/chat/chat_message_bubble.dart';
 import 'package:versin/features/rhymes/presentation/utils/command_handler.dart'; 
 
 import 'package:versin/features/rhymes/presentation/pages/components/terminal_mode/chat_header.dart';
-import 'package:versin/features/rhymes/presentation/pages/components/chat_list_view.dart';
+import 'package:versin/features/rhymes/presentation/pages/components/chat/chat_list_view.dart';
 import 'package:versin/features/rhymes/presentation/pages/components/chat_command_overlay/chat_command_overlay.dart';
-import 'package:versin/features/rhymes/presentation/pages/components/chat_bottom_bar.dart';
+import 'package:versin/features/rhymes/presentation/pages/components/chat/chat_bottom_bar.dart';
 import 'package:versin/features/rhymes/presentation/pages/components/chat_initializer/chat_initializer.dart';
 import 'package:versin/features/rhymes/presentation/pages/components/auth_modal/auth_modal.dart';
 

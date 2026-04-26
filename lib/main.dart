@@ -1,24 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'; 
-import 'package:flutter_dotenv/flutter_dotenv.dart'; // Import necessário para o .env
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:versin/features/rhymes/presentation/pages/chat_page.dart';
 
+// CAMINHO CORRIGIDO ABAIXO:
+import 'package:versin/features/rhymes/presentation/controller/auth_wrapper/auth_wrapper.dart';
+
 void main() async {
-  // 1. Garante que os widgets do Flutter estejam inicializados antes de rodar o app
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 2. Carrega as variáveis de ambiente do arquivo .env (Raiz do projeto)
+  // 1. Inicializa o ambiente
   await dotenv.load(fileName: ".env");
 
-  // 3. Inicializa o Supabase do Versin Genesis usando o dotenv
+  // 2. Configura o Supabase
   await Supabase.initialize(
     url: dotenv.env['SUPABASE_URL'] ?? '',
     anonKey: dotenv.env['SUPABASE_ANON_KEY'] ?? '',
+    authOptions: const FlutterAuthClientOptions(
+      authFlowType: AuthFlowType.implicit,
+    ),
   );
-
-  // linha temporariamente para deslogar sessão lixo no cache (remover depois dos testes)
-  // Agora está DEPOIS do initialize, o que evita o erro de Assertion
-  await Supabase.instance.client.auth.signOut();
 
   runApp(const MyApp());
 }
@@ -31,7 +32,6 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Versin',
       debugShowCheckedModeBanner: false,
-      // Tema escuro total para combinar com a interface do Versin
       theme: ThemeData(
         brightness: Brightness.dark,
         scaffoldBackgroundColor: const Color(0xFF0F0F0F),
@@ -41,7 +41,8 @@ class MyApp extends StatelessWidget {
         ),
         useMaterial3: true,
       ),
-      home: const ChatPage(),
+      // O AuthWrapper agora é o ponto de entrada da árvore de widgets
+      home: const AuthWrapper(), 
     );
   }
 }

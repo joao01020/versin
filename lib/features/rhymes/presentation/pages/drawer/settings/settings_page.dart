@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart'; 
-import 'package:supabase_flutter/supabase_flutter.dart'; // Importado para o logout
+import 'package:supabase_flutter/supabase_flutter.dart'; 
 import 'package:versin/features/rhymes/presentation/controller/rhymes_controller.dart';
 import 'package:versin/features/rhymes/presentation/pages/drawer/ai_memory/ai_memory_page.dart';
 import 'package:versin/features/rhymes/presentation/pages/drawer/rhyme_level/rhyme_level_page.dart';
+// Importação da nova página de perfil
+import 'package:versin/features/rhymes/presentation/pages/drawer/profile/profile_page.dart';
 
 class SettingsPage extends StatefulWidget {
   final RhymesController controller; 
@@ -16,17 +18,13 @@ class SettingsPage extends StatefulWidget {
 class PageSettings extends State<SettingsPage> {
   final _keyController = TextEditingController();
 
-  @override
-  void initState() {
-    super.initState();
-  }
+  // Verifica se o usuário está logado no Supabase
+  bool get _isUserLoggedIn => Supabase.instance.client.auth.currentUser != null;
 
-  // Função para deslogar do Supabase
   Future<void> _handleSignOut() async {
     try {
       await Supabase.instance.client.auth.signOut();
       if (mounted) {
-        // Remove todas as telas e volta para a raiz (onde o listener do main.dart vai agir)
         Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
       }
     } catch (e) {
@@ -60,10 +58,23 @@ class PageSettings extends State<SettingsPage> {
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          _buildSectionTitle("Perfil"),
-          _settingsTile(Icons.person_outline, "Editar Perfil", "Mude seu nome e avatar", () {}),
+          // Seção de Perfil (Só aparece se logado)
+          if (_isUserLoggedIn) ...[
+            _buildSectionTitle("Perfil"),
+            _settingsTile(
+              Icons.person_outline, 
+              "Meu Perfil", 
+              "Ver nome, carteira wallet@ e foto", 
+              () {
+                Navigator.push(
+                  context, 
+                  MaterialPageRoute(builder: (context) => const ProfilePage())
+                );
+              }
+            ),
+            const SizedBox(height: 20),
+          ],
           
-          const SizedBox(height: 20),
           _buildSectionTitle("Versin Pro & Autonomia"),
           _buildProCard(), 
           
@@ -114,15 +125,21 @@ class PageSettings extends State<SettingsPage> {
           const SizedBox(height: 20),
           _buildSectionTitle("Aplicativo"),
           _settingsTile(Icons.dark_mode_outlined, "Tema", "Escuro (Padrão)", () {}),
-          _settingsTile(Icons.notifications_none, "Notificações", "Gerenciar alertas", () {}),
+          
+          // Notificações (Só aparece se logado)
+          if (_isUserLoggedIn)
+            _settingsTile(Icons.notifications_none, "Notificações", "Gerenciar alertas", () {}),
           
           const SizedBox(height: 40),
-          Center(
-            child: TextButton(
-              onPressed: _handleSignOut, // BOTÃO AGORA FUNCIONAL
-              child: const Text("Sair da Conta", style: TextStyle(color: Colors.redAccent)),
-            ),
-          )
+          
+          // Sair da Conta (Só aparece se logado)
+          if (_isUserLoggedIn)
+            Center(
+              child: TextButton(
+                onPressed: _handleSignOut,
+                child: const Text("Sair da Conta", style: TextStyle(color: Colors.redAccent)),
+              ),
+            )
         ],
       ),
     );

@@ -21,7 +21,7 @@ class AuthModal extends StatefulWidget {
 class _AuthModalState extends State<AuthModal> {
   bool _isLoading = false;
   bool _isExpanded = false;
-  bool _registrationSuccess = false; // Controle para a tela de sucesso
+  bool _registrationSuccess = false;
 
   final _emailController = TextEditingController();
   final _usernameController = TextEditingController();
@@ -54,7 +54,6 @@ class _AuthModalState extends State<AuthModal> {
         provider,
         redirectTo: kIsWeb ? null : 'io.supabase.versin://callback', 
       );
-      // O AuthWrapper no main.dart cuidará de fechar este modal ao detectar o sucesso
     } catch (e) {
       debugPrint("Erro Social: $e");
     }
@@ -76,13 +75,12 @@ class _AuthModalState extends State<AuthModal> {
         },
       );
       
-      // MUDANÇA AQUI: Em vez de SnackBar, mostramos a UI de Sucesso com Cadeado
       setState(() {
         _isLoading = false;
         _registrationSuccess = true;
       });
 
-      // Fecha o modal automaticamente após 2 segundos para o Wrapper assumir
+      // Timer de 2 segundos antes de fechar para o usuário ler a mensagem de sucesso
       await Future.delayed(const Duration(seconds: 2));
       if (mounted) Navigator.pop(context);
 
@@ -115,7 +113,6 @@ class _AuthModalState extends State<AuthModal> {
     );
   }
 
-  // NOVA VIEW: Sucesso com Cadeado de Segurança
   Widget _buildSuccessView() {
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -216,7 +213,6 @@ class _AuthModalState extends State<AuthModal> {
     );
   }
 
-  // --- MÉTODOS AUXILIARES DE UI (MANTIDOS) ---
   Widget _buildActionButton({required String label, required Color color, required Color textColor, required VoidCallback onPressed, IconData? icon}) {
     return ElevatedButton.icon(
       style: ElevatedButton.styleFrom(
@@ -261,5 +257,14 @@ class _AuthModalState extends State<AuthModal> {
         focusedBorder: OutlineInputBorder(borderSide: const BorderSide(color: Colors.purpleAccent, width: 1), borderRadius: BorderRadius.circular(14)),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _usernameController.dispose();
+    _passwordController.dispose();
+    _debounce?.cancel();
+    super.dispose();
   }
 }

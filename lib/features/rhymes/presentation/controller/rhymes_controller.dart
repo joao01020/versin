@@ -13,11 +13,23 @@ class RhymesController extends ChangeNotifier {
   // --- ESTADO DO CHAT E SUGESTÕES ---
   List<String> _suggestionsList = [];
   List<String> get suggestionsList => _suggestionsList;
-
   String get suggestion => _suggestionsList.isNotEmpty ? _suggestionsList.first : "";
 
   bool _isLoading = false;
   bool get isLoading => _isLoading;
+
+  // --- ESTADO DA TIMELINE E PROGRESSO (NOVO) ---
+  int _currentStep = 1;
+  int get currentStep => _currentStep;
+  
+  double _stepProgress = 0.0;
+  double get stepProgress => _stepProgress;
+
+  // --- ESTADOS DE MODO DE INTERFACE (NOVO) ---
+  bool isRhymeMode = false;
+  bool isComposeMode = false;
+  bool isListMode = false;
+  bool isMarketingMode = false;
 
   // --- ESTADO DA GAMIFICAÇÃO ---
   double starProgress = 0.0;
@@ -42,8 +54,33 @@ class RhymesController extends ChangeNotifier {
   String? get userApiKey => _userApiKey;
 
   List<Rhyme> vocabulary = [];
+  List<Map<String, dynamic>> trendingWords = [];
 
   bool get isProActive => _userApiKey != null && _userApiKey!.isNotEmpty;
+
+  // --- LÓGICA DE UI (CORES) ---
+  Color getActiveColor() {
+    if (isRhymeMode) return Colors.greenAccent;
+    if (isComposeMode) return Colors.blueAccent;
+    if (isListMode) return Colors.orangeAccent;
+    if (isMarketingMode) return Colors.yellowAccent;
+    return Colors.purpleAccent;
+  }
+
+  // --- ATUALIZAÇÃO DE ESTADOS DE FLUXO ---
+  void updateProgress(int step, double progress) {
+    _currentStep = step;
+    _stepProgress = progress;
+    notifyListeners();
+  }
+
+  void updateModes({bool? rhyme, bool? compose, bool? list, bool? marketing}) {
+    if (rhyme != null) isRhymeMode = rhyme;
+    if (compose != null) isComposeMode = compose;
+    if (list != null) isListMode = list;
+    if (marketing != null) isMarketingMode = marketing;
+    notifyListeners();
+  }
 
   void searchSuggestion(String word) {
     onTextChanged(word);
@@ -71,7 +108,7 @@ class RhymesController extends ChangeNotifier {
     notifyListeners();
   }
 
-  // --- LÓGICA DE GAMIFICAÇÃO LOCAL ULTRA AVANÇADA (SEM EMOJIS) ---
+  // --- LÓGICA DE GAMIFICAÇÃO LOCAL (SEM EMOJIS) ---
   void _processarProgressoTecnico(String texto) {
     if (texto.trim().isEmpty) {
       starProgress = 0.0;
@@ -89,12 +126,10 @@ class RhymesController extends ChangeNotifier {
     int rimasNoVocabulario = vocabulary.length;
     int totalLinhas = linhasRaw.length;
 
-    // 1. Analisador de Diversidade e Complexidade
     Set<String> palavrasUnicas = palavras.toSet();
     double diversidadeLexica = palavras.isEmpty ? 0 : palavrasUnicas.length / palavras.length;
     int palavrasLargas = palavrasUnicas.where((p) => p.length > 9).length;
 
-    // 2. Analisador de Flow (Consistência de tamanho de linha)
     double varianciaFlow = 0;
     if (totalLinhas > 2) {
       List<int> tamanhos = linhasRaw.map((l) => l.length).toList();
@@ -102,13 +137,11 @@ class RhymesController extends ChangeNotifier {
       varianciaFlow = tamanhos.where((l) => (l - media).abs() < 15).length / totalLinhas;
     }
 
-    // 3. Detecção de Punchlines e Impacto
     int punchlines = t.allMatches("!").length + t.allMatches("\\?").length;
     bool temRimaInterna = false;
     for (var linha in linhasRaw) {
       List<String> pLinha = linha.split(" ");
       if (pLinha.length > 4) {
-        // Checa rimas simples no meio da linha (mesmo sufixo)
         String p2 = pLinha[1].toLowerCase();
         String p4 = pLinha[3].toLowerCase();
         if (p2.length > 3 && p4.length > 3 && p2.substring(p2.length - 2) == p4.substring(p4.length - 2)) {
@@ -117,7 +150,6 @@ class RhymesController extends ChangeNotifier {
       }
     }
 
-    // --- CÁLCULO DE ESTRELAS (MÉTRICA E LÍRICA) ---
     if ((rimasNoVocabulario >= 15 || totalLinhas >= 20) && diversidadeLexica > 0.55) {
       starProgress = 3.0;
       currentFeedback = "Nivel Maximo! Vocabulario de mestre e lirica impecavel.";
@@ -132,23 +164,15 @@ class RhymesController extends ChangeNotifier {
       currentFeedback = "Escrevendo... O sistema esta analisando seu flow.";
     }
 
-    // --- CÁLCULO DE FOGO (ESTRUTURA E PERFORMANCE) ---
     int firePoints = 0;
-    
-    // Pontos por Estrutura Identificada
     bool temEstrutura = t.contains("INTRO") || t.contains("REFRÃO") || t.contains("REFRAO") || t.contains("FINAL");
     if (temEstrutura) firePoints++;
-
-    // Pontos por Flow e Metrica
     if (varianciaFlow > 0.7 && totalLinhas >= 8) firePoints++;
-
-    // Pontos por Punchlines e Rimas Internas
     if (punchlines >= 2 || temRimaInterna) firePoints++;
 
     if (caracteres > 150 && firePoints > 0) {
       fireProgress = firePoints.toDouble().clamp(0.0, 3.0);
-      starProgress = 0.0; // Prioridade estética para o fogo
-
+      starProgress = 0.0;
       if (fireProgress == 3.0) {
         currentFeedback = "HIT DETECTADO! Metrica perfeita e estrutura profissional.";
       } else if (fireProgress == 2.0) {
@@ -159,14 +183,6 @@ class RhymesController extends ChangeNotifier {
     } else {
       fireProgress = 0.0;
     }
-
-    // Alertas de Qualidade
-    if (palavras.length > 15 && diversidadeLexica < 0.35) {
-      currentFeedback = "Alerta: Repeticao alta detectada. Isso pode cansar o ouvinte.";
-    } else if (totalLinhas > 4 && varianciaFlow < 0.3) {
-      currentFeedback = "Dica: Suas linhas estao com tamanhos muito diferentes (quebra de flow).";
-    }
-
     notifyListeners();
   }
 
@@ -180,7 +196,6 @@ class RhymesController extends ChangeNotifier {
             .select('rimas_usadas')
             .eq('id', user.id)
             .single();
-
         _rimasUsadas = data['rimas_usadas'] ?? 0;
         notifyListeners();
       } catch (e) {
@@ -194,33 +209,24 @@ class RhymesController extends ChangeNotifier {
     notifyListeners();
     final user = _supabase.auth.currentUser;
     if (user != null) {
-      await _supabase
-          .from('profiles')
-          .update({'rimas_usadas': _rimasUsadas})
-          .eq('id', user.id);
+      await _supabase.from('profiles').update({'rimas_usadas': _rimasUsadas}).eq('id', user.id);
     }
   }
 
   Future<List<Map<String, dynamic>>> fetchTrendingWords() async {
     try {
-      final response = await _supabase
-          .from('global_word_ranking')
-          .select('word, score')
-          .order('score', ascending: false)
-          .limit(6);
-
-      return List<Map<String, dynamic>>.from(response);
+      final response = await _supabase.from('global_word_ranking').select('word, score').order('score', ascending: false).limit(6);
+      trendingWords = List<Map<String, dynamic>>.from(response);
+      notifyListeners();
+      return trendingWords;
     } catch (e) {
-      debugPrint("Erro ao buscar trending words: $e");
       return [];
     }
   }
 
   Future<void> incrementWordScore(String word) async {
     try {
-      await _supabase.rpc('increment_word_score', params: {
-        'word_param': word.toLowerCase().trim(),
-      });
+      await _supabase.rpc('increment_word_score', params: {'word_param': word.toLowerCase().trim()});
     } catch (e) {
       debugPrint("Erro ao incrementar score: $e");
     }
@@ -236,19 +242,16 @@ class RhymesController extends ChangeNotifier {
       _suggestionsList = [];
       starProgress = 0.0;
       fireProgress = 0.0;
-      currentFeedback = "Comece a escrever para avaliarmos sua letra...";
       notifyListeners();
       return;
     }
 
     _processarProgressoTecnico(text);
-
     int duration = isProActive ? 400 : 800;
 
     _debounce = Timer(Duration(milliseconds: duration), () async {
       _isLoading = true;
       notifyListeners();
-
       try {
         final response = await http.post(
           Uri.parse('$_baseUrl/process'),
@@ -258,29 +261,21 @@ class RhymesController extends ChangeNotifier {
             'rhyme_list': vocabulary.map((r) => r.word).toList(),
             'private_api_key': _userApiKey,
             'style_config': {
-              'genre': currentGenre,
-              'subgenre': currentSubGenre,
-              'bpm': currentBpm,
-              'key': currentKey,
-              'vocal_style': currentVocalStyle,
+              'genre': currentGenre, 'subgenre': currentSubGenre, 'bpm': currentBpm, 'key': currentKey, 'vocal_style': currentVocalStyle,
             }
           }),
         ).timeout(const Duration(seconds: 30));
 
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
-
           if (data['result'] is List) {
             _suggestionsList = List<String>.from(data['result']);
           } else {
             String res = data['result'] ?? "";
             _suggestionsList = (res == "NENHUMA" || res.isEmpty) ? [] : [res];
           }
-          
           _incrementarUso();
         }
-      } catch (e) {
-        debugPrint("Erro Versin Processar: $e");
       } finally {
         _isLoading = false;
         notifyListeners();
@@ -291,23 +286,15 @@ class RhymesController extends ChangeNotifier {
   Future<String?> addSuggestedRhyme(String word) async {
     final user = _supabase.auth.currentUser;
     String p = word.trim().toLowerCase();
-
     if (p.isNotEmpty && !vocabulary.any((r) => r.word == p)) {
       vocabulary.insert(0, Rhyme(word: p, isPriority: false));
       _suggestionsList.remove(word);
-      
       _processarProgressoTecnico(p); 
       notifyListeners();
-
       if (user != null) {
         try {
-          await _supabase.from('user_vocabulary').insert({
-            'word': p,
-            'profile_id': user.id,
-          });
-        } catch (e) {
-          debugPrint("Erro ao salvar: $e");
-        }
+          await _supabase.from('user_vocabulary').insert({'word': p, 'profile_id': user.id});
+        } catch (e) {}
       }
       return word;
     }
@@ -342,24 +329,18 @@ class RhymesController extends ChangeNotifier {
           'message': message,
           'current_list': vocabulary.map((r) => r.word).toList(),
           'private_api_key': _userApiKey,
-          'style_config': {
-            'genre': currentGenre,
-            'subgenre': currentSubGenre,
-          }
+          'style_config': { 'genre': currentGenre, 'subgenre': currentSubGenre }
         }),
       ).timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         _incrementarUso();
-        return {
-          "role": "assistant",
-          "content": data['content'] ?? ""
-        };
+        return { "role": "assistant", "content": data['content'] ?? "" };
       }
-      return {"role": "assistant", "content": "Erro no servidor do estudio."};
+      return {"role": "assistant", "content": "Erro no servidor."};
     } catch (e) {
-      return {"role": "assistant", "content": "Erro de conexao com o Versin."};
+      return {"role": "assistant", "content": "Erro de conexão."};
     } finally {
       _isLoading = false;
       notifyListeners();

@@ -35,14 +35,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Sincronizado com RhymesController.dart
 class RequestData(BaseModel):
     user_text: str
     rhyme_list: List[str]
     private_api_key: Optional[str] = None
     style_config: Optional[Dict] = {}
 
-# Sincronizado com RhymesController.dart
 class ChatRequest(BaseModel):
     user_id: Optional[str] = "default_user"
     message: str
@@ -59,7 +57,6 @@ def get_groq_client(user_key: Optional[str]):
         return Groq(api_key=user_key)
     return client_groq_default
 
-# --- SISTEMA DE CACHE INTELIGENTE ---
 @lru_cache(maxsize=2048)
 def buscar_rima_na_ia_cached(texto_usuario, rimas_str, api_key_hash):
     client = get_groq_client(GROQ_API_KEY if api_key_hash == "DEFAULT" else api_key_hash)
@@ -86,52 +83,21 @@ def buscar_rima_na_ia_cached(texto_usuario, rimas_str, api_key_hash):
     )
     return completion.choices[0].message.content
 
-# --- LÓGICA DE MODOS DINÂMICOS ---
+# --- LÓGICA UNIFICADA: MODOS REMOVIDOS ---
 def definir_comportamento(mensagem: str, lista_rimas: List[str], inventory_count: int = 0, inventory_limit: int = 100) -> str:
-    msg = mensagem.lower()
-    slots_available = inventory_limit - inventory_count
-    
-    if "/modorima" in msg:
-        return (
-            "--- MODO EXTRAÇÃO DE RIMAS ---"
-            "VOCÊ É UM BANCO DE DADOS. NÃO CONVERSE. NÃO DÊ DICAS."
-            "REGRAS:"
-            "1. Retorne rimas para a palavra solicitada no formato: [WORD:palavra] --> definição_curta."
-            "2. A definição deve ter no máximo 6 palavras."
-            "3. Se o usuário falar algo fora de rimas, responda: '[ERROR: Apenas rimas].'"
-            "\nEXEMPLO: [WORD:Arroz] --> Cereal básico da alimentação humana."
-            f"\nSTATUS: {inventory_count}/{inventory_limit}."
-        
-        )
-    elif "/modocompor" in msg:
-        return (
-            "MODO COMPOR ATIVO. Foco: Estrutura, métrica e flow. "
-            f"Status do Inventário: {inventory_count}/{inventory_limit}. "
-            "Aqui você pode ser o mentor técnico. Use [WORD:palavra] para sugerir rimas que podem ser salvas."
-        )
-    elif "/modolistar" in msg:
-        return (
-            "MODO LISTAR ATIVO. Foco: Curadoria de vocabulário. "
-            f"Lista atual: {lista_rimas}. Feedback: Destaque a rima mais 'cara'."
-        )
-    elif "/modomarketing" in msg:
-        return (
-            "MODO MARKETING ATIVO. Foco: Viralização e Branding."
-        )
-    else:
-        return (
-            "Você é o Versin, Mentor de Elite. Use [WORD:palavra] para sugerir rimas interativas.\n"
-            "PROCESSO CRIATIVO (6 PONTOS):\n"
-            "PONTO 1 (Rimas): Analise e sugira variações.\n"
-            "PONTO 2 (Expressão): Analise carga emocional.\n"
-            "PONTO 3 (Flow): Oriente cadência.\n"
-            "PONTO 4 (Arquitetura): Blocos de construção.\n"
-            "PONTO 5 (Assistência): Fine-tuning.\n"
-            "PONTO 6 (Finalização): Assinatura digital e exportação para nuvem.\n"
-            f"Use a biblioteca {lista_rimas} como base."
-        )
+    # Removidos todos os 'if /modorima', '/modocompor', etc.
+    return (
+        "Você é o Versin, Mentor de Elite de Rap e Trap. "
+        "Seu objetivo é ajudar na composição, métrica e flow de forma direta. "
+        "REGRAS DE RESPOSTA:\n"
+        "1. Use apenas texto puro. Nunca use colchetes, tags como [WORD:] ou códigos extras.\n"
+        "2. Sugira rimas e melhorias integradas naturalmente ao seu parágrafo.\n"
+        "3. Não mencione comandos ou modos de interface.\n"
+        f"4. Use o vocabulário do usuário como base: {lista_rimas}.\n"
+        f"5. Status atual do projeto: {inventory_count}/{inventory_limit} rimas salvas.\n"
+        "\nPROCESSO CRIATIVO: Foque em Rimas, Expressão, Flow e Arquitetura do verso."
+    )
 
-# --- ROTA DE RIMA (AVALIAÇÃO COM CACHE) ---
 @app.post("/process")
 async def processar_versin(data: RequestData):
     try:
@@ -155,7 +121,6 @@ async def processar_versin(data: RequestData):
         print(f"ERRO NO PROCESSAMENTO: {e}")
         return {"result": [], "impact_level": 1, "feedback_reason": "Sintonizando..."}
 
-# --- ROTA DE CHAT (MODOS INTEGRADOS) ---
 @app.post("/chat")
 async def chat_versin(data: ChatRequest):
     try:
@@ -163,6 +128,7 @@ async def chat_versin(data: ChatRequest):
         client = get_groq_client(data.private_api_key)
         model_chat = "llama-3.3-70b-versatile" if is_pro else "llama-3.1-8b-instant"
 
+        # Chama a função unificada sem distinção de modos
         system_behavior = definir_comportamento(
             data.message, 
             data.current_list, 
@@ -172,10 +138,10 @@ async def chat_versin(data: ChatRequest):
         
         system_behavior += (
             " Retorne APENAS JSON: {"
-            "'content': 'resposta_em_markdown', "
+            "'content': 'sua_resposta_em_markdown', "
             "'impact_level': 1_a_6, "
-            "'feedback_reason': 'comentário_curto_termômetro'"
-            "}. Níveis: 1-2 (Ok), 3-4 (Bom), 5-6 (Hit/Ouro)."
+            "'feedback_reason': 'comentário_curto'"
+            "}."
         )
 
         completion = client.chat.completions.create(

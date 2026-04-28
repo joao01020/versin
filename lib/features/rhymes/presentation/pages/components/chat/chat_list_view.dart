@@ -32,9 +32,10 @@ class ChatListView extends StatelessWidget {
 
     return ListView.builder(
       controller: scrollController,
+      // AJUSTE CRÍTICO 1: clipBehavior none permite que o "X" flutuante apareça
+      clipBehavior: Clip.none, 
       physics: const BouncingScrollPhysics(),
-      // Padding ajustado para não colidir com o ChatBottomBar
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 40),
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 80), // Aumentado o bottom para mais respiro
       itemCount: messages.length + (isAiTyping ? 1 : 0),
       itemBuilder: (context, index) {
         if (index == messages.length) {
@@ -46,19 +47,21 @@ class ChatListView extends StatelessWidget {
         
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          // AJUSTE CRÍTICO 2: Column também deve permitir transbordamento
+          mainAxisSize: MainAxisSize.min,
           children: [
             ChatMessageBubble(
-              // Convertemos apenas o conteúdo textual para a bolha
               message: {
                 "role": message["role"] ?? "assistant",
                 "content": message["content"]?.toString() ?? "",
               },
               activeColor: activeColor,
             ),
-            // EXIBIÇÃO DO CUSTOM WIDGET (Essencial para os ActionChips de Arquitetura)
             if (customWidget != null) 
               Padding(
-                padding: const EdgeInsets.only(left: 12, top: 8, bottom: 16),
+                // AJUSTE CRÍTICO 3: Padding lateral para garantir que o widget customizado 
+                // não encoste na borda da tela e o Stack tenha espaço para respirar
+                padding: const EdgeInsets.fromLTRB(12, 16, 12, 24),
                 child: customWidget,
               ),
           ],
@@ -71,7 +74,6 @@ class ChatListView extends StatelessWidget {
     String mainMessage = "Versin analisando...";
     String subMessage = "processando métrica e rimas...";
 
-    // Lógica para manter o usuário informado sobre o despertar do servidor
     if (secondsActive > 5) {
       mainMessage = "Servidor acordando...";
       subMessage = "Otimizando rimas (Tempo: ${secondsActive}s)...";

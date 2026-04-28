@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:supabase_flutter/supabase_flutter.dart'; 
 
 class ChatInitializer {
   static Timer? _metronomeTimer;
   static final AudioPlayer _audioPlayer = AudioPlayer();
+  static final _supabase = Supabase.instance.client;
 
   static void run({
     required Function(bool) onLoadingStatusChanged,
@@ -19,13 +21,29 @@ class ChatInitializer {
     });
   }
 
-  // Função para emitir o som do metrônomo
   static void _playMetronomeClick() {
-    // Caminho ajustado para a localização informada na lib
     _audioPlayer.play(
       AssetSource('sounds/click.wav'), 
       mode: PlayerMode.lowLatency
-    );
+    ).catchError((e) => debugPrint("Erro ao tocar áudio: $e"));
+  }
+
+  static Future<void> _saveSessionToDatabase(int bpm, List<String> estrutura) async {
+    try {
+      final user = _supabase.auth.currentUser;
+      if (user == null) return;
+
+      await _supabase.from('lyrics_history').insert({
+        'profile_id': user.id,
+        'content': 'Sessão iniciada: Aguardando composição...',
+        'hash_signature': DateTime.now().millisecondsSinceEpoch.toString(),
+        'bpm': bpm,
+        'structure': estrutura.join(' > '),
+      });
+      debugPrint("Configurações salvas no Supabase com sucesso!");
+    } catch (e) {
+      debugPrint("Erro ao salvar no banco: $e");
+    }
   }
 
   static void welcomeFlow({
@@ -49,7 +67,7 @@ class ChatInitializer {
       bool isMetronomeOn = false;
 
       addMessage(
-        "Salve! Sou o Versin. 🎤 Vamos preparar o estúdio. Arraste o BPM para ajustar e ative o metrônomo ao lado para ouvir o tempo:",
+        "Salve! Sou o Versin. 🎤 Vamos preparar o estúdio. Arraste o BPM para ajustar e monte a sequência abaixo:",
         customWidget: StatefulBuilder(
           builder: (context, setLocalState) {
             
@@ -66,6 +84,7 @@ class ChatInitializer {
 
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 const SizedBox(height: 15),
                 
@@ -87,15 +106,7 @@ class ChatInitializer {
                         ),
                         child: Column(
                           children: [
-                            Text(
-                              "$bpm",
-                              style: TextStyle(
-                                color: activeColor,
-                                fontSize: 32,
-                                fontWeight: FontWeight.bold,
-                                fontFamily: 'monospace',
-                              ),
-                            ),
+                            Text("$bpm", style: TextStyle(color: activeColor, fontSize: 32, fontWeight: FontWeight.bold, fontFamily: 'monospace')),
                             const Text("BPM", style: TextStyle(color: Colors.white24, fontSize: 10, letterSpacing: 2)),
                           ],
                         ),
@@ -103,12 +114,7 @@ class ChatInitializer {
                     ),
                     const SizedBox(width: 20),
                     IconButton(
-                      // ÍCONE CORRIGIDO AQUI:
-                      icon: Icon(
-                        isMetronomeOn ? Icons.timer : Icons.play_circle_outline_rounded,
-                        color: isMetronomeOn ? activeColor : Colors.white30,
-                        size: 40,
-                      ),
+                      icon: Icon(isMetronomeOn ? Icons.timer : Icons.play_circle_outline_rounded, color: isMetronomeOn ? activeColor : Colors.white30, size: 40),
                       onPressed: () {
                         setLocalState(() {
                           isMetronomeOn = !isMetronomeOn;
@@ -116,14 +122,11 @@ class ChatInitializer {
                         });
                       },
                     ),
-                    if (isMetronomeOn)
-                      Text("LIVE", style: TextStyle(color: activeColor, fontSize: 10, fontWeight: FontWeight.bold)),
                   ],
                 ),
 
                 const SizedBox(height: 25),
-
-                const Text("Monte a estrutura da sua track:", style: TextStyle(color: Colors.white70, fontSize: 12)),
+                const Text("Toque para adicionar à sequência:", style: TextStyle(color: Colors.white70, fontSize: 11)),
                 const SizedBox(height: 10),
                 Wrap(
                   spacing: 8,
@@ -137,34 +140,80 @@ class ChatInitializer {
                 ),
 
                 if (estruturaTemp.isNotEmpty) ...[
-                  const SizedBox(height: 20),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.03),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      "Sequência: ${estruturaTemp.join(' > ')}",
-                      style: TextStyle(color: activeColor, fontWeight: FontWeight.w600, fontSize: 13),
-                    ),
+                  const SizedBox(height: 30),
+                  Text(
+                    "Sua Estrutura (Segure e arraste para organizar):", 
+                    style: TextStyle(color: activeColor, fontSize: 11, fontWeight: FontWeight.bold)
                   ),
                   const SizedBox(height: 15),
+                  SizedBox(
+                    height: 48,
+                    child: ReorderableListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: estruturaTemp.length,
+                      onReorder: (oldIndex, newIndex) {
+                        setLocalState(() {
+                          if (newIndex > oldIndex) newIndex -= 1;
+                          final String item = estruturaTemp.removeAt(oldIndex);
+                          estruturaTemp.insert(newIndex, item);
+                        });
+                      },
+                      itemBuilder: (context, i) {
+                        return Container(
+                          key: ValueKey('struct_item_${estruturaTemp[i]}_$i'),
+                          margin: const EdgeInsets.only(right: 10),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.05),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: activeColor.withOpacity(0.3)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 12),
+                                child: Text(
+                                  estruturaTemp[i],
+                                  style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                                ),
+                              ),
+                              GestureDetector(
+                                onTap: () => setLocalState(() => estruturaTemp.removeAt(i)),
+                                child: Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.05),
+                                    borderRadius: const BorderRadius.only(
+                                      topRight: Radius.circular(7),
+                                      bottomRight: Radius.circular(7),
+                                    ),
+                                  ),
+                                  child: const Icon(Icons.close, color: Colors.white54, size: 14),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 20),
                   Row(
                     children: [
                       TextButton(
                         onPressed: () => setLocalState(() => estruturaTemp.clear()),
-                        child: const Text("Limpar", style: TextStyle(color: Colors.white38)),
+                        child: const Text("Limpar tudo", style: TextStyle(color: Colors.white38, fontSize: 12)),
                       ),
                       const Spacer(),
                       ElevatedButton(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: activeColor,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                         ),
-                        onPressed: () {
+                        onPressed: () async {
                           _metronomeTimer?.cancel();
+                          await _saveSessionToDatabase(bpm, estruturaTemp);
                           onStructureConfirmed("BPM: $bpm | Estrutura: ${estruturaTemp.join(' > ')}");
                         },
                         child: const Text("INICIAR SESSÃO", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),

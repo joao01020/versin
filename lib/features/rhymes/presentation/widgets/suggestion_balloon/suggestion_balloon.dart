@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-class AiSuggestionBalloon extends StatelessWidget {
+class SuggestionBalloon extends StatelessWidget {
   final String suggestion;
   final VoidCallback onTap;
   final VoidCallback? onDismiss;
@@ -9,7 +9,7 @@ class AiSuggestionBalloon extends StatelessWidget {
   final VoidCallback? onAddCommand; // Novo parâmetro para o comando de pesquisa
   final bool isLoading;
 
-  const AiSuggestionBalloon({
+  const SuggestionBalloon({
     super.key,
     required this.suggestion,
     required this.onTap,

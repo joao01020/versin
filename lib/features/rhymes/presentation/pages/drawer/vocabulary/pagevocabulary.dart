@@ -35,13 +35,13 @@ class PageVocabulary extends State<VocabularioPage> {
         final file = File(result.files.single.path!);
         final String content = await file.readAsString();
         
-        // Suporta separação por vírgula, ponto e vírgula ou nova linha
         final List<String> importedRhymes = content.split(RegExp(r'[,\n;]'));
         
         int count = 0;
         for (var rhyme in importedRhymes) {
           String cleanRhyme = rhyme.trim().toLowerCase();
           if (cleanRhyme.isNotEmpty) {
+            // Utiliza o método addWord restaurado no controller
             widget.controller.addWord(cleanRhyme, false);
             count++;
           }
@@ -149,9 +149,16 @@ class PageVocabulary extends State<VocabularioPage> {
                 final vocab = widget.controller.vocabulary;
                 
                 if (vocab.isEmpty) {
-                  return const Center(child: Text("Sua biblioteca está vazia.\nImporte um .txt ou adicione rimas!", textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)));
+                  return const Center(
+                    child: Text(
+                      "Sua biblioteca está vazia.\nImporte um .txt ou adicione rimas!", 
+                      textAlign: TextAlign.center, 
+                      style: TextStyle(color: Colors.grey)
+                    )
+                  );
                 }
 
+                // Separação visual das listas por prioridade
                 final priorities = vocab.where((r) => r.isPriority).toList();
                 final general = vocab.where((r) => !r.isPriority).toList();
 
@@ -194,7 +201,10 @@ class PageVocabulary extends State<VocabularioPage> {
       child: Row(
         children: [
           IconButton(
-            icon: Icon(_isNextPriority ? Icons.star : Icons.star_border, color: _isNextPriority ? Colors.yellow : Colors.grey),
+            icon: Icon(
+              _isNextPriority ? Icons.star : Icons.star_border, 
+              color: _isNextPriority ? Colors.yellow : Colors.grey
+            ),
             onPressed: () => setState(() => _isNextPriority = !_isNextPriority),
           ),
           Expanded(
@@ -202,17 +212,24 @@ class PageVocabulary extends State<VocabularioPage> {
               controller: _textController,
               style: const TextStyle(color: Colors.white),
               onSubmitted: (_) => _confirmAddition(),
-              decoration: const InputDecoration(hintText: "Adicionar rima ao banco...", hintStyle: TextStyle(color: Colors.grey, fontSize: 14), border: InputBorder.none),
+              decoration: const InputDecoration(
+                hintText: "Adicionar rima ao banco...", 
+                hintStyle: TextStyle(color: Colors.grey, fontSize: 14), 
+                border: InputBorder.none
+              ),
             ),
           ),
-          IconButton(icon: const Icon(Icons.add_circle, color: Colors.purpleAccent, size: 30), onPressed: _confirmAddition),
+          IconButton(
+            icon: const Icon(Icons.add_circle, color: Colors.purpleAccent, size: 30), 
+            onPressed: _confirmAddition
+          ),
         ],
       ),
     );
   }
 
   void _confirmAddition() {
-    if (_textController.text.isNotEmpty) {
+    if (_textController.text.trim().isNotEmpty) {
       widget.controller.addWord(_textController.text, _isNextPriority);
       _textController.clear();
       setState(() => _isNextPriority = false);
@@ -220,6 +237,7 @@ class PageVocabulary extends State<VocabularioPage> {
   }
 
   Widget _buildRhymeTile(Rhyme rhyme) {
+    // Busca o index real no vocabulário global para garantir que as funções de toggle/remove funcionem
     final int realIndex = widget.controller.vocabulary.indexWhere((element) => element.word == rhyme.word);
     
     return Container(
@@ -227,12 +245,19 @@ class PageVocabulary extends State<VocabularioPage> {
       decoration: BoxDecoration(color: Colors.white.withOpacity(0.03), borderRadius: BorderRadius.circular(12)),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-        title: Text(rhyme.word, style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500)),
+        title: Text(
+          rhyme.word, 
+          style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500)
+        ),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             IconButton(
-              icon: Icon(rhyme.isPriority ? Icons.star : Icons.star_border, color: rhyme.isPriority ? Colors.yellow : Colors.white24, size: 20),
+              icon: Icon(
+                rhyme.isPriority ? Icons.star : Icons.star_border, 
+                color: rhyme.isPriority ? Colors.yellow : Colors.white24, 
+                size: 20
+              ),
               onPressed: () => widget.controller.togglePriority(realIndex),
             ),
             IconButton(

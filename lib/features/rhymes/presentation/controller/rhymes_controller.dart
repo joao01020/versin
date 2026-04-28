@@ -7,58 +7,45 @@ import 'package:versin/core/models/rhyme_model.dart';
 
 class RhymesController extends ChangeNotifier {
   Timer? _debounce;
-  final String _baseUrl = "https://versin.onrender.com";
+  Timer? _connectionTimer; // Timer para o contador real
   final _supabase = Supabase.instance.client;
+  final String _baseUrl = "https://versin.onrender.com";
 
-  // --- ESTADO DO CHAT E SUGESTÕES ---
+  // --- ESTADOS ---
   List<String> _suggestionsList = [];
   List<String> get suggestionsList => _suggestionsList;
+  List<String> get suggestions => _suggestionsList;
   String get suggestion => _suggestionsList.isNotEmpty ? _suggestionsList.first : "";
 
   bool _isLoading = false;
   bool get isLoading => _isLoading;
 
-  // --- ESTADO DA TIMELINE E PROGRESSO (NOVO) ---
+  int connectionSeconds = 0; // Segundos reais passados na requisição
+
+  // --- PROGRESSO E GAMIFICAÇÃO ---
   int _currentStep = 1;
   int get currentStep => _currentStep;
-  
   double _stepProgress = 0.0;
   double get stepProgress => _stepProgress;
 
-  // --- ESTADOS DE MODO DE INTERFACE (NOVO) ---
+  double starProgress = 0.0;
+  double fireProgress = 0.0;
+  String currentFeedback = "Comece a escrever para validar sua letra...";
+
+  // --- MODOS DE INTERFACE ---
   bool isRhymeMode = false;
   bool isComposeMode = false;
   bool isListMode = false;
   bool isMarketingMode = false;
 
-  // --- ESTADO DA GAMIFICAÇÃO ---
-  double starProgress = 0.0;
-  double fireProgress = 0.0;
-  String currentFeedback = "Comece a escrever para validar sua letra...";
-
-  // --- ESTADO DE USO ---
-  int _rimasUsadas = 0;
-  int get rimasUsadas => _rimasUsadas;
-  bool get temSaldo => true;
-
-  // --- CONFIGURAÇÕES DE ESTILO ---
-  String currentGenre = 'Automático';
-  String currentSubGenre = 'Padrão';
-  String currentBpm = 'Automático';
-  String currentKey = 'Automático';
-  String currentVocalStyle = 'Automático';
-  bool shareDictionary = false;
-
-  final String _userId = "user_dev_01";
-  String? _userApiKey = "VERSIN-PRO-TRIAL-2026-FREE";
-  String? get userApiKey => _userApiKey;
-
+  // --- DADOS E API ---
   List<Rhyme> vocabulary = [];
   List<Map<String, dynamic>> trendingWords = [];
-
+  String? _userApiKey = "VERSIN-PRO-TRIAL-2026-FREE";
+  String? get userApiKey => _userApiKey;
   bool get isProActive => _userApiKey != null && _userApiKey!.isNotEmpty;
 
-  // --- LÓGICA DE UI (CORES) ---
+  // --- LÓGICA DE CORES ---
   Color getActiveColor() {
     if (isRhymeMode) return Colors.greenAccent;
     if (isComposeMode) return Colors.blueAccent;
@@ -67,291 +54,128 @@ class RhymesController extends ChangeNotifier {
     return Colors.purpleAccent;
   }
 
-  // --- ATUALIZAÇÃO DE ESTADOS DE FLUXO ---
-  void updateProgress(int step, double progress) {
-    _currentStep = step;
-    _stepProgress = progress;
-    notifyListeners();
-  }
-
-  void updateModes({bool? rhyme, bool? compose, bool? list, bool? marketing}) {
-    if (rhyme != null) isRhymeMode = rhyme;
-    if (compose != null) isComposeMode = compose;
-    if (list != null) isListMode = list;
-    if (marketing != null) isMarketingMode = marketing;
-    notifyListeners();
-  }
-
-  void searchSuggestion(String word) {
-    onTextChanged(word);
-  }
-
-  void updateSetup({
-    String? genre,
-    String? subGenre,
-    String? bpm,
-    String? key,
-    String? vocalStyle,
-    bool? share,
-  }) {
-    if (genre != null) currentGenre = genre;
-    if (subGenre != null) currentSubGenre = subGenre;
-    if (bpm != null) currentBpm = bpm;
-    if (key != null) currentKey = key;
-    if (vocalStyle != null) currentVocalStyle = vocalStyle;
-    if (share != null) shareDictionary = share;
-    notifyListeners();
-  }
-
-  void setApiKey(String key) {
-    _userApiKey = key.trim().isEmpty ? null : key.trim();
-    notifyListeners();
-  }
-
-  // --- LÓGICA DE GAMIFICAÇÃO LOCAL (SEM EMOJIS) ---
-  void _processarProgressoTecnico(String texto) {
-    if (texto.trim().isEmpty) {
-      starProgress = 0.0;
-      fireProgress = 0.0;
-      currentFeedback = "Comece a escrever para validar sua letra...";
-      notifyListeners();
-      return;
-    }
-
-    final String t = texto.toUpperCase();
-    final List<String> linhasRaw = texto.split('\n').where((l) => l.trim().isNotEmpty).toList();
-    final List<String> palavras = t.split(RegExp(r'\s+')).where((p) => p.length > 2).toList();
-    
-    int caracteres = texto.trim().length;
-    int rimasNoVocabulario = vocabulary.length;
-    int totalLinhas = linhasRaw.length;
-
-    Set<String> palavrasUnicas = palavras.toSet();
-    double diversidadeLexica = palavras.isEmpty ? 0 : palavrasUnicas.length / palavras.length;
-    int palavrasLargas = palavrasUnicas.where((p) => p.length > 9).length;
-
-    double varianciaFlow = 0;
-    if (totalLinhas > 2) {
-      List<int> tamanhos = linhasRaw.map((l) => l.length).toList();
-      int media = tamanhos.reduce((a, b) => a + b) ~/ totalLinhas;
-      varianciaFlow = tamanhos.where((l) => (l - media).abs() < 15).length / totalLinhas;
-    }
-
-    int punchlines = t.allMatches("!").length + t.allMatches("\\?").length;
-    bool temRimaInterna = false;
-    for (var linha in linhasRaw) {
-      List<String> pLinha = linha.split(" ");
-      if (pLinha.length > 4) {
-        String p2 = pLinha[1].toLowerCase();
-        String p4 = pLinha[3].toLowerCase();
-        if (p2.length > 3 && p4.length > 3 && p2.substring(p2.length - 2) == p4.substring(p4.length - 2)) {
-          temRimaInterna = true;
-        }
-      }
-    }
-
-    if ((rimasNoVocabulario >= 15 || totalLinhas >= 20) && diversidadeLexica > 0.55) {
-      starProgress = 3.0;
-      currentFeedback = "Nivel Maximo! Vocabulario de mestre e lirica impecavel.";
-    } else if ((rimasNoVocabulario >= 8 || totalLinhas >= 10) && palavrasLargas >= 3) {
-      starProgress = 2.0;
-      currentFeedback = "Evolucao nitida. Voce esta construindo frases mais complexas.";
-    } else if (caracteres >= 60 || totalLinhas >= 4) {
-      starProgress = 1.0;
-      currentFeedback = "Fundamentos solidos. Continue expandindo as estrofes.";
-    } else {
-      starProgress = 0.5;
-      currentFeedback = "Escrevendo... O sistema esta analisando seu flow.";
-    }
-
-    int firePoints = 0;
-    bool temEstrutura = t.contains("INTRO") || t.contains("REFRÃO") || t.contains("REFRAO") || t.contains("FINAL");
-    if (temEstrutura) firePoints++;
-    if (varianciaFlow > 0.7 && totalLinhas >= 8) firePoints++;
-    if (punchlines >= 2 || temRimaInterna) firePoints++;
-
-    if (caracteres > 150 && firePoints > 0) {
-      fireProgress = firePoints.toDouble().clamp(0.0, 3.0);
-      starProgress = 0.0;
-      if (fireProgress == 3.0) {
-        currentFeedback = "HIT DETECTADO! Metrica perfeita e estrutura profissional.";
-      } else if (fireProgress == 2.0) {
-        currentFeedback = "Flow constante. A cadencia da sua letra esta excelente.";
-      } else {
-        currentFeedback = "Calor aumentando. Sua estrutura esta ganhando peso.";
-      }
-    } else {
-      fireProgress = 0.0;
-    }
-    notifyListeners();
-  }
-
-  // --- SINCRONIZAÇÃO COM SUPABASE ---
-  Future<void> carregarDadosUsuario() async {
-    final user = _supabase.auth.currentUser;
-    if (user != null) {
-      try {
-        final data = await _supabase
-            .from('profiles')
-            .select('rimas_usadas')
-            .eq('id', user.id)
-            .single();
-        _rimasUsadas = data['rimas_usadas'] ?? 0;
-        notifyListeners();
-      } catch (e) {
-        debugPrint("Erro ao sincronizar uso: $e");
-      }
-    }
-  }
-
-  Future<void> _incrementarUso() async {
-    _rimasUsadas++;
-    notifyListeners();
-    final user = _supabase.auth.currentUser;
-    if (user != null) {
-      await _supabase.from('profiles').update({'rimas_usadas': _rimasUsadas}).eq('id', user.id);
-    }
-  }
-
-  Future<List<Map<String, dynamic>>> fetchTrendingWords() async {
-    try {
-      final response = await _supabase.from('global_word_ranking').select('word, score').order('score', ascending: false).limit(6);
-      trendingWords = List<Map<String, dynamic>>.from(response);
-      notifyListeners();
-      return trendingWords;
-    } catch (e) {
-      return [];
-    }
-  }
-
-  Future<void> incrementWordScore(String word) async {
-    try {
-      await _supabase.rpc('increment_word_score', params: {'word_param': word.toLowerCase().trim()});
-    } catch (e) {
-      debugPrint("Erro ao incrementar score: $e");
-    }
-  }
-
-  void updateGamification(dynamic rawLevel) {}
-
+  // --- LÓGICA DE DIGITAÇÃO E FEEDBACK ---
   void onTextChanged(String text) {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
-    String t = text.trim();
-
-    if (t.isEmpty) {
-      _suggestionsList = [];
-      starProgress = 0.0;
-      fireProgress = 0.0;
-      notifyListeners();
-      return;
-    }
-
+    
     _processarProgressoTecnico(text);
-    int duration = isProActive ? 400 : 800;
 
-    _debounce = Timer(Duration(milliseconds: duration), () async {
-      _isLoading = true;
-      notifyListeners();
-      try {
-        final response = await http.post(
-          Uri.parse('$_baseUrl/process'),
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({
-            'user_text': t,
-            'rhyme_list': vocabulary.map((r) => r.word).toList(),
-            'private_api_key': _userApiKey,
-            'style_config': {
-              'genre': currentGenre, 'subgenre': currentSubGenre, 'bpm': currentBpm, 'key': currentKey, 'vocal_style': currentVocalStyle,
-            }
-          }),
-        ).timeout(const Duration(seconds: 30));
-
-        if (response.statusCode == 200) {
-          final data = jsonDecode(response.body);
-          if (data['result'] is List) {
-            _suggestionsList = List<String>.from(data['result']);
-          } else {
-            String res = data['result'] ?? "";
-            _suggestionsList = (res == "NENHUMA" || res.isEmpty) ? [] : [res];
-          }
-          _incrementarUso();
-        }
-      } finally {
-        _isLoading = false;
+    _debounce = Timer(const Duration(milliseconds: 300), () {
+      String t = text.trim().toLowerCase();
+      if (t.isEmpty) {
+        _suggestionsList = [];
         notifyListeners();
+        return;
       }
+
+      final words = t.split(RegExp(r'\s+'));
+      final lastWord = words.last;
+
+      if (lastWord.length >= 2) {
+        _suggestionsList = vocabulary
+            .where((item) {
+              String wordInVocab = item.word.toLowerCase();
+              return wordInVocab.endsWith(lastWord.substring(lastWord.length - 2)) || 
+                     wordInVocab.contains(lastWord);
+            })
+            .map((item) => item.word)
+            .where((word) => word != lastWord)
+            .toList();
+      } else {
+        _suggestionsList = [];
+      }
+      notifyListeners();
     });
   }
 
-  Future<String?> addSuggestedRhyme(String word) async {
-    final user = _supabase.auth.currentUser;
-    String p = word.trim().toLowerCase();
-    if (p.isNotEmpty && !vocabulary.any((r) => r.word == p)) {
-      vocabulary.insert(0, Rhyme(word: p, isPriority: false));
-      _suggestionsList.remove(word);
-      _processarProgressoTecnico(p); 
-      notifyListeners();
-      if (user != null) {
-        try {
-          await _supabase.from('user_vocabulary').insert({'word': p, 'profile_id': user.id});
-        } catch (e) {}
-      }
-      return word;
+  void _processarProgressoTecnico(String texto) {
+    if (texto.trim().isEmpty) {
+      starProgress = 0.0;
+      currentFeedback = "Comece a escrever para validar sua letra...";
+    } else {
+      currentFeedback = "Versin analisando seu flow...";
+      final totalLinhas = texto.split('\n').where((l) => l.trim().isNotEmpty).length;
+      starProgress = (totalLinhas / 10).clamp(0.0, 3.0);
     }
-    return null;
-  }
-
-  void registerUsedRhyme(String rhyme) {
-    _suggestionsList.remove(rhyme);
     notifyListeners();
   }
 
-  void removeFromList(String rhyme) {
-    _suggestionsList.remove(rhyme);
-    notifyListeners();
-  }
-
-  void clearSuggestions() {
-    _suggestionsList = [];
-    _isLoading = false;
-    notifyListeners();
-  }
-
+  // --- CONEXÃO COM IA DO CHAT COM TIMER REAL ---
   Future<Map<String, String>> fetchAiResponse(String message) async {
     _isLoading = true;
+    connectionSeconds = 0; // Reseta o contador
     notifyListeners();
+
+    // Inicia o contador de segundos real para o ChatListView
+    _connectionTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      connectionSeconds++;
+      notifyListeners();
+    });
+    
     try {
       final response = await http.post(
         Uri.parse('$_baseUrl/chat'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'user_id': _userId,
+          'user_id': "user_dev_01",
           'message': message,
           'current_list': vocabulary.map((r) => r.word).toList(),
           'private_api_key': _userApiKey,
-          'style_config': { 'genre': currentGenre, 'subgenre': currentSubGenre }
         }),
-      ).timeout(const Duration(seconds: 30));
+      ).timeout(const Duration(seconds: 60)); // Aumentado para 60s (acordar o Render)
+
+      _connectionTimer?.cancel();
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        _incrementarUso();
         return { "role": "assistant", "content": data['content'] ?? "" };
       }
-      return {"role": "assistant", "content": "Erro no servidor."};
+      return {"role": "assistant", "content": "Erro no servidor (Status: ${response.statusCode})"};
     } catch (e) {
-      return {"role": "assistant", "content": "Erro de conexão."};
+      _connectionTimer?.cancel();
+      return {"role": "assistant", "content": "O servidor demorou muito. Tente enviar de novo!"};
     } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
 
+  // --- MÉTODOS DE SUPABASE ---
+  Future<void> carregarDadosUsuario() async {
+    final user = _supabase.auth.currentUser;
+    if (user != null) {
+      try {
+        final vocabData = await _supabase.from('user_vocabulary').select('word, is_priority').eq('profile_id', user.id);
+        vocabulary = (vocabData as List).map((item) => Rhyme(word: item['word'], isPriority: item['is_priority'] ?? false)).toList();
+        notifyListeners();
+      } catch (e) { debugPrint("Erro ao carregar: $e"); }
+    }
+  }
+
+  // --- MÉTODOS DE GERENCIAMENTO ---
   void addWord(String word, bool priority) {
     String p = word.trim().toLowerCase();
     if (p.isNotEmpty && !vocabulary.any((r) => r.word == p)) {
       vocabulary.insert(0, Rhyme(word: p, isPriority: priority));
       notifyListeners();
+      final user = _supabase.auth.currentUser;
+      if (user != null) {
+        _supabase.from('user_vocabulary').insert({
+          'word': p, 'profile_id': user.id, 'is_priority': priority
+        }).then((_) => null);
+      }
+    }
+  }
+
+  void removeWord(int index) {
+    if (index >= 0 && index < vocabulary.length) {
+      final wordToRemove = vocabulary[index].word;
+      vocabulary.removeAt(index);
+      notifyListeners();
+      final user = _supabase.auth.currentUser;
+      if (user != null) {
+        _supabase.from('user_vocabulary').delete().eq('word', wordToRemove).eq('profile_id', user.id).then((_) => null);
+      }
     }
   }
 
@@ -362,16 +186,17 @@ class RhymesController extends ChangeNotifier {
     }
   }
 
-  void removeWord(int index) {
-    if (index >= 0 && index < vocabulary.length) {
-      vocabulary.removeAt(index);
-      notifyListeners();
-    }
-  }
+  void setApiKey(String key) { _userApiKey = key; notifyListeners(); }
+  void updateGamification(dynamic v) { if (v is double) starProgress = v; notifyListeners(); }
+  Future<void> fetchTrendingWords() async { /* Implementar se necessário */ }
+  void incrementWordScore(String w) { /* Implementar se necessário */ }
+  void updateProgress(int s, double p) { _currentStep = s; _stepProgress = p; notifyListeners(); }
+  void clearSuggestions() { _suggestionsList = []; notifyListeners(); }
 
   @override
   void dispose() {
     _debounce?.cancel();
+    _connectionTimer?.cancel();
     super.dispose();
   }
 }

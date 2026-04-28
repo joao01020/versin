@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:versin/features/rhymes/presentation/widgets/structure_builder/structure_draggable_list.dart';
 
 class ChatInitializer {
   static void run({
@@ -8,7 +7,8 @@ class ChatInitializer {
     required Function() onStartWelcomeFlow,
     required bool mounted,
   }) {
-    Timer(const Duration(seconds: 5), () {
+    // Reduzi um pouco o tempo para o app parecer mais ágil
+    Timer(const Duration(seconds: 3), () {
       if (mounted) {
         onLoadingStatusChanged(false);
         onStartWelcomeFlow();
@@ -31,21 +31,21 @@ class ChatInitializer {
 
     Timer(const Duration(seconds: 1), () {
       if (!mounted) return;
-      addMessage("Salve! Sou o Versin... 🎤");
+      // Removido qualquer customWidget que pudesse injetar botões
+      addMessage("Salve! Sou o Versin, seu mentor de composição. 🎤", customWidget: null);
       scrollToBottom();
 
       Timer(const Duration(seconds: 2), () {
         if (!mounted) return;
         setAiTyping(false);
         
-        // Agora o flow envia apenas a orientação textual
+        // Texto limpo focado na imersão do usuário
         addMessage(
-          "Para começar, mande o sentimento que quer na letra",
+          "Para começar a arquitetar sua letra, mande o sentimento ou o tema que você tem em mente agora.",
+          customWidget: null,
         );
         
-        // Atualiza o progresso para o ponto 2 (Expressão), pois não há mais o seletor
         onProgressUpdate(2, 0.0);
-        
         scrollToBottom();
       });
     });
@@ -59,17 +59,17 @@ class ChatInitializer {
   }) {
     onProgressUpdate(4, 0.0);
     
+    // CORREÇÃO FINAL: Removida a DraggableList que ocupava espaço e trazia o roxo.
+    // O usuário agora define a estrutura por texto, mantendo o minimalismo.
     addMessage(
-      "Quarto ponto: Estrutura. Arraste para organizar ou use o '+' para novos blocos.",
-      customWidget: StructureDraggableList(
-        initialStructure: const ["Intro", "Verso 1", "Refrão", "Verso 2", "Refrão", "Ponte", "Final"],
-        activeColor: activeColor,
-        onStructureChanged: (newStructure) {
-          onProgressUpdate(4, 1.0);
-          Future.delayed(const Duration(seconds: 1), () => onProgressUpdate(5, 0.1));
-        },
-      ),
+      "Ponto 4: Arquitetura. Como você visualiza a ordem? (Ex: Intro > Verso > Refrão). Digite sua sequência.",
+      customWidget: null,
     );
+    
+    // Atualiza o progresso automaticamente para não travar a timeline
+    onProgressUpdate(4, 1.0);
+    Future.delayed(const Duration(milliseconds: 500), () => onProgressUpdate(5, 0.0));
+    
     scrollToBottom();
   }
 }

@@ -33,7 +33,8 @@ class ChatListView extends StatelessWidget {
     return ListView.builder(
       controller: scrollController,
       physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 100),
+      // Padding ajustado para não colidir com o ChatBottomBar
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 40),
       itemCount: messages.length + (isAiTyping ? 1 : 0),
       itemBuilder: (context, index) {
         if (index == messages.length) {
@@ -41,16 +42,25 @@ class ChatListView extends StatelessWidget {
         }
 
         final message = messages[index];
+        final Widget? customWidget = message['customWidget'];
         
-        // REMOVIDO: A lógica que injetava customWidgets (botões roxos) foi ignorada aqui
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             ChatMessageBubble(
-              message: message.map((k, v) => MapEntry(k, v is String ? v : v.toString())),
+              // Convertemos apenas o conteúdo textual para a bolha
+              message: {
+                "role": message["role"] ?? "assistant",
+                "content": message["content"]?.toString() ?? "",
+              },
               activeColor: activeColor,
             ),
-            // O espaço reservado para o customWidget foi removido para manter o chat limpo
+            // EXIBIÇÃO DO CUSTOM WIDGET (Essencial para os ActionChips de Arquitetura)
+            if (customWidget != null) 
+              Padding(
+                padding: const EdgeInsets.only(left: 12, top: 8, bottom: 16),
+                child: customWidget,
+              ),
           ],
         );
       },
@@ -61,9 +71,10 @@ class ChatListView extends StatelessWidget {
     String mainMessage = "Versin analisando...";
     String subMessage = "processando métrica e rimas...";
 
+    // Lógica para manter o usuário informado sobre o despertar do servidor
     if (secondsActive > 5) {
-      mainMessage = "Acordando servidor...";
-      subMessage = "O Render está subindo, aguarde (${secondsActive}s)...";
+      mainMessage = "Servidor acordando...";
+      subMessage = "Otimizando rimas (Tempo: ${secondsActive}s)...";
     }
 
     return Padding(
@@ -75,16 +86,14 @@ class ChatListView extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              // Cor neutra para o fundo do loading
               color: Colors.white.withOpacity(0.05),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: SizedBox(
+            child: const SizedBox(
               width: 14,
               height: 14,
               child: CircularProgressIndicator(
                 strokeWidth: 2, 
-                // Cor do carregamento mais discreta
                 valueColor: AlwaysStoppedAnimation<Color>(Colors.white24),
               ),
             ),
@@ -95,7 +104,7 @@ class ChatListView extends StatelessWidget {
             children: [
               Text(
                 mainMessage,
-                style: TextStyle(
+                style: const TextStyle(
                   color: Colors.white70, 
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
@@ -104,7 +113,7 @@ class ChatListView extends StatelessWidget {
               ),
               Text(
                 subMessage,
-                style: TextStyle(
+                style: const TextStyle(
                   color: Colors.white38, 
                   fontSize: 10,
                 ),

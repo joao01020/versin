@@ -40,6 +40,9 @@ class _ChatPageState extends State<ChatPage> {
     _setupAuthListener(); 
     _loadInitialData();
     _startAuthTimer();
+    
+    // Wake up do servidor (Keep-alive inicial)
+    _rhymesController.fetchTrendingWords(); 
   }
 
   void _initializeLogic() {
@@ -66,7 +69,6 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   Future<void> _loadInitialData() async {
-    await _rhymesController.fetchTrendingWords();
     await _rhymesController.carregarDadosUsuario();
     if (mounted) {
       ChatInitializer.run(
@@ -79,9 +81,7 @@ class _ChatPageState extends State<ChatPage> {
 
   void _checkInitialSession() {
     final session = Supabase.instance.client.auth.currentSession;
-    if (session != null) {
-      _authModalTimer?.cancel();
-    }
+    if (session != null) _authModalTimer?.cancel();
   }
 
   void _setupAuthListener() {
@@ -102,13 +102,12 @@ class _ChatPageState extends State<ChatPage> {
     });
   }
 
-  void _sendMessage() async {
-    final text = _messageController.text.trim();
+  // Função centralizada para processar mensagens e gatilhos de IA
+  void _processMessage(String text) async {
     if (text.isEmpty) return;
 
     setState(() {
       messages.add({"role": "user", "content": text});
-      _messageController.clear();
       _isAiTyping = true; 
     });
     
@@ -125,39 +124,38 @@ class _ChatPageState extends State<ChatPage> {
     }
   }
 
+  void _sendMessage() {
+    final text = _messageController.text.trim();
+    _processMessage(text);
+    _messageController.clear();
+  }
+
   void _startWelcomeFlow() {
     ChatInitializer.welcomeFlow(
       mounted: mounted,
       messages: messages,
-      // REMOÇÃO: Forçando customWidget como null para limpar o chat inicial
+      // Agora permitimos que o customWidget (BPM/Chips) seja renderizado
       addMessage: (content, {Widget? customWidget}) => setState(() {
-        messages.add({"role": "assistant", "content": content, "customWidget": null});
+        messages.add({
+          "role": "assistant", 
+          "content": content, 
+          "customWidget": customWidget 
+        });
       }),
       setAiTyping: (typing) => setState(() => _isAiTyping = typing),
       scrollToBottom: _scrollToBottom,
-      userRhymes: _rhymesController.vocabulary.map((e) => e.word.toString()).toList(), 
       onProgressUpdate: (step, progress) => _rhymesController.updateProgress(step, progress),
-      globalTrendingWords: _rhymesController.trendingWords,
-      onWordSelected: (word) => _rhymesController.incrementWordScore(word),
+      activeColor: _rhymesController.getActiveColor(),
+      // Quando o usuário clica em "Confirmar Estúdio" no início:
+      onStructureConfirmed: (configEstudio) {
+        _processMessage("Configuração do Estúdio: $configEstudio. Agora, me diga o tema da sua letra.");
+      },
     );
   }
 
   void _completeStep(int step) {
     _rhymesController.updateProgress(step + 1, 0.0);
-    if (_rhymesController.currentStep == 4) {
-      ChatInitializer.startStructureStep(
-        addMessage: _addAiMessageWithWidget,
-        onProgressUpdate: (s, p) => _rhymesController.updateProgress(s, p),
-        scrollToBottom: _scrollToBottom,
-        activeColor: _rhymesController.getActiveColor(),
-      );
-    }
-  }
-
-  // REMOÇÃO: Forçando customWidget como null para impedir novos botões roxos
-  void _addAiMessageWithWidget(String content, {Widget? customWidget}) {
-    setState(() => messages.add({"role": "assistant", "content": content, "customWidget": null}));
-    _scrollToBottom();
+    // Lógica para passos manuais se necessário futuramente
   }
 
   void _scrollToBottom() {
@@ -190,6 +188,7 @@ class _ChatPageState extends State<ChatPage> {
       ),
       body: Stack(
         children: [
+          // Timeline Superior
           Positioned(top: 40, left: 0, right: 0,
             child: VersinTimeline(
               currentStep: _rhymesController.currentStep, 
@@ -197,6 +196,7 @@ class _ChatPageState extends State<ChatPage> {
               activeColor: activeColor
             ),
           ),
+          // Logo e Header (Genesis)
           Positioned(top: 100, left: 0, right: 0,
             child: Column(
               children: [
@@ -207,13 +207,17 @@ class _ChatPageState extends State<ChatPage> {
               ],
             ),
           ),
+          // Botão Menu
           Positioned(top: 95, left: 15,
             child: IconButton(
               icon: Icon(Icons.menu_rounded, color: activeColor, size: 32),
               onPressed: () => _scaffoldKey.currentState?.openDrawer()
             ),
           ),
-          Positioned.fill(top: 240, bottom: 120 + bottomPadding, 
+          // LISTA DE MENSAGENS (Padding ajustado para respiro do teclado e input)
+          Positioned.fill(
+            top: 240, 
+            bottom: 110 + bottomPadding, 
             child: ChatListView(
               isInitializing: _isInitializing, 
               messages: messages,
@@ -223,6 +227,7 @@ class _ChatPageState extends State<ChatPage> {
               secondsActive: _rhymesController.connectionSeconds,
             ),
           ),
+          // Barra de Digitação Inferior (ChatBottomBar)
           Positioned(bottom: bottomPadding + 15, left: 15, right: 15,
             child: ChatBottomBar(
               messageController: _messageController, 

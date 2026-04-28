@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:versin/features/rhymes/presentation/controller/rhymes_controller.dart';
-import 'package:versin/features/rhymes/presentation/widgets/ai_suggestion/ai_suggestion_balloon.dart';
+import 'package:versin/features/rhymes/presentation/widgets/suggestion_balloon/suggestion_balloon.dart';
 import 'package:versin/features/rhymes/presentation/widgets/chat/chat_input_area.dart';
 
 class ChatBottomBar extends StatelessWidget {
@@ -11,7 +11,6 @@ class ChatBottomBar extends StatelessWidget {
   final VoidCallback onSend;
   final int currentSuggestionIndex;
   final Function(int) onUpdateSuggestionIndex;
-  // NOVO: Parâmetro para salvar e completar a rima
   final Function(String)? onAddRhyme; 
 
   const ChatBottomBar({
@@ -23,7 +22,7 @@ class ChatBottomBar extends StatelessWidget {
     required this.onSend,
     required this.currentSuggestionIndex,
     required this.onUpdateSuggestionIndex,
-    this.onAddRhyme, // Inicializado aqui
+    this.onAddRhyme, 
   });
 
   @override
@@ -36,9 +35,9 @@ class ChatBottomBar extends StatelessWidget {
         ChatInputArea(
           controller: messageController,
           onSend: onSend,
-          activeColor: activeColor,
-          hintText: isRhymeMode ? "Buscar rima..." : "Manda o sentimento...",
-          // Repassando a função para o InputArea
+          // CORREÇÃO: Usando branco/cinza no input para manter o minimalismo
+          activeColor: Colors.white70,
+          hintText: isRhymeMode ? "Filtrando vocabulário..." : "Escreva seus versos...",
           onAddRhyme: onAddRhyme, 
         ),
       ],
@@ -54,28 +53,33 @@ class ChatBottomBar extends StatelessWidget {
 
         final safeIndex = currentSuggestionIndex >= rimas.length ? 0 : currentSuggestionIndex;
 
-        return AiSuggestionBalloon(
+        return SuggestionBalloon(
           suggestion: rimas[safeIndex],
           isLoading: rhymesController.isLoading, 
+          // CORREÇÃO: Garantindo que o balão não receba o roxo do controller
           onTap: () {
-            // Se o onAddRhyme existir, usamos ele para salvar e completar
             if (onAddRhyme != null) {
               onAddRhyme!(rimas[safeIndex]);
             } else {
-              // Fallback caso a função não seja passada
-              messageController.text =
-                  "${messageController.text} ${rimas[safeIndex]} "
-                      .trimLeft();
+              final currentText = messageController.text;
+              messageController.text = "$currentText ${rimas[safeIndex]} ".trimLeft();
               messageController.selection = TextSelection.fromPosition(
                 TextPosition(offset: messageController.text.length),
               );
-              rhymesController.registerUsedRhyme(rimas[safeIndex]);
             }
+            rhymesController.clearSuggestions();
           },
           onNext: rimas.length > 1
               ? () {
                   final nextIndex = (safeIndex + 1) % rimas.length;
                   onUpdateSuggestionIndex(nextIndex); 
+                }
+              : null,
+          // Adicionado navegação para trás para melhorar a UX sem precisar de ícones extras
+          onPrevious: rimas.length > 1
+              ? () {
+                  final prevIndex = (safeIndex - 1 < 0) ? rimas.length - 1 : safeIndex - 1;
+                  onUpdateSuggestionIndex(prevIndex);
                 }
               : null,
           onDismiss: () => rhymesController.clearSuggestions(), 

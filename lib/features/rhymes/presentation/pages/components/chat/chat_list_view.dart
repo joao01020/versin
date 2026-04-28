@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
-
 import 'package:versin/features/rhymes/presentation/widgets/chat/welcome_card/chat_welcome_card.dart';
 import 'package:versin/features/rhymes/presentation/widgets/chat/chat_message_bubble.dart';
+
 class ChatListView extends StatelessWidget {
   final bool isInitializing;
   final List<Map<String, dynamic>> messages;
   final bool isAiTyping;
   final ScrollController scrollController;
   final Color activeColor;
+  final int secondsActive; 
 
   const ChatListView({
     super.key,
@@ -16,6 +17,7 @@ class ChatListView extends StatelessWidget {
     required this.isAiTyping,
     required this.scrollController,
     required this.activeColor,
+    this.secondsActive = 0, 
   });
 
   @override
@@ -24,13 +26,14 @@ class ChatListView extends StatelessWidget {
       return ChatWelcomeCard(activeColor: activeColor);
     }
 
-    if (messages.isEmpty) {
-      return const SizedBox.shrink();
+    if (messages.isEmpty && !isAiTyping) {
+      return ChatWelcomeCard(activeColor: activeColor);
     }
 
     return ListView.builder(
       controller: scrollController,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 100),
       itemCount: messages.length + (isAiTyping ? 1 : 0),
       itemBuilder: (context, index) {
         if (index == messages.length) {
@@ -39,24 +42,15 @@ class ChatListView extends StatelessWidget {
 
         final message = messages[index];
         
-        // CORREÇÃO: Verificação segura para saber se o campo realmente contém um Widget
-        final dynamic customData = message['customWidget'];
-        final Widget? customWidget = (customData is Widget) ? customData : null;
-
+        // REMOVIDO: A lógica que injetava customWidgets (botões roxos) foi ignorada aqui
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             ChatMessageBubble(
-              // Convertemos os valores para String para o Bubble, exceto campos complexos
               message: message.map((k, v) => MapEntry(k, v is String ? v : v.toString())),
               activeColor: activeColor,
             ),
-            // Só renderiza se for de fato um Widget, evitando o erro de cast
-            if (customWidget != null) 
-              Padding(
-                padding: const EdgeInsets.only(left: 45, top: 8, bottom: 12),
-                child: customWidget,
-              ),
+            // O espaço reservado para o customWidget foi removido para manter o chat limpo
           ],
         );
       },
@@ -64,19 +58,58 @@ class ChatListView extends StatelessWidget {
   }
 
   Widget _buildTypingIndicator(Color color) {
+    String mainMessage = "Versin analisando...";
+    String subMessage = "processando métrica e rimas...";
+
+    if (secondsActive > 5) {
+      mainMessage = "Acordando servidor...";
+      subMessage = "O Render está subindo, aguarde (${secondsActive}s)...";
+    }
+
     return Padding(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.start, 
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 12,
-            height: 12,
-            child: CircularProgressIndicator(strokeWidth: 2, color: color),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              // Cor neutra para o fundo do loading
+              color: Colors.white.withOpacity(0.05),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: SizedBox(
+              width: 14,
+              height: 14,
+              child: CircularProgressIndicator(
+                strokeWidth: 2, 
+                // Cor do carregamento mais discreta
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.white24),
+              ),
+            ),
           ),
-          const SizedBox(width: 10),
-          Text(
-            "Versin analisando...",
-            style: TextStyle(color: color.withOpacity(0.7), fontSize: 13),
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                mainMessage,
+                style: TextStyle(
+                  color: Colors.white70, 
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              Text(
+                subMessage,
+                style: TextStyle(
+                  color: Colors.white38, 
+                  fontSize: 10,
+                ),
+              ),
+            ],
           )
         ],
       ),

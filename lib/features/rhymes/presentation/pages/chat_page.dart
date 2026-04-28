@@ -2,19 +2,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-// Widgets e Componentes de UI
 import 'package:versin/features/rhymes/presentation/widgets/versin_drawer/versin_drawer.dart';
-import 'package:versin/features/rhymes/presentation/pages/components/terminal_mode/chat_header.dart';
+import 'package:versin/features/rhymes/presentation/pages/components/header/chat_header.dart';
 import 'package:versin/features/rhymes/presentation/pages/components/chat/chat_list_view.dart';
-import 'package:versin/features/rhymes/presentation/pages/components/chat_command_overlay/chat_command_overlay.dart';
 import 'package:versin/features/rhymes/presentation/pages/components/chat/chat_bottom_bar.dart';
 import 'package:versin/features/rhymes/presentation/pages/components/chat_initializer/chat_initializer.dart';
 import 'package:versin/features/rhymes/presentation/pages/components/auth_modal/auth_modal.dart';
 import 'package:versin/features/rhymes/presentation/pages/components/timeline/versin_timeline.dart';
-
-// Controladores e Lógica de Negócio
 import 'package:versin/features/rhymes/presentation/controller/rhymes_controller.dart';
-import 'package:versin/features/rhymes/presentation/utils/command_handler.dart'; 
 
 class ChatPage extends StatefulWidget {
   const ChatPage({super.key});
@@ -23,21 +18,17 @@ class ChatPage extends StatefulWidget {
 }
 
 class _ChatPageState extends State<ChatPage> {
-  // --- CONTROLLERS ---
   final _messageController = TextEditingController();
   final RhymesController _rhymesController = RhymesController();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final ScrollController _scrollController = ScrollController();
   
-  // --- STATE VARIABLES ---
-  late CommandHandler _commandHandler; 
   Timer? _authModalTimer; 
   StreamSubscription<AuthState>? _authSubscription; 
   
   List<Map<String, dynamic>> messages = [];
   bool _isAiTyping = false; 
   bool _isInitializing = true; 
-  bool _showCommandMenu = false;
   int _currentSuggestionIndex = 0;
 
   @override
@@ -52,24 +43,18 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   void _initializeLogic() {
-    _commandHandler = CommandHandler(
-      rhymesController: _rhymesController,
-      onSystemMessage: _addSystemMessage,
-      onClearChat: () => setState(() => messages.clear()),
-      onUpdateModes: ({rhyme, compose, list, marketing}) {
-        _rhymesController.updateModes(
-          rhyme: rhyme, compose: compose, list: list, marketing: marketing
-        );
-        setState(() {}); // Atualiza a UI com as novas cores/modos do controller
-      },
-    );
-    _rhymesController.updateGamification(0);
+    _rhymesController.updateGamification(0.0);
+    _rhymesController.addListener(_handleControllerChanges);
+  }
+
+  void _handleControllerChanges() {
+    if (mounted) setState(() {});
   }
 
   void _setupListeners() {
     _messageController.addListener(() {
       final text = _messageController.text;
-      setState(() => _showCommandMenu = text.startsWith("/"));
+      _rhymesController.onTextChanged(text); 
       
       if (_rhymesController.currentStep == 2) {
         int lines = text.split('\n').where((l) => l.trim().isNotEmpty).length;
@@ -77,12 +62,12 @@ class _ChatPageState extends State<ChatPage> {
         _rhymesController.updateProgress(2, progress);
         if (progress >= 1.0) _completeStep(2); 
       }
-      _rhymesController.onTextChanged(text);
     });
   }
 
   Future<void> _loadInitialData() async {
     await _rhymesController.fetchTrendingWords();
+    await _rhymesController.carregarDadosUsuario();
     if (mounted) {
       ChatInitializer.run(
         mounted: mounted,
@@ -96,7 +81,6 @@ class _ChatPageState extends State<ChatPage> {
     final session = Supabase.instance.client.auth.currentSession;
     if (session != null) {
       _authModalTimer?.cancel();
-      _rhymesController.carregarDadosUsuario();
     }
   }
 
@@ -105,8 +89,6 @@ class _ChatPageState extends State<ChatPage> {
       if (data.event == AuthChangeEvent.signedIn && data.session != null) {
         _authModalTimer?.cancel(); 
         _rhymesController.carregarDadosUsuario();
-        if (mounted) Navigator.of(context, rootNavigator: true).popUntil((route) => route.isFirst);
-        // O feedback de sucesso agora é gerenciado internamente pelo AuthModal
       }
       if (data.event == AuthChangeEvent.signedOut) _startAuthTimer();
     });
@@ -114,7 +96,7 @@ class _ChatPageState extends State<ChatPage> {
 
   void _startAuthTimer() {
     _authModalTimer?.cancel(); 
-    _authModalTimer = Timer(const Duration(seconds: 35), () {
+    _authModalTimer = Timer(const Duration(seconds: 45), () {
       if (!mounted) return;
       if (Supabase.instance.client.auth.currentUser == null) AuthModal.show(context);
     });
@@ -124,27 +106,22 @@ class _ChatPageState extends State<ChatPage> {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
 
-    if (_commandHandler.handle(text)) {
-      _messageController.clear();
-      setState(() => _showCommandMenu = false);
-      return;
-    }
-
     setState(() {
       messages.add({"role": "user", "content": text});
       _messageController.clear();
-      _isAiTyping = true;
+      _isAiTyping = true; 
     });
+    
     _scrollToBottom();
 
-    final aiResponse = await _rhymesController.fetchAiResponse(text);
+    final response = await _rhymesController.fetchAiResponse(text);
 
     if (mounted) {
-      setState(() { _isAiTyping = false; messages.add(aiResponse); });
+      setState(() {
+        messages.add(response);
+        _isAiTyping = false; 
+      });
       _scrollToBottom();
-      if (_rhymesController.currentStep == 5) {
-        _rhymesController.updateProgress(5, _rhymesController.stepProgress + 0.2);
-      }
     }
   }
 
@@ -152,8 +129,9 @@ class _ChatPageState extends State<ChatPage> {
     ChatInitializer.welcomeFlow(
       mounted: mounted,
       messages: messages,
+      // REMOÇÃO: Forçando customWidget como null para limpar o chat inicial
       addMessage: (content, {Widget? customWidget}) => setState(() {
-        messages.add({"role": "assistant", "content": content, "customWidget": customWidget});
+        messages.add({"role": "assistant", "content": content, "customWidget": null});
       }),
       setAiTyping: (typing) => setState(() => _isAiTyping = typing),
       scrollToBottom: _scrollToBottom,
@@ -176,21 +154,20 @@ class _ChatPageState extends State<ChatPage> {
     }
   }
 
+  // REMOÇÃO: Forçando customWidget como null para impedir novos botões roxos
   void _addAiMessageWithWidget(String content, {Widget? customWidget}) {
-    setState(() => messages.add({"role": "assistant", "content": content, "customWidget": customWidget}));
-    _scrollToBottom();
-  }
-
-  void _addSystemMessage(String content) {
-    setState(() => messages.add({"role": "assistant", "content": content}));
+    setState(() => messages.add({"role": "assistant", "content": content, "customWidget": null}));
     _scrollToBottom();
   }
 
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
-        _scrollController.animateTo(_scrollController.position.maxScrollExtent, 
-          duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent, 
+          duration: const Duration(milliseconds: 400), 
+          curve: Curves.easeOut
+        );
       }
     });
   }
@@ -221,51 +198,49 @@ class _ChatPageState extends State<ChatPage> {
             ),
           ),
           Positioned(top: 100, left: 0, right: 0,
-            child: ChatHeader(
-              activeColor: activeColor, 
-              rhymesController: _rhymesController, 
-              isRhymeMode: _rhymesController.isRhymeMode, 
-              isComposeMode: _rhymesController.isComposeMode,
-              isListMode: _rhymesController.isListMode, 
-              isMarketingMode: _rhymesController.isMarketingMode,
+            child: Column(
+              children: [
+                const Text("Versin", style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold)),
+                const Text("GENESIS", style: TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 5)),
+                const SizedBox(height: 15),
+                ChatHeader(activeColor: activeColor, rhymesController: _rhymesController),
+              ],
             ),
           ),
           Positioned(top: 95, left: 15,
-            child: IconButton(icon: Icon(Icons.menu_rounded, color: activeColor, size: 32),
-              onPressed: () => _scaffoldKey.currentState?.openDrawer()),
+            child: IconButton(
+              icon: Icon(Icons.menu_rounded, color: activeColor, size: 32),
+              onPressed: () => _scaffoldKey.currentState?.openDrawer()
+            ),
           ),
-          Positioned.fill(top: 240, bottom: 140 + bottomPadding, 
+          Positioned.fill(top: 240, bottom: 120 + bottomPadding, 
             child: ChatListView(
-              isInitializing: _isInitializing, messages: messages,
-              isAiTyping: _isAiTyping, scrollController: _scrollController,
+              isInitializing: _isInitializing, 
+              messages: messages,
+              isAiTyping: _isAiTyping, 
+              scrollController: _scrollController,
               activeColor: activeColor,
+              secondsActive: _rhymesController.connectionSeconds,
             ),
           ),
           Positioned(bottom: bottomPadding + 15, left: 15, right: 15,
-            child: Column(
-              children: [
-                if (_showCommandMenu) ChatCommandOverlay(
-                  commandHandler: _commandHandler, activeColor: activeColor,
-                  onCommandSelected: (cmd) { _messageController.text = cmd; _sendMessage(); },
-                ),
-                ChatBottomBar(
-                  messageController: _messageController, rhymesController: _rhymesController, 
-                  activeColor: activeColor, isRhymeMode: _rhymesController.isRhymeMode, onSend: _sendMessage,
-                  currentSuggestionIndex: _currentSuggestionIndex,
-                  onUpdateSuggestionIndex: (index) => setState(() => _currentSuggestionIndex = index),
-                  onAddRhyme: (word) async {
-                    final completed = await _rhymesController.addSuggestedRhyme(word);
-                    if (completed != null) {
-                      setState(() {
-                        _messageController.text = "${_messageController.text.trim()} $completed ";
-                        _messageController.selection = TextSelection.fromPosition(
-                          TextPosition(offset: _messageController.text.length)
-                        );
-                      });
-                    }
-                  }, 
-                ),
-              ],
+            child: ChatBottomBar(
+              messageController: _messageController, 
+              rhymesController: _rhymesController, 
+              activeColor: activeColor, 
+              isRhymeMode: _rhymesController.isRhymeMode, 
+              onSend: _sendMessage,
+              currentSuggestionIndex: _currentSuggestionIndex,
+              onUpdateSuggestionIndex: (index) => setState(() => _currentSuggestionIndex = index),
+              onAddRhyme: (word) {
+                setState(() {
+                  String currentText = _messageController.text;
+                  _messageController.text = "$currentText $word ";
+                  _messageController.selection = TextSelection.fromPosition(
+                    TextPosition(offset: _messageController.text.length)
+                  );
+                });
+              }, 
             ),
           ),
         ],
@@ -275,10 +250,10 @@ class _ChatPageState extends State<ChatPage> {
 
   @override
   void dispose() {
+    _rhymesController.removeListener(_handleControllerChanges);
     _authSubscription?.cancel();
     _authModalTimer?.cancel();
     _messageController.dispose(); 
-    _rhymesController.dispose(); 
     _scrollController.dispose();
     super.dispose();
   }

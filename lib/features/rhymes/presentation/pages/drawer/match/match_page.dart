@@ -4,7 +4,6 @@ import 'package:record/record.dart';
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'dart:async';
-import 'dart:io';
 
 // Bibliotecas para PDF e Data
 import 'package:pdf/pdf.dart';

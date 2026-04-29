@@ -135,76 +135,61 @@ class ChatInitializer {
                     label: Text(label, style: const TextStyle(color: Colors.white, fontSize: 11)),
                     backgroundColor: const Color(0xFF1A1A1A),
                     shape: StadiumBorder(side: BorderSide(color: activeColor.withOpacity(0.2))),
-                    onPressed: () => setLocalState(() => estruturaTemp.add(label)),
+                    onPressed: () {
+                      setLocalState(() => estruturaTemp.add(label));
+                      scrollToBottom();
+                    },
                   )).toList(),
                 ),
 
                 if (estruturaTemp.isNotEmpty) ...[
                   const SizedBox(height: 30),
                   Text(
-                    "Sua Estrutura (Segure e arraste para organizar):", 
+                    "Sua Estrutura (Toque no 'X' para remover):", 
                     style: TextStyle(color: activeColor, fontSize: 11, fontWeight: FontWeight.bold)
                   ),
                   const SizedBox(height: 15),
-                  SizedBox(
-                    height: 48,
-                    child: ReorderableListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: estruturaTemp.length,
-                      onReorder: (oldIndex, newIndex) {
-                        setLocalState(() {
-                          if (newIndex > oldIndex) newIndex -= 1;
-                          final String item = estruturaTemp.removeAt(oldIndex);
-                          estruturaTemp.insert(newIndex, item);
-                        });
-                      },
-                      itemBuilder: (context, i) {
-                        return Container(
-                          key: ValueKey('struct_item_${estruturaTemp[i]}_$i'),
-                          margin: const EdgeInsets.only(right: 10),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.05),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: activeColor.withOpacity(0.3)),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 12),
-                                child: Text(
-                                  estruturaTemp[i],
-                                  style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
-                                ),
-                              ),
-                              GestureDetector(
-                                onTap: () => setLocalState(() => estruturaTemp.removeAt(i)),
-                                child: Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.05),
-                                    borderRadius: const BorderRadius.only(
-                                      topRight: Radius.circular(7),
-                                      bottomRight: Radius.circular(7),
-                                    ),
-                                  ),
-                                  child: const Icon(Icons.close, color: Colors.white54, size: 14),
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
+                  
+                  // Alterado de ReorderableListView para Wrap para evitar o erro das imagens
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: List.generate(estruturaTemp.length, (i) {
+                      return Container(
+                        padding: const EdgeInsets.only(left: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.05),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: activeColor.withOpacity(0.3)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              estruturaTemp[i],
+                              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                            ),
+                            const SizedBox(width: 4),
+                            IconButton(
+                              constraints: const BoxConstraints(),
+                              padding: const EdgeInsets.all(8),
+                              icon: const Icon(Icons.close, color: Colors.white54, size: 14),
+                              onPressed: () => setLocalState(() => estruturaTemp.removeAt(i)),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
                   ),
-                  const SizedBox(height: 20),
+                  
+                  const SizedBox(height: 25),
                   Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       TextButton(
                         onPressed: () => setLocalState(() => estruturaTemp.clear()),
                         child: const Text("Limpar tudo", style: TextStyle(color: Colors.white38, fontSize: 12)),
                       ),
-                      const Spacer(),
                       ElevatedButton(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: activeColor,

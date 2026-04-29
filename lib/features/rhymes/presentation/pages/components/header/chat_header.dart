@@ -14,17 +14,36 @@ class ChatHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // O header agora foca apenas no feedback visual da gamificação
+    // O ListenableBuilder garante que o header se atualize apenas quando necessário
     return ListenableBuilder(
       listenable: rhymesController,
       builder: (context, _) {
-        return Padding(
+        return Container(
+          // Definimos largura total para evitar problemas de alinhamento no Column pai
+          width: double.infinity,
           padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: ThermometerFeedback(
-            // Sincroniza o progresso das estrelas e do fogo com o controller
-            starProgress: rhymesController.starProgress,
-            fireProgress: rhymesController.fireProgress,
-            feedbackText: rhymesController.currentFeedback,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Widget de feedback visual (Termômetro/Estrelas)
+              ThermometerFeedback(
+                starProgress: rhymesController.starProgress,
+                fireProgress: rhymesController.fireProgress,
+                feedbackText: rhymesController.currentFeedback,
+              ),
+              const SizedBox(height: 8),
+              // Linha sutil de instrução para o usuário, respeitando o design mobile
+              Text(
+                "Comece a escrever para analisar sua letra...",
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.5),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w400,
+                  letterSpacing: 0.3,
+                ),
+              ),
+            ],
           ),
         );
       },

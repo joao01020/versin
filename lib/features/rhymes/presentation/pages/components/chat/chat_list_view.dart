@@ -32,10 +32,13 @@ class ChatListView extends StatelessWidget {
 
     return ListView.builder(
       controller: scrollController,
-      // AJUSTE CRÍTICO 1: clipBehavior none permite que o "X" flutuante apareça
-      clipBehavior: Clip.none, 
-      physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 80), // Aumentado o bottom para mais respiro
+      // AJUSTE PARA MOBILE: clipBehavior hardEdge garante que o conteúdo 
+      // seja cortado exatamente no limite do widget Expanded definido na Page.
+      clipBehavior: Clip.hardEdge, 
+      physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+      // Padding reduzido no topo (5) para não criar buracos e 
+      // aumentado no bottom (100) para não ficar atrás da barra de digitação.
+      padding: const EdgeInsets.fromLTRB(16, 5, 16, 100), 
       itemCount: messages.length + (isAiTyping ? 1 : 0),
       itemBuilder: (context, index) {
         if (index == messages.length) {
@@ -47,7 +50,6 @@ class ChatListView extends StatelessWidget {
         
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          // AJUSTE CRÍTICO 2: Column também deve permitir transbordamento
           mainAxisSize: MainAxisSize.min,
           children: [
             ChatMessageBubble(
@@ -59,9 +61,8 @@ class ChatListView extends StatelessWidget {
             ),
             if (customWidget != null) 
               Padding(
-                // AJUSTE CRÍTICO 3: Padding lateral para garantir que o widget customizado 
-                // não encoste na borda da tela e o Stack tenha espaço para respirar
-                padding: const EdgeInsets.fromLTRB(12, 16, 12, 24),
+                // Ajuste de margem para o slider de sentimento ou outros widgets
+                padding: const EdgeInsets.fromLTRB(8, 12, 8, 20),
                 child: customWidget,
               ),
           ],

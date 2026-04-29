@@ -25,7 +25,7 @@ class _VersinTimelineState extends State<VersinTimeline> with SingleTickerProvid
       children: [
         // A Linha do Tempo Animada
         Container(
-          height: 60,
+          height: 50, // Reduzi levemente de 60 para 50 para ganhar espaço no mobile
           width: double.infinity,
           padding: const EdgeInsets.symmetric(horizontal: 40),
           child: CustomPaint(
@@ -36,18 +36,7 @@ class _VersinTimelineState extends State<VersinTimeline> with SingleTickerProvid
             ),
           ),
         ),
-        const SizedBox(height: 8),
-        // O Nome Versin como base da jornada
-        Text(
-          "versin",
-          style: TextStyle(
-            color: widget.activeColor.withOpacity(0.8),
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 4,
-            fontFamily: 'Courier', // Estilo terminal/retro
-          ),
-        ),
+        // Removido o SizedBox e o Text "versin" que causavam a duplicidade e ocupavam espaço extra
       ],
     );
   }
@@ -87,7 +76,6 @@ class TimelinePainter extends CustomPainter {
       canvas.drawLine(Offset(startX, y), Offset(endX, y), paintLine);
       
       if (currentStep > i + 1) {
-        // Linha totalmente preenchida se o passo já passou
         canvas.drawLine(Offset(startX, y), Offset(endX, y), paintActiveLine);
       }
     }
@@ -98,7 +86,6 @@ class TimelinePainter extends CustomPainter {
       bool isCompleted = currentStep > i + 1;
       bool isCurrent = currentStep == i + 1;
 
-      // Círculo de fundo (Vazio)
       canvas.drawCircle(
         Offset(x, y),
         6,
@@ -111,18 +98,15 @@ class TimelinePainter extends CustomPainter {
         Paint()..color = Colors.white24..style = PaintingStyle.stroke..strokeWidth = 1,
       );
 
-      // Preenchimento animado do ponto atual
       if (isCurrent || isCompleted) {
         double fillPercent = isCompleted ? 1.0 : stepProgress;
         
-        // Efeito visual progressivo (o "." crescendo dentro do ponto)
         canvas.drawCircle(
           Offset(x, y),
           4 * fillPercent,
           Paint()..color = activeColor..style = PaintingStyle.fill,
         );
 
-        // Brilho externo para o ponto ativo
         if (isCurrent) {
           canvas.drawCircle(
             Offset(x, y),

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart'; 
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:versin/features/rhymes/presentation/pages/chat_page.dart';
 
 // CAMINHO CORRIGIDO ABAIXO:
 import 'package:versin/features/rhymes/presentation/controller/auth_wrapper/auth_wrapper.dart';
@@ -42,7 +41,7 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
       ),
       // O AuthWrapper agora é o ponto de entrada da árvore de widgets
-      home: const AuthWrapper(), 
+      home: const AuthWrapper(),
     );
   }
 }

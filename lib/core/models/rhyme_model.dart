@@ -20,20 +20,17 @@ class Rhyme {
 
   // Converte o objeto Rhyme para JSON/Map para enviar ao Backend ou salvar
   Map<String, dynamic> toMap() {
-    return {
-      'word': word,
-      'isPriority': isPriority,
-      'origin': origin,
-    };
+    return {'word': word, 'isPriority': isPriority, 'origin': origin};
   }
 
   // Identifica visualmente a procedência para o Mentor Sincero
   String get originMessage {
-    return origin == "versin" 
-      ? "Esta rima foi sugerida pelo Versin" 
-      : "Esta rima foi configurada por você";
+    return origin == "versin"
+        ? "Esta rima foi sugerida pelo Versin"
+        : "Esta rima foi configurada por você";
   }
 
   @override
-  String toString() => 'Rhyme(word: $word, priority: $isPriority, origin: $origin)';
+  String toString() =>
+      'Rhyme(word: $word, priority: $isPriority, origin: $origin)';
 }

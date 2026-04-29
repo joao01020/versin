@@ -30,19 +30,23 @@ class _HistoryPageState extends State<HistoryPage> {
       backgroundColor: const Color(0xFF0F0F0F),
       appBar: AppBar(
         title: const Text(
-          "HISTÓRICO", 
+          "HISTÓRICO",
           style: TextStyle(
-            fontSize: 12, 
+            fontSize: 12,
             letterSpacing: 2,
             fontWeight: FontWeight.bold,
             color: Colors.white38,
-          )
+          ),
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, size: 18, color: Colors.white30),
+          icon: const Icon(
+            Icons.arrow_back_ios_new,
+            size: 18,
+            color: Colors.white30,
+          ),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -50,7 +54,9 @@ class _HistoryPageState extends State<HistoryPage> {
         stream: _getHistoryStream(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator(color: Colors.white10));
+            return const Center(
+              child: CircularProgressIndicator(color: Colors.white10),
+            );
           }
 
           final history = snapshot.data ?? [];
@@ -87,26 +93,41 @@ class _HistoryPageState extends State<HistoryPage> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.orange.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
                             "$bpm BPM",
-                            style: const TextStyle(color: Colors.orange, fontSize: 10, fontWeight: FontWeight.bold),
+                            style: const TextStyle(
+                              color: Colors.orange,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                         Text(
                           _formatDate(item['created_at']),
-                          style: const TextStyle(color: Colors.white24, fontSize: 10),
+                          style: const TextStyle(
+                            color: Colors.white24,
+                            fontSize: 10,
+                          ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      content.length > 80 ? "${content.substring(0, 80)}..." : content,
-                      style: const TextStyle(color: Colors.white70, fontSize: 13),
+                      content.length > 80
+                          ? "${content.substring(0, 80)}..."
+                          : content,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 13,
+                      ),
                     ),
                     const SizedBox(height: 12),
                     Text(

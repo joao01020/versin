@@ -11,7 +11,7 @@ class ChatBottomBar extends StatelessWidget {
   final VoidCallback onSend;
   final int currentSuggestionIndex;
   final Function(int) onUpdateSuggestionIndex;
-  final Function(String)? onAddRhyme; 
+  final Function(String)? onAddRhyme;
 
   const ChatBottomBar({
     super.key,
@@ -22,7 +22,7 @@ class ChatBottomBar extends StatelessWidget {
     required this.onSend,
     required this.currentSuggestionIndex,
     required this.onUpdateSuggestionIndex,
-    this.onAddRhyme, 
+    this.onAddRhyme,
   });
 
   @override
@@ -37,8 +37,10 @@ class ChatBottomBar extends StatelessWidget {
           onSend: onSend,
           // CORREÇÃO: Usando branco/cinza no input para manter o minimalismo
           activeColor: Colors.white70,
-          hintText: isRhymeMode ? "Filtrando vocabulário..." : "Escreva seus versos...",
-          onAddRhyme: onAddRhyme, 
+          hintText: isRhymeMode
+              ? "Filtrando vocabulário..."
+              : "Escreva seus versos...",
+          onAddRhyme: onAddRhyme,
         ),
       ],
     );
@@ -48,21 +50,24 @@ class ChatBottomBar extends StatelessWidget {
     return ListenableBuilder(
       listenable: rhymesController,
       builder: (context, _) {
-        final rimas = rhymesController.suggestionsList; 
+        final rimas = rhymesController.suggestionsList;
         if (rimas.isEmpty) return const SizedBox.shrink();
 
-        final safeIndex = currentSuggestionIndex >= rimas.length ? 0 : currentSuggestionIndex;
+        final safeIndex = currentSuggestionIndex >= rimas.length
+            ? 0
+            : currentSuggestionIndex;
 
         return SuggestionBalloon(
           suggestion: rimas[safeIndex],
-          isLoading: rhymesController.isLoading, 
+          isLoading: rhymesController.isLoading,
           // CORREÇÃO: Garantindo que o balão não receba o roxo do controller
           onTap: () {
             if (onAddRhyme != null) {
               onAddRhyme!(rimas[safeIndex]);
             } else {
               final currentText = messageController.text;
-              messageController.text = "$currentText ${rimas[safeIndex]} ".trimLeft();
+              messageController.text = "$currentText ${rimas[safeIndex]} "
+                  .trimLeft();
               messageController.selection = TextSelection.fromPosition(
                 TextPosition(offset: messageController.text.length),
               );
@@ -72,17 +77,19 @@ class ChatBottomBar extends StatelessWidget {
           onNext: rimas.length > 1
               ? () {
                   final nextIndex = (safeIndex + 1) % rimas.length;
-                  onUpdateSuggestionIndex(nextIndex); 
+                  onUpdateSuggestionIndex(nextIndex);
                 }
               : null,
           // Adicionado navegação para trás para melhorar a UX sem precisar de ícones extras
           onPrevious: rimas.length > 1
               ? () {
-                  final prevIndex = (safeIndex - 1 < 0) ? rimas.length - 1 : safeIndex - 1;
+                  final prevIndex = (safeIndex - 1 < 0)
+                      ? rimas.length - 1
+                      : safeIndex - 1;
                   onUpdateSuggestionIndex(prevIndex);
                 }
               : null,
-          onDismiss: () => rhymesController.clearSuggestions(), 
+          onDismiss: () => rhymesController.clearSuggestions(),
         );
       },
     );

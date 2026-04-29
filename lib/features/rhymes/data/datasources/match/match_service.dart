@@ -3,12 +3,15 @@ import '../../models/match_card_model.dart';
 class MatchService {
   // Algoritmo que calcula a afinidade entre dois perfis
   double calculateMatchScore(MatchCardModel user, MatchCardModel target) {
-    if (user.role == target.role) return 0.0; // Artista busca Beatmaker e vice-versa
+    if (user.role == target.role)
+      return 0.0; // Artista busca Beatmaker e vice-versa
 
     double score = 0.0;
-    
+
     // Afinidade por Gênero (50%)
-    final commonGenres = user.genres.where((g) => target.genres.contains(g)).length;
+    final commonGenres = user.genres
+        .where((g) => target.genres.contains(g))
+        .length;
     score += (commonGenres / user.genres.length) * 0.5;
 
     // Afinidade por BPM (50%) - Margem de erro de 5 BPM

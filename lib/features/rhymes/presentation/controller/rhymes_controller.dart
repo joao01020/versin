@@ -15,7 +15,8 @@ class RhymesController extends ChangeNotifier {
   List<String> _suggestionsList = [];
   List<String> get suggestionsList => _suggestionsList;
   List<String> get suggestions => _suggestionsList;
-  String get suggestion => _suggestionsList.isNotEmpty ? _suggestionsList.first : "";
+  String get suggestion =>
+      _suggestionsList.isNotEmpty ? _suggestionsList.first : "";
 
   bool _isLoading = false;
   bool get isLoading => _isLoading;
@@ -57,7 +58,7 @@ class RhymesController extends ChangeNotifier {
   // --- LÓGICA DE DIGITAÇÃO E FEEDBACK ---
   void onTextChanged(String text) {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
-    
+
     _processarProgressoTecnico(text);
 
     _debounce = Timer(const Duration(milliseconds: 300), () {
@@ -75,8 +76,10 @@ class RhymesController extends ChangeNotifier {
         _suggestionsList = vocabulary
             .where((item) {
               String wordInVocab = item.word.toLowerCase();
-              return wordInVocab.endsWith(lastWord.substring(lastWord.length - 2)) || 
-                     wordInVocab.contains(lastWord);
+              return wordInVocab.endsWith(
+                    lastWord.substring(lastWord.length - 2),
+                  ) ||
+                  wordInVocab.contains(lastWord);
             })
             .map((item) => item.word)
             .where((word) => word != lastWord)
@@ -94,7 +97,10 @@ class RhymesController extends ChangeNotifier {
       currentFeedback = "Comece a escrever para validar sua letra...";
     } else {
       currentFeedback = "Versin analisando seu flow...";
-      final totalLinhas = texto.split('\n').where((l) => l.trim().isNotEmpty).length;
+      final totalLinhas = texto
+          .split('\n')
+          .where((l) => l.trim().isNotEmpty)
+          .length;
       starProgress = (totalLinhas / 10).clamp(0.0, 3.0);
     }
     notifyListeners();
@@ -111,29 +117,39 @@ class RhymesController extends ChangeNotifier {
       connectionSeconds++;
       notifyListeners();
     });
-    
+
     try {
-      final response = await http.post(
-        Uri.parse('$_baseUrl/chat'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'user_id': "user_dev_01",
-          'message': message,
-          'current_list': vocabulary.map((r) => r.word).toList(),
-          'private_api_key': _userApiKey,
-        }),
-      ).timeout(const Duration(seconds: 60)); // Aumentado para 60s (acordar o Render)
+      final response = await http
+          .post(
+            Uri.parse('$_baseUrl/chat'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'user_id': "user_dev_01",
+              'message': message,
+              'current_list': vocabulary.map((r) => r.word).toList(),
+              'private_api_key': _userApiKey,
+            }),
+          )
+          .timeout(
+            const Duration(seconds: 60),
+          ); // Aumentado para 60s (acordar o Render)
 
       _connectionTimer?.cancel();
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        return { "role": "assistant", "content": data['content'] ?? "" };
+        return {"role": "assistant", "content": data['content'] ?? ""};
       }
-      return {"role": "assistant", "content": "Erro no servidor (Status: ${response.statusCode})"};
+      return {
+        "role": "assistant",
+        "content": "Erro no servidor (Status: ${response.statusCode})",
+      };
     } catch (e) {
       _connectionTimer?.cancel();
-      return {"role": "assistant", "content": "O servidor demorou muito. Tente enviar de novo!"};
+      return {
+        "role": "assistant",
+        "content": "O servidor demorou muito. Tente enviar de novo!",
+      };
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -145,10 +161,22 @@ class RhymesController extends ChangeNotifier {
     final user = _supabase.auth.currentUser;
     if (user != null) {
       try {
-        final vocabData = await _supabase.from('user_vocabulary').select('word, is_priority').eq('profile_id', user.id);
-        vocabulary = (vocabData as List).map((item) => Rhyme(word: item['word'], isPriority: item['is_priority'] ?? false)).toList();
+        final vocabData = await _supabase
+            .from('user_vocabulary')
+            .select('word, is_priority')
+            .eq('profile_id', user.id);
+        vocabulary = (vocabData as List)
+            .map(
+              (item) => Rhyme(
+                word: item['word'],
+                isPriority: item['is_priority'] ?? false,
+              ),
+            )
+            .toList();
         notifyListeners();
-      } catch (e) { debugPrint("Erro ao carregar: $e"); }
+      } catch (e) {
+        debugPrint("Erro ao carregar: $e");
+      }
     }
   }
 
@@ -160,9 +188,10 @@ class RhymesController extends ChangeNotifier {
       notifyListeners();
       final user = _supabase.auth.currentUser;
       if (user != null) {
-        _supabase.from('user_vocabulary').insert({
-          'word': p, 'profile_id': user.id, 'is_priority': priority
-        }).then((_) => null);
+        _supabase
+            .from('user_vocabulary')
+            .insert({'word': p, 'profile_id': user.id, 'is_priority': priority})
+            .then((_) => null);
       }
     }
   }
@@ -174,7 +203,12 @@ class RhymesController extends ChangeNotifier {
       notifyListeners();
       final user = _supabase.auth.currentUser;
       if (user != null) {
-        _supabase.from('user_vocabulary').delete().eq('word', wordToRemove).eq('profile_id', user.id).then((_) => null);
+        _supabase
+            .from('user_vocabulary')
+            .delete()
+            .eq('word', wordToRemove)
+            .eq('profile_id', user.id)
+            .then((_) => null);
       }
     }
   }
@@ -186,12 +220,32 @@ class RhymesController extends ChangeNotifier {
     }
   }
 
-  void setApiKey(String key) { _userApiKey = key; notifyListeners(); }
-  void updateGamification(dynamic v) { if (v is double) starProgress = v; notifyListeners(); }
-  Future<void> fetchTrendingWords() async { /* Implementar se necessário */ }
-  void incrementWordScore(String w) { /* Implementar se necessário */ }
-  void updateProgress(int s, double p) { _currentStep = s; _stepProgress = p; notifyListeners(); }
-  void clearSuggestions() { _suggestionsList = []; notifyListeners(); }
+  void setApiKey(String key) {
+    _userApiKey = key;
+    notifyListeners();
+  }
+
+  void updateGamification(dynamic v) {
+    if (v is double) starProgress = v;
+    notifyListeners();
+  }
+
+  Future<void> fetchTrendingWords() async {
+    /* Implementar se necessário */
+  }
+  void incrementWordScore(String w) {
+    /* Implementar se necessário */
+  }
+  void updateProgress(int s, double p) {
+    _currentStep = s;
+    _stepProgress = p;
+    notifyListeners();
+  }
+
+  void clearSuggestions() {
+    _suggestionsList = [];
+    notifyListeners();
+  }
 
   @override
   void dispose() {

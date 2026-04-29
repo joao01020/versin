@@ -37,7 +37,7 @@ class SuggestionBalloon extends StatelessWidget {
             color: Colors.black.withOpacity(0.3),
             blurRadius: 5,
             offset: const Offset(0, 2),
-          )
+          ),
         ],
       ),
       child: isLoading
@@ -61,22 +61,33 @@ class SuggestionBalloon extends StatelessWidget {
                     onTap: onDismiss,
                     child: const Padding(
                       padding: EdgeInsets.symmetric(horizontal: 6),
-                      child: Icon(Icons.close, size: 14, color: Colors.redAccent),
+                      child: Icon(
+                        Icons.close,
+                        size: 14,
+                        color: Colors.redAccent,
+                      ),
                     ),
                   ),
-                
+
                 // Navegação Esquerda (<)
                 if (onPrevious != null)
                   GestureDetector(
                     onTap: onPrevious,
-                    child: const Icon(Icons.chevron_left, size: 20, color: Colors.black54),
+                    child: const Icon(
+                      Icons.chevron_left,
+                      size: 20,
+                      color: Colors.black54,
+                    ),
                   ),
 
                 // Texto da Rima (Onde o clique registra o uso)
                 GestureDetector(
                   onTap: onTap,
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     child: Text(
                       suggestion,
                       style: const TextStyle(
@@ -92,7 +103,11 @@ class SuggestionBalloon extends StatelessWidget {
                 if (onNext != null)
                   GestureDetector(
                     onTap: onNext,
-                    child: const Icon(Icons.chevron_right, size: 20, color: Colors.black54),
+                    child: const Icon(
+                      Icons.chevron_right,
+                      size: 20,
+                      color: Colors.black54,
+                    ),
                   ),
 
                 // Botão de Comando (+) - Só aparece se onAddCommand não for nulo
@@ -101,7 +116,11 @@ class SuggestionBalloon extends StatelessWidget {
                     onTap: onAddCommand,
                     child: const Padding(
                       padding: EdgeInsets.only(left: 4, right: 8),
-                      child: Icon(Icons.add_circle_outline, size: 18, color: Colors.purpleAccent),
+                      child: Icon(
+                        Icons.add_circle_outline,
+                        size: 18,
+                        color: Colors.purpleAccent,
+                      ),
                     ),
                   ),
               ],

@@ -56,7 +56,10 @@ class VersinDrawer extends StatelessWidget {
 
           // CAMPO DE PESQUISAR
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16.0,
+              vertical: 10.0,
+            ),
             child: Container(
               decoration: BoxDecoration(
                 color: const Color(0xFF1A1A1A),
@@ -68,7 +71,11 @@ class VersinDrawer extends StatelessWidget {
                 decoration: InputDecoration(
                   hintText: "Pesquisar projetos...",
                   hintStyle: TextStyle(color: Colors.grey, fontSize: 13),
-                  prefixIcon: Icon(Icons.search_rounded, color: Colors.purpleAccent, size: 20),
+                  prefixIcon: Icon(
+                    Icons.search_rounded,
+                    color: Colors.purpleAccent,
+                    size: 20,
+                  ),
                   border: InputBorder.none,
                   contentPadding: EdgeInsets.symmetric(vertical: 12),
                 ),
@@ -81,7 +88,10 @@ class VersinDrawer extends StatelessWidget {
           // SEÇÃO DE AÇÕES
           ListTile(
             leading: const Icon(Icons.add_box_outlined, color: Colors.white70),
-            title: const Text("Novo Projeto", style: TextStyle(color: Colors.white, fontSize: 14)),
+            title: const Text(
+              "Novo Projeto",
+              style: TextStyle(color: Colors.white, fontSize: 14),
+            ),
             onTap: () {
               onNewChat();
               Navigator.pop(context);
@@ -89,8 +99,14 @@ class VersinDrawer extends StatelessWidget {
           ),
 
           ListTile(
-            leading: const Icon(Icons.history_rounded, color: Colors.orangeAccent),
-            title: const Text("Histórico", style: TextStyle(color: Colors.white, fontSize: 14)),
+            leading: const Icon(
+              Icons.history_rounded,
+              color: Colors.orangeAccent,
+            ),
+            title: const Text(
+              "Histórico",
+              style: TextStyle(color: Colors.white, fontSize: 14),
+            ),
             onTap: () {
               Navigator.pop(context);
               Navigator.push(
@@ -101,8 +117,14 @@ class VersinDrawer extends StatelessWidget {
           ),
 
           ListTile(
-            leading: const Icon(Icons.auto_awesome_mosaic_rounded, color: Colors.greenAccent),
-            title: const Text("Vitrine", style: TextStyle(color: Colors.white, fontSize: 14)),
+            leading: const Icon(
+              Icons.auto_awesome_mosaic_rounded,
+              color: Colors.greenAccent,
+            ),
+            title: const Text(
+              "Vitrine",
+              style: TextStyle(color: Colors.white, fontSize: 14),
+            ),
             onTap: () {
               Navigator.pop(context);
               Navigator.push(
@@ -114,8 +136,14 @@ class VersinDrawer extends StatelessWidget {
 
           // --- VERSIN MATCH: ARTISTAS & BEATMAKERS ---
           ListTile(
-            leading: const Icon(Icons.compare_arrows_rounded, color: Colors.pinkAccent),
-            title: const Text("Versin Match", style: TextStyle(color: Colors.white, fontSize: 14)),
+            leading: const Icon(
+              Icons.compare_arrows_rounded,
+              color: Colors.pinkAccent,
+            ),
+            title: const Text(
+              "Versin Match",
+              style: TextStyle(color: Colors.white, fontSize: 14),
+            ),
             onTap: () {
               Navigator.pop(context);
               Navigator.push(
@@ -126,8 +154,14 @@ class VersinDrawer extends StatelessWidget {
           ),
 
           ListTile(
-            leading: const Icon(Icons.help_outline_rounded, color: Colors.blueAccent),
-            title: const Text("Como usar?", style: TextStyle(color: Colors.white, fontSize: 14)),
+            leading: const Icon(
+              Icons.help_outline_rounded,
+              color: Colors.blueAccent,
+            ),
+            title: const Text(
+              "Como usar?",
+              style: TextStyle(color: Colors.white, fontSize: 14),
+            ),
             onTap: () {
               Navigator.pop(context);
               Navigator.push(
@@ -138,8 +172,14 @@ class VersinDrawer extends StatelessWidget {
           ),
 
           ListTile(
-            leading: const Icon(Icons.support_agent_rounded, color: Colors.redAccent),
-            title: const Text("Ajuda & Suporte", style: TextStyle(color: Colors.white, fontSize: 14)),
+            leading: const Icon(
+              Icons.support_agent_rounded,
+              color: Colors.redAccent,
+            ),
+            title: const Text(
+              "Ajuda & Suporte",
+              style: TextStyle(color: Colors.white, fontSize: 14),
+            ),
             onTap: () {
               Navigator.pop(context);
               Navigator.push(
@@ -151,7 +191,10 @@ class VersinDrawer extends StatelessWidget {
 
           // DICIONÁRIO / VOCABULÁRIO
           ListTile(
-            leading: const Icon(Icons.terminal_rounded, color: Colors.purpleAccent),
+            leading: const Icon(
+              Icons.terminal_rounded,
+              color: Colors.purpleAccent,
+            ),
             title: const Text(
               "Minha lista",
               style: TextStyle(color: Colors.white, fontSize: 14),
@@ -161,7 +204,8 @@ class VersinDrawer extends StatelessWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => VocabularioPage(controller: rhymesController),
+                  builder: (context) =>
+                      VocabularioPage(controller: rhymesController),
                 ),
               );
             },
@@ -170,13 +214,17 @@ class VersinDrawer extends StatelessWidget {
           // CONFIGURAÇÕES
           ListTile(
             leading: const Icon(Icons.settings_outlined, color: Colors.white70),
-            title: const Text("Configurações", style: TextStyle(color: Colors.white, fontSize: 14)),
+            title: const Text(
+              "Configurações",
+              style: TextStyle(color: Colors.white, fontSize: 14),
+            ),
             onTap: () {
               Navigator.pop(context);
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => SettingsPage(controller: rhymesController),
+                  builder: (context) =>
+                      SettingsPage(controller: rhymesController),
                 ),
               );
             },
@@ -190,7 +238,7 @@ class VersinDrawer extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Divider(color: Colors.purpleAccent, thickness: 1), 
+                const Divider(color: Colors.purpleAccent, thickness: 1),
                 const SizedBox(height: 10),
                 Row(
                   children: [
@@ -206,9 +254,9 @@ class VersinDrawer extends StatelessWidget {
                     const Text(
                       "VERSÃO ALFA",
                       style: TextStyle(
-                        color: Colors.grey, 
-                        fontSize: 10, 
-                        fontFamily: 'monospace'
+                        color: Colors.grey,
+                        fontSize: 10,
+                        fontFamily: 'monospace',
                       ),
                     ),
                   ],

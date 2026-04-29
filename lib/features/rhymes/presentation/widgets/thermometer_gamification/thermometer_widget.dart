@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 class ThermometerFeedback extends StatelessWidget {
   final double starProgress; // 0.0 a 3.0
   final double fireProgress; // 0.0 a 3.0
-  final String feedbackText; // Adicionei para exibir o comentário abaixo dos ícones
+  final String
+  feedbackText; // Adicionei para exibir o comentário abaixo dos ícones
 
   const ThermometerFeedback({
     super.key,
@@ -32,7 +33,10 @@ class ThermometerFeedback extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: isFirePhase
                 ? List.generate(3, (index) {
-                    double iconProgress = (fireProgress - index).clamp(0.0, 1.0);
+                    double iconProgress = (fireProgress - index).clamp(
+                      0.0,
+                      1.0,
+                    );
                     return _GradualIcon(
                       icon: Icons.local_fire_department_rounded,
                       percentage: iconProgress,
@@ -40,7 +44,10 @@ class ThermometerFeedback extends StatelessWidget {
                     );
                   })
                 : List.generate(3, (index) {
-                    double iconProgress = (starProgress - index).clamp(0.0, 1.0);
+                    double iconProgress = (starProgress - index).clamp(
+                      0.0,
+                      1.0,
+                    );
                     return _GradualIcon(
                       icon: Icons.star_rounded,
                       percentage: iconProgress,
@@ -91,14 +98,10 @@ class _GradualIcon extends StatelessWidget {
             begin: Alignment.bottomCenter,
             end: Alignment.topCenter,
             stops: [percentage, percentage],
-            colors: [color, Colors.white.withOpacity(0.2)], 
+            colors: [color, Colors.white.withOpacity(0.2)],
           ).createShader(rect);
         },
-        child: Icon(
-          icon,
-          size: 32,
-          color: Colors.white,
-        ),
+        child: Icon(icon, size: 32, color: Colors.white),
       ),
     );
   }

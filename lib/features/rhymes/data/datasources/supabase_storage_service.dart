@@ -1,23 +1,26 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:versin/features/rhymes/data/models/author_hash.dart';
-// Novo Import para usar o HashHelper real que criamos
 import 'package:versin/features/rhymes/data/datasources/utils/hash_helper.dart';
 
 class SupabaseStorageService {
   final _supabase = Supabase.instance.client;
 
   /// Registra a obra completa, gera o Hash real e salva rimas utilizadas
-  Future<void> registerWorkInSupa(String title, String content, String username, {List<String>? usedRhymes}) async {
+  Future<void> registerWorkInSupa(
+    String title,
+    String content,
+    String username, {
+    List<String>? usedRhymes,
+  }) async {
     final user = _supabase.auth.currentUser;
     if (user == null) throw Exception("Usuário não autenticado");
 
     final wallet = "wallet@$username";
-    
+
     // Geração de Hash Real usando o nosso HashHelper
     final hash = HashHelper.generateVersinHash(
-      lyric: content, 
-      userWallet: wallet, 
-      username: username
+      lyric: content,
+      userWallet: wallet,
+      username: username,
     );
 
     final newWork = {
@@ -31,24 +34,27 @@ class SupabaseStorageService {
       // Armazena as rimas para análise de tendências futura
       'meta_data': {
         'used_rhymes': usedRhymes ?? [],
-        'versin_version': '1.0.0-genesis'
-      }
+        'versin_version': '1.0.0-genesis',
+      },
     };
 
     try {
       await _supabase.from('works').insert(newWork);
-      
+
       // LOGICA REAL: Se houver rimas, incrementamos o score global delas agora
       if (usedRhymes != null && usedRhymes.isNotEmpty) {
         for (var rhyme in usedRhymes) {
-          await _supabase.rpc('increment_word_score', params: {'word_param': rhyme.toLowerCase()});
+          await _supabase.rpc(
+            'increment_word_score',
+            params: {'word_param': rhyme.toLowerCase()},
+          );
         }
       }
 
       print("🚀 Obra registrada e assinada: $hash");
     } catch (e) {
       print("❌ Erro ao registrar obra: $e");
-      rethrow; 
+      rethrow;
     }
   }
 
@@ -70,12 +76,15 @@ class SupabaseStorageService {
     }
   }
 
-  Future<void> transferOwnership(String workHash, String newDestinationWallet) async {
+  Future<void> transferOwnership(
+    String workHash,
+    String newDestinationWallet,
+  ) async {
     try {
       await _supabase
           .from('works')
           .update({
-            'current_owner_wallet': newDestinationWallet, 
+            'current_owner_wallet': newDestinationWallet,
             'status': 'transferred',
             'transferred_at': DateTime.now().toIso8601String(),
           })

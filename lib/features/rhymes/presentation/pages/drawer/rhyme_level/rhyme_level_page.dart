@@ -14,15 +14,36 @@ class _RhymeLevelPageState extends State<RhymeLevelPage> {
   String selectedBpm = 'Automático';
   String selectedKey = 'Automático';
   String selectedVocalStyle = 'Automático';
-  
+
   // Variável para o Checkbox do Dicionário
   bool allowDataSharing = false;
 
   // Mapa de subcategorias focado em Trap, Rap e Funk
   final Map<String, List<String>> subGenres = {
-    'Trap': ['Padrão', 'Emo Trap', 'Drill', 'Agressivo', 'Melódico', 'Dark Trap'],
-    'Rap': ['Padrão', 'Boom Bap', 'Old School', 'Hardcore', 'Consciente', 'Lofi'],
-    'Funk': ['Padrão', 'Mandelão', 'Consciente', 'MTG', 'Proibidão', 'Ostentação'],
+    'Trap': [
+      'Padrão',
+      'Emo Trap',
+      'Drill',
+      'Agressivo',
+      'Melódico',
+      'Dark Trap',
+    ],
+    'Rap': [
+      'Padrão',
+      'Boom Bap',
+      'Old School',
+      'Hardcore',
+      'Consciente',
+      'Lofi',
+    ],
+    'Funk': [
+      'Padrão',
+      'Mandelão',
+      'Consciente',
+      'MTG',
+      'Proibidão',
+      'Ostentação',
+    ],
     'Automático': ['Padrão'],
   };
 
@@ -31,8 +52,14 @@ class _RhymeLevelPageState extends State<RhymeLevelPage> {
     return Scaffold(
       backgroundColor: const Color(0xFF0F0F0F),
       appBar: AppBar(
-        title: const Text('NÍVEL DE RIMA', 
-          style: TextStyle(letterSpacing: 4, fontWeight: FontWeight.w300, fontSize: 16)),
+        title: const Text(
+          'NÍVEL DE RIMA',
+          style: TextStyle(
+            letterSpacing: 4,
+            fontWeight: FontWeight.w300,
+            fontSize: 16,
+          ),
+        ),
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
@@ -43,7 +70,11 @@ class _RhymeLevelPageState extends State<RhymeLevelPage> {
         children: [
           const Text(
             "Configurações de Estilo",
-            style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           const SizedBox(height: 30),
 
@@ -55,7 +86,8 @@ class _RhymeLevelPageState extends State<RhymeLevelPage> {
             onChanged: (val) {
               setState(() {
                 selectedGenre = val!;
-                selectedSubGenre = 'Padrão'; // Reseta a subcategoria ao mudar o gênero
+                selectedSubGenre =
+                    'Padrão'; // Reseta a subcategoria ao mudar o gênero
               });
             },
           ),
@@ -79,7 +111,14 @@ class _RhymeLevelPageState extends State<RhymeLevelPage> {
           _buildDropdown(
             label: "Tom da Voz / Beat",
             value: selectedKey,
-            items: ['Automático', 'C Maior', 'A Menor', 'G Maior', 'E Menor', 'F# Menor'],
+            items: [
+              'Automático',
+              'C Maior',
+              'A Menor',
+              'G Maior',
+              'E Menor',
+              'F# Menor',
+            ],
             onChanged: (val) => setState(() => selectedKey = val!),
           ),
 
@@ -95,10 +134,14 @@ class _RhymeLevelPageState extends State<RhymeLevelPage> {
           // SEÇÃO DE COLABORAÇÃO E RECOMPENSAS
           const Text(
             "Comunidade & Dicionário",
-            style: TextStyle(color: Colors.purpleAccent, fontSize: 14, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              color: Colors.purpleAccent,
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           const SizedBox(height: 10),
-          
+
           Container(
             decoration: BoxDecoration(
               color: Colors.purpleAccent.withOpacity(0.05),
@@ -135,10 +178,17 @@ class _RhymeLevelPageState extends State<RhymeLevelPage> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.purpleAccent,
                 padding: const EdgeInsets.symmetric(vertical: 15),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
-              child: const Text("SALVAR SETUP", 
-                style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+              child: const Text(
+                "SALVAR SETUP",
+                style: TextStyle(
+                  color: Colors.black,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
           ),
           const SizedBox(height: 30),
@@ -148,17 +198,25 @@ class _RhymeLevelPageState extends State<RhymeLevelPage> {
   }
 
   Widget _buildDropdown({
-    required String label, 
-    required String value, 
-    required List<String> items, 
-    required ValueChanged<String?> onChanged
+    required String label,
+    required String value,
+    required List<String> items,
+    required ValueChanged<String?> onChanged,
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: const TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.grey,
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1.2,
+            ),
+          ),
           const SizedBox(height: 8),
           DropdownButtonFormField<String>(
             value: value,
@@ -167,14 +225,17 @@ class _RhymeLevelPageState extends State<RhymeLevelPage> {
             decoration: InputDecoration(
               filled: true,
               fillColor: Colors.white.withOpacity(0.05),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 0),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide.none,
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 15,
+                vertical: 0,
+              ),
             ),
             items: items.map((String item) {
-              return DropdownMenuItem<String>(
-                value: item,
-                child: Text(item),
-              );
+              return DropdownMenuItem<String>(value: item, child: Text(item));
             }).toList(),
             onChanged: onChanged,
           ),

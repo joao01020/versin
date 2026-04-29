@@ -18,14 +18,18 @@ class AuthOptionsModal extends StatelessWidget {
   Future<void> _handleSocialLogin(BuildContext context, String provider) async {
     try {
       // Simulação de criação de dados após sucesso:
-      final String tempUser = "user_${DateTime.now().millisecondsSinceEpoch.toString().substring(10)}";
-      final String tempWallet = "0x${DateTime.now().millisecondsSinceEpoch}versin";
+      final String tempUser =
+          "user_${DateTime.now().millisecondsSinceEpoch.toString().substring(10)}";
+      final String tempWallet =
+          "0x${DateTime.now().millisecondsSinceEpoch}versin";
 
       print("Criando perfil para: $tempUser com Carteira: $tempWallet");
-      
+
       Navigator.pop(context);
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Erro: $e")));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Erro: $e")));
     }
   }
 
@@ -44,10 +48,14 @@ class AuthOptionsModal extends StatelessWidget {
           children: [
             const Text(
               "ESCOLHA UMA OPÇÃO",
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, letterSpacing: 1.1),
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.1,
+              ),
             ),
             const SizedBox(height: 24),
-            
+
             // Botão Google
             _authButton(
               label: "Entrar com Google",
@@ -56,7 +64,7 @@ class AuthOptionsModal extends StatelessWidget {
               onPressed: () => _handleSocialLogin(context, 'google'),
             ),
             const SizedBox(height: 12),
-            
+
             // Botão GitHub
             _authButton(
               label: "Entrar com GitHub",
@@ -65,7 +73,7 @@ class AuthOptionsModal extends StatelessWidget {
               onPressed: () => _handleSocialLogin(context, 'github'),
             ),
             const SizedBox(height: 12),
-            
+
             // Botão Criar Conta Email (CORRIGIDO)
             _authButton(
               label: "Criar conta com E-mail",
@@ -82,7 +90,12 @@ class AuthOptionsModal extends StatelessWidget {
     );
   }
 
-  Widget _authButton({required String label, required IconData icon, required Color color, required VoidCallback onPressed}) {
+  Widget _authButton({
+    required String label,
+    required IconData icon,
+    required Color color,
+    required VoidCallback onPressed,
+  }) {
     return ElevatedButton.icon(
       style: ElevatedButton.styleFrom(
         backgroundColor: color,

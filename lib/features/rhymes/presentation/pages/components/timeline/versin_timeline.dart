@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'dart:math' as math;
 
 class VersinTimeline extends StatefulWidget {
   final int currentStep;
@@ -17,7 +16,8 @@ class VersinTimeline extends StatefulWidget {
   State<VersinTimeline> createState() => _VersinTimelineState();
 }
 
-class _VersinTimelineState extends State<VersinTimeline> with SingleTickerProviderStateMixin {
+class _VersinTimelineState extends State<VersinTimeline>
+    with SingleTickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -25,7 +25,8 @@ class _VersinTimelineState extends State<VersinTimeline> with SingleTickerProvid
       children: [
         // A Linha do Tempo Animada
         Container(
-          height: 50, // Reduzi levemente de 60 para 50 para ganhar espaço no mobile
+          height:
+              50, // Reduzi levemente de 60 para 50 para ganhar espaço no mobile
           width: double.infinity,
           padding: const EdgeInsets.symmetric(horizontal: 40),
           child: CustomPaint(
@@ -72,9 +73,9 @@ class TimelinePainter extends CustomPainter {
     for (int i = 0; i < 5; i++) {
       double startX = i * spacing;
       double endX = (i + 1) * spacing;
-      
+
       canvas.drawLine(Offset(startX, y), Offset(endX, y), paintLine);
-      
+
       if (currentStep > i + 1) {
         canvas.drawLine(Offset(startX, y), Offset(endX, y), paintActiveLine);
       }
@@ -89,22 +90,29 @@ class TimelinePainter extends CustomPainter {
       canvas.drawCircle(
         Offset(x, y),
         6,
-        Paint()..color = const Color(0xFF1A1A1A)..style = PaintingStyle.fill,
+        Paint()
+          ..color = const Color(0xFF1A1A1A)
+          ..style = PaintingStyle.fill,
       );
-      
+
       canvas.drawCircle(
         Offset(x, y),
         6,
-        Paint()..color = Colors.white24..style = PaintingStyle.stroke..strokeWidth = 1,
+        Paint()
+          ..color = Colors.white24
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1,
       );
 
       if (isCurrent || isCompleted) {
         double fillPercent = isCompleted ? 1.0 : stepProgress;
-        
+
         canvas.drawCircle(
           Offset(x, y),
           4 * fillPercent,
-          Paint()..color = activeColor..style = PaintingStyle.fill,
+          Paint()
+            ..color = activeColor
+            ..style = PaintingStyle.fill,
         );
 
         if (isCurrent) {
@@ -122,8 +130,8 @@ class TimelinePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant TimelinePainter oldDelegate) {
-    return oldDelegate.currentStep != currentStep || 
-           oldDelegate.stepProgress != stepProgress ||
-           oldDelegate.activeColor != activeColor;
+    return oldDelegate.currentStep != currentStep ||
+        oldDelegate.stepProgress != stepProgress ||
+        oldDelegate.activeColor != activeColor;
   }
 }

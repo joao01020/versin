@@ -39,8 +39,12 @@ class _StructureDraggableListState extends State<StructureDraggableList> {
           decoration: InputDecoration(
             hintText: "Ex: Ponte do João",
             hintStyle: TextStyle(color: widget.activeColor.withOpacity(0.5)),
-            enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: widget.activeColor)),
-            focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: widget.activeColor, width: 2)),
+            enabledBorder: UnderlineInputBorder(
+              borderSide: BorderSide(color: widget.activeColor),
+            ),
+            focusedBorder: UnderlineInputBorder(
+              borderSide: BorderSide(color: widget.activeColor, width: 2),
+            ),
           ),
         ),
         actions: [
@@ -58,7 +62,13 @@ class _StructureDraggableListState extends State<StructureDraggableList> {
                 Navigator.pop(context);
               }
             },
-            child: Text("ADICIONAR", style: TextStyle(color: widget.activeColor, fontWeight: FontWeight.bold)),
+            child: Text(
+              "ADICIONAR",
+              style: TextStyle(
+                color: widget.activeColor,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ],
       ),
@@ -90,7 +100,7 @@ class _StructureDraggableListState extends State<StructureDraggableList> {
             },
           ),
         ),
-        
+
         // Botão "+" para adicionar novos blocos personalizados
         Padding(
           padding: const EdgeInsets.only(top: 12.0),
@@ -115,7 +125,10 @@ class _StructureDraggableListState extends State<StructureDraggableList> {
       shadowColor: widget.activeColor.withOpacity(0.1),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
-        side: BorderSide(color: widget.activeColor.withOpacity(0.3), width: 0.5),
+        side: BorderSide(
+          color: widget.activeColor.withOpacity(0.3),
+          width: 0.5,
+        ),
       ),
       child: ListTile(
         title: Text(

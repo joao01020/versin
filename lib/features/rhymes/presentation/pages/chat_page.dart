@@ -23,13 +23,13 @@ class _ChatPageState extends State<ChatPage> {
   final RhymesController _rhymesController = RhymesController();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final ScrollController _scrollController = ScrollController();
-  
-  Timer? _authModalTimer; 
-  StreamSubscription<AuthState>? _authSubscription; 
-  
+
+  Timer? _authModalTimer;
+  StreamSubscription<AuthState>? _authSubscription;
+
   List<Map<String, dynamic>> messages = [];
-  bool _isAiTyping = false; 
-  bool _isInitializing = true; 
+  bool _isAiTyping = false;
+  bool _isInitializing = true;
   int _currentSuggestionIndex = 0;
   String _selectedMood = "Calmo";
 
@@ -39,10 +39,10 @@ class _ChatPageState extends State<ChatPage> {
     _initializeLogic();
     _setupListeners();
     _checkInitialSession();
-    _setupAuthListener(); 
+    _setupAuthListener();
     _loadInitialData();
     _startAuthTimer();
-    _rhymesController.fetchTrendingWords(); 
+    _rhymesController.fetchTrendingWords();
   }
 
   void _initializeLogic() {
@@ -57,12 +57,12 @@ class _ChatPageState extends State<ChatPage> {
   void _setupListeners() {
     _messageController.addListener(() {
       final text = _messageController.text;
-      _rhymesController.onTextChanged(text); 
+      _rhymesController.onTextChanged(text);
       if (_rhymesController.currentStep == 2) {
         int lines = text.split('\n').where((l) => l.trim().isNotEmpty).length;
         double progress = (lines / 5).clamp(0.0, 1.0);
         _rhymesController.updateProgress(2, progress);
-        if (progress >= 1.0) _completeStep(2); 
+        if (progress >= 1.0) _completeStep(2);
       }
     });
   }
@@ -72,7 +72,8 @@ class _ChatPageState extends State<ChatPage> {
     if (mounted) {
       ChatInitializer.run(
         mounted: mounted,
-        onLoadingStatusChanged: (status) => setState(() => _isInitializing = status),
+        onLoadingStatusChanged: (status) =>
+            setState(() => _isInitializing = status),
         onStartWelcomeFlow: _startWelcomeFlow,
       );
     }
@@ -84,9 +85,11 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   void _setupAuthListener() {
-    _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+    _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((
+      data,
+    ) {
       if (data.event == AuthChangeEvent.signedIn && data.session != null) {
-        _authModalTimer?.cancel(); 
+        _authModalTimer?.cancel();
         _rhymesController.carregarDadosUsuario();
       }
       if (data.event == AuthChangeEvent.signedOut) _startAuthTimer();
@@ -94,10 +97,11 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   void _startAuthTimer() {
-    _authModalTimer?.cancel(); 
+    _authModalTimer?.cancel();
     _authModalTimer = Timer(const Duration(seconds: 45), () {
       if (!mounted) return;
-      if (Supabase.instance.client.auth.currentUser == null) AuthModal.show(context);
+      if (Supabase.instance.client.auth.currentUser == null)
+        AuthModal.show(context);
     });
   }
 
@@ -105,14 +109,16 @@ class _ChatPageState extends State<ChatPage> {
     if (text.isEmpty) return;
     setState(() {
       messages.add({"role": "user", "content": text});
-      _isAiTyping = true; 
+      _isAiTyping = true;
     });
     _scrollToBottom();
-    final response = await _rhymesController.fetchAiResponse("$text [Vibe: $_selectedMood]");
+    final response = await _rhymesController.fetchAiResponse(
+      "$text [Vibe: $_selectedMood]",
+    );
     if (mounted) {
       setState(() {
         messages.add(response);
-        _isAiTyping = false; 
+        _isAiTyping = false;
       });
       _scrollToBottom();
     }
@@ -132,23 +138,32 @@ class _ChatPageState extends State<ChatPage> {
       messages: messages,
       addMessage: (content, {Widget? customWidget}) => setState(() {
         messages.add({
-          "role": "assistant", 
-          "content": content, 
-          "customWidget": customWidget 
+          "role": "assistant",
+          "content": content,
+          "customWidget": customWidget,
         });
       }),
       setAiTyping: (typing) => setState(() => _isAiTyping = typing),
       scrollToBottom: _scrollToBottom,
-      onProgressUpdate: (step, progress) => _rhymesController.updateProgress(step, progress),
+      onProgressUpdate: (step, progress) =>
+          _rhymesController.updateProgress(step, progress),
       activeColor: _rhymesController.getActiveColor(),
       onStructureConfirmed: (configEstudio) {
         setState(() {
           messages.add({
             "role": "assistant",
-            "content": "Configuração do Estúdio: $configEstudio. Agora, me diga o tema da sua letra e escolha o nível emocional:",
+            "content":
+                "Configuração do Estúdio: $configEstudio. Agora, me diga o tema da sua letra e escolha o nível emocional:",
             "customWidget": MoodSelectorSlider(
               onMoodChanged: (valor) {
-                final moods = ['Calmo', 'Contemplativo', 'Melancólico', 'Romance', 'Energético', 'Agressivo'];
+                final moods = [
+                  'Calmo',
+                  'Contemplativo',
+                  'Melancólico',
+                  'Romance',
+                  'Energético',
+                  'Agressivo',
+                ];
                 _selectedMood = moods[valor.toInt()];
               },
             ),
@@ -159,15 +174,16 @@ class _ChatPageState extends State<ChatPage> {
     );
   }
 
-  void _completeStep(int step) => _rhymesController.updateProgress(step + 1, 0.0);
+  void _completeStep(int step) =>
+      _rhymesController.updateProgress(step + 1, 0.0);
 
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent, 
-          duration: const Duration(milliseconds: 400), 
-          curve: Curves.easeOut
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 400),
+          curve: Curves.easeOut,
         );
       }
     });
@@ -181,12 +197,12 @@ class _ChatPageState extends State<ChatPage> {
       key: _scaffoldKey,
       backgroundColor: const Color(0xFF0F0F0F),
       drawer: VersinDrawer(
-        rhymesController: _rhymesController, 
+        rhymesController: _rhymesController,
         onNewChat: () {
           setState(() => messages.clear());
           _rhymesController.updateProgress(1, 0.0);
           _startWelcomeFlow();
-        }
+        },
       ),
       body: SafeArea(
         child: Column(
@@ -195,9 +211,9 @@ class _ChatPageState extends State<ChatPage> {
             Padding(
               padding: const EdgeInsets.only(top: 10, bottom: 5),
               child: VersinTimeline(
-                currentStep: _rhymesController.currentStep, 
-                stepProgress: _rhymesController.stepProgress, 
-                activeColor: activeColor
+                currentStep: _rhymesController.currentStep,
+                stepProgress: _rhymesController.stepProgress,
+                activeColor: activeColor,
               ),
             ),
 
@@ -212,8 +228,13 @@ class _ChatPageState extends State<ChatPage> {
                     Align(
                       alignment: Alignment.centerLeft,
                       child: IconButton(
-                        icon: Icon(Icons.menu_rounded, color: activeColor, size: 30),
-                        onPressed: () => _scaffoldKey.currentState?.openDrawer()
+                        icon: Icon(
+                          Icons.menu_rounded,
+                          color: activeColor,
+                          size: 30,
+                        ),
+                        onPressed: () =>
+                            _scaffoldKey.currentState?.openDrawer(),
                       ),
                     ),
                     // Títulos limpos: Apenas o Branco e o Genesis
@@ -221,21 +242,21 @@ class _ChatPageState extends State<ChatPage> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         const Text(
-                          "Versin", 
+                          "Versin",
                           style: TextStyle(
-                            color: Colors.white, 
-                            fontSize: 22, 
-                            fontWeight: FontWeight.bold
-                          )
+                            color: Colors.white,
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                         const Text(
-                          "GENESIS", 
+                          "GENESIS",
                           style: TextStyle(
-                            color: Colors.grey, 
-                            fontSize: 8, 
-                            fontWeight: FontWeight.w900, 
-                            letterSpacing: 4
-                          )
+                            color: Colors.grey,
+                            fontSize: 8,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 4,
+                          ),
                         ),
                       ],
                     ),
@@ -247,15 +268,18 @@ class _ChatPageState extends State<ChatPage> {
             // 3. WIDGET DE FEEDBACK (Onde fica o "Comece a escrever...")
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
-              child: ChatHeader(activeColor: activeColor, rhymesController: _rhymesController),
+              child: ChatHeader(
+                activeColor: activeColor,
+                rhymesController: _rhymesController,
+              ),
             ),
 
             // 4. LISTA DE MENSAGENS
             Expanded(
               child: ChatListView(
-                isInitializing: _isInitializing, 
+                isInitializing: _isInitializing,
                 messages: messages,
-                isAiTyping: _isAiTyping, 
+                isAiTyping: _isAiTyping,
                 scrollController: _scrollController,
                 activeColor: activeColor,
                 secondsActive: _rhymesController.connectionSeconds,
@@ -266,22 +290,23 @@ class _ChatPageState extends State<ChatPage> {
             Padding(
               padding: const EdgeInsets.fromLTRB(15, 5, 15, 15),
               child: ChatBottomBar(
-                messageController: _messageController, 
-                rhymesController: _rhymesController, 
-                activeColor: activeColor, 
-                isRhymeMode: _rhymesController.isRhymeMode, 
+                messageController: _messageController,
+                rhymesController: _rhymesController,
+                activeColor: activeColor,
+                isRhymeMode: _rhymesController.isRhymeMode,
                 onSend: _sendMessage,
                 currentSuggestionIndex: _currentSuggestionIndex,
-                onUpdateSuggestionIndex: (index) => setState(() => _currentSuggestionIndex = index),
+                onUpdateSuggestionIndex: (index) =>
+                    setState(() => _currentSuggestionIndex = index),
                 onAddRhyme: (word) {
                   setState(() {
                     String currentText = _messageController.text;
                     _messageController.text = "$currentText $word ";
                     _messageController.selection = TextSelection.fromPosition(
-                      TextPosition(offset: _messageController.text.length)
+                      TextPosition(offset: _messageController.text.length),
                     );
                   });
-                }, 
+                },
               ),
             ),
           ],
@@ -295,7 +320,7 @@ class _ChatPageState extends State<ChatPage> {
     _rhymesController.removeListener(_handleControllerChanges);
     _authSubscription?.cancel();
     _authModalTimer?.cancel();
-    _messageController.dispose(); 
+    _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
   }

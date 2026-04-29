@@ -8,7 +8,7 @@ class ChatListView extends StatelessWidget {
   final bool isAiTyping;
   final ScrollController scrollController;
   final Color activeColor;
-  final int secondsActive; 
+  final int secondsActive;
 
   const ChatListView({
     super.key,
@@ -17,7 +17,7 @@ class ChatListView extends StatelessWidget {
     required this.isAiTyping,
     required this.scrollController,
     required this.activeColor,
-    this.secondsActive = 0, 
+    this.secondsActive = 0,
   });
 
   @override
@@ -32,13 +32,15 @@ class ChatListView extends StatelessWidget {
 
     return ListView.builder(
       controller: scrollController,
-      // AJUSTE PARA MOBILE: clipBehavior hardEdge garante que o conteúdo 
+      // AJUSTE PARA MOBILE: clipBehavior hardEdge garante que o conteúdo
       // seja cortado exatamente no limite do widget Expanded definido na Page.
-      clipBehavior: Clip.hardEdge, 
-      physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
-      // Padding reduzido no topo (5) para não criar buracos e 
+      clipBehavior: Clip.hardEdge,
+      physics: const AlwaysScrollableScrollPhysics(
+        parent: BouncingScrollPhysics(),
+      ),
+      // Padding reduzido no topo (5) para não criar buracos e
       // aumentado no bottom (100) para não ficar atrás da barra de digitação.
-      padding: const EdgeInsets.fromLTRB(16, 5, 16, 100), 
+      padding: const EdgeInsets.fromLTRB(16, 5, 16, 100),
       itemCount: messages.length + (isAiTyping ? 1 : 0),
       itemBuilder: (context, index) {
         if (index == messages.length) {
@@ -47,7 +49,7 @@ class ChatListView extends StatelessWidget {
 
         final message = messages[index];
         final Widget? customWidget = message['customWidget'];
-        
+
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
@@ -59,7 +61,7 @@ class ChatListView extends StatelessWidget {
               },
               activeColor: activeColor,
             ),
-            if (customWidget != null) 
+            if (customWidget != null)
               Padding(
                 // Ajuste de margem para o slider de sentimento ou outros widgets
                 padding: const EdgeInsets.fromLTRB(8, 12, 8, 20),
@@ -83,7 +85,7 @@ class ChatListView extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.start, 
+        mainAxisAlignment: MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
@@ -96,7 +98,7 @@ class ChatListView extends StatelessWidget {
               width: 14,
               height: 14,
               child: CircularProgressIndicator(
-                strokeWidth: 2, 
+                strokeWidth: 2,
                 valueColor: AlwaysStoppedAnimation<Color>(Colors.white24),
               ),
             ),
@@ -108,7 +110,7 @@ class ChatListView extends StatelessWidget {
               Text(
                 mainMessage,
                 style: const TextStyle(
-                  color: Colors.white70, 
+                  color: Colors.white70,
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                   letterSpacing: 0.5,
@@ -116,13 +118,10 @@ class ChatListView extends StatelessWidget {
               ),
               Text(
                 subMessage,
-                style: const TextStyle(
-                  color: Colors.white38, 
-                  fontSize: 10,
-                ),
+                style: const TextStyle(color: Colors.white38, fontSize: 10),
               ),
             ],
-          )
+          ),
         ],
       ),
     );

@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class AIService {
-  // No Linux (Debian), mantenha 127.0.0.1. 
+  // No Linux (Debian), mantenha 127.0.0.1.
   // Se for testar no celular físico, lembre de usar o IP da sua máquina.
   final String _baseUrl = 'http://127.0.0.1:8000/processar';
 
@@ -13,16 +13,21 @@ class AIService {
     bool isComando = false,
   }) async {
     try {
-      final response = await http.post(
-        Uri.parse(_baseUrl),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'texto_usuario': texto,
-          'lista_rimas': rimasUsuario,
-          'is_comando': isComando,
-          'api_key_privada': apiKeyPrivada, // ENVIANDO O TURBO PARA O BACKEND
-        }),
-      ).timeout(const Duration(seconds: 4)); // Timeout curto para não travar o flow
+      final response = await http
+          .post(
+            Uri.parse(_baseUrl),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'texto_usuario': texto,
+              'lista_rimas': rimasUsuario,
+              'is_comando': isComando,
+              'api_key_privada':
+                  apiKeyPrivada, // ENVIANDO O TURBO PARA O BACKEND
+            }),
+          )
+          .timeout(
+            const Duration(seconds: 4),
+          ); // Timeout curto para não travar o flow
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);

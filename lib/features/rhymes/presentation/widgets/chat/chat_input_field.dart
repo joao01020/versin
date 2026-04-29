@@ -19,9 +19,9 @@ class ChatInputArea extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       decoration: BoxDecoration(
-        color: const Color(0xFF1A1A1A), 
-        borderRadius: BorderRadius.circular(22), 
-        border: Border.all(color: activeColor.withOpacity(0.3))
+        color: const Color(0xFF1A1A1A),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: activeColor.withOpacity(0.3)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
@@ -30,14 +30,14 @@ class ChatInputArea extends StatelessWidget {
             child: TextField(
               controller: controller,
               keyboardType: TextInputType.multiline,
-              maxLines: 5, 
+              maxLines: 5,
               minLines: 1,
               style: TextStyle(color: activeColor, fontSize: 16),
               decoration: InputDecoration(
                 hintText: hintText,
-                hintStyle: const TextStyle(color: Colors.grey, fontSize: 15), 
-                border: InputBorder.none, 
-                contentPadding: const EdgeInsets.symmetric(vertical: 12)
+                hintStyle: const TextStyle(color: Colors.grey, fontSize: 15),
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(vertical: 12),
               ),
             ),
           ),

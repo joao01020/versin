@@ -10,7 +10,7 @@ class MemoryService {
         .select('ia_memory')
         .eq('username', username)
         .single();
-    
+
     // Retorno padrão caso a memória esteja vazia no banco
     return data['ia_memory'] ?? "O usuário prefere rimas de Trap.";
   }
@@ -29,7 +29,7 @@ class MemoryService {
         .from('profiles')
         .update({'ia_memory': updatedMemory})
         .eq('username', username);
-    
+
     // Log técnico para o terminal do Linux no seu Dell
     print("🧠 Versin evoluiu: $newKnowledge");
   }

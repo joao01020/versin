@@ -21,7 +21,11 @@ class UserService {
   }
 
   // 3. SALVAR FAVORITO (Pesquisa + Resposta + Data)
-  Future<void> saveToFavorites(String username, String query, String response) async {
+  Future<void> saveToFavorites(
+    String username,
+    String query,
+    String response,
+  ) async {
     // Primeiro pegamos o ID do perfil pelo username
     final profile = await _supabase
         .from('profiles')
@@ -38,7 +42,10 @@ class UserService {
   }
 
   // 4. SALVAR CONFIGURAÇÕES
-  Future<void> updateSettings(String username, Map<String, dynamic> newSettings) async {
+  Future<void> updateSettings(
+    String username,
+    Map<String, dynamic> newSettings,
+  ) async {
     await _supabase
         .from('profiles')
         .update({'settings': newSettings})

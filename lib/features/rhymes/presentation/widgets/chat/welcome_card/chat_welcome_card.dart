@@ -3,10 +3,7 @@ import 'package:flutter/material.dart';
 class ChatWelcomeCard extends StatelessWidget {
   final Color activeColor;
 
-  const ChatWelcomeCard({
-    super.key, 
-    this.activeColor = Colors.purpleAccent,
-  });
+  const ChatWelcomeCard({super.key, this.activeColor = Colors.purpleAccent});
 
   @override
   Widget build(BuildContext context) {
@@ -30,26 +27,28 @@ class ChatWelcomeCard extends StatelessWidget {
                       color: activeColor.withOpacity(0.05),
                       blurRadius: 15,
                       spreadRadius: 2,
-                    )
+                    ),
                   ],
                 ),
-                child: Icon(Icons.mic_external_on, color: activeColor, size: 38), // Reduzido de 45 para 38
+                child: Icon(
+                  Icons.mic_external_on,
+                  color: activeColor,
+                  size: 38,
+                ), // Reduzido de 45 para 38
               ),
               const SizedBox(height: 20), // Reduzido de 30 para 20
-              
               // Título Principal
               const Text(
                 "VERSIN",
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: Colors.white, 
+                  color: Colors.white,
                   fontSize: 24, // Reduzido de 28 para 24
-                  fontWeight: FontWeight.bold, 
-                  letterSpacing: 4
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 4,
                 ),
               ),
               const SizedBox(height: 15), // Reduzido de 25 para 15
-              
               // Texto de boas-vindas com quebras de linha automáticas para mobile
               Text(
                 "uma letra organizada brota ouvintes até do chão,\n"
@@ -57,7 +56,7 @@ class ChatWelcomeCard extends StatelessWidget {
                 "versão escrita",
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: Colors.grey.shade400, 
+                  color: Colors.grey.shade400,
                   fontSize: 14, // Reduzido de 16 para 14
                   fontStyle: FontStyle.italic,
                   height: 1.4,

@@ -11,12 +11,12 @@ class MoodSelectorSlider extends StatefulWidget {
 class _MoodSelectorSliderState extends State<MoodSelectorSlider> {
   double _currentValue = 0;
   final List<String> _moods = [
-    'Calmo', 
-    'Contemplativo', 
-    'Melancólico', 
-    'Romance', 
-    'Energético', 
-    'Agressivo'
+    'Calmo',
+    'Contemplativo',
+    'Melancólico',
+    'Romance',
+    'Energético',
+    'Agressivo',
   ];
 
   @override
@@ -26,7 +26,10 @@ class _MoodSelectorSliderState extends State<MoodSelectorSlider> {
       children: [
         Text(
           "Vibe: ${_moods[_currentValue.toInt()]}",
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         SliderTheme(
           data: SliderTheme.of(context).copyWith(
@@ -34,7 +37,10 @@ class _MoodSelectorSliderState extends State<MoodSelectorSlider> {
             activeTrackColor: const Color(0xFF9130FF), // Roxo da referência
             inactiveTrackColor: Colors.white24,
             thumbColor: Colors.white,
-            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8.0, elevation: 5),
+            thumbShape: const RoundSliderThumbShape(
+              enabledThumbRadius: 8.0,
+              elevation: 5,
+            ),
             overlayColor: const Color(0xFF9130FF).withAlpha(32),
             // Estilo dos "pontinhos" da referência
             tickMarkShape: const RoundSliderTickMarkShape(tickMarkRadius: 2),

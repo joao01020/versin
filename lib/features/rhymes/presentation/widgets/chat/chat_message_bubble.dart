@@ -8,8 +8,8 @@ class ChatMessageBubble extends StatefulWidget {
   final Function(String word)? onAddRhyme;
 
   const ChatMessageBubble({
-    super.key, 
-    required this.message, 
+    super.key,
+    required this.message,
     required this.activeColor,
     this.onAddRhyme,
   });
@@ -29,31 +29,36 @@ class _ChatMessageBubbleState extends State<ChatMessageBubble> {
       child: Container(
         margin: const EdgeInsets.symmetric(vertical: 8.0),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.85),
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.of(context).size.width * 0.85,
+        ),
         decoration: BoxDecoration(
           // Fundo escuro para o usuário e transparente para a IA (estilo clean)
           color: isUser ? const Color(0xFF2D2D2D) : Colors.transparent,
           borderRadius: BorderRadius.circular(18),
         ),
-        child: isUser 
-          ? Text(content, style: const TextStyle(color: Colors.white, fontSize: 15))
-          : MarkdownBody(
-              data: content,
-              builders: {
-                'word': RhymeTagBuilder(
-                  activeColor: widget.activeColor, 
-                  onTap: (word) => widget.onAddRhyme?.call(word),
-                ),
-              },
-              inlineSyntaxes: [RhymeSyntax()],
-              styleSheet: MarkdownStyleSheet(
-                p: const TextStyle(
-                  color: Colors.white, 
-                  fontSize: 16, 
-                  height: 1.5,
+        child: isUser
+            ? Text(
+                content,
+                style: const TextStyle(color: Colors.white, fontSize: 15),
+              )
+            : MarkdownBody(
+                data: content,
+                builders: {
+                  'word': RhymeTagBuilder(
+                    activeColor: widget.activeColor,
+                    onTap: (word) => widget.onAddRhyme?.call(word),
+                  ),
+                },
+                inlineSyntaxes: [RhymeSyntax()],
+                styleSheet: MarkdownStyleSheet(
+                  p: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    height: 1.5,
+                  ),
                 ),
               ),
-            ),
       ),
     );
   }
@@ -77,15 +82,12 @@ class RhymeTagBuilder extends MarkdownElementBuilder {
   final Color activeColor;
   final Function(String) onTap;
 
-  RhymeTagBuilder({
-    required this.activeColor, 
-    required this.onTap
-  });
+  RhymeTagBuilder({required this.activeColor, required this.onTap});
 
   @override
   Widget? visitElementAfter(md.Element element, TextStyle? preferredStyle) {
     final textContent = element.textContent;
-    
+
     // Limpa a palavra caso venha com o significado (ex: amor --> afeto)
     final parts = textContent.split('-->');
     final word = parts[0].trim();
@@ -100,7 +102,8 @@ class RhymeTagBuilder extends MarkdownElementBuilder {
         style: const TextStyle(
           color: Colors.white, // Texto branco
           fontWeight: FontWeight.bold,
-          decoration: TextDecoration.underline, // Sublinhado discreto para indicar clique
+          decoration: TextDecoration
+              .underline, // Sublinhado discreto para indicar clique
           decorationColor: Colors.white24,
         ),
       ),

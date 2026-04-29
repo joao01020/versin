@@ -34,9 +34,9 @@ class PageVocabulary extends State<VocabularioPage> {
       if (result != null && result.files.single.path != null) {
         final file = File(result.files.single.path!);
         final String content = await file.readAsString();
-        
+
         final List<String> importedRhymes = content.split(RegExp(r'[,\n;]'));
-        
+
         int count = 0;
         for (var rhyme in importedRhymes) {
           String cleanRhyme = rhyme.trim().toLowerCase();
@@ -51,8 +51,13 @@ class PageVocabulary extends State<VocabularioPage> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               backgroundColor: Colors.cyanAccent,
-              content: Text("Sucesso! $count rimas integradas ao Versin.", 
-              style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+              content: Text(
+                "Sucesso! $count rimas integradas ao Versin.",
+                style: const TextStyle(
+                  color: Colors.black,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
           );
         }
@@ -60,7 +65,9 @@ class PageVocabulary extends State<VocabularioPage> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Erro ao ler o arquivo. Verifique o formato.")),
+          const SnackBar(
+            content: Text("Erro ao ler o arquivo. Verifique o formato."),
+          ),
         );
       }
     }
@@ -72,15 +79,18 @@ class PageVocabulary extends State<VocabularioPage> {
       final Directory? downloadsDir = await getDownloadsDirectory();
       if (downloadsDir == null) return;
 
-      final String path = "${downloadsDir.path}/versin_backup_${DateTime.now().millisecondsSinceEpoch}.txt";
+      final String path =
+          "${downloadsDir.path}/versin_backup_${DateTime.now().millisecondsSinceEpoch}.txt";
       final File file = File(path);
 
       StringBuffer buffer = StringBuffer();
       buffer.writeln("--- BACKUP VERSIN: VOCABULÁRIO ---");
       buffer.writeln("Exportado em: ${DateTime.now()}\n");
-      
+
       for (var rhyme in widget.controller.vocabulary) {
-        buffer.writeln("${rhyme.word}${rhyme.isPriority ? ' [PRIORIDADE]' : ''}");
+        buffer.writeln(
+          "${rhyme.word}${rhyme.isPriority ? ' [PRIORIDADE]' : ''}",
+        );
       }
 
       await file.writeAsString(buffer.toString());
@@ -89,16 +99,16 @@ class PageVocabulary extends State<VocabularioPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: Colors.greenAccent,
-            content: Text("Arquivo salvo: $path"), 
-            duration: const Duration(seconds: 5)
+            content: Text("Arquivo salvo: $path"),
+            duration: const Duration(seconds: 5),
           ),
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Erro na exportação.")),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text("Erro na exportação.")));
       }
     }
   }
@@ -111,13 +121,34 @@ class PageVocabulary extends State<VocabularioPage> {
         children: [
           Row(
             children: [
-              Container(width: 4, height: 18, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2))),
+              Container(
+                width: 4,
+                height: 18,
+                decoration: BoxDecoration(
+                  color: color,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
               const SizedBox(width: 10),
-              Text(title, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 14, letterSpacing: 1.2)),
+              Text(
+                title,
+                style: TextStyle(
+                  color: color,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  letterSpacing: 1.2,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 4),
-          Text(description, style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11)),
+          Text(
+            description,
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.4),
+              fontSize: 11,
+            ),
+          ),
         ],
       ),
     );
@@ -128,14 +159,30 @@ class PageVocabulary extends State<VocabularioPage> {
     return Scaffold(
       backgroundColor: const Color(0xFF0F0F0F),
       appBar: AppBar(
-        title: const Text("BIBLIOTECA DE RIMAS", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+        title: const Text(
+          "BIBLIOTECA DE RIMAS",
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
         iconTheme: const IconThemeData(color: Colors.white),
         actions: [
-          IconButton(icon: const Icon(Icons.upload_file, color: Colors.cyanAccent), onPressed: _importTxtFile),
-          IconButton(icon: const Icon(Icons.download_for_offline, color: Colors.greenAccent), onPressed: _exportToTxt),
+          IconButton(
+            icon: const Icon(Icons.upload_file, color: Colors.cyanAccent),
+            onPressed: _importTxtFile,
+          ),
+          IconButton(
+            icon: const Icon(
+              Icons.download_for_offline,
+              color: Colors.greenAccent,
+            ),
+            onPressed: _exportToTxt,
+          ),
           const SizedBox(width: 8),
         ],
       ),
@@ -147,14 +194,14 @@ class PageVocabulary extends State<VocabularioPage> {
               listenable: widget.controller,
               builder: (context, _) {
                 final vocab = widget.controller.vocabulary;
-                
+
                 if (vocab.isEmpty) {
                   return const Center(
                     child: Text(
-                      "Sua biblioteca está vazia.\nImporte um .txt ou adicione rimas!", 
-                      textAlign: TextAlign.center, 
-                      style: TextStyle(color: Colors.grey)
-                    )
+                      "Sua biblioteca está vazia.\nImporte um .txt ou adicione rimas!",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.grey),
+                    ),
                   );
                 }
 
@@ -165,16 +212,29 @@ class PageVocabulary extends State<VocabularioPage> {
                 return CustomScrollView(
                   slivers: [
                     if (priorities.isNotEmpty) ...[
-                      SliverToBoxAdapter(child: _buildSectionHeader("PRIORIDADE MÁXIMA", "O Versin prioriza estas rimas no balão de sugestão.", Colors.orangeAccent)),
+                      SliverToBoxAdapter(
+                        child: _buildSectionHeader(
+                          "PRIORIDADE MÁXIMA",
+                          "O Versin prioriza estas rimas no balão de sugestão.",
+                          Colors.orangeAccent,
+                        ),
+                      ),
                       SliverList(
                         delegate: SliverChildBuilderDelegate(
-                          (context, index) => _buildRhymeTile(priorities[index]),
+                          (context, index) =>
+                              _buildRhymeTile(priorities[index]),
                           childCount: priorities.length,
                         ),
                       ),
                     ],
                     if (general.isNotEmpty) ...[
-                      SliverToBoxAdapter(child: _buildSectionHeader("DICIONÁRIO GERAL", "Banco de dados secundário para expansão de vocabulário.", Colors.purpleAccent)),
+                      SliverToBoxAdapter(
+                        child: _buildSectionHeader(
+                          "DICIONÁRIO GERAL",
+                          "Banco de dados secundário para expansão de vocabulário.",
+                          Colors.purpleAccent,
+                        ),
+                      ),
                       SliverList(
                         delegate: SliverChildBuilderDelegate(
                           (context, index) => _buildRhymeTile(general[index]),
@@ -197,13 +257,16 @@ class PageVocabulary extends State<VocabularioPage> {
     return Container(
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      decoration: BoxDecoration(color: const Color(0xFF1A1A1A), borderRadius: BorderRadius.circular(16)),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1A1A),
+        borderRadius: BorderRadius.circular(16),
+      ),
       child: Row(
         children: [
           IconButton(
             icon: Icon(
-              _isNextPriority ? Icons.star : Icons.star_border, 
-              color: _isNextPriority ? Colors.yellow : Colors.grey
+              _isNextPriority ? Icons.star : Icons.star_border,
+              color: _isNextPriority ? Colors.yellow : Colors.grey,
             ),
             onPressed: () => setState(() => _isNextPriority = !_isNextPriority),
           ),
@@ -213,15 +276,19 @@ class PageVocabulary extends State<VocabularioPage> {
               style: const TextStyle(color: Colors.white),
               onSubmitted: (_) => _confirmAddition(),
               decoration: const InputDecoration(
-                hintText: "Adicionar rima ao banco...", 
-                hintStyle: TextStyle(color: Colors.grey, fontSize: 14), 
-                border: InputBorder.none
+                hintText: "Adicionar rima ao banco...",
+                hintStyle: TextStyle(color: Colors.grey, fontSize: 14),
+                border: InputBorder.none,
               ),
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.add_circle, color: Colors.purpleAccent, size: 30), 
-            onPressed: _confirmAddition
+            icon: const Icon(
+              Icons.add_circle,
+              color: Colors.purpleAccent,
+              size: 30,
+            ),
+            onPressed: _confirmAddition,
           ),
         ],
       ),
@@ -238,25 +305,34 @@ class PageVocabulary extends State<VocabularioPage> {
 
   Widget _buildRhymeTile(Rhyme rhyme) {
     // Busca o index real no vocabulário global para garantir que as funções de toggle/remove funcionem
-    final int realIndex = widget.controller.vocabulary.indexWhere((element) => element.word == rhyme.word);
-    
+    final int realIndex = widget.controller.vocabulary.indexWhere(
+      (element) => element.word == rhyme.word,
+    );
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      decoration: BoxDecoration(color: Colors.white.withOpacity(0.03), borderRadius: BorderRadius.circular(12)),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.03),
+        borderRadius: BorderRadius.circular(12),
+      ),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16),
         title: Text(
-          rhyme.word, 
-          style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500)
+          rhyme.word,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 15,
+            fontWeight: FontWeight.w500,
+          ),
         ),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             IconButton(
               icon: Icon(
-                rhyme.isPriority ? Icons.star : Icons.star_border, 
-                color: rhyme.isPriority ? Colors.yellow : Colors.white24, 
-                size: 20
+                rhyme.isPriority ? Icons.star : Icons.star_border,
+                color: rhyme.isPriority ? Colors.yellow : Colors.white24,
+                size: 20,
               ),
               onPressed: () => widget.controller.togglePriority(realIndex),
             ),

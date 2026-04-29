@@ -9,7 +9,7 @@ class AIMemoryPage extends StatefulWidget {
 
 class _AIMemoryPageState extends State<AIMemoryPage> {
   // Variável que controla o consumo da memória
-  double memoryUsage = 1.0; 
+  double memoryUsage = 1.0;
 
   // Lógica de cores baseada no consumo
   Color getMemoryColor(double usage) {
@@ -20,7 +20,7 @@ class _AIMemoryPageState extends State<AIMemoryPage> {
     } else if (usage <= 0.1) {
       return Colors.redAccent; // Alerta de consumo alto
     }
-    return Colors.purpleAccent; 
+    return Colors.purpleAccent;
   }
 
   String getPercentageText(double usage) {
@@ -44,8 +44,14 @@ class _AIMemoryPageState extends State<AIMemoryPage> {
     return Scaffold(
       backgroundColor: const Color(0xFF0F0F0F),
       appBar: AppBar(
-        title: const Text('MEMÓRIA DA IA', 
-          style: TextStyle(letterSpacing: 4, fontWeight: FontWeight.w300, fontSize: 16)),
+        title: const Text(
+          'MEMÓRIA DA IA',
+          style: TextStyle(
+            letterSpacing: 4,
+            fontWeight: FontWeight.w300,
+            fontSize: 16,
+          ),
+        ),
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
@@ -58,33 +64,42 @@ class _AIMemoryPageState extends State<AIMemoryPage> {
           children: [
             const Text(
               "Status do Contexto",
-              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             const SizedBox(height: 30),
-            
+
             ClipRRect(
               borderRadius: BorderRadius.circular(10),
               child: LinearProgressIndicator(
                 value: memoryUsage,
                 minHeight: 12,
                 backgroundColor: Colors.white10,
-                valueColor: AlwaysStoppedAnimation<Color>(getMemoryColor(memoryUsage)),
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  getMemoryColor(memoryUsage),
+                ),
               ),
             ),
-            
+
             const SizedBox(height: 15),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  getPercentageText(memoryUsage), 
+                  getPercentageText(memoryUsage),
                   style: TextStyle(
-                    color: getMemoryColor(memoryUsage), 
-                    fontWeight: FontWeight.bold, 
-                    fontSize: 13
+                    color: getMemoryColor(memoryUsage),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
                   ),
                 ),
-                const Text("Saldo: 0 tokens", style: TextStyle(color: Colors.grey, fontSize: 12)),
+                const Text(
+                  "Saldo: 0 tokens",
+                  style: TextStyle(color: Colors.grey, fontSize: 12),
+                ),
               ],
             ),
 
@@ -95,40 +110,54 @@ class _AIMemoryPageState extends State<AIMemoryPage> {
               decoration: BoxDecoration(
                 color: getMemoryColor(memoryUsage).withOpacity(0.05),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: getMemoryColor(memoryUsage).withOpacity(0.2)),
+                border: Border.all(
+                  color: getMemoryColor(memoryUsage).withOpacity(0.2),
+                ),
               ),
               child: Column(
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.tips_and_updates_outlined, color: getMemoryColor(memoryUsage), size: 20),
+                      Icon(
+                        Icons.tips_and_updates_outlined,
+                        color: getMemoryColor(memoryUsage),
+                        size: 20,
+                      ),
                       const SizedBox(width: 12),
                       const Text(
                         "Sugestão do Versin",
-                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 10),
                   Text(
                     getMemoryStatusMessage(memoryUsage),
-                    style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 14, height: 1.5),
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.8),
+                      fontSize: 14,
+                      height: 1.5,
+                    ),
                   ),
                 ],
               ),
             ),
-            
+
             const Spacer(),
-            
+
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
                 onPressed: () {
-                  setState(() => memoryUsage = 1.0); 
+                  setState(() => memoryUsage = 1.0);
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text("Memória de curto prazo limpa!"), 
-                      backgroundColor: Colors.purpleAccent
+                      content: Text("Memória de curto prazo limpa!"),
+                      backgroundColor: Colors.purpleAccent,
                     ),
                   );
                 },
@@ -139,7 +168,9 @@ class _AIMemoryPageState extends State<AIMemoryPage> {
                   foregroundColor: Colors.purpleAccent,
                   side: const BorderSide(color: Colors.purpleAccent),
                   padding: const EdgeInsets.symmetric(vertical: 15),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
             ),

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart'; 
-import 'package:supabase_flutter/supabase_flutter.dart'; 
+import 'package:url_launcher/url_launcher.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:versin/features/rhymes/presentation/controller/rhymes_controller.dart';
 import 'package:versin/features/rhymes/presentation/pages/drawer/ai_memory/ai_memory_page.dart';
 import 'package:versin/features/rhymes/presentation/pages/drawer/rhyme_level/rhyme_level_page.dart';
@@ -8,7 +8,7 @@ import 'package:versin/features/rhymes/presentation/pages/drawer/rhyme_level/rhy
 import 'package:versin/features/rhymes/presentation/pages/drawer/profile/profile_page.dart';
 
 class SettingsPage extends StatefulWidget {
-  final RhymesController controller; 
+  final RhymesController controller;
   const SettingsPage({super.key, required this.controller});
 
   @override
@@ -30,7 +30,10 @@ class PageSettings extends State<SettingsPage> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Erro ao sair: $e"), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text("Erro ao sair: $e"),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
@@ -48,8 +51,14 @@ class PageSettings extends State<SettingsPage> {
     return Scaffold(
       backgroundColor: const Color(0xFF0F0F0F),
       appBar: AppBar(
-        title: const Text('CONFIGURAÇÕES', 
-          style: TextStyle(letterSpacing: 4, fontWeight: FontWeight.w300, fontSize: 16)),
+        title: const Text(
+          'CONFIGURAÇÕES',
+          style: TextStyle(
+            letterSpacing: 4,
+            fontWeight: FontWeight.w300,
+            fontSize: 16,
+          ),
+        ),
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
@@ -62,22 +71,22 @@ class PageSettings extends State<SettingsPage> {
           if (_isUserLoggedIn) ...[
             _buildSectionTitle("Perfil"),
             _settingsTile(
-              Icons.person_outline, 
-              "Meu Perfil", 
-              "Ver nome, carteira wallet@ e foto", 
+              Icons.person_outline,
+              "Meu Perfil",
+              "Ver nome, carteira wallet@ e foto",
               () {
                 Navigator.push(
-                  context, 
-                  MaterialPageRoute(builder: (context) => const ProfilePage())
+                  context,
+                  MaterialPageRoute(builder: (context) => const ProfilePage()),
                 );
-              }
+              },
             ),
             const SizedBox(height: 20),
           ],
-          
+
           _buildSectionTitle("Versin Pro & Autonomia"),
-          _buildProCard(), 
-          
+          _buildProCard(),
+
           const SizedBox(height: 15),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -89,13 +98,21 @@ class PageSettings extends State<SettingsPage> {
                 hintStyle: const TextStyle(color: Colors.grey),
                 filled: true,
                 fillColor: const Color(0xFF1A1A1A),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
                 suffixIcon: IconButton(
-                  icon: const Icon(Icons.check_circle, color: Colors.purpleAccent),
+                  icon: const Icon(
+                    Icons.check_circle,
+                    color: Colors.purpleAccent,
+                  ),
                   onPressed: () {
                     widget.controller.setApiKey(_keyController.text.trim());
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text("Chave salva! Modo Pro Ativado. 🚀")),
+                      const SnackBar(
+                        content: Text("Chave salva! Modo Pro Ativado. 🚀"),
+                      ),
                     );
                   },
                 ),
@@ -106,40 +123,59 @@ class PageSettings extends State<SettingsPage> {
           const SizedBox(height: 25),
           _buildSectionTitle("AI & Flow"),
           _settingsTile(
-            Icons.auto_awesome_outlined, 
-            "Nível de Rima", 
-            "Configurar gênero, BPM e tom", 
+            Icons.auto_awesome_outlined,
+            "Nível de Rima",
+            "Configurar gênero, BPM e tom",
             () {
-              Navigator.push(context, MaterialPageRoute(builder: (context) => const RhymeLevelPage()));
-            }
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const RhymeLevelPage()),
+              );
+            },
           ),
           _settingsTile(
-            Icons.memory_outlined, 
-            "Memória da IA", 
-            "Gerenciar uso de contexto e cache", 
+            Icons.memory_outlined,
+            "Memória da IA",
+            "Gerenciar uso de contexto e cache",
             () {
-              Navigator.push(context, MaterialPageRoute(builder: (context) => const AIMemoryPage()));
-            }
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const AIMemoryPage()),
+              );
+            },
           ),
-          
+
           const SizedBox(height: 20),
           _buildSectionTitle("Aplicativo"),
-          _settingsTile(Icons.dark_mode_outlined, "Tema", "Escuro (Padrão)", () {}),
-          
+          _settingsTile(
+            Icons.dark_mode_outlined,
+            "Tema",
+            "Escuro (Padrão)",
+            () {},
+          ),
+
           // Notificações (Só aparece se logado)
           if (_isUserLoggedIn)
-            _settingsTile(Icons.notifications_none, "Notificações", "Gerenciar alertas", () {}),
-          
+            _settingsTile(
+              Icons.notifications_none,
+              "Notificações",
+              "Gerenciar alertas",
+              () {},
+            ),
+
           const SizedBox(height: 40),
-          
+
           // Sair da Conta (Só aparece se logado)
           if (_isUserLoggedIn)
             Center(
               child: TextButton(
                 onPressed: _handleSignOut,
-                child: const Text("Sair da Conta", style: TextStyle(color: Colors.redAccent)),
+                child: const Text(
+                  "Sair da Conta",
+                  style: TextStyle(color: Colors.redAccent),
+                ),
               ),
-            )
+            ),
         ],
       ),
     );
@@ -156,8 +192,14 @@ class PageSettings extends State<SettingsPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text("🚀 O Próximo Nível do seu Flow", 
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+          const Text(
+            "🚀 O Próximo Nível do seu Flow",
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+            ),
+          ),
           const SizedBox(height: 8),
           const Text(
             "Cansou do limite diário? Use sua própria API Key para ter mensagens ilimitadas, "
@@ -165,21 +207,47 @@ class PageSettings extends State<SettingsPage> {
             style: TextStyle(color: Colors.grey, fontSize: 12),
           ),
           const SizedBox(height: 12),
-          const Text("🎁 Teste Grátis (Copie e Cole):", 
-            style: TextStyle(color: Colors.purpleAccent, fontSize: 11, fontWeight: FontWeight.bold)),
-          const SelectableText("VERSIN-PRO-TRIAL-2026-FREE", 
-            style: TextStyle(color: Colors.white, fontFamily: 'monospace', fontSize: 13)),
+          const Text(
+            "🎁 Teste Grátis (Copie e Cole):",
+            style: TextStyle(
+              color: Colors.purpleAccent,
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SelectableText(
+            "VERSIN-PRO-TRIAL-2026-FREE",
+            style: TextStyle(
+              color: Colors.white,
+              fontFamily: 'monospace',
+              fontSize: 13,
+            ),
+          ),
           const SizedBox(height: 15),
-          const Text("🛠️ Como conseguir minha chave?", 
-            style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+          const Text(
+            "🛠️ Como conseguir minha chave?",
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
           _stepText("1. Acesse o Google AI Studio"),
           _stepText("2. Gere sua Key em 'Get API Key'"),
-          _stepText("3. O Versin não lucra nada com isso, é sua ponte direta com a IA."),
+          _stepText(
+            "3. O Versin não lucra nada com isso, é sua ponte direta com a IA.",
+          ),
           const SizedBox(height: 10),
           GestureDetector(
             onTap: _openGoogleStudio,
-            child: const Text("👉 Abrir Google AI Studio", 
-              style: TextStyle(color: Colors.blueAccent, fontSize: 12, decoration: TextDecoration.underline)),
+            child: const Text(
+              "👉 Abrir Google AI Studio",
+              style: TextStyle(
+                color: Colors.blueAccent,
+                fontSize: 12,
+                decoration: TextDecoration.underline,
+              ),
+            ),
           ),
         ],
       ),
@@ -189,24 +257,45 @@ class PageSettings extends State<SettingsPage> {
   Widget _stepText(String text) {
     return Padding(
       padding: const EdgeInsets.only(top: 4),
-      child: Text("• $text", style: const TextStyle(color: Colors.grey, fontSize: 11)),
+      child: Text(
+        "• $text",
+        style: const TextStyle(color: Colors.grey, fontSize: 11),
+      ),
     );
   }
 
   Widget _buildSectionTitle(String title) {
     return Padding(
       padding: const EdgeInsets.only(left: 10, bottom: 10),
-      child: Text(title, 
-        style: const TextStyle(color: Colors.purpleAccent, fontWeight: FontWeight.bold, fontSize: 12)),
+      child: Text(
+        title,
+        style: const TextStyle(
+          color: Colors.purpleAccent,
+          fontWeight: FontWeight.bold,
+          fontSize: 12,
+        ),
+      ),
     );
   }
 
-  Widget _settingsTile(IconData icon, String title, String subtitle, VoidCallback onTap) {
+  Widget _settingsTile(
+    IconData icon,
+    String title,
+    String subtitle,
+    VoidCallback onTap,
+  ) {
     return ListTile(
       leading: Icon(icon, color: Colors.white70),
       title: Text(title, style: const TextStyle(color: Colors.white)),
-      subtitle: Text(subtitle, style: const TextStyle(color: Colors.grey, fontSize: 12)),
-      trailing: const Icon(Icons.arrow_forward_ios, color: Colors.white24, size: 14),
+      subtitle: Text(
+        subtitle,
+        style: const TextStyle(color: Colors.grey, fontSize: 12),
+      ),
+      trailing: const Icon(
+        Icons.arrow_forward_ios,
+        color: Colors.white24,
+        size: 14,
+      ),
       onTap: onTap,
     );
   }

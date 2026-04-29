@@ -6,7 +6,7 @@ class ChatInputArea extends StatelessWidget {
   final Color activeColor;
   final String hintText;
   // NOVO: Adicionando o parâmetro para receber a função de salvar rima
-  final Function(String)? onAddRhyme; 
+  final Function(String)? onAddRhyme;
 
   const ChatInputArea({
     super.key,

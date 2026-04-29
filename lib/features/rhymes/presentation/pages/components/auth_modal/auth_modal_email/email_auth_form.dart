@@ -5,10 +5,7 @@ class EmailAuthForm extends StatefulWidget {
   const EmailAuthForm({super.key});
 
   static void show(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => const EmailAuthForm(),
-    );
+    showDialog(context: context, builder: (context) => const EmailAuthForm());
   }
 
   @override
@@ -21,7 +18,7 @@ class _EmailAuthFormState extends State<EmailAuthForm> {
 
   Future<void> _handleMagicLink() async {
     final email = _emailController.text.trim();
-    
+
     if (email.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Por favor, insira um e-mail válido.")),
@@ -37,7 +34,7 @@ class _EmailAuthFormState extends State<EmailAuthForm> {
       // Se o erro 401 persistir, tente comentar a linha 'emailRedirectTo' para testar.
       await Supabase.instance.client.auth.signInWithOtp(
         email: email,
-        emailRedirectTo: 'io.supabase.versin://login-callback/', 
+        emailRedirectTo: 'io.supabase.versin://login-callback/',
       );
 
       if (mounted) {
@@ -51,11 +48,15 @@ class _EmailAuthFormState extends State<EmailAuthForm> {
       }
     } on AuthException catch (e) {
       // Captura erros específicos do Supabase (como o 401)
-      debugPrint("ERRO DE AUTENTICAÇÃO: ${e.message} (Código: ${e.statusCode})");
+      debugPrint(
+        "ERRO DE AUTENTICAÇÃO: ${e.message} (Código: ${e.statusCode})",
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text("Erro na API (401): Verifique se as chaves no main.dart estão corretas."),
+            content: Text(
+              "Erro na API (401): Verifique se as chaves no main.dart estão corretas.",
+            ),
             backgroundColor: Colors.redAccent,
           ),
         );
@@ -64,7 +65,10 @@ class _EmailAuthFormState extends State<EmailAuthForm> {
       debugPrint("ERRO GENÉRICO: $e");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Erro inesperado: $e"), backgroundColor: Colors.redAccent),
+          SnackBar(
+            content: Text("Erro inesperado: $e"),
+            backgroundColor: Colors.redAccent,
+          ),
         );
       }
     } finally {
@@ -88,7 +92,7 @@ class _EmailAuthFormState extends State<EmailAuthForm> {
             const Text(
               "ENTRAR COM E-MAIL",
               style: TextStyle(
-                color: Colors.white, 
+                color: Colors.white,
                 fontWeight: FontWeight.bold,
                 fontSize: 16,
               ),
@@ -107,7 +111,10 @@ class _EmailAuthFormState extends State<EmailAuthForm> {
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide.none,
                 ),
-                prefixIcon: const Icon(Icons.email_outlined, color: Colors.purpleAccent),
+                prefixIcon: const Icon(
+                  Icons.email_outlined,
+                  color: Colors.purpleAccent,
+                ),
               ),
             ),
             const SizedBox(height: 24),
@@ -117,12 +124,17 @@ class _EmailAuthFormState extends State<EmailAuthForm> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.purpleAccent,
                       minimumSize: const Size(double.infinity, 50),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                     onPressed: _handleMagicLink,
                     child: const Text(
-                      "ENVIAR LINK DE ACESSO", 
-                      style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+                      "ENVIAR LINK DE ACESSO",
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
           ],

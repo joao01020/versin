@@ -11,19 +11,23 @@ class ShowcasePage extends StatelessWidget {
       backgroundColor: const Color(0xFF0F0F0F), // Fundo padrão do Versin
       appBar: AppBar(
         title: const Text(
-          "VITRINE", 
+          "VITRINE",
           style: TextStyle(
-            fontSize: 12, 
-            letterSpacing: 2, 
+            fontSize: 12,
+            letterSpacing: 2,
             fontWeight: FontWeight.bold,
             color: Colors.white38,
-          )
+          ),
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, size: 18, color: Colors.white30),
+          icon: const Icon(
+            Icons.arrow_back_ios_new,
+            size: 18,
+            color: Colors.white30,
+          ),
           onPressed: () => Navigator.pop(context),
         ),
       ),

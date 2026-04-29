@@ -33,7 +33,7 @@ class _AuthModalState extends State<AuthModal> {
   Future<void> _checkWalletAvailability(String value) async {
     if (value.isEmpty) return;
     if (_debounce?.isActive ?? false) _debounce!.cancel();
-    
+
     _debounce = Timer(const Duration(milliseconds: 500), () async {
       try {
         final res = await Supabase.instance.client
@@ -52,7 +52,7 @@ class _AuthModalState extends State<AuthModal> {
     try {
       await Supabase.instance.client.auth.signInWithOAuth(
         provider,
-        redirectTo: kIsWeb ? null : 'io.supabase.versin://callback', 
+        redirectTo: kIsWeb ? null : 'io.supabase.versin://callback',
       );
     } catch (e) {
       debugPrint("Erro Social: $e");
@@ -64,7 +64,8 @@ class _AuthModalState extends State<AuthModal> {
 
     setState(() => _isLoading = true);
     try {
-      final String generatedWallet = "0x${DateTime.now().millisecondsSinceEpoch}vrs";
+      final String generatedWallet =
+          "0x${DateTime.now().millisecondsSinceEpoch}vrs";
 
       await Supabase.instance.client.auth.signUp(
         email: _emailController.text.trim(),
@@ -74,7 +75,7 @@ class _AuthModalState extends State<AuthModal> {
           'wallet': generatedWallet,
         },
       );
-      
+
       setState(() {
         _isLoading = false;
         _registrationSuccess = true;
@@ -83,12 +84,14 @@ class _AuthModalState extends State<AuthModal> {
       // Timer de 2 segundos antes de fechar para o usuário ler a mensagem de sucesso
       await Future.delayed(const Duration(seconds: 2));
       if (mounted) Navigator.pop(context);
-
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Erro: ${e.toString()}"), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text("Erro: ${e.toString()}"),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
@@ -117,11 +120,19 @@ class _AuthModalState extends State<AuthModal> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Icon(Icons.lock_outline_rounded, color: Colors.greenAccent, size: 64),
+        const Icon(
+          Icons.lock_outline_rounded,
+          color: Colors.greenAccent,
+          size: 64,
+        ),
         const SizedBox(height: 24),
         const Text(
           "ACESSO GARANTIDO",
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, letterSpacing: 2),
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 2,
+          ),
         ),
         const SizedBox(height: 12),
         const Text(
@@ -130,7 +141,10 @@ class _AuthModalState extends State<AuthModal> {
           style: TextStyle(color: Colors.grey, fontSize: 13),
         ),
         const SizedBox(height: 24),
-        const LinearProgressIndicator(color: Colors.greenAccent, backgroundColor: Colors.white10),
+        const LinearProgressIndicator(
+          color: Colors.greenAccent,
+          backgroundColor: Colors.white10,
+        ),
       ],
     );
   }
@@ -141,7 +155,15 @@ class _AuthModalState extends State<AuthModal> {
       children: [
         const Icon(Icons.token_outlined, color: Colors.purpleAccent, size: 54),
         const SizedBox(height: 16),
-        const Text("VERSIN GENESIS", style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: 2)),
+        const Text(
+          "VERSIN GENESIS",
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 2,
+          ),
+        ),
         const SizedBox(height: 32),
 
         if (!_isExpanded) ...[
@@ -158,7 +180,10 @@ class _AuthModalState extends State<AuthModal> {
               Expanded(child: Divider(color: Colors.white.withOpacity(0.1))),
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 16),
-                child: Text("ENTRAR COM", style: TextStyle(color: Colors.grey, fontSize: 10)),
+                child: Text(
+                  "ENTRAR COM",
+                  style: TextStyle(color: Colors.grey, fontSize: 10),
+                ),
               ),
               Expanded(child: Divider(color: Colors.white.withOpacity(0.1))),
             ],
@@ -166,15 +191,31 @@ class _AuthModalState extends State<AuthModal> {
           const SizedBox(height: 24),
           Row(
             children: [
-              Expanded(child: _buildSocialButton(label: "GITHUB", icon: Icons.code_rounded, onPressed: () => _handleSocialLogin(OAuthProvider.github))),
+              Expanded(
+                child: _buildSocialButton(
+                  label: "GITHUB",
+                  icon: Icons.code_rounded,
+                  onPressed: () => _handleSocialLogin(OAuthProvider.github),
+                ),
+              ),
               const SizedBox(width: 12),
-              Expanded(child: _buildSocialButton(label: "GOOGLE", icon: Icons.g_mobiledata_rounded, onPressed: () => _handleSocialLogin(OAuthProvider.google))),
+              Expanded(
+                child: _buildSocialButton(
+                  label: "GOOGLE",
+                  icon: Icons.g_mobiledata_rounded,
+                  onPressed: () => _handleSocialLogin(OAuthProvider.google),
+                ),
+              ),
             ],
           ),
         ],
 
         if (_isExpanded) ...[
-          _buildTextField(controller: _emailController, label: "E-mail", icon: Icons.alternate_email_rounded),
+          _buildTextField(
+            controller: _emailController,
+            label: "E-mail",
+            icon: Icons.alternate_email_rounded,
+          ),
           const SizedBox(height: 16),
           _buildTextField(
             controller: _usernameController,
@@ -182,13 +223,22 @@ class _AuthModalState extends State<AuthModal> {
             icon: Icons.badge_outlined,
             prefixText: "wallet@",
             onChanged: _checkWalletAvailability,
-            helperText: _usernameController.text.isEmpty ? null : (_isWalletAvailable ? "Disponível ✅" : "Indisponível ❌"),
-            helperColor: _isWalletAvailable ? Colors.greenAccent : Colors.redAccent,
+            helperText: _usernameController.text.isEmpty
+                ? null
+                : (_isWalletAvailable ? "Disponível ✅" : "Indisponível ❌"),
+            helperColor: _isWalletAvailable
+                ? Colors.greenAccent
+                : Colors.redAccent,
           ),
           const SizedBox(height: 16),
-          _buildTextField(controller: _passwordController, label: "Senha", icon: Icons.lock_person_outlined, isPassword: true),
+          _buildTextField(
+            controller: _passwordController,
+            label: "Senha",
+            icon: Icons.lock_person_outlined,
+            isPassword: true,
+          ),
           const SizedBox(height: 24),
-          
+
           if (_isLoading)
             const CircularProgressIndicator(color: Colors.purpleAccent)
           else
@@ -198,22 +248,34 @@ class _AuthModalState extends State<AuthModal> {
               textColor: Colors.black,
               onPressed: _handleEmailGenesis,
             ),
-          
+
           TextButton(
             onPressed: () => setState(() => _isExpanded = false),
-            child: const Text("Voltar", style: TextStyle(color: Colors.grey, fontSize: 12)),
+            child: const Text(
+              "Voltar",
+              style: TextStyle(color: Colors.grey, fontSize: 12),
+            ),
           ),
         ],
         const SizedBox(height: 8),
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text("Sair", style: TextStyle(color: Colors.grey, fontSize: 12)),
+          child: const Text(
+            "Sair",
+            style: TextStyle(color: Colors.grey, fontSize: 12),
+          ),
         ),
       ],
     );
   }
 
-  Widget _buildActionButton({required String label, required Color color, required Color textColor, required VoidCallback onPressed, IconData? icon}) {
+  Widget _buildActionButton({
+    required String label,
+    required Color color,
+    required Color textColor,
+    required VoidCallback onPressed,
+    IconData? icon,
+  }) {
     return ElevatedButton.icon(
       style: ElevatedButton.styleFrom(
         backgroundColor: color,
@@ -221,12 +283,21 @@ class _AuthModalState extends State<AuthModal> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
       onPressed: onPressed,
-      icon: icon != null ? Icon(icon, color: textColor, size: 20) : const SizedBox.shrink(),
-      label: Text(label, style: TextStyle(color: textColor, fontWeight: FontWeight.bold)),
+      icon: icon != null
+          ? Icon(icon, color: textColor, size: 20)
+          : const SizedBox.shrink(),
+      label: Text(
+        label,
+        style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
+      ),
     );
   }
 
-  Widget _buildSocialButton({required String label, required IconData icon, required VoidCallback onPressed}) {
+  Widget _buildSocialButton({
+    required String label,
+    required IconData icon,
+    required VoidCallback onPressed,
+  }) {
     return OutlinedButton.icon(
       style: OutlinedButton.styleFrom(
         minimumSize: const Size(double.infinity, 50),
@@ -235,11 +306,23 @@ class _AuthModalState extends State<AuthModal> {
       ),
       onPressed: onPressed,
       icon: Icon(icon, color: Colors.white, size: 20),
-      label: Text(label, style: const TextStyle(color: Colors.white, fontSize: 12)),
+      label: Text(
+        label,
+        style: const TextStyle(color: Colors.white, fontSize: 12),
+      ),
     );
   }
 
-  Widget _buildTextField({required TextEditingController controller, required String label, required IconData icon, bool isPassword = false, String? prefixText, String? helperText, Color? helperColor, Function(String)? onChanged}) {
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    bool isPassword = false,
+    String? prefixText,
+    String? helperText,
+    Color? helperColor,
+    Function(String)? onChanged,
+  }) {
     return TextField(
       controller: controller,
       obscureText: isPassword,
@@ -253,8 +336,14 @@ class _AuthModalState extends State<AuthModal> {
         helperStyle: TextStyle(color: helperColor ?? Colors.grey, fontSize: 11),
         filled: true,
         fillColor: Colors.white.withOpacity(0.03),
-        enabledBorder: OutlineInputBorder(borderSide: const BorderSide(color: Colors.transparent), borderRadius: BorderRadius.circular(14)),
-        focusedBorder: OutlineInputBorder(borderSide: const BorderSide(color: Colors.purpleAccent, width: 1), borderRadius: BorderRadius.circular(14)),
+        enabledBorder: OutlineInputBorder(
+          borderSide: const BorderSide(color: Colors.transparent),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderSide: const BorderSide(color: Colors.purpleAccent, width: 1),
+          borderRadius: BorderRadius.circular(14),
+        ),
       ),
     );
   }

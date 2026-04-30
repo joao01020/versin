@@ -7,7 +7,7 @@ import 'package:versin/core/models/rhyme_model.dart';
 
 class RhymesController extends ChangeNotifier {
   Timer? _debounce;
-  Timer? _connectionTimer; // Timer para o contador real
+  Timer? _connectionTimer; 
   final _supabase = Supabase.instance.client;
   final String _baseUrl = "https://versin.onrender.com";
 
@@ -21,7 +21,7 @@ class RhymesController extends ChangeNotifier {
   bool _isLoading = false;
   bool get isLoading => _isLoading;
 
-  int connectionSeconds = 0; // Segundos reais passados na requisição
+  int connectionSeconds = 0; 
 
   // --- PROGRESSO E GAMIFICAÇÃO ---
   int _currentStep = 1;
@@ -39,9 +39,14 @@ class RhymesController extends ChangeNotifier {
   bool isListMode = false;
   bool isMarketingMode = false;
 
+  // --- CONFIGURAÇÕES DE SESSÃO ATUAL (ESTÚDIO) ---
+  String selectedTechnique = "Melódico"; 
+  String selectedVibe = "Calmo";
+  int currentBpm = 120;
+
   // --- DADOS E API ---
   List<Rhyme> vocabulary = [];
-  List<Map<String, dynamic>> trendingWords = [];
+  List<Map<String, dynamic>> trendingWords = []; // Lista para armazenar tendências
   String? _userApiKey = "VERSIN-PRO-TRIAL-2026-FREE";
   String? get userApiKey => _userApiKey;
   bool get isProActive => _userApiKey != null && _userApiKey!.isNotEmpty;
@@ -52,7 +57,26 @@ class RhymesController extends ChangeNotifier {
     if (isComposeMode) return Colors.blueAccent;
     if (isListMode) return Colors.orangeAccent;
     if (isMarketingMode) return Colors.yellowAccent;
-    return Colors.purpleAccent;
+    return const Color(0xFFE100FF); 
+  }
+
+  // --- BUSCA DE TENDÊNCIAS (SOLUÇÃO DO ERRO) ---
+  Future<void> fetchTrendingWords() async {
+    // Método chamado no initState da ChatPage para evitar o erro de compilação
+    try {
+      // Aqui você pode implementar a chamada real para sua API no Render futuramente
+      debugPrint("Versin: Buscando palavras em alta...");
+      
+      // Simulação de dados para não vir vazio
+      trendingWords = [
+        {"word": "Flow", "count": 150},
+        {"word": "Beat", "count": 120},
+      ];
+      
+      notifyListeners();
+    } catch (e) {
+      debugPrint("Erro ao buscar trending words: $e");
+    }
   }
 
   // --- LÓGICA DE DIGITAÇÃO E FEEDBACK ---
@@ -106,13 +130,12 @@ class RhymesController extends ChangeNotifier {
     notifyListeners();
   }
 
-  // --- CONEXÃO COM IA DO CHAT COM TIMER REAL ---
+  // --- CONEXÃO COM IA ---
   Future<Map<String, String>> fetchAiResponse(String message) async {
     _isLoading = true;
-    connectionSeconds = 0; // Reseta o contador
+    connectionSeconds = 0; 
     notifyListeners();
 
-    // Inicia o contador de segundos real para o ChatListView
     _connectionTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       connectionSeconds++;
       notifyListeners();
@@ -124,15 +147,18 @@ class RhymesController extends ChangeNotifier {
             Uri.parse('$_baseUrl/chat'),
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode({
-              'user_id': "user_dev_01",
+              'user_id': _supabase.auth.currentUser?.id ?? "user_dev_01",
               'message': message,
               'current_list': vocabulary.map((r) => r.word).toList(),
               'private_api_key': _userApiKey,
+              'context': {
+                'bpm': currentBpm,
+                'vibe': selectedVibe,
+                'technique': selectedTechnique,
+              }
             }),
           )
-          .timeout(
-            const Duration(seconds: 60),
-          ); // Aumentado para 60s (acordar o Render)
+          .timeout(const Duration(seconds: 60)); 
 
       _connectionTimer?.cancel();
 
@@ -141,14 +167,14 @@ class RhymesController extends ChangeNotifier {
         return {"role": "assistant", "content": data['content'] ?? ""};
       }
       return {
-        "role": "assistant",
-        "content": "Erro no servidor (Status: ${response.statusCode})",
+        "role": "assistant", 
+        "content": "Erro no servidor (Status: ${response.statusCode})"
       };
     } catch (e) {
       _connectionTimer?.cancel();
       return {
         "role": "assistant",
-        "content": "O servidor demorou muito. Tente enviar de novo!",
+        "content": "Conexão instável. Tente novamente!",
       };
     } finally {
       _isLoading = false;
@@ -175,7 +201,7 @@ class RhymesController extends ChangeNotifier {
             .toList();
         notifyListeners();
       } catch (e) {
-        debugPrint("Erro ao carregar: $e");
+        debugPrint("Erro ao carregar vocabulário: $e");
       }
     }
   }
@@ -220,6 +246,13 @@ class RhymesController extends ChangeNotifier {
     }
   }
 
+  void updateStudioConfig({int? bpm, String? vibe, String? technique}) {
+    if (bpm != null) currentBpm = bpm;
+    if (vibe != null) selectedVibe = vibe;
+    if (technique != null) selectedTechnique = technique;
+    notifyListeners();
+  }
+
   void setApiKey(String key) {
     _userApiKey = key;
     notifyListeners();
@@ -230,12 +263,6 @@ class RhymesController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> fetchTrendingWords() async {
-    /* Implementar se necessário */
-  }
-  void incrementWordScore(String w) {
-    /* Implementar se necessário */
-  }
   void updateProgress(int s, double p) {
     _currentStep = s;
     _stepProgress = p;

@@ -22,25 +22,20 @@ class ChatListView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (isInitializing) {
-      return ChatWelcomeCard(activeColor: activeColor);
-    }
-
-    if (messages.isEmpty && !isAiTyping) {
+    // Exibe o card de boas-vindas se estiver inicializando ou se o chat estiver vazio
+    if (isInitializing || (messages.isEmpty && !isAiTyping)) {
       return ChatWelcomeCard(activeColor: activeColor);
     }
 
     return ListView.builder(
       controller: scrollController,
-      // AJUSTE PARA MOBILE: clipBehavior hardEdge garante que o conteúdo
-      // seja cortado exatamente no limite do widget Expanded definido na Page.
+      // clipBehavior hardEdge garante que a lista respeite os limites do SafeAre/Expanded
       clipBehavior: Clip.hardEdge,
       physics: const AlwaysScrollableScrollPhysics(
         parent: BouncingScrollPhysics(),
       ),
-      // Padding reduzido no topo (5) para não criar buracos e
-      // aumentado no bottom (100) para não ficar atrás da barra de digitação.
-      padding: const EdgeInsets.fromLTRB(16, 5, 16, 100),
+      // Padding bottom de 120 para garantir que a última linha da letra não fique coberta pela BottomBar
+      padding: const EdgeInsets.fromLTRB(16, 5, 16, 120),
       itemCount: messages.length + (isAiTyping ? 1 : 0),
       itemBuilder: (context, index) {
         if (index == messages.length) {
@@ -50,30 +45,36 @@ class ChatListView extends StatelessWidget {
         final message = messages[index];
         final Widget? customWidget = message['customWidget'];
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ChatMessageBubble(
-              message: {
-                "role": message["role"] ?? "assistant",
-                "content": message["content"]?.toString() ?? "",
-              },
-              activeColor: activeColor,
-            ),
-            if (customWidget != null)
-              Padding(
-                // Ajuste de margem para o slider de sentimento ou outros widgets
-                padding: const EdgeInsets.fromLTRB(8, 12, 8, 20),
-                child: customWidget,
+        return Padding(
+          // Espaçamento vertical entre blocos de mensagens e versos
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ChatMessageBubble(
+                message: {
+                  "role": message["role"] ?? "assistant",
+                  // Garante que o conteúdo preserve as quebras de linha (\n) do editor
+                  "content": message["content"]?.toString() ?? "",
+                },
+                activeColor: activeColor,
               ),
-          ],
+              if (customWidget != null)
+                Padding(
+                  // Margem específica para widgets injetados (ex: MoodSelectorSlider)
+                  padding: const EdgeInsets.fromLTRB(8, 12, 8, 8),
+                  child: customWidget,
+                ),
+            ],
+          ),
         );
       },
     );
   }
 
   Widget _buildTypingIndicator(Color color) {
+    // Feedback dinâmico para o usuário enquanto a IA processa os versos
     String mainMessage = "Versin analisando...";
     String subMessage = "processando métrica e rimas...";
 

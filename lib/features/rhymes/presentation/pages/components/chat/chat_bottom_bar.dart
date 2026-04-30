@@ -35,12 +35,14 @@ class ChatBottomBar extends StatelessWidget {
         ChatInputArea(
           controller: messageController,
           onSend: onSend,
-          // CORREÇÃO: Usando branco/cinza no input para manter o minimalismo
-          activeColor: Colors.white70,
+          // Mantendo a estética clean para o foco na escrita dos versos
+          activeColor: Colors.white70, 
           hintText: isRhymeMode
               ? "Filtrando vocabulário..."
               : "Escreva seus versos...",
           onAddRhyme: onAddRhyme,
+          // Nota técnica: keyboardType e maxLines foram movidos para a 
+          // ChatInputArea para evitar erros de parâmetros não definidos.
         ),
       ],
     );
@@ -60,14 +62,13 @@ class ChatBottomBar extends StatelessWidget {
         return SuggestionBalloon(
           suggestion: rimas[safeIndex],
           isLoading: rhymesController.isLoading,
-          // CORREÇÃO: Garantindo que o balão não receba o roxo do controller
           onTap: () {
             if (onAddRhyme != null) {
               onAddRhyme!(rimas[safeIndex]);
             } else {
               final currentText = messageController.text;
-              messageController.text = "$currentText ${rimas[safeIndex]} "
-                  .trimLeft();
+              // Adiciona a sugestão e posiciona o cursor ao final para compor
+              messageController.text = "$currentText ${rimas[safeIndex]} ";
               messageController.selection = TextSelection.fromPosition(
                 TextPosition(offset: messageController.text.length),
               );
@@ -80,7 +81,6 @@ class ChatBottomBar extends StatelessWidget {
                   onUpdateSuggestionIndex(nextIndex);
                 }
               : null,
-          // Adicionado navegação para trás para melhorar a UX sem precisar de ícones extras
           onPrevious: rimas.length > 1
               ? () {
                   final prevIndex = (safeIndex - 1 < 0)

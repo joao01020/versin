@@ -15,7 +15,6 @@ class VocabularioPage extends StatefulWidget {
 
 class PageVocabulary extends State<VocabularioPage> {
   final _textController = TextEditingController();
-  bool _isNextPriority = false;
 
   @override
   void dispose() {
@@ -23,135 +22,72 @@ class PageVocabulary extends State<VocabularioPage> {
     super.dispose();
   }
 
-  // --- LÓGICA: IMPORTAR ARQUIVO DE BLOCO DE NOTAS (.txt) ---
-  Future<void> _importTxtFile() async {
+  // --- LÓGICA: IMPORTAR ARQUIVO (.txt ou .md) ---
+  Future<void> _importFile() async {
     try {
       FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['txt'],
+        allowedExtensions: ['txt', 'md'],
       );
 
       if (result != null && result.files.single.path != null) {
         final file = File(result.files.single.path!);
         final String content = await file.readAsString();
-
         final List<String> importedRhymes = content.split(RegExp(r'[,\n;]'));
 
         int count = 0;
         for (var rhyme in importedRhymes) {
           String cleanRhyme = rhyme.trim().toLowerCase();
           if (cleanRhyme.isNotEmpty) {
-            // Utiliza o método addWord restaurado no controller
             widget.controller.addWord(cleanRhyme, false);
             count++;
           }
         }
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              backgroundColor: Colors.cyanAccent,
-              content: Text(
-                "Sucesso! $count rimas integradas ao Versin.",
-                style: const TextStyle(
-                  color: Colors.black,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          );
-        }
+        if (mounted) _showSnackBar("Sucesso! $count rimas importadas.", Colors.purpleAccent);
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Erro ao ler o arquivo. Verifique o formato."),
-          ),
-        );
-      }
+      if (mounted) _showSnackBar("Erro ao ler o arquivo.", Colors.redAccent);
     }
   }
 
-  // --- LÓGICA: EXPORTAR PARA BLOCO DE NOTAS ---
+  // --- LÓGICA: EXPORTAR PARA BACKUP ---
   Future<void> _exportToTxt() async {
     try {
       final Directory? downloadsDir = await getDownloadsDirectory();
       if (downloadsDir == null) return;
 
-      final String path =
-          "${downloadsDir.path}/versin_backup_${DateTime.now().millisecondsSinceEpoch}.txt";
+      final String path = "${downloadsDir.path}/versin_backup_${DateTime.now().millisecondsSinceEpoch}.txt";
       final File file = File(path);
 
       StringBuffer buffer = StringBuffer();
-      buffer.writeln("--- BACKUP VERSIN: VOCABULÁRIO ---");
-      buffer.writeln("Exportado em: ${DateTime.now()}\n");
-
+      buffer.writeln("--- BACKUP VERSIN: VOCABULÁRIO ---\n");
       for (var rhyme in widget.controller.vocabulary) {
-        buffer.writeln(
-          "${rhyme.word}${rhyme.isPriority ? ' [PRIORIDADE]' : ''}",
-        );
+        buffer.writeln(rhyme.word);
       }
 
       await file.writeAsString(buffer.toString());
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: Colors.greenAccent,
-            content: Text("Arquivo salvo: $path"),
-            duration: const Duration(seconds: 5),
-          ),
-        );
-      }
+      if (mounted) _showSnackBar("Arquivo salvo em: $path", Colors.greenAccent);
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text("Erro na exportação.")));
-      }
+      if (mounted) _showSnackBar("Erro na exportação.", Colors.redAccent);
     }
   }
 
-  Widget _buildSectionHeader(String title, String description, Color color) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 4,
-                height: 18,
-                decoration: BoxDecoration(
-                  color: color,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Text(
-                title,
-                style: TextStyle(
-                  color: color,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                  letterSpacing: 1.2,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            description,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.4),
-              fontSize: 11,
-            ),
-          ),
-        ],
+  void _showSnackBar(String message, Color color) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: color,
+        content: Text(message, style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
       ),
     );
+  }
+
+  void _confirmAddition() {
+    final text = _textController.text.trim();
+    if (text.isNotEmpty) {
+      widget.controller.addWord(text, false);
+      _textController.clear();
+      FocusScope.of(context).unfocus(); 
+    }
   }
 
   @override
@@ -159,28 +95,15 @@ class PageVocabulary extends State<VocabularioPage> {
     return Scaffold(
       backgroundColor: const Color(0xFF0F0F0F),
       appBar: AppBar(
-        title: const Text(
-          "BIBLIOTECA DE RIMAS",
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
         backgroundColor: Colors.transparent,
         elevation: 0,
-        centerTitle: true,
-        iconTheme: const IconThemeData(color: Colors.white),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.upload_file, color: Colors.cyanAccent),
-            onPressed: _importTxtFile,
-          ),
-          IconButton(
-            icon: const Icon(
-              Icons.download_for_offline,
-              color: Colors.greenAccent,
-            ),
+            icon: const Icon(Icons.download_for_offline, color: Colors.white24),
             onPressed: _exportToTxt,
           ),
           const SizedBox(width: 8),
@@ -188,66 +111,94 @@ class PageVocabulary extends State<VocabularioPage> {
       ),
       body: Column(
         children: [
-          _buildInputArea(),
+          // CABEÇALHO E ÁREA DE IMPORTAÇÃO ROXA
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Column(
+              children: [
+                const Text(
+                  "BIBLIOTECA DE RIMAS",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 2,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                
+                // ÁREA DE IMPORTAÇÃO EM ROXO
+                GestureDetector(
+                  onTap: _importFile,
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 30),
+                    decoration: BoxDecoration(
+                      color: Colors.purpleAccent.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: Colors.purpleAccent.withOpacity(0.4),
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        const Icon(
+                          Icons.drive_folder_upload,
+                          color: Colors.purpleAccent,
+                          size: 38,
+                        ),
+                        const SizedBox(height: 12),
+                        const Text(
+                          "IMPORTAR BANCO DE RIMAS",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          "Clique aqui para enviar .txt ou .md",
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.4),
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // LISTA DE RIMAS
           Expanded(
             child: ListenableBuilder(
               listenable: widget.controller,
               builder: (context, _) {
                 final vocab = widget.controller.vocabulary;
-
                 if (vocab.isEmpty) {
-                  return const Center(
+                  return Center(
                     child: Text(
-                      "Sua biblioteca está vazia.\nImporte um .txt ou adicione rimas!",
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.grey),
+                      "Sua lista está vazia.",
+                      style: TextStyle(color: Colors.white.withOpacity(0.1)),
                     ),
                   );
                 }
-
-                // Separação visual das listas por prioridade
-                final priorities = vocab.where((r) => r.isPriority).toList();
-                final general = vocab.where((r) => !r.isPriority).toList();
-
-                return CustomScrollView(
-                  slivers: [
-                    if (priorities.isNotEmpty) ...[
-                      SliverToBoxAdapter(
-                        child: _buildSectionHeader(
-                          "PRIORIDADE MÁXIMA",
-                          "O Versin prioriza estas rimas no balão de sugestão.",
-                          Colors.orangeAccent,
-                        ),
-                      ),
-                      SliverList(
-                        delegate: SliverChildBuilderDelegate(
-                          (context, index) =>
-                              _buildRhymeTile(priorities[index]),
-                          childCount: priorities.length,
-                        ),
-                      ),
-                    ],
-                    if (general.isNotEmpty) ...[
-                      SliverToBoxAdapter(
-                        child: _buildSectionHeader(
-                          "DICIONÁRIO GERAL",
-                          "Banco de dados secundário para expansão de vocabulário.",
-                          Colors.purpleAccent,
-                        ),
-                      ),
-                      SliverList(
-                        delegate: SliverChildBuilderDelegate(
-                          (context, index) => _buildRhymeTile(general[index]),
-                          childCount: general.length,
-                        ),
-                      ),
-                    ],
-                    const SliverPadding(padding: EdgeInsets.only(bottom: 100)),
-                  ],
+                return ListView.builder(
+                  padding: const EdgeInsets.only(top: 20, bottom: 130),
+                  itemCount: vocab.length,
+                  itemBuilder: (context, index) => _buildRhymeTile(vocab[index], index),
                 );
               },
             ),
           ),
+
+          // ÁREA DE INPUT FIXA NA BASE
+          _buildInputArea(),
         ],
       ),
     );
@@ -255,92 +206,75 @@ class PageVocabulary extends State<VocabularioPage> {
 
   Widget _buildInputArea() {
     return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1A1A1A),
-        borderRadius: BorderRadius.circular(16),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).padding.bottom + 16,
+        left: 16,
+        right: 16,
+        top: 12,
       ),
-      child: Row(
+      decoration: const BoxDecoration(
+        color: Color(0xFF141414),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          IconButton(
-            icon: Icon(
-              _isNextPriority ? Icons.star : Icons.star_border,
-              color: _isNextPriority ? Colors.yellow : Colors.grey,
-            ),
-            onPressed: () => setState(() => _isNextPriority = !_isNextPriority),
-          ),
-          Expanded(
-            child: TextField(
-              controller: _textController,
-              style: const TextStyle(color: Colors.white),
-              onSubmitted: (_) => _confirmAddition(),
-              decoration: const InputDecoration(
-                hintText: "Adicionar rima ao banco...",
-                hintStyle: TextStyle(color: Colors.grey, fontSize: 14),
-                border: InputBorder.none,
+          SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: ElevatedButton(
+              onPressed: _confirmAddition,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.purpleAccent,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                elevation: 0,
+              ),
+              child: const Text(
+                "+ ADICIONAR À LISTA",
+                style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1),
               ),
             ),
           ),
-          IconButton(
-            icon: const Icon(
-              Icons.add_circle,
-              color: Colors.purpleAccent,
-              size: 30,
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.05),
+              borderRadius: BorderRadius.circular(12),
             ),
-            onPressed: _confirmAddition,
+            child: TextField(
+              controller: _textController,
+              onSubmitted: (_) => _confirmAddition(),
+              style: const TextStyle(color: Colors.white),
+              decoration: const InputDecoration(
+                hintText: "Digite uma nova rima...",
+                hintStyle: TextStyle(color: Colors.white24, fontSize: 14),
+                border: InputBorder.none,
+              ),
+            ),
           ),
         ],
       ),
     );
   }
 
-  void _confirmAddition() {
-    if (_textController.text.trim().isNotEmpty) {
-      widget.controller.addWord(_textController.text, _isNextPriority);
-      _textController.clear();
-      setState(() => _isNextPriority = false);
-    }
-  }
-
-  Widget _buildRhymeTile(Rhyme rhyme) {
-    // Busca o index real no vocabulário global para garantir que as funções de toggle/remove funcionem
-    final int realIndex = widget.controller.vocabulary.indexWhere(
-      (element) => element.word == rhyme.word,
-    );
-
+  Widget _buildRhymeTile(Rhyme rhyme, int index) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.03),
+        color: Colors.white.withOpacity(0.02),
         borderRadius: BorderRadius.circular(12),
       ),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16),
         title: Text(
           rhyme.word,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 15,
-            fontWeight: FontWeight.w500,
-          ),
+          style: const TextStyle(color: Colors.white, fontSize: 15),
         ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              icon: Icon(
-                rhyme.isPriority ? Icons.star : Icons.star_border,
-                color: rhyme.isPriority ? Colors.yellow : Colors.white24,
-                size: 20,
-              ),
-              onPressed: () => widget.controller.togglePriority(realIndex),
-            ),
-            IconButton(
-              icon: const Icon(Icons.close, color: Colors.redAccent, size: 18),
-              onPressed: () => widget.controller.removeWord(realIndex),
-            ),
-          ],
+        trailing: IconButton(
+          icon: Icon(Icons.delete_outline, color: Colors.white.withOpacity(0.1), size: 20),
+          onPressed: () => widget.controller.removeWord(index),
         ),
       ),
     );

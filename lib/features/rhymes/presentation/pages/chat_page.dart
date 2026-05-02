@@ -184,7 +184,6 @@ class _ChatPageState extends State<ChatPage> {
             activeColor: activeColor,
           ),
           const SizedBox(width: 12),
-          // ITEM DE PERFORMANCE (TÉCNICA VOCAL) - REF: Captura de imagem_20260430_001439.png
           _buildToolbarItem(
             icon: Icons.mic_external_on_outlined,
             label: _selectedTechnique,
@@ -205,6 +204,15 @@ class _ChatPageState extends State<ChatPage> {
         ],
       ),
     );
+  }
+
+  void _enviarEstruturaParaChat(List<String> blocos) {
+    // Adicionadas 4 quebras de linha para criar o distanciamento da Captura de imagem_20260501_221242.png
+    String textoEstrutura = blocos.map((b) => "$b\n\n\n\n").join("\n");
+    setState(() {
+      _messageController.text = textoEstrutura;
+      _messageController.selection = TextSelection.fromPosition(const TextPosition(offset: 0));
+    });
   }
 
   void _showStructureEditor(Color activeColor) {
@@ -264,17 +272,36 @@ class _ChatPageState extends State<ChatPage> {
                     label: Text("ADICIONAR BLOCO", style: TextStyle(color: activeColor)),
                   ),
                   Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(backgroundColor: activeColor),
-                        onPressed: () {
-                          setState(() => _lastConfirmedStructure = estruturaLista.join(', '));
-                          Navigator.pop(context);
-                        },
-                        child: const Text("SALVAR NOVA ORDEM", style: TextStyle(fontWeight: FontWeight.bold)),
-                      ),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Column(
+                      children: [
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(backgroundColor: activeColor),
+                            onPressed: () {
+                              setState(() => _lastConfirmedStructure = estruturaLista.join(', '));
+                              Navigator.pop(context);
+                            },
+                            child: const Text("SALVAR NOVA ORDEM", style: TextStyle(fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton(
+                            style: OutlinedButton.styleFrom(
+                              side: BorderSide(color: activeColor.withOpacity(0.5)),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                            onPressed: () {
+                              _enviarEstruturaParaChat(estruturaLista);
+                              Navigator.pop(context);
+                            },
+                            child: const Text("ENVIAR PARA O CHAT", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -413,6 +440,8 @@ class _ChatPageState extends State<ChatPage> {
     return Scaffold(
       key: _scaffoldKey,
       backgroundColor: const Color(0xFF0F0F0F),
+      // Crucial para que o teclado não quebre o layout
+      resizeToAvoidBottomInset: true, 
       drawer: VersinDrawer(
         rhymesController: _rhymesController,
         onNewChat: () {
@@ -468,6 +497,7 @@ class _ChatPageState extends State<ChatPage> {
                 rhymesController: _rhymesController,
               ),
             ),
+            // Expanded garante que a lista ocupe o espaço restante e diminua quando o input crescer
             Expanded(
               child: ChatListView(
                 isInitializing: _isInitializing,
@@ -483,6 +513,7 @@ class _ChatPageState extends State<ChatPage> {
                 padding: const EdgeInsets.only(bottom: 8),
                 child: _buildEstudioToolbar(activeColor),
               ),
+            // Padding ajustado para o ChatBottomBar
             Padding(
               padding: const EdgeInsets.fromLTRB(15, 5, 15, 15),
               child: ChatBottomBar(

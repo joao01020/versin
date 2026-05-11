@@ -2,6 +2,16 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+// REPOSITÓRIO E CONTROLLER
+import 'package:versin/features/rhymes/data/repositories/studio_repository.dart';
+import 'package:versin/features/rhymes/presentation/controller/rhymes_controller.dart';
+
+// COMPONENTES EXTRAÍDOS E MODAIS
+import 'package:versin/features/rhymes/presentation/pages/components/chat/studio_toolbar.dart';
+import 'package:versin/features/rhymes/presentation/pages/components/chat/structure_editor_modal.dart';
+import 'package:versin/features/rhymes/presentation/widgets/common/versin_bottom_menu.dart';
+
+// COMPONENTES DE UI CORE
 import 'package:versin/features/rhymes/presentation/widgets/versin_drawer/versin_drawer.dart';
 import 'package:versin/features/rhymes/presentation/pages/components/header/chat_header.dart';
 import 'package:versin/features/rhymes/presentation/pages/components/chat/chat_list_view.dart';
@@ -9,21 +19,21 @@ import 'package:versin/features/rhymes/presentation/pages/components/chat/chat_b
 import 'package:versin/features/rhymes/presentation/pages/components/chat_initializer/chat_initializer.dart';
 import 'package:versin/features/rhymes/presentation/pages/components/auth_modal/auth_modal.dart';
 import 'package:versin/features/rhymes/presentation/pages/components/timeline/versin_timeline.dart';
-import 'package:versin/features/rhymes/presentation/controller/rhymes_controller.dart';
 import 'package:versin/features/rhymes/presentation/widgets/mood_selector_slider/mood_selector_slider.dart';
-
-// IMPORT ATUALIZADO PARA O CAMINHO DA SUBPASTA
 import 'package:versin/features/rhymes/presentation/pages/components/chat/suggestion_balloon/suggestion_balloon.dart';
 
 class ChatPage extends StatefulWidget {
   const ChatPage({super.key});
+
   @override
   State<ChatPage> createState() => _ChatPageState();
 }
 
 class _ChatPageState extends State<ChatPage> {
+  // --- CONTROLLERS E ESTADOS CORE ---
   final _messageController = TextEditingController();
   final RhymesController _rhymesController = RhymesController();
+  final StudioRepository _studioRepo = StudioRepository(); 
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final ScrollController _scrollController = ScrollController();
 
@@ -35,10 +45,8 @@ class _ChatPageState extends State<ChatPage> {
   bool _isInitializing = true;
   int _currentSuggestionIndex = 0;
 
+  // --- ESTADOS DO MENU DE ESTÚDIO ---
   bool _configuracaoFinalizada = false; 
-  int _currentBpm = 120;
-  String _selectedVibe = "Calmo";
-  String _selectedTechnique = "Melódico";
   String _lastConfirmedStructure = "";
 
   @override
@@ -53,6 +61,8 @@ class _ChatPageState extends State<ChatPage> {
     _rhymesController.fetchTrendingWords();
   }
 
+  // --- MÉTODOS DE INICIALIZAÇÃO ---
+
   void _initializeLogic() {
     _rhymesController.updateGamification(0.0);
     _rhymesController.addListener(_handleControllerChanges);
@@ -66,11 +76,12 @@ class _ChatPageState extends State<ChatPage> {
     _messageController.addListener(() {
       final text = _messageController.text;
       _rhymesController.onTextChanged(text);
+      
       if (_rhymesController.currentStep == 2) {
         int lines = text.split('\n').where((l) => l.trim().isNotEmpty).length;
         double progress = (lines / 5).clamp(0.0, 1.0);
         _rhymesController.updateProgress(2, progress);
-        if (progress >= 1.0) _completeStep(2);
+        if (progress >= 1.0) _rhymesController.updateProgress(3, 0.0);
       }
     });
   }
@@ -80,12 +91,13 @@ class _ChatPageState extends State<ChatPage> {
     if (mounted) {
       ChatInitializer.run(
         mounted: mounted,
-        onLoadingStatusChanged: (status) =>
-            setState(() => _isInitializing = status),
+        onLoadingStatusChanged: (status) => setState(() => _isInitializing = status),
         onStartWelcomeFlow: _startWelcomeFlow,
       );
     }
   }
+
+  // --- GESTÃO DE SESSÃO ---
 
   void _checkInitialSession() {
     final session = Supabase.instance.client.auth.currentSession;
@@ -93,9 +105,7 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   void _setupAuthListener() {
-    _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((
-      data,
-    ) {
+    _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((data) {
       if (data.event == AuthChangeEvent.signedIn && data.session != null) {
         _authModalTimer?.cancel();
         _rhymesController.carregarDadosUsuario();
@@ -114,10 +124,22 @@ class _ChatPageState extends State<ChatPage> {
     });
   }
 
-  Future<void> _iniciarSessaoNoBanco() async {
-    final user = Supabase.instance.client.auth.currentUser;
-    if (user == null) return;
+  // --- LÓGICA DE ESTÚDIO E ÁUDIO ---
 
+  void _toggleBpm() {
+    // Agora o controller gerencia o loop de som e o estado isBpmPlaying
+    _rhymesController.toggleMetronome();
+  }
+
+  void _enviarEstruturaParaChat(List<String> blocos) {
+    String textoEstrutura = blocos.map((b) => "[$b]\n\n\n\n").join("\n");
+    setState(() {
+      _messageController.text = textoEstrutura;
+      _messageController.selection = TextSelection.fromPosition(const TextPosition(offset: 0));
+    });
+  }
+
+  Future<void> _iniciarSessaoNoBanco() async {
     setState(() {
       messages.clear(); 
       _configuracaoFinalizada = true; 
@@ -125,234 +147,28 @@ class _ChatPageState extends State<ChatPage> {
     });
 
     try {
-      await Supabase.instance.client.from('lyrics_history').insert({
-        'user_id': user.id,
-        'bpm': _currentBpm,
-        'structure': _lastConfirmedStructure,
-        'theme': _messageController.text.isNotEmpty ? _messageController.text : "Tema Livre",
-        'vibe': _selectedVibe,
-        'vocal_technique': _selectedTechnique,
-        'created_at': DateTime.now().toIso8601String(),
-      });
+      await _studioRepo.inserirSessaoNoBanco(
+        bpm: _rhymesController.currentBpm,
+        structure: _lastConfirmedStructure,
+        theme: _messageController.text.isNotEmpty ? _messageController.text : "Tema Livre",
+        vibe: _rhymesController.selectedVibe,
+        technique: _rhymesController.selectedTechnique,
+      );
 
       setState(() {
         messages.add({
           "role": "assistant",
-          "content": "✨ **Estúdio Iniciado!**\n\nA estrutura foi salva. Comece a compor agora!\n\n*Dica: Use **Enter** para pular linha.*",
+          "content": "✨ **Estúdio Configurado!**\nSua sessão foi salva. Manda ver na composição!",
         });
       });
-
-      String prompt = "Inicie a composição. Estrutura: $_lastConfirmedStructure. Vibe: $_selectedVibe. Técnica: $_selectedTechnique. Tema: ${_messageController.text}";
-      final response = await _rhymesController.fetchAiResponse(prompt);
-
-      if (mounted) {
-        setState(() {
-          messages.add(response);
-          _isAiTyping = false;
-          _rhymesController.updateProgress(1, 1.0);
-        });
-        _scrollToBottom();
-      }
+      _processMessage("O estúdio está pronto. Vamos começar a letra?");
     } catch (e) {
-      debugPrint("Erro ao salvar sessão: $e");
+      debugPrint("Erro ao salvar: $e");
       setState(() => _isAiTyping = false);
     }
   }
 
-  Widget _buildEstudioToolbar(Color activeColor) {
-    if (!_configuracaoFinalizada) return const SizedBox.shrink();
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.03),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _buildToolbarItem(
-            icon: Icons.speed,
-            label: "$_currentBpm BPM",
-            onTap: () => _showQuickMenu("Ajustar BPM", ["80", "90", "100", "120", "140", "160"], (val) {
-              setState(() => _currentBpm = int.parse(val));
-            }),
-            activeColor: activeColor,
-          ),
-          const SizedBox(width: 12),
-          _buildToolbarItem(
-            icon: Icons.account_tree_outlined,
-            label: "Estrutura",
-            onTap: () => _showStructureEditor(activeColor),
-            activeColor: activeColor,
-          ),
-          const SizedBox(width: 12),
-          _buildToolbarItem(
-            icon: Icons.mic_external_on_outlined,
-            label: _selectedTechnique,
-            onTap: () => _showQuickMenu("Performance Vocal", ["Melódico", "Agressivo", "Flow Rápido", "Sussurrado", "Falsete"], (val) {
-              setState(() => _selectedTechnique = val);
-            }),
-            activeColor: activeColor,
-          ),
-          const SizedBox(width: 12),
-          _buildToolbarItem(
-            icon: Icons.auto_awesome,
-            label: _selectedVibe,
-            onTap: () => _showQuickMenu("Alterar Vibe", ["Calmo", "Energético", "Agressivo", "Triste", "Melancólico"], (val) {
-              setState(() => _selectedVibe = val);
-            }),
-            activeColor: activeColor,
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _enviarEstruturaParaChat(List<String> blocos) {
-    String textoEstrutura = blocos.map((b) => "$b\n\n\n\n").join("\n");
-    setState(() {
-      _messageController.text = textoEstrutura;
-      _messageController.selection = TextSelection.fromPosition(const TextPosition(offset: 0));
-    });
-  }
-
-  void _showStructureEditor(Color activeColor) {
-    List<String> estruturaLista = _lastConfirmedStructure.split(', ').where((s) => s.isNotEmpty).toList();
-    if (estruturaLista.isEmpty) estruturaLista = ["Intro", "Verso 1", "Refrão", "Verso 2", "Final"];
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: const Color(0xFF1A1A1A),
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text("Organizar Estrutura", style: TextStyle(color: Colors.white54, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
-                  const Text("Arraste os itens para mudar a ordem da letra", style: TextStyle(color: Colors.white24, fontSize: 11)),
-                  const SizedBox(height: 15),
-                  ConstrainedBox(
-                    constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.4),
-                    child: ReorderableListView(
-                      shrinkWrap: true,
-                      children: [
-                        for (int i = 0; i < estruturaLista.length; i++)
-                          ListTile(
-                            key: ValueKey("$i-${estruturaLista[i]}"),
-                            leading: Icon(Icons.drag_handle_rounded, color: activeColor.withOpacity(0.5)),
-                            title: Text(estruturaLista[i], style: const TextStyle(color: Colors.white, fontSize: 14)),
-                            trailing: IconButton(
-                              icon: const Icon(Icons.remove_circle_outline, color: Colors.white10, size: 18),
-                              onPressed: () => setModalState(() => estruturaLista.removeAt(i)),
-                            ),
-                          ),
-                      ],
-                      onReorder: (oldIdx, newIdx) {
-                        setModalState(() {
-                          if (newIdx > oldIdx) newIdx -= 1;
-                          final item = estruturaLista.removeAt(oldIdx);
-                          estruturaLista.insert(newIdx, item);
-                        });
-                      },
-                    ),
-                  ),
-                  const Divider(color: Colors.white10),
-                  TextButton.icon(
-                    onPressed: () {
-                      _showQuickMenu("Adicionar Bloco", ["Intro", "Verso", "Refrão", "Ponte", "Solo", "Final"], (val) {
-                        setModalState(() => estruturaLista.add(val));
-                      });
-                    },
-                    icon: Icon(Icons.add, color: activeColor, size: 18),
-                    label: Text("ADICIONAR BLOCO", style: TextStyle(color: activeColor)),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    child: Column(
-                      children: [
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(backgroundColor: activeColor),
-                            onPressed: () {
-                              setState(() => _lastConfirmedStructure = estruturaLista.join(', '));
-                              Navigator.pop(context);
-                            },
-                            child: const Text("SALVAR NOVA ORDEM", style: TextStyle(fontWeight: FontWeight.bold)),
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        SizedBox(
-                          width: double.infinity,
-                          child: OutlinedButton(
-                            style: OutlinedButton.styleFrom(
-                              side: BorderSide(color: activeColor.withOpacity(0.5)),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                            ),
-                            onPressed: () {
-                              _enviarEstruturaParaChat(estruturaLista);
-                              Navigator.pop(context);
-                            },
-                            child: const Text("ENVIAR PARA O CHAT", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildToolbarItem({required IconData icon, required String label, required VoidCallback onTap, required Color activeColor}) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(15),
-      child: Row(
-        children: [
-          Icon(icon, size: 14, color: Colors.white54),
-          const SizedBox(width: 4),
-          Text(label, style: const TextStyle(color: Colors.white70, fontSize: 11)),
-          const Icon(Icons.keyboard_arrow_down, size: 14, color: Colors.white30),
-        ],
-      ),
-    );
-  }
-
-  void _showQuickMenu(String title, List<String> options, Function(String) onSelect) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: const Color(0xFF1A1A1A),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (context) => Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Text(title, style: const TextStyle(color: Colors.white54, fontWeight: FontWeight.bold)),
-          ),
-          ...options.map((opt) => ListTile(
-            title: Text(opt, style: const TextStyle(color: Colors.white)),
-            onTap: () {
-              onSelect(opt);
-              Navigator.pop(context);
-            },
-          )),
-        ],
-      ),
-    );
-  }
+  // --- FLUXO DE MENSAGENS ---
 
   void _processMessage(String text) async {
     if (text.isEmpty) return;
@@ -361,9 +177,11 @@ class _ChatPageState extends State<ChatPage> {
       _isAiTyping = true;
     });
     _scrollToBottom();
+
     final response = await _rhymesController.fetchAiResponse(
-      "$text [Vibe: $_selectedVibe | Técnica: $_selectedTechnique | Estrutura: $_lastConfirmedStructure]",
+      "$text [Contexto: ${_rhymesController.selectedVibe}, ${_rhymesController.selectedTechnique}, ${_rhymesController.currentBpm} BPM]",
     );
+
     if (mounted) {
       setState(() {
         messages.add(response);
@@ -386,29 +204,24 @@ class _ChatPageState extends State<ChatPage> {
       mounted: mounted,
       messages: messages,
       addMessage: (content, {Widget? customWidget}) => setState(() {
-        messages.add({
-          "role": "assistant",
-          "content": content,
-          "customWidget": customWidget,
-        });
+        messages.add({"role": "assistant", "content": content, "customWidget": customWidget});
       }),
       setAiTyping: (typing) => setState(() => _isAiTyping = typing),
       scrollToBottom: _scrollToBottom,
-      onProgressUpdate: (step, progress) =>
-          _rhymesController.updateProgress(step, progress),
+      onProgressUpdate: (step, progress) => _rhymesController.updateProgress(step, progress),
       activeColor: _rhymesController.getActiveColor(),
-      onStructureConfirmed: (configEstudio) {
-        _lastConfirmedStructure = configEstudio;
+      onStructureConfirmed: (config) {
+        _lastConfirmedStructure = config;
         setState(() {
           messages.add({
             "role": "assistant",
-            "content": "Estrutura definida! Defina o tema e use o slider para configurar a performance:",
+            "content": "Boa! Agora defina a vibe e técnica usando o slider:",
             "customWidget": MoodSelectorSlider(
               onSelectionChanged: (valor, nome, isFinalStep) {
                 if (!isFinalStep) {
-                  _selectedVibe = nome;
+                  _rhymesController.updateStudioConfig(vibe: nome);
                 } else {
-                  _selectedTechnique = nome;
+                  _rhymesController.updateStudioConfig(technique: nome);
                   _iniciarSessaoNoBanco();
                 }
               },
@@ -419,9 +232,6 @@ class _ChatPageState extends State<ChatPage> {
       },
     );
   }
-
-  void _completeStep(int step) =>
-      _rhymesController.updateProgress(step + 1, 0.0);
 
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -442,14 +252,13 @@ class _ChatPageState extends State<ChatPage> {
     return Scaffold(
       key: _scaffoldKey,
       backgroundColor: const Color(0xFF0F0F0F),
-      resizeToAvoidBottomInset: true, 
       drawer: VersinDrawer(
         rhymesController: _rhymesController,
         onNewChat: () {
           setState(() {
             messages.clear();
-            _lastConfirmedStructure = "";
             _configuracaoFinalizada = false;
+            if (_rhymesController.isBpmPlaying) _rhymesController.toggleMetronome();
           });
           _rhymesController.updateProgress(1, 0.0);
           _startWelcomeFlow();
@@ -458,46 +267,12 @@ class _ChatPageState extends State<ChatPage> {
       body: SafeArea(
         child: Column(
           children: [
-            Padding(
-              padding: const EdgeInsets.only(top: 10, bottom: 5),
-              child: VersinTimeline(
-                currentStep: _rhymesController.currentStep,
-                stepProgress: _rhymesController.stepProgress,
-                activeColor: activeColor,
-              ),
+            VersinTimeline(
+              currentStep: _rhymesController.currentStep,
+              stepProgress: _rhymesController.stepProgress,
+              activeColor: activeColor,
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              child: SizedBox(
-                height: 50,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: IconButton(
-                        icon: Icon(Icons.menu_rounded, color: activeColor, size: 30),
-                        onPressed: () => _scaffoldKey.currentState?.openDrawer(),
-                      ),
-                    ),
-                    const Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text("Versin", style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
-                        Text("GENESIS", style: TextStyle(color: Colors.grey, fontSize: 8, fontWeight: FontWeight.w900, letterSpacing: 4)),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: ChatHeader(
-                activeColor: activeColor,
-                rhymesController: _rhymesController,
-              ),
-            ),
+            ChatHeader(activeColor: activeColor, rhymesController: _rhymesController, scaffoldKey: _scaffoldKey),
             Expanded(
               child: ChatListView(
                 isInitializing: _isInitializing,
@@ -506,69 +281,66 @@ class _ChatPageState extends State<ChatPage> {
                 scrollController: _scrollController,
                 activeColor: activeColor,
                 secondsActive: _rhymesController.connectionSeconds,
+                isBpmPlaying: _rhymesController.isBpmPlaying,
+                currentBpm: _rhymesController.currentBpm,
+                onToggleBpm: _toggleBpm,
               ),
             ),
-
-            // SEÇÃO DO SUGGESTION BALLOON INTEGRADA
+            
             if (_rhymesController.isRhymeMode && _rhymesController.suggestions.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: SuggestionBalloon(
-                  suggestion: _rhymesController.suggestions[_currentSuggestionIndex],
-                  onTap: () {
-                    setState(() {
-                      final word = _rhymesController.suggestions[_currentSuggestionIndex];
-                      String currentText = _messageController.text;
-                      _messageController.text = "$currentText $word ";
-                      _messageController.selection = TextSelection.fromPosition(
-                        TextPosition(offset: _messageController.text.length),
-                      );
-                      _rhymesController.clearSuggestions();
-                    });
-                  },
-                  onDismiss: () => _rhymesController.clearSuggestions(),
-                  onNext: () {
-                    setState(() {
-                      _currentSuggestionIndex = (_currentSuggestionIndex + 1) % _rhymesController.suggestions.length;
-                    });
-                  },
-                  onPrevious: () {
-                    setState(() {
-                      _currentSuggestionIndex = (_currentSuggestionIndex - 1 + _rhymesController.suggestions.length) % _rhymesController.suggestions.length;
-                    });
-                  },
-                  onAddCommand: () {
-                    _processMessage("Dê um exemplo de verso usando a rima: ${_rhymesController.suggestions[_currentSuggestionIndex]}");
-                  },
-                ),
-              ),
-
-            if (_configuracaoFinalizada)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: _buildEstudioToolbar(activeColor),
-              ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(15, 5, 15, 15),
-              child: ChatBottomBar(
-                messageController: _messageController,
-                rhymesController: _rhymesController,
-                activeColor: activeColor,
-                isRhymeMode: _rhymesController.isRhymeMode,
-                onSend: _sendMessage,
-                currentSuggestionIndex: _currentSuggestionIndex,
-                onUpdateSuggestionIndex: (index) =>
-                    setState(() => _currentSuggestionIndex = index),
-                onAddRhyme: (word) {
+              SuggestionBalloon(
+                suggestion: _rhymesController.suggestions[_currentSuggestionIndex],
+                onTap: () {
                   setState(() {
-                    String currentText = _messageController.text;
-                    _messageController.text = "$currentText $word ";
-                    _messageController.selection = TextSelection.fromPosition(
-                      TextPosition(offset: _messageController.text.length),
-                    );
+                    _messageController.text += " ${_rhymesController.suggestions[_currentSuggestionIndex]} ";
+                    _rhymesController.clearSuggestions();
                   });
                 },
+                onDismiss: () => _rhymesController.clearSuggestions(),
+                onNext: () => setState(() => _currentSuggestionIndex = (_currentSuggestionIndex + 1) % _rhymesController.suggestions.length),
+                onPrevious: () => setState(() => _currentSuggestionIndex = (_currentSuggestionIndex - 1 + _rhymesController.suggestions.length) % _rhymesController.suggestions.length),
+                onAddCommand: () => _processMessage("Exemplo de verso com: ${_rhymesController.suggestions[_currentSuggestionIndex]}"),
               ),
+
+            StudioToolbar(
+              configuracaoFinalizada: _configuracaoFinalizada,
+              currentBpm: _rhymesController.currentBpm,
+              selectedVibe: _rhymesController.selectedVibe,
+              selectedTechnique: _rhymesController.selectedTechnique,
+              activeColor: activeColor,
+              onShowStructure: () => StructureEditorModal.show(
+                context: context,
+                initialStructure: _lastConfirmedStructure,
+                activeColor: activeColor,
+                onSave: (val) => setState(() => _lastConfirmedStructure = val),
+                onSendToChat: _enviarEstruturaParaChat,
+                showQuickMenu: (title, opts, onSelect) => VersinBottomMenu.show(
+                  context: context,
+                  title: title,
+                  options: opts,
+                  onSelect: onSelect,
+                ),
+              ),
+              onShowMenu: (title, opts, onSelect) => VersinBottomMenu.show(
+                context: context,
+                title: title,
+                options: opts,
+                onSelect: onSelect,
+              ),
+              onBpmChanged: (val) => _rhymesController.updateStudioConfig(bpm: val),
+              onTechniqueChanged: (val) => _rhymesController.updateStudioConfig(technique: val),
+              onVibeChanged: (val) => _rhymesController.updateStudioConfig(vibe: val),
+            ),
+
+            ChatBottomBar(
+              messageController: _messageController,
+              rhymesController: _rhymesController,
+              activeColor: activeColor,
+              isRhymeMode: _rhymesController.isRhymeMode,
+              onSend: _sendMessage,
+              currentSuggestionIndex: _currentSuggestionIndex,
+              onUpdateSuggestionIndex: (index) => setState(() => _currentSuggestionIndex = index),
+              onAddRhyme: (word) => setState(() => _messageController.text += " $word "),
             ),
           ],
         ),

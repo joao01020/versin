@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:versin/features/rhymes/presentation/controller/rhymes_controller.dart';
-import 'package:versin/features/rhymes/presentation/widgets/suggestion_balloon/suggestion_balloon.dart';
+
+// Importação atualizada para o caminho correto do componente
+import 'package:versin/features/rhymes/presentation/pages/components/chat/suggestion_balloon/suggestion_balloon.dart';
 import 'package:versin/features/rhymes/presentation/widgets/chat/chat_input_area.dart';
 
 class ChatBottomBar extends StatelessWidget {
@@ -30,19 +32,18 @@ class ChatBottomBar extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
+        // O balão aparece aqui quando houver rimas disponíveis
         _buildSuggestionBalloon(),
         const SizedBox(height: 10),
         ChatInputArea(
           controller: messageController,
           onSend: onSend,
-          // Mantendo a estética clean para o foco na escrita dos versos
+          // Estética clean focada na escrita
           activeColor: Colors.white70, 
           hintText: isRhymeMode
               ? "Filtrando vocabulário..."
               : "Escreva seus versos...",
           onAddRhyme: onAddRhyme,
-          // Nota técnica: keyboardType e maxLines foram movidos para a 
-          // ChatInputArea para evitar erros de parâmetros não definidos.
         ),
       ],
     );
@@ -52,7 +53,9 @@ class ChatBottomBar extends StatelessWidget {
     return ListenableBuilder(
       listenable: rhymesController,
       builder: (context, _) {
-        final rimas = rhymesController.suggestionsList;
+        // Verifica a lista de sugestões no controller (ajustado para suggestions)
+        final rimas = rhymesController.suggestions;
+        
         if (rimas.isEmpty) return const SizedBox.shrink();
 
         final safeIndex = currentSuggestionIndex >= rimas.length
@@ -61,13 +64,12 @@ class ChatBottomBar extends StatelessWidget {
 
         return SuggestionBalloon(
           suggestion: rimas[safeIndex],
-          isLoading: rhymesController.isLoading,
+          // Parâmetros do seu componente suggestion_balloon.dart
           onTap: () {
             if (onAddRhyme != null) {
               onAddRhyme!(rimas[safeIndex]);
             } else {
               final currentText = messageController.text;
-              // Adiciona a sugestão e posiciona o cursor ao final para compor
               messageController.text = "$currentText ${rimas[safeIndex]} ";
               messageController.selection = TextSelection.fromPosition(
                 TextPosition(offset: messageController.text.length),
@@ -75,21 +77,20 @@ class ChatBottomBar extends StatelessWidget {
             }
             rhymesController.clearSuggestions();
           },
-          onNext: rimas.length > 1
-              ? () {
-                  final nextIndex = (safeIndex + 1) % rimas.length;
-                  onUpdateSuggestionIndex(nextIndex);
-                }
-              : null,
-          onPrevious: rimas.length > 1
-              ? () {
-                  final prevIndex = (safeIndex - 1 < 0)
-                      ? rimas.length - 1
-                      : safeIndex - 1;
-                  onUpdateSuggestionIndex(prevIndex);
-                }
-              : null,
+          onNext: () {
+            final nextIndex = (safeIndex + 1) % rimas.length;
+            onUpdateSuggestionIndex(nextIndex);
+          },
+          onPrevious: () {
+            final prevIndex = (safeIndex - 1 < 0)
+                ? rimas.length - 1
+                : safeIndex - 1;
+            onUpdateSuggestionIndex(prevIndex);
+          },
           onDismiss: () => rhymesController.clearSuggestions(),
+          onAddCommand: () {
+            // Lógica extra para o botão (+) se necessário
+          },
         );
       },
     );

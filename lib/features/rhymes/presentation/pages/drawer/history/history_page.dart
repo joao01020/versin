@@ -12,7 +12,7 @@ class HistoryPage extends StatefulWidget {
 class _HistoryPageState extends State<HistoryPage> {
   final _supabase = Supabase.instance.client;
 
-  // STREAM CORRIGIDO: Usa 'profile_id' conforme o seu SQL Schema
+  // STREAM ATUALIZADA: Usa 'user_id' conforme o seu SQL Schema V2.8
   Stream<List<Map<String, dynamic>>> _getHistoryStream() {
     final userId = _supabase.auth.currentUser?.id;
     if (userId == null) return Stream.value([]);
@@ -20,7 +20,7 @@ class _HistoryPageState extends State<HistoryPage> {
     return _supabase
         .from('lyrics_history')
         .stream(primaryKey: ['id'])
-        .eq('profile_id', userId) // Ajustado de user_id para profile_id
+        .eq('user_id', userId) 
         .order('created_at', ascending: false);
   }
 
@@ -45,7 +45,12 @@ class _HistoryPageState extends State<HistoryPage> {
       appBar: AppBar(
         title: const Text(
           "HISTÓRICO DE PRODUÇÃO",
-          style: TextStyle(fontSize: 10, letterSpacing: 2, fontWeight: FontWeight.bold, color: Colors.white38),
+          style: TextStyle(
+            fontSize: 10, 
+            letterSpacing: 2, 
+            fontWeight: FontWeight.bold, 
+            color: Colors.white38
+          ),
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -60,6 +65,10 @@ class _HistoryPageState extends State<HistoryPage> {
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator(color: Colors.white10));
+          }
+
+          if (snapshot.hasError) {
+            debugPrint("Erro na Stream de Histórico: ${snapshot.error}");
           }
 
           final history = snapshot.data ?? [];
@@ -78,10 +87,11 @@ class _HistoryPageState extends State<HistoryPage> {
             itemBuilder: (context, index) {
               final item = history[index];
               
-              // Mapeamento baseado exatamente nas colunas do seu SQL
+              // Mapeamento baseado nas colunas do seu SQL V2.8
               final bpm = item['bpm'] ?? 120;
               final structure = item['structure'] ?? 'N/A';
               final content = item['content'] ?? 'Sem letra registrada.';
+              final theme = item['theme'] ?? 'Geral';
 
               return Container(
                 margin: const EdgeInsets.only(bottom: 16),
@@ -97,8 +107,17 @@ class _HistoryPageState extends State<HistoryPage> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        _buildConfigTag("$bpm BPM", Colors.orange),
-                        Text(_formatDate(item['created_at']), style: const TextStyle(color: Colors.white24, fontSize: 10)),
+                        Row(
+                          children: [
+                            _buildConfigTag("$bpm BPM", Colors.orange),
+                            const SizedBox(width: 8),
+                            _buildConfigTag(theme.toUpperCase(), Colors.purpleAccent),
+                          ],
+                        ),
+                        Text(
+                          _formatDate(item['created_at']), 
+                          style: const TextStyle(color: Colors.white24, fontSize: 10)
+                        ),
                       ],
                     ),
                     const SizedBox(height: 16),
@@ -116,8 +135,12 @@ class _HistoryPageState extends State<HistoryPage> {
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
-                            "ESTRUTURA: $structure",
-                            style: const TextStyle(color: Colors.cyan, fontSize: 9, fontWeight: FontWeight.bold),
+                            "ESTRUTURA: ${structure.toUpperCase()}",
+                            style: const TextStyle(
+                              color: Colors.cyan, 
+                              fontSize: 9, 
+                              fontWeight: FontWeight.bold
+                            ),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
@@ -134,7 +157,11 @@ class _HistoryPageState extends State<HistoryPage> {
   }
 
   String _formatDate(String dateStr) {
-    final date = DateTime.parse(dateStr);
-    return "${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}";
+    try {
+      final date = DateTime.parse(dateStr);
+      return "${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}";
+    } catch (e) {
+      return "--/--/--";
+    }
   }
 }

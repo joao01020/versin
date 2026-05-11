@@ -46,7 +46,7 @@ class RhymesController extends ChangeNotifier {
 
   // --- DADOS E API ---
   List<Rhyme> vocabulary = [];
-  List<Map<String, dynamic>> trendingWords = []; // Lista para armazenar tendências
+  List<Map<String, dynamic>> trendingWords = [];
   String? _userApiKey = "VERSIN-PRO-TRIAL-2026-FREE";
   String? get userApiKey => _userApiKey;
   bool get isProActive => _userApiKey != null && _userApiKey!.isNotEmpty;
@@ -60,26 +60,21 @@ class RhymesController extends ChangeNotifier {
     return const Color(0xFFE100FF); 
   }
 
-  // --- BUSCA DE TENDÊNCIAS (SOLUÇÃO DO ERRO) ---
+  // --- BUSCA DE TENDÊNCIAS ---
   Future<void> fetchTrendingWords() async {
-    // Método chamado no initState da ChatPage para evitar o erro de compilação
     try {
-      // Aqui você pode implementar a chamada real para sua API no Render futuramente
       debugPrint("Versin: Buscando palavras em alta...");
-      
-      // Simulação de dados para não vir vazio
       trendingWords = [
         {"word": "Flow", "count": 150},
         {"word": "Beat", "count": 120},
       ];
-      
       notifyListeners();
     } catch (e) {
       debugPrint("Erro ao buscar trending words: $e");
     }
   }
 
-  // --- LÓGICA DE DIGITAÇÃO E FEEDBACK ---
+  // --- LÓGICA DE DIGITAÇÃO ---
   void onTextChanged(String text) {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
 
@@ -182,20 +177,21 @@ class RhymesController extends ChangeNotifier {
     }
   }
 
-  // --- MÉTODOS DE SUPABASE ---
+  // --- MÉTODOS DE SUPABASE (REMOVIDO IS_PRIORITY / ATUALIZADO USER_ID) ---
   Future<void> carregarDadosUsuario() async {
     final user = _supabase.auth.currentUser;
     if (user != null) {
       try {
         final vocabData = await _supabase
             .from('user_vocabulary')
-            .select('word, is_priority')
-            .eq('profile_id', user.id);
+            .select('word') // Removido is_priority
+            .eq('user_id', user.id); // Atualizado para user_id
+            
         vocabulary = (vocabData as List)
             .map(
               (item) => Rhyme(
                 word: item['word'],
-                isPriority: item['is_priority'] ?? false,
+                isPriority: false, // Default falso já que removemos do banco
               ),
             )
             .toList();
@@ -206,18 +202,23 @@ class RhymesController extends ChangeNotifier {
     }
   }
 
-  // --- MÉTODOS DE GERENCIAMENTO ---
   void addWord(String word, bool priority) {
     String p = word.trim().toLowerCase();
     if (p.isNotEmpty && !vocabulary.any((r) => r.word == p)) {
-      vocabulary.insert(0, Rhyme(word: p, isPriority: priority));
+      vocabulary.insert(0, Rhyme(word: p, isPriority: false));
       notifyListeners();
+      
       final user = _supabase.auth.currentUser;
       if (user != null) {
         _supabase
             .from('user_vocabulary')
-            .insert({'word': p, 'profile_id': user.id, 'is_priority': priority})
-            .then((_) => null);
+            .insert({
+              'word': p, 
+              'user_id': user.id // Atualizado para user_id
+              // Removido is_priority do insert
+            })
+            .then((_) => null)
+            .catchError((e) => debugPrint("Erro ao salvar palavra: $e"));
       }
     }
   }
@@ -227,18 +228,20 @@ class RhymesController extends ChangeNotifier {
       final wordToRemove = vocabulary[index].word;
       vocabulary.removeAt(index);
       notifyListeners();
+      
       final user = _supabase.auth.currentUser;
       if (user != null) {
         _supabase
             .from('user_vocabulary')
             .delete()
             .eq('word', wordToRemove)
-            .eq('profile_id', user.id)
+            .eq('user_id', user.id) // Atualizado para user_id
             .then((_) => null);
       }
     }
   }
 
+  // Método simplificado (não faz mais nada no banco, apenas interface)
   void togglePriority(int index) {
     if (index >= 0 && index < vocabulary.length) {
       vocabulary[index].isPriority = !vocabulary[index].isPriority;
@@ -246,6 +249,7 @@ class RhymesController extends ChangeNotifier {
     }
   }
 
+  // --- MÉTODOS DE GERENCIAMENTO ---
   void updateStudioConfig({int? bpm, String? vibe, String? technique}) {
     if (bpm != null) currentBpm = bpm;
     if (vibe != null) selectedVibe = vibe;

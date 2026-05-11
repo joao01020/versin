@@ -12,6 +12,9 @@ import 'package:versin/features/rhymes/presentation/pages/components/timeline/ve
 import 'package:versin/features/rhymes/presentation/controller/rhymes_controller.dart';
 import 'package:versin/features/rhymes/presentation/widgets/mood_selector_slider/mood_selector_slider.dart';
 
+// IMPORT ATUALIZADO PARA O CAMINHO DA SUBPASTA
+import 'package:versin/features/rhymes/presentation/pages/components/chat/suggestion_balloon/suggestion_balloon.dart';
+
 class ChatPage extends StatefulWidget {
   const ChatPage({super.key});
   @override
@@ -207,7 +210,6 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   void _enviarEstruturaParaChat(List<String> blocos) {
-    // Adicionadas 4 quebras de linha para criar o distanciamento da Captura de imagem_20260501_221242.png
     String textoEstrutura = blocos.map((b) => "$b\n\n\n\n").join("\n");
     setState(() {
       _messageController.text = textoEstrutura;
@@ -440,7 +442,6 @@ class _ChatPageState extends State<ChatPage> {
     return Scaffold(
       key: _scaffoldKey,
       backgroundColor: const Color(0xFF0F0F0F),
-      // Crucial para que o teclado não quebre o layout
       resizeToAvoidBottomInset: true, 
       drawer: VersinDrawer(
         rhymesController: _rhymesController,
@@ -497,7 +498,6 @@ class _ChatPageState extends State<ChatPage> {
                 rhymesController: _rhymesController,
               ),
             ),
-            // Expanded garante que a lista ocupe o espaço restante e diminua quando o input crescer
             Expanded(
               child: ChatListView(
                 isInitializing: _isInitializing,
@@ -508,12 +508,46 @@ class _ChatPageState extends State<ChatPage> {
                 secondsActive: _rhymesController.connectionSeconds,
               ),
             ),
+
+            // SEÇÃO DO SUGGESTION BALLOON INTEGRADA
+            if (_rhymesController.isRhymeMode && _rhymesController.suggestions.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: SuggestionBalloon(
+                  suggestion: _rhymesController.suggestions[_currentSuggestionIndex],
+                  onTap: () {
+                    setState(() {
+                      final word = _rhymesController.suggestions[_currentSuggestionIndex];
+                      String currentText = _messageController.text;
+                      _messageController.text = "$currentText $word ";
+                      _messageController.selection = TextSelection.fromPosition(
+                        TextPosition(offset: _messageController.text.length),
+                      );
+                      _rhymesController.clearSuggestions();
+                    });
+                  },
+                  onDismiss: () => _rhymesController.clearSuggestions(),
+                  onNext: () {
+                    setState(() {
+                      _currentSuggestionIndex = (_currentSuggestionIndex + 1) % _rhymesController.suggestions.length;
+                    });
+                  },
+                  onPrevious: () {
+                    setState(() {
+                      _currentSuggestionIndex = (_currentSuggestionIndex - 1 + _rhymesController.suggestions.length) % _rhymesController.suggestions.length;
+                    });
+                  },
+                  onAddCommand: () {
+                    _processMessage("Dê um exemplo de verso usando a rima: ${_rhymesController.suggestions[_currentSuggestionIndex]}");
+                  },
+                ),
+              ),
+
             if (_configuracaoFinalizada)
               Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: _buildEstudioToolbar(activeColor),
               ),
-            // Padding ajustado para o ChatBottomBar
             Padding(
               padding: const EdgeInsets.fromLTRB(15, 5, 15, 15),
               child: ChatBottomBar(

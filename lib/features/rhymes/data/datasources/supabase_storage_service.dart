@@ -28,20 +28,19 @@ class SupabaseStorageService {
       'content': content,
       'original_hash': hash,
       'current_owner_wallet': wallet,
-      'author_id': user.id,
+      'author_id': user.id, // Mantido author_id conforme estrutura de works
       'created_at': DateTime.now().toIso8601String(),
       'status': 'original',
-      // Armazena as rimas para análise de tendências futura
       'meta_data': {
         'used_rhymes': usedRhymes ?? [],
-        'versin_version': '1.0.0-genesis',
+        'versin_version': '2.8.0-production', // Atualizado para a versão do Schema
       },
     };
 
     try {
       await _supabase.from('works').insert(newWork);
 
-      // LOGICA REAL: Se houver rimas, incrementamos o score global delas agora
+      // Lógica de incremento de score global via RPC
       if (usedRhymes != null && usedRhymes.isNotEmpty) {
         for (var rhyme in usedRhymes) {
           await _supabase.rpc(
@@ -58,16 +57,28 @@ class SupabaseStorageService {
     }
   }
 
-  /// Salva uma letra isolada e seu hash (utilizado pelo botão Finalizar da ChatPage)
-  Future<void> saveLyric(String content, String hash) async {
+  /// Salva uma letra no histórico (Utilizado pelo botão Finalizar)
+  /// Atualizado para incluir BPM e metadados do Schema V2.8
+  Future<void> saveLyric({
+    required String content,
+    required String hash,
+    int bpm = 120,
+    String? vibe,
+    String? theme,
+    String? structure,
+  }) async {
     final user = _supabase.auth.currentUser;
     if (user == null) return;
 
     try {
       await _supabase.from('lyrics_history').insert({
-        'profile_id': user.id,
+        'user_id': 
         'content': content,
         'hash_signature': hash,
+        'bpm': bpm,
+        'vibe': vibe,
+        'theme': theme,
+        'structure': structure,
         'created_at': DateTime.now().toIso8601String(),
       });
       print("✅ Letra salva no histórico do Versin.");
@@ -76,6 +87,7 @@ class SupabaseStorageService {
     }
   }
 
+  /// Transfere a posse de uma obra assinada
   Future<void> transferOwnership(
     String workHash,
     String newDestinationWallet,
@@ -96,6 +108,7 @@ class SupabaseStorageService {
     }
   }
 
+  /// Lista obras por carteira do proprietário
   Future<List<dynamic>> listWorksByOwner(String username) async {
     final wallet = "wallet@$username";
     try {

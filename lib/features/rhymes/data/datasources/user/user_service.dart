@@ -3,52 +3,72 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 class UserService {
   final _supabase = Supabase.instance.client;
 
-  // 1. CRIAR CONTA E WALLET
-  Future<void> createUser(String username) async {
+  // Retorna o ID do usuário logado para evitar buscas repetitivas
+  String? get _currentUserId => _supabase.auth.currentUser?.id;
+
+  // 1. CRIAR OU ATUALIZAR PERFIL
+  // O trigger 'on_auth_user_created' no seu SQL já cria o perfil automaticamente.
+  // Este método agora serve para completar dados como a wallet.
+  Future<void> updateWallet(String username) async {
+    if (_currentUserId == null) return;
+
     final wallet = "wallet@$username";
-    await _supabase.from('profiles').insert({
-      'username': username,
+    await _supabase.from('profiles').update({
+      'username': username, // Garante que o username esteja atualizado
       'wallet_address': wallet,
-    });
+    }).eq('id', _currentUserId!);
   }
 
-  // 2. SALVAR MEMÓRIA DA IA (O estilo do João, as gírias, etc)
-  Future<void> updateIAMemory(String username, String newMemory) async {
+  // 2. SALVAR MEMÓRIA DA IA
+  // Alterado para usar o ID autenticado, garantindo que um usuário não altere a memória de outro.
+  Future<void> updateIAMemory(String newMemory) async {
+    if (_currentUserId == null) return;
+
     await _supabase
         .from('profiles')
         .update({'ia_memory': newMemory})
-        .eq('username', username);
+        .eq('id', _currentUserId!);
   }
 
   // 3. SALVAR FAVORITO (Pesquisa + Resposta + Data)
-  Future<void> saveToFavorites(
-    String username,
-    String query,
-    String response,
-  ) async {
-    // Primeiro pegamos o ID do perfil pelo username
-    final profile = await _supabase
-        .from('profiles')
-        .select('id')
-        .eq('username', username)
-        .single();
 
-    await _supabase.from('favorites').insert({
-      'profile_id': profile['id'],
-      'query': query,
-      'response': response,
-    });
-    print("⭐ Salvo nos favoritos!");
+  Future<void> saveToFavorites({
+    required String query,
+    required String response,
+  }) async {
+    if (_currentUserId == null) return;
+
+    try {
+      await _supabase.from('favorites').insert({
+        'user_id': _currentUserId, 
+        'query': query,
+        'response': response,
+      });
+      print("⭐ Salvo nos favoritos!");
+    } catch (e) {
+      print("Erro ao favoritar: $e");
+    }
   }
 
   // 4. SALVAR CONFIGURAÇÕES
-  Future<void> updateSettings(
-    String username,
-    Map<String, dynamic> newSettings,
-  ) async {
+  Future<void> updateSettings(Map<String, dynamic> newSettings) async {
+    if (_currentUserId == null) return;
+
     await _supabase
         .from('profiles')
         .update({'settings': newSettings})
-        .eq('username', username);
+        .eq('id', _currentUserId!);
+  }
+
+  // 5. BUSCAR DADOS DO PERFIL (Útil para o Header/Drawer)
+  Future<Map<String, dynamic>?> getProfileData() async {
+    if (_currentUserId == null) return null;
+
+    final data = await _supabase
+        .from('profiles')
+        .select()
+        .eq('id', _currentUserId!)
+        .single();
+    return data;
   }
 }

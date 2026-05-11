@@ -1,0 +1,5 @@
+- criptografia local
+- hash SHA-256
+- autenticação JWT
+- backup
+- controle de acesso

@@ -10,6 +10,11 @@ class ChatListView extends StatelessWidget {
   final Color activeColor;
   final int secondsActive;
 
+  // ESTES SÃO OS PARÂMETROS QUE ESTÃO FALTANDO NO SEU ARQUIVO ATUAL:
+  final bool isBpmPlaying;
+  final int currentBpm;
+  final VoidCallback onToggleBpm;
+
   const ChatListView({
     super.key,
     required this.isInitializing,
@@ -17,24 +22,24 @@ class ChatListView extends StatelessWidget {
     required this.isAiTyping,
     required this.scrollController,
     required this.activeColor,
+    required this.isBpmPlaying, // Adicionado
+    required this.currentBpm,   // Adicionado
+    required this.onToggleBpm,  // Adicionado
     this.secondsActive = 0,
   });
 
   @override
   Widget build(BuildContext context) {
-    // Exibe o card de boas-vindas se estiver inicializando ou se o chat estiver vazio
     if (isInitializing || (messages.isEmpty && !isAiTyping)) {
       return ChatWelcomeCard(activeColor: activeColor);
     }
 
     return ListView.builder(
       controller: scrollController,
-      // clipBehavior hardEdge garante que a lista respeite os limites do SafeAre/Expanded
       clipBehavior: Clip.hardEdge,
       physics: const AlwaysScrollableScrollPhysics(
         parent: BouncingScrollPhysics(),
       ),
-      // Padding bottom de 120 para garantir que a última linha da letra não fique coberta pela BottomBar
       padding: const EdgeInsets.fromLTRB(16, 5, 16, 120),
       itemCount: messages.length + (isAiTyping ? 1 : 0),
       itemBuilder: (context, index) {
@@ -46,7 +51,6 @@ class ChatListView extends StatelessWidget {
         final Widget? customWidget = message['customWidget'];
 
         return Padding(
-          // Espaçamento vertical entre blocos de mensagens e versos
           padding: const EdgeInsets.only(bottom: 12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -54,15 +58,17 @@ class ChatListView extends StatelessWidget {
             children: [
               ChatMessageBubble(
                 message: {
-                  "role": message["role"] ?? "assistant",
-                  // Garante que o conteúdo preserve as quebras de linha (\n) do editor
+                  "role": message["role"]?.toString() ?? "assistant",
                   "content": message["content"]?.toString() ?? "",
                 },
                 activeColor: activeColor,
+                // REPASSANDO PARA A BOLHA DE MENSAGEM:
+                isBpmPlaying: isBpmPlaying,
+                currentBpm: currentBpm,
+                onToggleBpm: onToggleBpm,
               ),
               if (customWidget != null)
                 Padding(
-                  // Margem específica para widgets injetados (ex: MoodSelectorSlider)
                   padding: const EdgeInsets.fromLTRB(8, 12, 8, 8),
                   child: customWidget,
                 ),
@@ -74,7 +80,6 @@ class ChatListView extends StatelessWidget {
   }
 
   Widget _buildTypingIndicator(Color color) {
-    // Feedback dinâmico para o usuário enquanto a IA processa os versos
     String mainMessage = "Versin analisando...";
     String subMessage = "processando métrica e rimas...";
 
@@ -87,7 +92,6 @@ class ChatListView extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.start,
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
             padding: const EdgeInsets.all(8),
@@ -114,7 +118,6 @@ class ChatListView extends StatelessWidget {
                   color: Colors.white70,
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  letterSpacing: 0.5,
                 ),
               ),
               Text(

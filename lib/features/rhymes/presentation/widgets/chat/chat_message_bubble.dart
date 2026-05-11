@@ -3,14 +3,22 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:markdown/markdown.dart' as md;
 
 class ChatMessageBubble extends StatefulWidget {
-  final Map<String, String> message;
+  final Map<String, dynamic> message;
   final Color activeColor;
   final Function(String word)? onAddRhyme;
+  
+  // Parâmetros mantidos no construtor para evitar erros de compilação na ChatPage
+  final bool isBpmPlaying;
+  final int currentBpm;
+  final VoidCallback onToggleBpm;
 
   const ChatMessageBubble({
     super.key,
     required this.message,
     required this.activeColor,
+    required this.isBpmPlaying,
+    required this.currentBpm,
+    required this.onToggleBpm,
     this.onAddRhyme,
   });
 
@@ -33,38 +41,42 @@ class _ChatMessageBubbleState extends State<ChatMessageBubble> {
           maxWidth: MediaQuery.of(context).size.width * 0.85,
         ),
         decoration: BoxDecoration(
-          // Fundo escuro para o usuário e transparente para a IA (estilo clean)
+          // Fundo para o usuário, transparente para a IA conforme seu estilo original
           color: isUser ? const Color(0xFF2D2D2D) : Colors.transparent,
           borderRadius: BorderRadius.circular(18),
         ),
-        child: isUser
-            ? Text(
-                content,
-                style: const TextStyle(color: Colors.white, fontSize: 15),
-              )
-            : MarkdownBody(
-                data: content,
-                builders: {
-                  'word': RhymeTagBuilder(
-                    activeColor: widget.activeColor,
-                    onTap: (word) => widget.onAddRhyme?.call(word),
+        child: Column(
+          crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          children: [
+            isUser
+                ? Text(
+                    content,
+                    style: const TextStyle(color: Colors.white, fontSize: 15),
+                  )
+                : MarkdownBody(
+                    data: content,
+                    builders: {
+                      'word': RhymeTagBuilder(
+                        activeColor: widget.activeColor,
+                        onTap: (word) => widget.onAddRhyme?.call(word),
+                      ),
+                    },
+                    inlineSyntaxes: [RhymeSyntax()],
+                    styleSheet: MarkdownStyleSheet(
+                      p: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        height: 1.5,
+                      ),
+                    ),
                   ),
-                },
-                inlineSyntaxes: [RhymeSyntax()],
-                styleSheet: MarkdownStyleSheet(
-                  p: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    height: 1.5,
-                  ),
-                ),
-              ),
+          ],
+        ),
       ),
     );
   }
 }
 
-// O Syntax continua existindo para não quebrar o Markdown, mas o Builder mudou
 class RhymeSyntax extends md.InlineSyntax {
   RhymeSyntax() : super(r'\[WORD:(.*?)\]');
 
@@ -87,23 +99,18 @@ class RhymeTagBuilder extends MarkdownElementBuilder {
   @override
   Widget? visitElementAfter(md.Element element, TextStyle? preferredStyle) {
     final textContent = element.textContent;
-
-    // Limpa a palavra caso venha com o significado (ex: amor --> afeto)
     final parts = textContent.split('-->');
     final word = parts[0].trim();
 
-    // RETIRADO: ActionChip, Ícone de "+" e Fundo Roxo.
-    // AGORA: Apenas um texto clicável e elegante.
     return InkWell(
       onTap: () => onTap(word),
       borderRadius: BorderRadius.circular(4),
       child: Text(
         word,
         style: const TextStyle(
-          color: Colors.white, // Texto branco
+          color: Colors.white,
           fontWeight: FontWeight.bold,
-          decoration: TextDecoration
-              .underline, // Sublinhado discreto para indicar clique
+          decoration: TextDecoration.underline,
           decorationColor: Colors.white24,
         ),
       ),

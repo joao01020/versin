@@ -2,8 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-// REPOSITÓRIO E CONTROLLER
-import 'package:versin/features/rhymes/data/repositories/studio_repository.dart';
+// CONTROLLER (Centralizador de lógica)
 import 'package:versin/features/rhymes/presentation/controller/rhymes_controller.dart';
 
 // COMPONENTES EXTRAÍDOS E MODAIS
@@ -33,7 +32,6 @@ class _ChatPageState extends State<ChatPage> {
   // --- CONTROLLERS E ESTADOS CORE ---
   final _messageController = TextEditingController();
   final RhymesController _rhymesController = RhymesController();
-  final StudioRepository _studioRepo = StudioRepository(); 
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final ScrollController _scrollController = ScrollController();
 
@@ -60,8 +58,6 @@ class _ChatPageState extends State<ChatPage> {
     _startAuthTimer();
     _rhymesController.fetchTrendingWords();
   }
-
-  // --- MÉTODOS DE INICIALIZAÇÃO ---
 
   void _initializeLogic() {
     _rhymesController.updateGamification(0.0);
@@ -98,7 +94,6 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   // --- GESTÃO DE SESSÃO ---
-
   void _checkInitialSession() {
     final session = Supabase.instance.client.auth.currentSession;
     if (session != null) _authModalTimer?.cancel();
@@ -124,10 +119,8 @@ class _ChatPageState extends State<ChatPage> {
     });
   }
 
-  // --- LÓGICA DE ESTÚDIO E ÁUDIO ---
-
+  // --- LÓGICA DE ESTÚDIO ---
   void _toggleBpm() {
-    // Agora o controller gerencia o loop de som e o estado isBpmPlaying
     _rhymesController.toggleMetronome();
   }
 
@@ -139,37 +132,24 @@ class _ChatPageState extends State<ChatPage> {
     });
   }
 
-  Future<void> _iniciarSessaoNoBanco() async {
+  Future<void> _finalizarConfiguracaoEstudio() async {
     setState(() {
       messages.clear(); 
       _configuracaoFinalizada = true; 
       _isAiTyping = true;
     });
 
-    try {
-      await _studioRepo.inserirSessaoNoBanco(
-        bpm: _rhymesController.currentBpm,
-        structure: _lastConfirmedStructure,
-        theme: _messageController.text.isNotEmpty ? _messageController.text : "Tema Livre",
-        vibe: _rhymesController.selectedVibe,
-        technique: _rhymesController.selectedTechnique,
-      );
-
-      setState(() {
-        messages.add({
-          "role": "assistant",
-          "content": "✨ **Estúdio Configurado!**\nSua sessão foi salva. Manda ver na composição!",
-        });
+    // O Controller agora cuida da inteligência de início
+    setState(() {
+      messages.add({
+        "role": "assistant",
+        "content": "✨ **Estúdio Configurado!**\nSua sessão foi iniciada no seu workflow profissional. Manda ver!",
       });
-      _processMessage("O estúdio está pronto. Vamos começar a letra?");
-    } catch (e) {
-      debugPrint("Erro ao salvar: $e");
-      setState(() => _isAiTyping = false);
-    }
+    });
+    _processMessage("O estúdio está pronto. Vamos começar a letra?");
   }
 
   // --- FLUXO DE MENSAGENS ---
-
   void _processMessage(String text) async {
     if (text.isEmpty) return;
     setState(() {
@@ -178,9 +158,7 @@ class _ChatPageState extends State<ChatPage> {
     });
     _scrollToBottom();
 
-    final response = await _rhymesController.fetchAiResponse(
-      "$text [Contexto: ${_rhymesController.selectedVibe}, ${_rhymesController.selectedTechnique}, ${_rhymesController.currentBpm} BPM]",
-    );
+    final response = await _rhymesController.fetchAiResponse(text);
 
     if (mounted) {
       setState(() {
@@ -222,7 +200,7 @@ class _ChatPageState extends State<ChatPage> {
                   _rhymesController.updateStudioConfig(vibe: nome);
                 } else {
                   _rhymesController.updateStudioConfig(technique: nome);
-                  _iniciarSessaoNoBanco();
+                  _finalizarConfiguracaoEstudio();
                 }
               },
             ),
@@ -289,17 +267,17 @@ class _ChatPageState extends State<ChatPage> {
             
             if (_rhymesController.isRhymeMode && _rhymesController.suggestions.isNotEmpty)
               SuggestionBalloon(
-                suggestion: _rhymesController.suggestions[_currentSuggestionIndex],
+                suggestion: _rhymesController.suggestions[_currentSuggestionIndex % _rhymesController.suggestions.length],
                 onTap: () {
                   setState(() {
-                    _messageController.text += " ${_rhymesController.suggestions[_currentSuggestionIndex]} ";
+                    _messageController.text += " ${_rhymesController.suggestions[_currentSuggestionIndex % _rhymesController.suggestions.length]} ";
                     _rhymesController.clearSuggestions();
                   });
                 },
                 onDismiss: () => _rhymesController.clearSuggestions(),
-                onNext: () => setState(() => _currentSuggestionIndex = (_currentSuggestionIndex + 1) % _rhymesController.suggestions.length),
-                onPrevious: () => setState(() => _currentSuggestionIndex = (_currentSuggestionIndex - 1 + _rhymesController.suggestions.length) % _rhymesController.suggestions.length),
-                onAddCommand: () => _processMessage("Exemplo de verso com: ${_rhymesController.suggestions[_currentSuggestionIndex]}"),
+                onNext: () => setState(() => _currentSuggestionIndex++),
+                onPrevious: () => setState(() => _currentSuggestionIndex--),
+                onAddCommand: () => _processMessage("Me dê um exemplo de rima com: ${_rhymesController.suggestions[_currentSuggestionIndex % _rhymesController.suggestions.length]}"),
               ),
 
             StudioToolbar(

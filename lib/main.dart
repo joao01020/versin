@@ -4,6 +4,8 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 // CAMINHO CORRIGIDO ABAIXO:
 import 'package:versin/features/rhymes/presentation/controller/auth_wrapper/auth_wrapper.dart';
+// Importação do novo serviço de sincronização
+import 'package:versin/core/services/sync_manager.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -19,6 +21,10 @@ void main() async {
       authFlowType: AuthFlowType.implicit,
     ),
   );
+
+  // 3. Inicializa o monitor de persistência offline
+  // Isso garante que o app comece a "ouvir" a internet imediatamente
+  SyncManager().watchConnection();
 
   runApp(const MyApp());
 }

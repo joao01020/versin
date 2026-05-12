@@ -4,7 +4,7 @@ import 'package:versin/features/rhymes/presentation/pages/drawer/vocabulary/page
 import 'package:versin/features/rhymes/presentation/pages/drawer/settings/settings_page.dart';
 import 'package:versin/features/rhymes/presentation/pages/drawer/how_to_use/how_to_use_page.dart';
 
-// Importações atualizadas com o caminho completo (Package) e subpastas
+// Importações de funcionalidades do Drawer
 import 'package:versin/features/rhymes/presentation/pages/drawer/match/match_page.dart';
 import 'package:versin/features/rhymes/presentation/pages/drawer/history/history_page.dart';
 import 'package:versin/features/rhymes/presentation/pages/drawer/showcase/showcase_page.dart';
@@ -85,7 +85,7 @@ class VersinDrawer extends StatelessWidget {
 
           const SizedBox(height: 10),
 
-          // SEÇÃO DE AÇÕES
+          // SEÇÃO DE AÇÕES - NOVO PROJETO (REINICIA WORKFLOW)
           ListTile(
             leading: const Icon(Icons.add_box_outlined, color: Colors.white70),
             title: const Text(
@@ -93,7 +93,9 @@ class VersinDrawer extends StatelessWidget {
               style: TextStyle(color: Colors.white, fontSize: 14),
             ),
             onTap: () {
+              // Dispara a limpeza de estado e reinício do WelcomeFlow na ChatPage
               onNewChat();
+              // Fecha o drawer para focar na sequência de configuração no chat
               Navigator.pop(context);
             },
           ),
@@ -134,7 +136,7 @@ class VersinDrawer extends StatelessWidget {
             },
           ),
 
-          // --- VERSIN MATCH: ARTISTAS & BEATMAKERS ---
+          // VERSIN MATCH
           ListTile(
             leading: const Icon(
               Icons.compare_arrows_rounded,

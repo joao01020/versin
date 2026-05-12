@@ -1,16 +1,22 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:sqflite/sqflite.dart';
 
-// CONTROLLER (Centralizador de lógica)
+// PERSISTÊNCIA CORE
+import 'package:versin/core/database/database_helper.dart';
+
+// SERVIÇOS E REPOSITÓRIOS
+import 'package:versin/features/rhymes/domain/services/session_service.dart';
+import 'package:versin/features/rhymes/presentation/widgets/project_check_modal/project_check_modal.dart';
+
+// CONTROLLER
 import 'package:versin/features/rhymes/presentation/controller/rhymes_controller.dart';
 
-// COMPONENTES EXTRAÍDOS E MODAIS
+// COMPONENTES
 import 'package:versin/features/rhymes/presentation/pages/components/chat/studio_toolbar.dart';
 import 'package:versin/features/rhymes/presentation/pages/components/chat/structure_editor_modal.dart';
 import 'package:versin/features/rhymes/presentation/widgets/common/versin_bottom_menu.dart';
-
-// COMPONENTES DE UI CORE
 import 'package:versin/features/rhymes/presentation/widgets/versin_drawer/versin_drawer.dart';
 import 'package:versin/features/rhymes/presentation/pages/components/header/chat_header.dart';
 import 'package:versin/features/rhymes/presentation/pages/components/chat/chat_list_view.dart';
@@ -23,27 +29,23 @@ import 'package:versin/features/rhymes/presentation/pages/components/chat/sugges
 
 class ChatPage extends StatefulWidget {
   const ChatPage({super.key});
-
   @override
   State<ChatPage> createState() => _ChatPageState();
 }
 
 class _ChatPageState extends State<ChatPage> {
-  // --- CONTROLLERS E ESTADOS CORE ---
   final _messageController = TextEditingController();
   final RhymesController _rhymesController = RhymesController();
+  final SessionService _sessionService = SessionService(); 
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final ScrollController _scrollController = ScrollController();
-
+  
   Timer? _authModalTimer;
   StreamSubscription<AuthState>? _authSubscription;
-
   List<Map<String, dynamic>> messages = [];
   bool _isAiTyping = false;
   bool _isInitializing = true;
   int _currentSuggestionIndex = 0;
-
-  // --- ESTADOS DO MENU DE ESTÚDIO ---
   bool _configuracaoFinalizada = false; 
   String _lastConfirmedStructure = "";
 
@@ -65,14 +67,16 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   void _handleControllerChanges() {
-    if (mounted) setState(() {});
+    if (mounted) {
+      _autosaveProject();
+      setState(() {});
+    }
   }
 
   void _setupListeners() {
     _messageController.addListener(() {
       final text = _messageController.text;
       _rhymesController.onTextChanged(text);
-      
       if (_rhymesController.currentStep == 2) {
         int lines = text.split('\n').where((l) => l.trim().isNotEmpty).length;
         double progress = (lines / 5).clamp(0.0, 1.0);
@@ -82,9 +86,81 @@ class _ChatPageState extends State<ChatPage> {
     });
   }
 
+  // --- PERSISTÊNCIA E VERIFICAÇÃO ---
+  
+  Future<void> _autosaveProject() async {
+    final db = await DatabaseHelper.instance.database;
+    final user = Supabase.instance.client.auth.currentUser;
+    
+    await db.insert('rhymes', {
+      'id': 'current_session',
+      'content': _messageController.text,
+      'bpm': _rhymesController.currentBpm,
+      'genre': _rhymesController.selectedVibe, 
+      'mood': _rhymesController.selectedTechnique,
+      'status': _configuracaoFinalizada ? 'active' : 'draft',
+      'created_at': DateTime.now().toIso8601String(),
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
+
+    if (user != null) {
+      await db.insert('user_profile', {
+        'id': user.id,
+        'name': user.userMetadata?['full_name'] ?? 'Artista',
+        'wallet': 'wallet@${user.email?.split('@')[0]}',
+        'synced': 0
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+  }
+
   Future<void> _loadInitialData() async {
+    final pendingProject = await _sessionService.hasPendingSession();
+
+    if (pendingProject != null && mounted) {
+      ProjectCheckModal.show(
+        context,
+        project: pendingProject,
+        onResume: () => _resumeProject(pendingProject),
+        onDiscard: () => _startNewFreshProject(),
+      );
+    } else {
+      _startNewFreshProject();
+    }
+
     await _rhymesController.carregarDadosUsuario();
+  }
+
+  void _resumeProject(Map<String, dynamic> project) {
+    setState(() {
+      _messageController.text = project['content'] ?? "";
+      _rhymesController.updateStudioConfig(
+        bpm: project['bpm'] ?? 140, // Padrão Trap se nulo
+        vibe: project['genre'] ?? "Trap",
+        technique: project['mood'] ?? "Agressiva"
+      );
+      _configuracaoFinalizada = true; 
+      _isInitializing = false;
+      messages.add({
+        "role": "assistant",
+        "content": "✨ **Workflow Restaurado.** O estúdio está pronto para continuar a letra.",
+      });
+    });
+    _rhymesController.updateProgress(4, 1.0);
+    _scrollToBottom();
+  }
+
+  void _startNewFreshProject() async {
+    await _sessionService.startFreshSession();
+    
+    // ATUALIZAÇÃO: Garante que as configs padrão apareçam mesmo sem projeto anterior
     if (mounted) {
+      setState(() {
+        _rhymesController.updateStudioConfig(
+          bpm: 140, // BPM Sugerido para Trap
+          vibe: "Trap",
+          technique: "Melódica"
+        );
+      });
+
       ChatInitializer.run(
         mounted: mounted,
         onLoadingStatusChanged: (status) => setState(() => _isInitializing = status),
@@ -93,7 +169,6 @@ class _ChatPageState extends State<ChatPage> {
     }
   }
 
-  // --- GESTÃO DE SESSÃO ---
   void _checkInitialSession() {
     final session = Supabase.instance.client.auth.currentSession;
     if (session != null) _authModalTimer?.cancel();
@@ -104,6 +179,7 @@ class _ChatPageState extends State<ChatPage> {
       if (data.event == AuthChangeEvent.signedIn && data.session != null) {
         _authModalTimer?.cancel();
         _rhymesController.carregarDadosUsuario();
+        _autosaveProject();
       }
       if (data.event == AuthChangeEvent.signedOut) _startAuthTimer();
     });
@@ -119,10 +195,7 @@ class _ChatPageState extends State<ChatPage> {
     });
   }
 
-  // --- LÓGICA DE ESTÚDIO ---
-  void _toggleBpm() {
-    _rhymesController.toggleMetronome();
-  }
+  void _toggleBpm() => _rhymesController.toggleMetronome();
 
   void _enviarEstruturaParaChat(List<String> blocos) {
     String textoEstrutura = blocos.map((b) => "[$b]\n\n\n\n").join("\n");
@@ -130,6 +203,7 @@ class _ChatPageState extends State<ChatPage> {
       _messageController.text = textoEstrutura;
       _messageController.selection = TextSelection.fromPosition(const TextPosition(offset: 0));
     });
+    _autosaveProject();
   }
 
   Future<void> _finalizarConfiguracaoEstudio() async {
@@ -138,8 +212,6 @@ class _ChatPageState extends State<ChatPage> {
       _configuracaoFinalizada = true; 
       _isAiTyping = true;
     });
-
-    // O Controller agora cuida da inteligência de início
     setState(() {
       messages.add({
         "role": "assistant",
@@ -147,9 +219,9 @@ class _ChatPageState extends State<ChatPage> {
       });
     });
     _processMessage("O estúdio está pronto. Vamos começar a letra?");
+    _autosaveProject();
   }
 
-  // --- FLUXO DE MENSAGENS ---
   void _processMessage(String text) async {
     if (text.isEmpty) return;
     setState(() {
@@ -157,9 +229,7 @@ class _ChatPageState extends State<ChatPage> {
       _isAiTyping = true;
     });
     _scrollToBottom();
-
     final response = await _rhymesController.fetchAiResponse(text);
-
     if (mounted) {
       setState(() {
         messages.add(response);
@@ -214,11 +284,8 @@ class _ChatPageState extends State<ChatPage> {
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 400),
-          curve: Curves.easeOut,
-        );
+        _scrollController.animateTo(_scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 400), curve: Curves.easeOut);
       }
     });
   }
@@ -226,7 +293,6 @@ class _ChatPageState extends State<ChatPage> {
   @override
   Widget build(BuildContext context) {
     final activeColor = _rhymesController.getActiveColor();
-
     return Scaffold(
       key: _scaffoldKey,
       backgroundColor: const Color(0xFF0F0F0F),
@@ -245,12 +311,30 @@ class _ChatPageState extends State<ChatPage> {
       body: SafeArea(
         child: Column(
           children: [
-            VersinTimeline(
-              currentStep: _rhymesController.currentStep,
-              stepProgress: _rhymesController.stepProgress,
-              activeColor: activeColor,
-            ),
+            VersinTimeline(currentStep: _rhymesController.currentStep, stepProgress: _rhymesController.stepProgress, activeColor: activeColor),
             ChatHeader(activeColor: activeColor, rhymesController: _rhymesController, scaffoldKey: _scaffoldKey),
+            
+            // Header: Exibe sempre que houver uma config (mesmo inicial)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+              decoration: BoxDecoration(
+                color: Colors.black,
+                border: Border(bottom: BorderSide(color: activeColor.withOpacity(0.3), width: 0.5)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.mic_none, color: activeColor, size: 14),
+                  const SizedBox(width: 8),
+                  Text(
+                    "ESTÚDIO: ${_rhymesController.selectedVibe.toUpperCase()} | ${_rhymesController.selectedTechnique.toUpperCase()} | ${_rhymesController.currentBpm} BPM",
+                    style: TextStyle(color: activeColor, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.2),
+                  ),
+                ],
+              ),
+            ),
+
             Expanded(
               child: ChatListView(
                 isInitializing: _isInitializing,
@@ -264,7 +348,6 @@ class _ChatPageState extends State<ChatPage> {
                 onToggleBpm: _toggleBpm,
               ),
             ),
-            
             if (_rhymesController.isRhymeMode && _rhymesController.suggestions.isNotEmpty)
               SuggestionBalloon(
                 suggestion: _rhymesController.suggestions[_currentSuggestionIndex % _rhymesController.suggestions.length],
@@ -279,37 +362,25 @@ class _ChatPageState extends State<ChatPage> {
                 onPrevious: () => setState(() => _currentSuggestionIndex--),
                 onAddCommand: () => _processMessage("Me dê um exemplo de rima com: ${_rhymesController.suggestions[_currentSuggestionIndex % _rhymesController.suggestions.length]}"),
               ),
-
+            
+            // StudioToolbar: Sempre visível para facilitar o workflow
             StudioToolbar(
-              configuracaoFinalizada: _configuracaoFinalizada,
+              configuracaoFinalizada: true, 
               currentBpm: _rhymesController.currentBpm,
               selectedVibe: _rhymesController.selectedVibe,
               selectedTechnique: _rhymesController.selectedTechnique,
               activeColor: activeColor,
               onShowStructure: () => StructureEditorModal.show(
-                context: context,
-                initialStructure: _lastConfirmedStructure,
-                activeColor: activeColor,
+                context: context, initialStructure: _lastConfirmedStructure, activeColor: activeColor,
                 onSave: (val) => setState(() => _lastConfirmedStructure = val),
                 onSendToChat: _enviarEstruturaParaChat,
-                showQuickMenu: (title, opts, onSelect) => VersinBottomMenu.show(
-                  context: context,
-                  title: title,
-                  options: opts,
-                  onSelect: onSelect,
-                ),
+                showQuickMenu: (title, opts, onSelect) => VersinBottomMenu.show(context: context, title: title, options: opts, onSelect: onSelect),
               ),
-              onShowMenu: (title, opts, onSelect) => VersinBottomMenu.show(
-                context: context,
-                title: title,
-                options: opts,
-                onSelect: onSelect,
-              ),
+              onShowMenu: (title, opts, onSelect) => VersinBottomMenu.show(context: context, title: title, options: opts, onSelect: onSelect),
               onBpmChanged: (val) => _rhymesController.updateStudioConfig(bpm: val),
               onTechniqueChanged: (val) => _rhymesController.updateStudioConfig(technique: val),
               onVibeChanged: (val) => _rhymesController.updateStudioConfig(vibe: val),
             ),
-
             ChatBottomBar(
               messageController: _messageController,
               rhymesController: _rhymesController,

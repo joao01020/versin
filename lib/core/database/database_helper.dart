@@ -15,27 +15,53 @@ class DatabaseHelper {
   Future<Database> _initDB(String filePath) async {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, filePath);
-    return await openDatabase(path, version: 1, onCreate: _createDB);
+    
+    // Versão incrementada para 2 para suportar a nova coluna de nome
+    return await openDatabase(
+      path, 
+      version: 2, 
+      onCreate: _createDB,
+      onUpgrade: _upgradeDB,
+    );
   }
 
   Future _createDB(Database db, int version) async {
     await db.execute('''
       CREATE TABLE offline_rhymes (id TEXT PRIMARY KEY, word TEXT, synced INTEGER)
     ''');
+    
+    // Tabela projects agora inclui o campo 'name' para o título do projeto
     await db.execute('''
-      CREATE TABLE projects (id TEXT PRIMARY KEY, lyrics TEXT, bpm INTEGER, vibe TEXT, technique TEXT, synced INTEGER)
+      CREATE TABLE projects (
+        id TEXT PRIMARY KEY, 
+        name TEXT, 
+        lyrics TEXT, 
+        bpm INTEGER, 
+        vibe TEXT, 
+        technique TEXT, 
+        synced INTEGER
+      )
     ''');
+    
     await db.execute('''
       CREATE TABLE user_profile (id TEXT PRIMARY KEY, name TEXT, wallet TEXT, synced INTEGER)
     ''');
   }
+
+  // Função para atualizar bancos de dados existentes sem perder dados
+  Future _upgradeDB(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      // Adiciona a coluna name se ela não existir (para quem já tem a V1 instalada)
+      await db.execute('ALTER TABLE projects ADD COLUMN name TEXT DEFAULT "SEM TÍTULO"');
+    }
+  }
 }
 
-// Linha 30: Estrutura preparada para persistência total (letras e wallet)
-// Linha 31: Tabela 'projects' armazena o estado atual do seu estúdio
-// Linha 32: Tabela 'user_profile' guarda os dados de acesso e carteira
-// Linha 33: Campo 'synced' em todas as tabelas para controle do SyncManager
-// Linha 34: Responsabilidade técnica: Garantia de dados offline first
-// Linha 35: Próximo passo: Atualizar o SyncManager para estas novas tabelas
-// Linha 36: Integração com Supabase facilitada via IDs únicos
-// Linha 37: Fim do arquivo DatabaseHelper atualizado.
+// Linha 30: Estrutura atualizada para incluir 'name' na tabela projects
+// Linha 31: Versão do banco subida para 2 para gatilho de atualização automática
+// Linha 32: Tabela 'projects' sincronizada com o header editável da ChatPage
+// Linha 33: Campo 'name' com valor padrão para evitar erros de nulo
+// Linha 34: Responsabilidade técnica: Persistência do título do projeto offline
+// Linha 35: Mantido o campo 'synced' para o fluxo do SyncManager
+// Linha 36: OnUpgrade implementado para garantir integridade dos dados antigos
+// Linha 37: Fim do arquivo DatabaseHelper sincronizado.

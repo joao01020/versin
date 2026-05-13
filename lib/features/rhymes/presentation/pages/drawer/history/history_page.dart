@@ -12,7 +12,7 @@ class HistoryPage extends StatefulWidget {
 class _HistoryPageState extends State<HistoryPage> {
   final _supabase = Supabase.instance.client;
 
-  // STREAM ATUALIZADA: Usa 'user_id' conforme o seu SQL Schema V2.8
+  // STREAM SINCRONIZADA: Ouve mudanças em tempo real na tabela do Supabase
   Stream<List<Map<String, dynamic>>> _getHistoryStream() {
     final userId = _supabase.auth.currentUser?.id;
     if (userId == null) return Stream.value([]);
@@ -87,11 +87,13 @@ class _HistoryPageState extends State<HistoryPage> {
             itemBuilder: (context, index) {
               final item = history[index];
               
-              // Mapeamento baseado nas colunas do seu SQL V2.8
-              final bpm = item['bpm'] ?? 120;
+              // MAPEAMENTO DOS CAMPOS VINDO DA CHATPAGE (DATABASE_HELPER V2)
+              final projectName = item['name'] ?? 'SEM TÍTULO';
+              final bpm = item['bpm'] ?? 100;
               final structure = item['structure'] ?? 'N/A';
               final content = item['content'] ?? 'Sem letra registrada.';
-              final theme = item['theme'] ?? 'Geral';
+              final genre = item['genre'] ?? 'TRAP'; 
+              final mood = item['mood'] ?? 'MELÓDICO'; 
 
               return Container(
                 margin: const EdgeInsets.only(bottom: 16),
@@ -107,12 +109,18 @@ class _HistoryPageState extends State<HistoryPage> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Row(
-                          children: [
-                            _buildConfigTag("$bpm BPM", Colors.orange),
-                            const SizedBox(width: 8),
-                            _buildConfigTag(theme.toUpperCase(), Colors.purpleAccent),
-                          ],
+                        // NOME DO PROJETO COM CORREÇÃO DE PESO DA FONTE
+                        Expanded(
+                          child: Text(
+                            projectName.toUpperCase(),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w900, // CORRIGIDO: de 'black' para 'w900'
+                              letterSpacing: 1.1
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                         Text(
                           _formatDate(item['created_at']), 
@@ -120,10 +128,25 @@ class _HistoryPageState extends State<HistoryPage> {
                         ),
                       ],
                     ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        _buildConfigTag("$bpm BPM", Colors.orange),
+                        const SizedBox(width: 8),
+                        _buildConfigTag(genre.toUpperCase(), Colors.purpleAccent),
+                        const SizedBox(width: 8),
+                        _buildConfigTag(mood.toUpperCase(), Colors.cyan),
+                      ],
+                    ),
                     const SizedBox(height: 16),
                     Text(
                       content.length > 120 ? "${content.substring(0, 120)}..." : content,
-                      style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.5),
+                      style: const TextStyle(
+                        color: Colors.white70, 
+                        fontSize: 13, 
+                        height: 1.5, 
+                        fontStyle: FontStyle.italic
+                      ),
                     ),
                     const Padding(
                       padding: EdgeInsets.symmetric(vertical: 12),
@@ -131,13 +154,13 @@ class _HistoryPageState extends State<HistoryPage> {
                     ),
                     Row(
                       children: [
-                        const Icon(Icons.account_tree_outlined, size: 12, color: Colors.cyan),
+                        const Icon(Icons.account_tree_outlined, size: 12, color: Colors.white30),
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
                             "ESTRUTURA: ${structure.toUpperCase()}",
                             style: const TextStyle(
-                              color: Colors.cyan, 
+                              color: Colors.white30, 
                               fontSize: 9, 
                               fontWeight: FontWeight.bold
                             ),

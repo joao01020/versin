@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:versin/features/rhymes/presentation/pages/chat_page.dart';
+// Importação do novo Dashboard que agora gerencia os módulos
+import 'package:versin/modules/dashboard/dashboard_page.dart';
 
 class AuthWrapper extends StatefulWidget {
   const AuthWrapper({super.key});
@@ -28,8 +29,8 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
   @override
   Widget build(BuildContext context) {
-    // Aqui você pode decidir: se não tiver sessão, mostra Login.
-    // Como seu app abre no Chat e o Login é um Modal, retornamos o ChatPage.
-    return const ChatPage();
+    // Agora o ponto de entrada logado é o Dashboard universal.
+    // O Dashboard cuidará de carregar o ChatPage internamente.
+    return const DashboardPage();
   }
 }

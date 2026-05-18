@@ -7,6 +7,10 @@ import 'package:versin/features/rhymes/presentation/controller/auth_wrapper/auth
 // Importação do novo serviço de sincronização
 import 'package:versin/core/services/sync_manager.dart';
 
+// Importações dos módulos para suporte a rotas nomeadas no Web
+import 'package:versin/modules/login/login_page.dart';
+import 'package:versin/modules/dashboard/dashboard_page.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -23,7 +27,7 @@ void main() async {
   );
 
   // 3. Inicializa o monitor de persistência offline
-  // Isso garante que o app comece a "ouvir" a internet imediatamente
+  // Isso guarantees que o app comece a "ouvir" a internet imediatamente
   SyncManager().watchConnection();
 
   runApp(const MyApp());
@@ -46,8 +50,15 @@ class MyApp extends StatelessWidget {
         ),
         useMaterial3: true,
       ),
-      // O AuthWrapper agora é o ponto de entrada da árvore de widgets
+      
+      // O AuthWrapper continua sendo a raiz para verificar sessões ativas
       home: const AuthWrapper(),
+
+      // Mapeamento de rotas originais para acesso direto via URL no ambiente Web
+      routes: {
+        '/login': (context) => const LoginPage(),
+        '/dashboard': (context) => const DashboardPage(),
+      },
     );
   }
 }

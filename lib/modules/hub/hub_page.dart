@@ -1,10 +1,13 @@
+// lib/modules/hub/hub_page.dart
+
 import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:versin/modules/hub/dashboard/dashboard_hub_page.dart';
 
-// Estados visuais para a animação de busca ativa do hardware
+// Estados visuais para a animação de busca activa do hardware
 enum SearchState { idle, searching, found, notFound }
 
 class HubPage extends StatefulWidget {
@@ -32,7 +35,7 @@ class _HubPageState extends State<HubPage> with TickerProviderStateMixin {
   bool _hasRevealedOnce = false; 
   bool _isDisconnecting = false; 
   
-  // TRAVA DE SEGURANÇA LOCAL: Evita que pings concorrentes do hardware anulem o clique do usuário imediatamente
+  // TRAVA DE SEGURANÇA LOCAL
   bool _forceOffline = false;
 
   late AnimationController _globalSearchController;
@@ -55,13 +58,11 @@ class _HubPageState extends State<HubPage> with TickerProviderStateMixin {
       duration: const Duration(seconds: 3),
     );
     
-    // Varredura completa para 15 segundos (3 segundos para cada um dos 5 componentes)
     _barramentoScanController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 15),
     );
 
-    // Listener para redesenhar a árvore conforme a porcentagem sequencial avança
     _barramentoScanController.addListener(() {
       setState(() {});
     });
@@ -83,13 +84,12 @@ class _HubPageState extends State<HubPage> with TickerProviderStateMixin {
     super.dispose();
   }
 
-  // Altera o status no banco e ativa a trava local imediata
   Future<void> _disconnectHardware() async {
     if (_isDisconnecting) return;
 
     setState(() {
       _isDisconnecting = true;
-      _forceOffline = true; // Ativa na hora a trava visual independente do Supabase
+      _forceOffline = true;
     });
 
     try {
@@ -102,7 +102,6 @@ class _HubPageState extends State<HubPage> with TickerProviderStateMixin {
           .eq('id', 1);
     } catch (e) {
       debugPrint("Erro ao desconectar hardware: $e");
-      // Se der erro crítico no update, desfazemos a trava para não quebrar a UI
       setState(() {
         _forceOffline = false;
       });
@@ -115,10 +114,8 @@ class _HubPageState extends State<HubPage> with TickerProviderStateMixin {
     }
   }
 
-  // Aciona a varredura ativa ao clicar no botão centralizado
   void _startActiveHardwareSearch(bool estaOnlineAgora) {
     if (_searchState == SearchState.searching) return;
-
     _searchTimeoutTimer?.cancel();
     
     setState(() {
@@ -127,13 +124,11 @@ class _HubPageState extends State<HubPage> with TickerProviderStateMixin {
       _globalSearchController.repeat();
     });
 
-    // Simulamos uma varredura ativa na rede de 3 segundos
     _searchTimeoutTimer = Timer(const Duration(seconds: 3), () {
       setState(() {
         _isGlobalSearching = false;
         _globalSearchController.stop();
         
-        // Se a trava offline estiver ligada, o resultado será obrigatoriamente não encontrado
         if (estaOnlineAgora && !_forceOffline) {
           _searchState = SearchState.found;
         } else {
@@ -141,7 +136,6 @@ class _HubPageState extends State<HubPage> with TickerProviderStateMixin {
         }
       });
 
-      // Aguarda 4 segundos exibindo o resultado (Verde/Vermelho) antes de restaurar o padrão Roxo
       _searchTimeoutTimer = Timer(const Duration(seconds: 4), () {
         setState(() {
           _searchState = SearchState.idle;
@@ -172,7 +166,6 @@ class _HubPageState extends State<HubPage> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    // Escuta em tempo real as mudanças da linha ID 1 da tabela status_hardware no Supabase
     final supabaseStream = Supabase.instance.client
         .from('status_hardware')
         .stream(primaryKey: ['id'])
@@ -183,7 +176,6 @@ class _HubPageState extends State<HubPage> with TickerProviderStateMixin {
       body: StreamBuilder<List<Map<String, dynamic>>>(
         stream: supabaseStream,
         builder: (context, snapshot) {
-          // Estados padrões (Fallback quando o hardware estiver desligado ou carregando)
           String statusReal = "offline";
           int sinalReal = 0;
           bool estaOnlineDeVerdade = false;
@@ -191,7 +183,6 @@ class _HubPageState extends State<HubPage> with TickerProviderStateMixin {
           String mensagemStatus = "Hardware desconectado";
           String trafegoText = "0.0 KB/s";
 
-          // Se a trava local de desligamento estiver ativa, ignoramos os dados de rede entrantes
           if (_forceOffline) {
             statusReal = "offline";
             estaOnlineDeVerdade = false;
@@ -211,10 +202,8 @@ class _HubPageState extends State<HubPage> with TickerProviderStateMixin {
             } else if (dadosHardware['updated_at'] != null) {
               final DateTime updatedAt = DateTime.parse(dadosHardware['updated_at']).toUtc();
               final DateTime agoraUtc = DateTime.now().toUtc();
-              
               final int diferencaSegundos = agoraUtc.difference(updatedAt).inSeconds.abs();
 
-              // Se no banco diz online E a atualização está em uma janela aceitável de 10 minutos
               if (statusReal == 'online' && diferencaSegundos < 600) {
                 estaOnlineDeVerdade = true;
                 mensagemStatus = "Hub conectado via Apolo-system";
@@ -225,8 +214,6 @@ class _HubPageState extends State<HubPage> with TickerProviderStateMixin {
                 mensagemStatus = "Último sinal há $diferencaSegundos segundos";
               }
             }
-          } else if (snapshot.hasError) {
-            mensagemStatus = "Erro na stream: Verifique o RLS";
           }
 
           return SingleChildScrollView(
@@ -237,8 +224,13 @@ class _HubPageState extends State<HubPage> with TickerProviderStateMixin {
               children: [
                 const SizedBox(height: 10),
 
-                // CARD MASTER DE BUSCA GLOBAL INTEGRADO COM SUPABASE REAL-TIME
+                // CARD MASTER DE BUSCA GLOBAL ATUALIZADO COM O BOTÃO "SINCRONIZAR"
                 _buildMasterSearchCard(estaOnlineDeVerdade, mensagemStatus),
+
+                const SizedBox(height: 16),
+
+                // CARD DE DIRECIONAMENTO AO CENTRO DE COMANDO
+                _buildNavigationDashboardCard(),
 
                 const SizedBox(height: 20),
 
@@ -253,7 +245,7 @@ class _HubPageState extends State<HubPage> with TickerProviderStateMixin {
                           Icon(Icons.wifi_tethering, color: accentNeon.withOpacity(0.5), size: 10),
                           const SizedBox(width: 4),
                           Text(
-                            estaOnlineDeVerdade ? "Sinal Wi-Fi: $sinalReal%" : "Ancoragem Wi-Fi / Bluetooth", 
+                            estaOnlineDeVerdade ? "Sinal Wi-Fi: $sinalReal%" : "Ancoragem Wi-Fi Local", 
                             style: const TextStyle(color: Colors.white30, fontSize: 10),
                           ),
                         ],
@@ -275,14 +267,14 @@ class _HubPageState extends State<HubPage> with TickerProviderStateMixin {
                 
                 const SizedBox(height: 14),
 
-                // TELEMETRIA DE SAÚDE DA PLACA (AQUECIMENTO E MEMÓRIA)
+                // TELEMETRIA DE SAÚDE DA PLACA
                 Row(
                   children: [
                     _buildHubStatCard(
                       title: "TEMPERATURA DO CORE",
                       value: estaOnlineDeVerdade ? "41 °C" : "-- °C",
                       subtitleWidget: Text(
-                        estaOnlineDeVerdade ? "Sensor térmico operacional" : "Sensor térmico interno offline", 
+                        estaOnlineDeVerdade ? "Sensor térmico operational" : "Sensor térmico interno offline", 
                         style: const TextStyle(color: Colors.white24, fontSize: 10),
                       ),
                       icon: Icons.thermostat_outlined,
@@ -341,7 +333,6 @@ class _HubPageState extends State<HubPage> with TickerProviderStateMixin {
 
                 const SizedBox(height: 14),
 
-                // CONTAINER DE SCAN ANIMADO (RADAR DO BARRAMENTO)
                 if (_isScanning) _buildAnimatedRadarCard(),
 
                 // LISTA DE COMPONENTES INTERNOS DO DISPOSITIVO
@@ -353,7 +344,7 @@ class _HubPageState extends State<HubPage> with TickerProviderStateMixin {
 
                 const SizedBox(height: 24),
 
-                // ANALISADOR DE INTEGRIDADE FLAT + BOTÃO REATIVO COM MEMÓRIA DE TRAVA
+                // ANALISADOR DE INTEGRIDADE FLAT + BOTÃO DE DESCONEXÃO
                 _buildIntegritySpectrumCard(estaOnlineDeVerdade),
                 const SizedBox(height: 20),
               ],
@@ -364,7 +355,77 @@ class _HubPageState extends State<HubPage> with TickerProviderStateMixin {
     );
   }
 
-  // COMPONENTE: CARD MASSIVO DE BUSCA COM TRANSICÃO DINÂMICA DE CORES REATIVAS
+  // CARD DE ACESSO AO PAINEL DE CONTROLE DO HARDWARE
+  Widget _buildNavigationDashboardCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.02),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.white.withOpacity(0.05)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: accentNeon.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(Icons.dashboard_customize_outlined, color: accentNeon, size: 20),
+              ),
+              const SizedBox(width: 14),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    "Centro de Controle OLED",
+                    style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    "Gerencie telas de estúdio e rimas físicas",
+                    style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 10),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: primaryPurple.withOpacity(0.2),
+              foregroundColor: Colors.white,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              side: BorderSide(color: accentNeon.withOpacity(0.3)),
+            ),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const DashboardHubPage(),
+                ),
+              );
+            },
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text("PAINEL", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                SizedBox(width: 6),
+                Icon(Icons.arrow_forward_ios, size: 10),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // CARD MASSIVO DE BUSCA ADAPTADO COM O BOTÃO "SINCRONIZAR"
   Widget _buildMasterSearchCard(bool online, String mensagemSub) {
     Color currentBorderColor;
     Color buttonBgColor;
@@ -384,14 +445,14 @@ class _HubPageState extends State<HubPage> with TickerProviderStateMixin {
         currentBorderColor = hackerGreen.withOpacity(0.7);
         buttonBgColor = hackerGreen.withOpacity(0.2);
         buttonContentColor = hackerGreen;
-        buttonText = "DISPOSITIVO LOCALIZADO";
+        buttonText = "CONEXÃO FIRMADA";
         buttonIcon = Icons.check_circle;
         break;
       case SearchState.notFound:
         currentBorderColor = hardwareRed.withOpacity(0.7);
         buttonBgColor = hardwareRed.withOpacity(0.2);
         buttonContentColor = hardwareRed;
-        buttonText = "FALHA NA LOCALIZAÇÃO";
+        buttonText = "CHASSI NÃO ENCONTRADO";
         buttonIcon = Icons.error_outline;
         break;
       case SearchState.idle:
@@ -399,8 +460,8 @@ class _HubPageState extends State<HubPage> with TickerProviderStateMixin {
         currentBorderColor = Colors.white.withOpacity(0.06);
         buttonBgColor = primaryPurple.withOpacity(0.2);
         buttonContentColor = Colors.white;
-        buttonText = _forceOffline ? "RECONECTAR SISTEMA HUB" : "BUSCAR HARDWARE EXTERNO";
-        buttonIcon = Icons.radar;
+        buttonText = "SINCRONIZAR";
+        buttonIcon = Icons.sync_lock_rounded;
         break;
     }
 
@@ -513,7 +574,6 @@ class _HubPageState extends State<HubPage> with TickerProviderStateMixin {
                         _cancelActiveSearch();
                       } else if (_searchState == SearchState.idle) {
                         if (_forceOffline) {
-                          // Se o usuário clicar no botão principal enquanto estiver sob a trava de desligamento, nós limpamos a trava
                           setState(() {
                             _forceOffline = false;
                           });
@@ -668,82 +728,65 @@ class _HubPageState extends State<HubPage> with TickerProviderStateMixin {
                 });
               }
             },
-            child: Container(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
               width: double.infinity,
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.4),
+                color: Colors.black.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.white.withOpacity(0.05)),
+                border: Border.all(
+                  color: _revealHardwareKey ? hackerGreen.withOpacity(0.3) : Colors.white.withOpacity(0.04),
+                ),
               ),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.fingerprint, color: _hasRevealedOnce ? Colors.greenAccent : accentNeon, size: 16),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _hasRevealedOnce ? "CONTRATO DIGITAL ASSINADO" : "GERAR CHAVE DE ASSINATURA",
-                          style: TextStyle(color: _hasRevealedOnce ? Colors.greenAccent : Colors.white70, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.5),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(secureHashSeed, style: const TextStyle(color: Colors.white24, fontSize: 9, fontFamily: 'monospace')),
-                      ],
-                    ),
-                  ),
-                  Icon(Icons.touch_app, color: Colors.white12, size: 16),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: Stack(
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.02),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: Colors.white.withOpacity(0.04)),
-                        ),
-                        child: Text(
-                          internalSigningKey,
-                          style: const TextStyle(color: Colors.white38, fontSize: 12, fontFamily: 'monospace', letterSpacing: 0.5),
+                      Text(
+                        "HARDWARE_SIGNING_KEY",
+                        style: TextStyle(
+                          color: _revealHardwareKey ? hackerGreen : Colors.white30,
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
                         ),
                       ),
                       if (!_revealHardwareKey)
-                        Positioned.fill(
-                          child: ImageFiltered(
-                            imageFilter: ImageFilter.blur(sigmaX: 4.5, sigmaY: 4.5),
-                            child: Container(color: Colors.black.withOpacity(0.1)),
-                          ),
-                        ),
+                        Row(
+                          children: [
+                            Icon(Icons.lock_outline, color: accentNeon.withOpacity(0.6), size: 12),
+                            const SizedBox(width: 4),
+                            Text("REVELAR", style: TextStyle(color: accentNeon, fontSize: 9, fontWeight: FontWeight.bold)),
+                          ],
+                        )
+                      else
+                        Icon(Icons.lock_open, color: hackerGreen, size: 12),
                     ],
                   ),
-                ),
+                  const SizedBox(height: 6),
+                  Text(
+                    _revealHardwareKey ? internalSigningKey : "••••••••••••••••••••••••••••••••••••••••••••••••",
+                    style: TextStyle(
+                      color: _revealHardwareKey ? Colors.white70 : Colors.white10,
+                      fontSize: 11,
+                      fontFamily: 'monospace',
+                      letterSpacing: _revealHardwareKey ? 0.0 : 2.0,
+                    ),
+                  ),
+                  if (_revealHardwareKey) ...[
+                    const SizedBox(height: 10),
+                    Divider(color: Colors.white.withOpacity(0.05)),
+                    const SizedBox(height: 4),
+                    Text("HASH DO ECOSSISTEMA", style: TextStyle(color: Colors.white.withOpacity(0.2), fontSize: 8, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 2),
+                    Text(secureHashSeed, style: const TextStyle(color: Colors.white38, fontSize: 9, fontFamily: 'monospace')),
+                  ]
+                ],
               ),
-              const SizedBox(width: 10),
-              IconButton(
-                icon: Icon(
-                  _revealHardwareKey ? Icons.visibility : Icons.visibility_off,
-                  color: _revealHardwareKey ? Colors.white30 : accentNeon.withOpacity(0.7),
-                  size: 20,
-                ),
-                onPressed: () {
-                  setState(() {
-                    _revealHardwareKey = !_revealHardwareKey;
-                  });
-                },
-              ),
-            ],
+            ),
           ),
         ],
       ),
@@ -751,47 +794,30 @@ class _HubPageState extends State<HubPage> with TickerProviderStateMixin {
   }
 
   Widget _buildAnimatedRadarCard() {
-    double totalProgress = _barramentoScanController.value;
-    int currentPercent = (totalProgress * 100).toInt();
-    int currentItemIndex = (totalProgress * _hardwareComponents.length).floor().clamp(0, _hardwareComponents.length - 1);
-    String activeComponentName = _hardwareComponents[currentItemIndex]['name'];
-
     return Container(
+      margin: const EdgeInsets.only(bottom: 14),
       width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 14), 
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: LinearGradient(colors: [hackerGreen.withOpacity(0.02), primaryPurple.withOpacity(0.02)]),
+        color: hackerGreen.withOpacity(0.02),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: hackerGreen.withOpacity(0.2)),
       ),
       child: Row(
         children: [
-          Stack(
-            alignment: Alignment.center,
-            children: [
-              SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(
-                  value: totalProgress,
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(hackerGreen),
-                  backgroundColor: Colors.white10,
-                ),
-              ),
-              Text("$currentPercent%", style: TextStyle(color: hackerGreen, fontSize: 8, fontWeight: FontWeight.bold, fontFamily: 'monospace')),
-            ],
+          SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              valueColor: AlwaysStoppedAnimation<Color>(hackerGreen),
+            ),
           ),
           const SizedBox(width: 14),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text("Varredura activa: $activeComponentName", style: TextStyle(color: hackerGreen, fontSize: 11, fontWeight: FontWeight.w500, fontFamily: 'monospace')),
-                const SizedBox(height: 2),
-                const Text("Injetando clock de teste e capturando frames I2C", style: TextStyle(color: Colors.white38, fontSize: 10)),
-              ],
+            child: Text(
+              "Escaneando pinos I/O do chassi e injetando pulsos de clock na partição SPIFFS...",
+              style: TextStyle(color: hackerGreen, fontSize: 10, fontStyle: FontStyle.italic),
             ),
           ),
         ],
@@ -799,91 +825,9 @@ class _HubPageState extends State<HubPage> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildSequentialComponentItem(Map<String, dynamic> component, int index, bool hardwareOnline) {
-    double totalProgress = _barramentoScanController.value;
-    double countComponents = _hardwareComponents.length.toDouble();
-    double startWindow = index / countComponents;
-    double endWindow = (index + 1) / countComponents;
-
-    bool isPassed = totalProgress >= endWindow;
-    bool isActive = _isScanning && (totalProgress >= startWindow && totalProgress < endWindow);
-    
-    double itemProgressFactor = 0.0;
-    int itemPercentage = 0;
-    
-    if (isActive) {
-      itemProgressFactor = (totalProgress - startWindow) / (endWindow - startWindow);
-      itemPercentage = (itemProgressFactor * 100).toInt().clamp(0, 100);
-    } else if (isPassed) {
-      itemProgressFactor = 1.0;
-      itemPercentage = 100;
-    }
-
-    Color componentColor = hardwareOnline ? hackerGreen : hardwareRed; 
-    LinearGradient fillGradient;
-
-    if (isActive || isPassed) {
-      fillGradient = LinearGradient(
-        begin: Alignment.centerLeft,
-        end: Alignment.centerRight,
-        colors: [
-          componentColor.withOpacity(0.08), 
-          componentColor.withOpacity(0.08),
-          Colors.white.withOpacity(0.02),   
-          Colors.white.withOpacity(0.02),
-        ],
-        stops: [0.0, itemProgressFactor, itemProgressFactor, 1.0],
-      );
-    } else {
-      fillGradient = LinearGradient(colors: [Colors.white.withOpacity(0.02), Colors.white.withOpacity(0.02)]);
-    }
-
-    Color currentBorderColor = Colors.white.withOpacity(0.04);
-    Color currentIconColor = Colors.white24;
-
-    if (isActive) {
-      currentBorderColor = componentColor.withOpacity(0.5);
-      currentIconColor = componentColor;
-    } else if (isPassed) {
-      currentBorderColor = componentColor.withOpacity(0.2);
-      currentIconColor = componentColor.withOpacity(0.6);
-    }
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 30),
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        gradient: fillGradient,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: currentBorderColor, width: isActive ? 1.5 : 1.0),
-      ),
-      child: Row(
-        children: [
-          Icon(component['icon'], color: currentIconColor, size: 18),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(component['name'], style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 1),
-                Text(component['desc'], style: const TextStyle(color: Colors.white12, fontSize: 11)),
-              ],
-            ),
-          ),
-          if (isActive)
-            Text("$itemPercentage%", style: TextStyle(color: componentColor, fontSize: 11, fontFamily: 'monospace'))
-          else if (isPassed)
-            Icon(hardwareOnline ? Icons.check_circle_outlined : Icons.error_outline, color: componentColor, size: 14),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildIntegritySpectrumCard(bool hardwareOnline) {
+  Widget _buildSequentialComponentItem(Map<String, dynamic> comp, int index, bool online) {
     return Container(
-      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.01),
@@ -891,46 +835,70 @@ class _HubPageState extends State<HubPage> with TickerProviderStateMixin {
         border: Border.all(color: Colors.white.withOpacity(0.03)),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text("Status Geral do Espectro", style: TextStyle(color: Colors.white38, fontSize: 11)),
-              const SizedBox(height: 2),
-              Text(
-                hardwareOnline ? "INTEGRIDADE MÁXIMA" : "SINAL CORROMPIDO",
-                style: TextStyle(color: hardwareOnline ? hackerGreen : hardwareRed, fontSize: 10, fontWeight: FontWeight.bold),
-              ),
-            ],
+          Icon(comp['icon'], color: online ? accentNeon : Colors.white24, size: 20),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(comp['name'], style: TextStyle(color: online ? Colors.white : Colors.white54, fontSize: 12, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 2),
+                Text(comp['desc'], style: const TextStyle(color: Colors.white24, fontSize: 10)),
+              ],
+            ),
           ),
-          // O botão agora altera seu comportamento caso esteja sob a trava local
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _forceOffline ? hackerGreen.withOpacity(0.1) : hardwareRed.withOpacity(0.1),
-              foregroundColor: _forceOffline ? hackerGreen : hardwareRed,
-              side: BorderSide(color: _forceOffline ? hackerGreen.withOpacity(0.3) : hardwareRed.withOpacity(0.3)),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          Text(
+            online ? "PRONTO" : "STDBY",
+            style: TextStyle(
+              color: online ? hackerGreen.withOpacity(0.8) : Colors.white12,
+              fontSize: 9,
+              fontWeight: FontWeight.bold,
+              fontFamily: 'monospace',
             ),
-            onPressed: _isDisconnecting 
-                ? null 
-                : () {
-                    if (_forceOffline) {
-                      setState(() {
-                        _forceOffline = false;
-                      });
-                    } else {
-                      _disconnectHardware();
-                    }
-                  },
-            icon: _isDisconnecting 
-                ? SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 1.5, valueColor: AlwaysStoppedAnimation<Color>(hardwareRed)))
-                : Icon(_forceOffline ? Icons.refresh : Icons.power_settings_new, size: 14),
-            label: Text(
-              _forceOffline ? "RECONECTAR HUB" : "DESCONECTAR HUB",
-              style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.5),
-            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildIntegritySpectrumCard(bool online) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.01),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withOpacity(0.03)),
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text("STATUS E CONEXÃO LOCAL", style: TextStyle(color: Colors.white60, fontSize: 11, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 2),
+                  Text(
+                    online ? "Firmware rodando em ambiente seguro estável" : "Aguardando sincronia via cabo/barramento local",
+                    style: const TextStyle(color: Colors.white24, fontSize: 9),
+                  ),
+                ],
+              ),
+              if (online)
+                TextButton(
+                  onPressed: _disconnectHardware,
+                  style: TextButton.styleFrom(
+                    foregroundColor: hardwareRed,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                  ),
+                  child: _isDisconnecting
+                      ? const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 1.5, color: Colors.redAccent))
+                      : const Text("DESCONECTAR", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                ),
+            ],
           ),
         ],
       ),
@@ -938,6 +906,7 @@ class _HubPageState extends State<HubPage> with TickerProviderStateMixin {
   }
 }
 
+// Pintor customizado para efeito de pulso radial do radar de sincronismo
 class RadarPulsePainter extends CustomPainter {
   final double progress;
   final Color pulseColor;
@@ -946,16 +915,19 @@ class RadarPulsePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final maxRadius = math.sqrt(size.width * size.width + size.height * size.height) / 2;
+    
     final paint = Paint()
       ..color = pulseColor.withOpacity((1.0 - progress).clamp(0.0, 1.0))
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.0;
 
-    final center = Offset(size.width / 2, size.height / 2);
-    final maxRadius = math.max(size.width, size.height) * 0.8;
     canvas.drawCircle(center, maxRadius * progress, paint);
   }
 
   @override
-  bool shouldRepaint(covariant RadarPulsePainter oldDelegate) => oldDelegate.progress != progress;
+  bool shouldRepaint(covariant RadarPulsePainter oldDelegate) {
+    return oldDelegate.progress != progress;
+  }
 }

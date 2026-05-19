@@ -12,7 +12,7 @@ import '../widgets/calendar_card_widget.dart'; // <-- Novo Widget Importado!
 
 // ECOSYSTEM MODULES IMPORTS
 import 'package:versin/features/rhymes/presentation/pages/chat_page.dart';
-import 'package:versin/modules/hub/hub_page.dart';
+import 'package:versin/modules/hub/views/hub_page.dart';
 import 'package:versin/modules/match/match_page.dart';
 import 'package:versin/modules/wallet/wallet_page.dart';
 import 'package:versin/modules/market/market_page.dart'; 

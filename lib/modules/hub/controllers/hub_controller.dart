@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
-import '../data/models/hub_mode_model.dart';
-import '../data/repositories/hub_repository.dart'; // <-- NOVO IMPORT
+import 'package:versin/modules/hub/data/models/hub_mode_model.dart';
+import 'package:versin/modules/hub/data/repositories/hub_repository.dart';
+// 🔥 CAMINHO SEGURO E ABSOLUTO: Apontando exatamente para onde o arquivo está guardado
+import 'package:versin/modules/hub/data/datasources/hub_remote_datasource.dart'; 
 
 class HubController {
-  // Instanciando o repositório do módulo
-  final HubRepository _repository = HubRepository(); // <-- INSTÂNCIA REAL
+  // SÊNIOR: Instanciando o repositório do módulo injetando o datasource sem acoplamento rígido
+  final HubRepository _repository = HubRepository(HubRemoteDatasource());
 
   final ValueNotifier<String> currentActiveMode = ValueNotifier<String>("IDLE");
   final ValueNotifier<bool> isSendingCommand = ValueNotifier<bool>(false);
@@ -34,7 +36,7 @@ class HubController {
     ),
   ];
 
-  /// Transmite a instrução serial para o chassi via Supabase real
+  /// Transmite a instrução serial para o chassi via Supabase real passando pelo Repositório
   Future<void> sendCommandToHub(String command, String modeName) async {
     if (isSendingCommand.value) return;
 
@@ -43,7 +45,7 @@ class HubController {
     try {
       debugPrint("Transmitindo barramento serial para o chassi: $command");
       
-      // 🔥 AGORA CONECTADO À INFRAESTRUTURA REAL
+      // ✅ Conectado à infraestrutura usando a nova arquitetura em 4 camadas
       await _repository.dispatchModeCommand(command, modeName);
       
       currentActiveMode.value = modeName;

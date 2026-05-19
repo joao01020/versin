@@ -98,6 +98,20 @@ class HubTelemetryController {
     }
   }
 
+  /// Ponto de entrada público para o botão "FORÇAR OFFLINE" (Solução 2)
+  void triggerManualDisconnect() {
+    // Interrompe imediatamente animações de varredura ativas
+    if (isScanning.value) {
+      toggleScan();
+    }
+    cancelActiveSearch();
+    
+    // Dispara a mutação remota no Supabase em segundo plano
+    disconnectHardware();
+    
+    debugPrint("Apolo-system: Barramento local desconectado manualmente pelo usuário.");
+  }
+
   /// Força a desconexão lógica gravando o estado offline no Supabase
   Future<void> disconnectHardware() async {
     if (isDisconnecting.value) return;
@@ -114,8 +128,8 @@ class HubTelemetryController {
           })
           .eq('id', 1);
     } catch (e) {
-      debugPrint("Erro ao desconectar hardware: $e");
-      forceOffline.value = false;
+      debugPrint("Erro ao desconectar hardware no Supabase: $e");
+      // Mantém em modo offline local por segurança mesmo com falha de rede
     } finally {
       isDisconnecting.value = false;
     }

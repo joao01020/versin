@@ -2,14 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:sqflite/sqflite.dart';
 
-// PERSISTÊNCIA CORE
-import 'package:versin/core/database/database_helper.dart';
-
-// SERVIÇOS E REPOSITÓRIOS
-import 'package:versin/features/rhymes/domain/services/session_service.dart';
-import 'package:versin/features/rhymes/presentation/widgets/project_check_modal/project_check_modal.dart';
-
-// CONTROLLER
+// CONTROLLER (Centralizador de lógica)
 import 'package:versin/features/rhymes/presentation/controller/rhymes_controller.dart';
 
 // COMPONENTES
@@ -35,7 +28,6 @@ class ChatPage extends StatefulWidget {
 class _ChatPageState extends State<ChatPage> {
   final _messageController = TextEditingController();
   final RhymesController _rhymesController = RhymesController();
-  final SessionService _sessionService = SessionService(); 
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final ScrollController _scrollController = ScrollController();
   
@@ -182,7 +174,36 @@ class _ChatPageState extends State<ChatPage> {
     }
   }
 
-  void _toggleBpm() => _rhymesController.toggleMetronome();
+  // --- GESTÃO DE SESSÃO ---
+  void _checkInitialSession() {
+    final session = Supabase.instance.client.auth.currentSession;
+    if (session != null) _authModalTimer?.cancel();
+  }
+
+  void _setupAuthListener() {
+    _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+      if (data.event == AuthChangeEvent.signedIn && data.session != null) {
+        _authModalTimer?.cancel();
+        _rhymesController.carregarDadosUsuario();
+      }
+      if (data.event == AuthChangeEvent.signedOut) _startAuthTimer();
+    });
+  }
+
+  void _startAuthTimer() {
+    _authModalTimer?.cancel();
+    _authModalTimer = Timer(const Duration(seconds: 45), () {
+      if (!mounted) return;
+      if (Supabase.instance.client.auth.currentUser == null) {
+        AuthModal.show(context);
+      }
+    });
+  }
+
+  // --- LÓGICA DE ESTÚDIO ---
+  void _toggleBpm() {
+    _rhymesController.toggleMetronome();
+  }
 
   void _enviarEstruturaParaChat(List<String> blocos) {
     String textoEstrutura = blocos.map((b) => "[$b]\n\n\n\n").join("\n");
@@ -193,6 +214,24 @@ class _ChatPageState extends State<ChatPage> {
     _autosaveProject();
   }
 
+  Future<void> _finalizarConfiguracaoEstudio() async {
+    setState(() {
+      messages.clear(); 
+      _configuracaoFinalizada = true; 
+      _isAiTyping = true;
+    });
+
+    // O Controller agora cuida da inteligência de início
+    setState(() {
+      messages.add({
+        "role": "assistant",
+        "content": "✨ **Estúdio Configurado!**\nSua sessão foi iniciada no seu workflow profissional. Manda ver!",
+      });
+    });
+    _processMessage("O estúdio está pronto. Vamos começar a letra?");
+  }
+
+  // --- FLUXO DE MENSAGENS ---
   void _processMessage(String text) async {
     if (text.isEmpty) return;
     setState(() {
@@ -200,7 +239,9 @@ class _ChatPageState extends State<ChatPage> {
       _isAiTyping = true;
     });
     _scrollToBottom();
+
     final response = await _rhymesController.fetchAiResponse(text);
+
     if (mounted) {
       setState(() {
         messages.add(response);
@@ -216,6 +257,40 @@ class _ChatPageState extends State<ChatPage> {
       _processMessage(text);
       _messageController.clear();
     }
+  }
+
+  void _startWelcomeFlow() {
+    ChatInitializer.welcomeFlow(
+      mounted: mounted,
+      messages: messages,
+      addMessage: (content, {Widget? customWidget}) => setState(() {
+        messages.add({"role": "assistant", "content": content, "customWidget": customWidget});
+      }),
+      setAiTyping: (typing) => setState(() => _isAiTyping = typing),
+      scrollToBottom: _scrollToBottom,
+      onProgressUpdate: (step, progress) => _rhymesController.updateProgress(step, progress),
+      activeColor: _rhymesController.getActiveColor(),
+      onStructureConfirmed: (config) {
+        _lastConfirmedStructure = config;
+        setState(() {
+          messages.add({
+            "role": "assistant",
+            "content": "Boa! Agora defina a vibe e técnica usando o slider:",
+            "customWidget": MoodSelectorSlider(
+              onSelectionChanged: (valor, nome, isFinalStep) {
+                if (!isFinalStep) {
+                  _rhymesController.updateStudioConfig(vibe: nome);
+                } else {
+                  _rhymesController.updateStudioConfig(technique: nome);
+                  _finalizarConfiguracaoEstudio();
+                }
+              },
+            ),
+          });
+        });
+        _scrollToBottom();
+      },
+    );
   }
 
   void _scrollToBottom() {

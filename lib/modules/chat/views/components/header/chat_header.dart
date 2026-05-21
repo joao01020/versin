@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:versin/features/rhymes/presentation/controller/rhymes_controller.dart';
-// Mova este componente para lib/core/widgets/gamification/ se ele for usado em outros lugares
 import 'package:versin/features/rhymes/presentation/widgets/thermometer_gamification/thermometer_widget.dart';
 
 class ChatHeader extends StatelessWidget {
@@ -20,31 +19,24 @@ class ChatHeader extends StatelessWidget {
       builder: (context, _) {
         return Container(
           width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: const BoxDecoration(color: Color(0xFF0F0F0F)),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Logo centralizado (Menu removido conforme solicitado)
+              // Logo centralizado
               _buildBranding(),
-              const SizedBox(height: 12),
               
+              const SizedBox(height: 16),
+              
+              // Termômetro de gamificação centralizado
               ThermometerFeedback(
                 starProgress: rhymesController.starProgress,
                 fireProgress: rhymesController.fireProgress,
                 feedbackText: rhymesController.currentFeedback,
               ),
               
-              const SizedBox(height: 8),
               
-              Text(
-                "Comece a escrever para analisar sua letra...",
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.5),
-                  fontSize: 11,
-                  letterSpacing: 0.3,
-                ),
-              ),
             ],
           ),
         );

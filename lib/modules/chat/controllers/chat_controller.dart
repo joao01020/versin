@@ -247,7 +247,7 @@ class ChatController extends ChangeNotifier {
 
     messages.add(ChatMessage(
       role: ChatRole.assistant,
-      content: "VERSIN GENESIS: Conexão estabelecida com o estúdio. Escreva sua letra para iniciar o tuning e análise de rimas..."
+      content: "VERSIN GENESIS: Conexão estabelecida com o estúdio. "
     ));
 
     isInitializing = false;

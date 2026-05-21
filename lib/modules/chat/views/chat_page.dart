@@ -36,9 +36,6 @@ class _ChatPageState extends State<ChatPage> with AutomaticKeepAliveClientMixin 
   void initState() {
     super.initState();
     
-    // SÊNIOR: Se você já gerencia o RhymesController globalmente via Injeção de Dependência 
-    // (ex: GetIt, Provider, BlocProvider), o ideal seria buscá-lo aqui em vez de instanciar um novo.
-    // Ex: rhymesController: GetIt.I<RhymesController>()
     _controller = ChatController(
       repository: ChatRepositoryImpl(),
       rhymesController: RhymesController(), 
@@ -60,7 +57,6 @@ class _ChatPageState extends State<ChatPage> with AutomaticKeepAliveClientMixin 
     super.dispose();
   }
 
-  // SÊNIOR: Função isolada e segura para invocar o painel de gravação do estúdio de forma sobreposta (Overlay/Sheet)
   void _abrirPainelDeVoz(BuildContext context, Color activeColor) {
     showModalBottomSheet(
       context: context,
@@ -70,7 +66,6 @@ class _ChatPageState extends State<ChatPage> with AutomaticKeepAliveClientMixin 
         return VoiceStudioPanel(
           activeColor: activeColor,
           onFinished: () {
-            // Callback quando o produtor desativa o microfone
             debugPrint("Gravação concluída no VoiceStudioPanel. Processando fluxo de rima na ChatPage...");
           },
         );
@@ -82,8 +77,6 @@ class _ChatPageState extends State<ChatPage> with AutomaticKeepAliveClientMixin 
   Widget build(BuildContext context) {
     super.build(context);
 
-    // SÊNIOR: Listenable.merge garante que a UI reconstrua tanto quando o ChatController
-    // adicionar uma nova mensagem quanto quando o RhymesController atualizar o timer da IA ou o BPM.
     return AnimatedBuilder(
       animation: Listenable.merge([_controller, _controller.rhymesController]),
       builder: (context, _) {
@@ -95,10 +88,13 @@ class _ChatPageState extends State<ChatPage> with AutomaticKeepAliveClientMixin 
           body: SafeArea(
             child: Column(
               children: [
+                // ➔ ATUALIZADO: stepProgress removido pois VersinTimeline agora é auto-gerenciado
                 VersinTimeline(
                   currentStep: rhymesCtrl.currentStep,
-                  stepProgress: rhymesCtrl.stepProgress,
                   activeColor: activeColor,
+                  onRimaFinalizada: (rimas) {
+                    // Lógica de callback caso precise tratar o envio da lista de rimas
+                  },
                 ),
                 
                 ChatHeader(
@@ -109,7 +105,6 @@ class _ChatPageState extends State<ChatPage> with AutomaticKeepAliveClientMixin 
                 Expanded(
                   child: ChatListView(
                     isInitializing: _controller.isInitializing,
-                    // SÊNIOR: Cast explícito e seguro sem risco de runtime type exceptions
                     messages: _controller.messages.map<Map<String, dynamic>>((m) => m.toJson()).toList(),
                     isAiTyping: _controller.isAiTyping,
                     scrollController: _controller.scrollController,
@@ -160,7 +155,6 @@ class _ChatPageState extends State<ChatPage> with AutomaticKeepAliveClientMixin 
                       rhymesController: rhymesCtrl,
                       activeColor: activeColor,
                       isRhymeMode: rhymesCtrl.isRhymeMode,
-                      // ➔ CORREÇÃO FINAL: Ignora o texto do callback, pois o Controller lê o messageController internamente
                       onSend: (_) => _controller.sendMessage(), 
                       currentSuggestionIndex: _controller.currentSuggestionIndex,
                       onUpdateSuggestionIndex: _controller.updateSuggestionIndex,

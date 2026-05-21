@@ -2,10 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:sqflite/sqflite.dart';
-
-// Importação da persistência core do Versin
-import 'package:versin/core/database/database_helper.dart';
 
 class AuthModal extends StatefulWidget {
   const AuthModal({super.key});
@@ -34,26 +30,6 @@ class _AuthModalState extends State<AuthModal> {
   bool _isWalletAvailable = true;
   Timer? _debounce;
 
-  // --- PERSISTÊNCIA LOCAL (SQLITE) ---
-  Future<void> _saveLocalProfile(String userId, String username) async {
-    try {
-      final db = await DatabaseHelper.instance.database;
-      await db.insert(
-        'user_profile',
-        {
-          'id': userId,
-          'name': username,
-          'wallet': "wallet@$username",
-          'synced': 1 // Indica que já está sincronizado com a nuvem Genesis
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
-    } catch (e) {
-      debugPrint("Erro ao salvar perfil local: $e");
-    }
-  }
-
-  // --- VERIFICAÇÃO DE DISPONIBILIDADE NO SUPABASE ---
   Future<void> _checkWalletAvailability(String value) async {
     if (value.isEmpty) return;
     if (_debounce?.isActive ?? false) _debounce!.cancel();
@@ -63,12 +39,9 @@ class _AuthModalState extends State<AuthModal> {
         final res = await Supabase.instance.client
             .from('profiles')
             .select('username')
-            .eq('username', value.trim())
+            .eq('username', value)
             .maybeSingle();
-        
-        if (mounted) {
-          setState(() => _isWalletAvailable = res == null);
-        }
+        setState(() => _isWalletAvailable = res == null);
       } catch (e) {
         debugPrint("Erro na checagem: $e");
       }
@@ -86,45 +59,38 @@ class _AuthModalState extends State<AuthModal> {
     }
   }
 
-  // --- REGISTRO COM PERSISTÊNCIA E SINCRONIA ---
   Future<void> _handleEmailGenesis() async {
-    final username = _usernameController.text.trim();
-    if (username.isEmpty || !_isWalletAvailable) return;
+    if (_usernameController.text.isEmpty || !_isWalletAvailable) return;
 
     setState(() => _isLoading = true);
     try {
       final String generatedWallet =
           "0x${DateTime.now().millisecondsSinceEpoch}vrs";
 
-      final AuthResponse res = await Supabase.instance.client.auth.signUp(
+      await Supabase.instance.client.auth.signUp(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
         data: {
-          'username': username,
+          'username': _usernameController.text.trim(),
           'wallet': generatedWallet,
         },
       );
 
-      if (res.user != null) {
-        // Grava na persistência local SQLite imediatamente
-        await _saveLocalProfile(res.user!.id, username);
+      setState(() {
+        _isLoading = false;
+        _registrationSuccess = true;
+      });
 
-        setState(() {
-          _isLoading = false;
-          _registrationSuccess = true;
-        });
-
-        // Delay para feedback visual de sucesso
-        await Future.delayed(const Duration(seconds: 2));
-        if (mounted) Navigator.pop(context);
-      }
+      // Timer de 2 segundos antes de fechar para o usuário ler a mensagem de sucesso
+      await Future.delayed(const Duration(seconds: 2));
+      if (mounted) Navigator.pop(context);
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text("Erro: ${e.toString()}"),
-            backgroundColor: Colors.redAccent,
+            backgroundColor: Colors.red,
           ),
         );
       }
@@ -170,7 +136,7 @@ class _AuthModalState extends State<AuthModal> {
         ),
         const SizedBox(height: 12),
         const Text(
-          "Sua identidade foi criptografada e salva localmente.\nVerifique seu e-mail para ativar.",
+          "Sua identidade foi criptografada.\nVerifique seu e-mail para ativar.",
           textAlign: TextAlign.center,
           style: TextStyle(color: Colors.grey, fontSize: 13),
         ),

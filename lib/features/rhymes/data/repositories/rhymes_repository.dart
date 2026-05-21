@@ -2,13 +2,9 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:versin/core/models/rhyme_model.dart';
-import 'package:versin/core/services/sync_manager.dart'; // Importação do SyncManager
 
 class RhymesRepository {
   final _supabase = Supabase.instance.client;
-  final _syncManager = SyncManager(); // Instância para gerenciar o offline
-  
-  // URL de produção no Render
   final String _baseUrl = "https://versin.onrender.com";
 
   Future<List<Rhyme>> fetchVocabulary() async {
@@ -25,12 +21,13 @@ class RhymesRepository {
         .toList();
   }
 
-  /// Agora salva primeiro no SQLite para garantir o modo offline
   Future<void> saveWord(String word) async {
     final user = _supabase.auth.currentUser;
     if (user != null) {
-      // O SyncManager cuida do SQLite e tenta subir para o Supabase
-      await _syncManager.saveAndSync(word);
+      await _supabase.from('user_vocabulary').insert({
+        'word': word,
+        'user_id': user.id,
+      });
     }
   }
 
@@ -45,51 +42,22 @@ class RhymesRepository {
     }
   }
 
-  /// Envia a mensagem para o Estúdio (Backend FastAPI)
   Future<http.Response> postChat({
     required String message,
     required List<String> currentList,
     required String? apiKey,
     required Map<String, dynamic> context,
   }) async {
-    
-    // Proteção: Se a apiKey for vazia ou inválida, enviamos null para o 
-    // backend usar a GROQ_API_KEY configurada no painel do Render.
-    final String? validApiKey = (apiKey != null && apiKey.trim().startsWith('gsk_')) 
-        ? apiKey.trim() 
-        : null;
-
-    final Map<String, dynamic> requestBody = {
-      'user_id': _supabase.auth.currentUser?.id ?? "user_dev_01",
-      'message': message,
-      'current_list': currentList,
-      'private_api_key': validApiKey,
-      'history_context': context, // Alinhado com o ChatRequest do Python
-    };
-
-    try {
-      final response = await http.post(
-        Uri.parse('$_baseUrl/chat'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(requestBody),
-      ).timeout(const Duration(seconds: 45));
-
-      // Debug para o console do VS Code
-      print("Status Estúdio: ${response.statusCode}");
-      if (response.statusCode != 200) {
-        print("Corpo do Erro: ${response.body}");
-      }
-
-      return response;
-    } catch (e) {
-      print("Erro na chamada postChat: $e");
-      rethrow;
-    }
+    return await http.post(
+      Uri.parse('$_baseUrl/chat'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'user_id': _supabase.auth.currentUser?.id ?? "user_dev_01",
+        'message': message,
+        'current_list': currentList,
+        'private_api_key': apiKey,
+        'context': context,
+      }),
+    ).timeout(const Duration(seconds: 60));
   }
 }
-
-// Linha 84: Espaçamento de segurança para manter a estrutura
-// Linha 85: Fim da implementação do repositório
-// Linha 86: Responsabilidade técnica: Offline First ativado
-// Linha 87: Sincronização em segundo plano garantida
-// Linha 88: Final do arquivo

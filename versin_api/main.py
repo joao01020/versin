@@ -8,7 +8,7 @@ from typing import List, Optional, Dict
 from dotenv import load_dotenv
 from groq import Groq
 
-# Carrega as variáveis de ambiente (Certifique-se que o GROQ_API_KEY está no Render)
+# Carrega as variáveis de ambiente
 load_dotenv()
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
@@ -25,13 +25,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Rota de Health Check para evitar erro 404 no UptimeRobot
+@app.get("/")
+async def health_check():
+    return {"status": "online", "message": "Versin AI está operante"}
+
 # Modelo de entrada
 class ChatRequest(BaseModel):
     user_id: Optional[str] = "default_user"
     message: str
     current_list: Optional[List[str]] = []
     private_api_key: Optional[str] = None
-    # Campo que deve bater exatamente com o jsonEncode do Flutter
     history_context: Optional[Dict] = None
 
 def get_groq_client(user_key: Optional[str]):
@@ -43,7 +47,6 @@ def get_groq_client(user_key: Optional[str]):
     return client_groq_default
 
 def definir_comportamento_produtor(contexto: Dict, lista_rimas: List[str]) -> str:
-    # Fallback caso o contexto venha vazio
     bpm = contexto.get("bpm", 120)
     vibe = contexto.get("vibe", "Desconhecida")
     tec = contexto.get("technique", "Melódico")
@@ -118,7 +121,6 @@ async def chat_versin(data: ChatRequest):
         print("ERRO: IA retornou JSON inválido.")
         return {"role": "assistant", "content": "Erro de processamento na IA.", "impact_level": 1}
     except Exception as e:
-        # Log detalhado no console do Render para você descobrir o erro real
         print(f"ERRO CRÍTICO NO CHAT: {type(e).__name__} - {str(e)}")
         return {"role": "assistant", "content": "Erro na conexão cerebral. Tente novamente.", "impact_level": 1}
 

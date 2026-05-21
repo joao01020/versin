@@ -31,7 +31,12 @@ dependencies:
   sqflite: ^2.4.2+1
   path: ^1.9.1
   connectivity_plus: ^7.1.1
+  wifi_scan: ^0.4.1+2
+  sqflite_common_ffi: ^2.4.0+3
+  sqlite3_flutter_libs: ^0.6.0+eol
+  get_it: ^8.0.0
 
+  
 dev_dependencies:
   flutter_test:
     sdk: flutter

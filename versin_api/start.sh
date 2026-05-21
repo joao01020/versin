@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# Garante que o pip esteja atualizado e instala apenas o necessário
-pip install --upgrade pip
-pip install gunicorn uvicorn fastapi groq python-dotenv google-generativeai
+# Instala as dependências necessárias
+pip install -r requirements.txt
 
-# Inicia com 2 workers e um timeout maior para o Render não desistir
-python -m gunicorn -w 2 -k uvicorn.workers.UvicornWorker main:app --bind 0.0.0.0:$PORT --timeout 120
+# Inicia o servidor diretamente com Uvicorn (mais estável para FastAPI)
+# O Gunicorn é ótimo, mas para uma única instância no Render, o Uvicorn é mais direto
+python -m uvicorn main:app --host 0.0.0.0 --port $PORT

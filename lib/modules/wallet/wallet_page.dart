@@ -1,6 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:versin/app/locator.dart'; // Importação do locator
+import 'package:versin/app/routes/app_routes.dart'; // Importação do sistema de rotas
+import 'package:versin/modules/dashboard/controllers/dashboard_controller.dart';
 
 class WalletPage extends StatefulWidget {
+  // Rota estática definida aqui para facilitar chamadas externas
+  static const String routeName = AppRoutes.wallet;
+
   const WalletPage({super.key});
 
   @override
@@ -8,70 +14,73 @@ class WalletPage extends StatefulWidget {
 }
 
 class _WalletPageState extends State<WalletPage> {
-  // CORES DO TEMA
-  final Color accentNeon = const Color(0xFFE040FB);
-  final Color primaryPurple = const Color(0xFF6A1B9A);
+  // Buscamos a instância única do controller via GetIt
+  final DashboardController controller = sl<DashboardController>();
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // CARD DE SALDO PRINCIPAL
-          _buildBalanceCard(),
+    return Scaffold(
+      backgroundColor: const Color(0xFF0D0B1F), // Fundo unificado
+      body: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // CARD DE SALDO PRINCIPAL
+            _buildBalanceCard(),
 
-          const SizedBox(height: 24),
+            const SizedBox(height: 24),
 
-          // BOTÕES DE AÇÃO RÁPIDA
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _buildQuickAction(Icons.account_balance_wallet, "Sacar"),
-              _buildQuickAction(Icons.add_chart, "Royalties"),
-              _buildQuickAction(Icons.history, "Extrato"),
-            ],
-          ),
-
-          const SizedBox(height: 32),
-
-          // SEÇÃO DE TRANSAÇÕES RECENTES
-          const Text(
-            "Atividade Recente",
-            style: TextStyle(
-              color: Colors.white, 
-              fontSize: 18, 
-              fontWeight: FontWeight.bold
+            // BOTÕES DE AÇÃO RÁPIDA
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildQuickAction(Icons.account_balance_wallet, "Sacar"),
+                _buildQuickAction(Icons.add_chart, "Royalties"),
+                _buildQuickAction(Icons.history, "Extrato"),
+              ],
             ),
-          ),
-          const SizedBox(height: 16),
 
-          // LISTA DE TRANSAÇÕES - CORREÇÃO DO ÍCONE AQUI
-          _buildTransactionItem(
-            title: "Royalties: Single 'Versin Flow'",
-            date: "15 Mai",
-            amount: "+ R\$ 1.240,00",
-            isPositive: true,
-            icon: Icons.music_note,
-          ),
-          _buildTransactionItem(
-            title: "Colab: Beatmaker X",
-            date: "12 Mai",
-            amount: "- R\$ 350,00",
-            isPositive: false,
-            icon: Icons.layers, // CORRIGIDO: de 'Layers' para 'layers'
-          ),
-          _buildTransactionItem(
-            title: "Assinatura Versin Pro",
-            date: "01 Mai",
-            amount: "- R\$ 49,90",
-            isPositive: false,
-            icon: Icons.star_outline,
-          ),
-          
-          const SizedBox(height: 30),
-        ],
+            const SizedBox(height: 32),
+
+            // SEÇÃO DE TRANSAÇÕES RECENTES
+            const Text(
+              "Atividade Recente",
+              style: TextStyle(
+                color: Colors.white, 
+                fontSize: 18, 
+                fontWeight: FontWeight.bold
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // LISTA DE TRANSAÇÕES
+            _buildTransactionItem(
+              title: "Royalties: Single 'Versin Flow'",
+              date: "15 Mai",
+              amount: "+ R\$ 1.240,00",
+              isPositive: true,
+              icon: Icons.music_note,
+            ),
+            _buildTransactionItem(
+              title: "Colab: Beatmaker X",
+              date: "12 Mai",
+              amount: "- R\$ 350,00",
+              isPositive: false,
+              icon: Icons.layers,
+            ),
+            _buildTransactionItem(
+              title: "Assinatura Versin Pro",
+              date: "01 Mai",
+              amount: "- R\$ 49,90",
+              isPositive: false,
+              icon: Icons.star_outline,
+            ),
+            
+            const SizedBox(height: 30),
+          ],
+        ),
       ),
     );
   }
@@ -85,11 +94,11 @@ class _WalletPageState extends State<WalletPage> {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [primaryPurple, const Color(0xFF4A148C)],
+          colors: [controller.primaryPurple, const Color(0xFF4A148C)],
         ),
         boxShadow: [
           BoxShadow(
-            color: accentNeon.withOpacity(0.2),
+            color: controller.accentNeon.withOpacity(0.2),
             blurRadius: 20,
             offset: const Offset(0, 10),
           )
@@ -152,7 +161,7 @@ class _WalletPageState extends State<WalletPage> {
             shape: BoxShape.circle,
             border: Border.all(color: Colors.white.withOpacity(0.1)),
           ),
-          child: Icon(icon, color: accentNeon, size: 24),
+          child: Icon(icon, color: controller.accentNeon, size: 24),
         ),
         const SizedBox(height: 8),
         Text(
@@ -183,10 +192,10 @@ class _WalletPageState extends State<WalletPage> {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: accentNeon.withOpacity(0.1),
+              color: controller.accentNeon.withOpacity(0.1),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(icon, color: accentNeon, size: 20),
+            child: Icon(icon, color: controller.accentNeon, size: 20),
           ),
           const SizedBox(width: 16),
           Expanded(

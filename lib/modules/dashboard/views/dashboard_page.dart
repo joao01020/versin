@@ -1,5 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:versin/app/locator.dart';
+import 'package:versin/app/routes/app_routes.dart'; // Importação das rotas
 
 // CONTROLLER & WIDGETS IMPORTS
 import '../controllers/dashboard_controller.dart';
@@ -21,6 +23,7 @@ import 'package:versin/modules/vnode/vnode_page.dart';
 import 'package:versin/modules/settings/settings_page.dart'; 
 
 class DashboardPage extends StatefulWidget {
+  static const String routeName = '/';
   const DashboardPage({super.key});
 
   @override
@@ -28,7 +31,20 @@ class DashboardPage extends StatefulWidget {
 }
 
 class _DashboardPageState extends State<DashboardPage> {
-  final DashboardController _controller = DashboardController();
+  final DashboardController _controller = sl<DashboardController>();
+
+  // Mapeamento dos índices para as rotas nomeadas
+  final List<String> _routes = [
+    '/',
+    AppRoutes.match,
+    AppRoutes.market,
+    AppRoutes.wallet,
+    AppRoutes.chat,
+    AppRoutes.showcase,
+    AppRoutes.hub,
+    AppRoutes.vnode,
+    AppRoutes.settings,
+  ];
 
   @override
   void initState() {
@@ -36,10 +52,12 @@ class _DashboardPageState extends State<DashboardPage> {
     _controller.init(); 
   }
 
-  @override
-  void dispose() {
-    _controller.disposeController(); 
-    super.dispose();
+  void _onNavigationTap(int index) {
+    setState(() => _controller.navigationTap(index));
+    // Navega para a rota correspondente via sistema de rotas do Flutter
+    if (index != 0) {
+      Navigator.of(context).pushNamed(_routes[index]);
+    }
   }
 
   void _showAddAppointmentSheet({String? fixedTime}) {
@@ -52,17 +70,10 @@ class _DashboardPageState extends State<DashboardPage> {
       context: context,
       isScrollControlled: true, 
       backgroundColor: const Color(0xFF15122C), 
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)), 
-      ),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (context) {
         return Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom + 24, 
-            top: 24,
-            left: 24,
-            right: 24,
-          ),
+          padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom + 24, top: 24, left: 24, right: 24),
           child: Column(
             mainAxisSize: MainAxisSize.min, 
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -70,59 +81,24 @@ class _DashboardPageState extends State<DashboardPage> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    "NOVO COMPROMISSO - DIA ${_controller.selectedDay}/${_controller.focusedDay.month}",
-                    style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 1.0),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close, color: Colors.white54, size: 20),
-                    onPressed: () => Navigator.pop(context), 
-                  ),
+                  Text("NOVO COMPROMISSO - DIA ${_controller.selectedDay}/${_controller.focusedDay.month}",
+                    style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 1.0)),
+                  IconButton(icon: const Icon(Icons.close, color: Colors.white54, size: 20), onPressed: () => Navigator.pop(context)),
                 ],
               ),
               const SizedBox(height: 16),
-              TextField(
-                controller: titleController,
-                style: const TextStyle(color: Colors.white),
-                decoration: InputDecoration(
-                  filled: true,
-                  fillColor: Colors.white.withOpacity(0.05),
-                  hintText: "Descrição do compromisso (ex: Gravar Vocais)",
-                  hintStyle: const TextStyle(color: Colors.white24, fontSize: 13),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                ),
-              ),
+              TextField(controller: titleController, style: const TextStyle(color: Colors.white), decoration: InputDecoration(filled: true, fillColor: Colors.white.withOpacity(0.05), hintText: "Descrição do compromisso", border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none))),
               const SizedBox(height: 12),
-              TextField(
-                controller: timeController,
-                style: const TextStyle(color: Colors.white, fontFamily: 'monospace'),
-                decoration: InputDecoration(
-                  filled: true,
-                  fillColor: Colors.white.withOpacity(0.05),
-                  hintText: "Horário (HH:MM)",
-                  hintStyle: const TextStyle(color: Colors.white24, fontSize: 13),
-                  prefixIcon: const Icon(Icons.access_time, color: Colors.white38, size: 18),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                ),
-              ),
+              TextField(controller: timeController, style: const TextStyle(color: Colors.white, fontFamily: 'monospace'), decoration: InputDecoration(filled: true, fillColor: Colors.white.withOpacity(0.05), hintText: "Horário (HH:MM)", prefixIcon: const Icon(Icons.access_time, color: Colors.white38, size: 18), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none))),
               const SizedBox(height: 20),
               SizedBox(
                 width: double.infinity,
                 height: 48,
                 child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _controller.accentNeon,
-                    foregroundColor: Colors.black,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
+                  style: ElevatedButton.styleFrom(backgroundColor: _controller.accentNeon, foregroundColor: Colors.black, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
                   onPressed: () {
                     if (titleController.text.isNotEmpty && timeController.text.isNotEmpty) {
-                      setState(() {
-                        _controller.addAppointment(
-                          title: titleController.text,
-                          time: timeController.text,
-                        );
-                      });
+                      setState(() => _controller.addAppointment(title: titleController.text, time: timeController.text));
                       Navigator.pop(context); 
                     }
                   },
@@ -144,30 +120,23 @@ class _DashboardPageState extends State<DashboardPage> {
       return Scaffold(
         backgroundColor: Colors.black, 
         bottomNavigationBar: isMobile 
-          ? Theme(
-              data: Theme.of(context).copyWith(canvasColor: Colors.black), 
-              child: BottomNavigationBar(
-                currentIndex: _controller.currentIndex,
-                onTap: (index) {
-                  setState(() => _controller.navigationTap(index));
-                },
-                selectedItemColor: _controller.accentNeon,
-                unselectedItemColor: Colors.white24,
-                showSelectedLabels: false,
-                showUnselectedLabels: false,
-                type: BottomNavigationBarType.fixed, 
-                items: const [
-                  BottomNavigationBarItem(icon: Icon(Icons.dashboard_outlined), label: "Dash"),
-                  BottomNavigationBarItem(icon: Icon(Icons.share_outlined), label: "Match"),
-                  BottomNavigationBarItem(icon: Icon(Icons.local_mall_outlined), label: "Market"), 
-                  BottomNavigationBarItem(icon: Icon(Icons.account_balance_wallet_outlined), label: "Wallet"),
-                  BottomNavigationBarItem(icon: Icon(Icons.mic_external_on_outlined), label: "Studio"),
-                  BottomNavigationBarItem(icon: Icon(Icons.storefront_outlined), label: "Showcase"),
-                  BottomNavigationBarItem(icon: Icon(Icons.settings_input_component), label: "Hub"), 
-                  BottomNavigationBarItem(icon: Icon(Icons.lan_outlined), label: "VNode"), 
-                  BottomNavigationBarItem(icon: Icon(Icons.settings_outlined), label: "Settings"), 
-                ],
-              ),
+          ? BottomNavigationBar(
+              currentIndex: _controller.currentIndex,
+              onTap: _onNavigationTap,
+              selectedItemColor: _controller.accentNeon,
+              unselectedItemColor: Colors.white24,
+              type: BottomNavigationBarType.fixed, 
+              items: const [
+                BottomNavigationBarItem(icon: Icon(Icons.dashboard_outlined), label: "Dash"),
+                BottomNavigationBarItem(icon: Icon(Icons.share_outlined), label: "Match"),
+                BottomNavigationBarItem(icon: Icon(Icons.local_mall_outlined), label: "Market"), 
+                BottomNavigationBarItem(icon: Icon(Icons.account_balance_wallet_outlined), label: "Wallet"),
+                BottomNavigationBarItem(icon: Icon(Icons.mic_external_on_outlined), label: "Studio"),
+                BottomNavigationBarItem(icon: Icon(Icons.storefront_outlined), label: "Showcase"),
+                BottomNavigationBarItem(icon: Icon(Icons.settings_input_component), label: "Hub"), 
+                BottomNavigationBarItem(icon: Icon(Icons.lan_outlined), label: "VNode"), 
+                BottomNavigationBarItem(icon: Icon(Icons.settings_outlined), label: "Settings"), 
+              ],
             ) 
           : null, 
         body: Container(
@@ -192,15 +161,15 @@ class _DashboardPageState extends State<DashboardPage> {
                           controller: _controller.pageController,
                           onPageChanged: (index) => setState(() => _controller.handlePageChange(index)), 
                           children: [
-                            _buildLabModule(constraints.maxWidth < 800), // Dash
-                            MatchPage(),                                 // Removido const
-                            MarketPage(),                                // Removido const
-                            WalletPage(),                                // Removido const
-                            ChatPage(),                                  // Removido const
-                            ShowcasePage(),                              // Removido const
-                            HubPage(),                                   // Removido const
-                            VNodePage(),                                 // Removido const
-                            SettingsPage(),                              // Removido const
+                            DashboardLabPage(controller: _controller, onAddAppointment: _showAddAppointmentSheet),
+                            const MatchPage(),
+                            const MarketPage(),
+                            const WalletPage(),
+                            const ChatPage(),
+                            const ShowcasePage(),
+                            const HubPage(),
+                            const VNodePage(),
+                            const SettingsPage(),
                           ],
                         ),
                       ),
@@ -214,8 +183,17 @@ class _DashboardPageState extends State<DashboardPage> {
       );
     });
   }
+}
 
-  Widget _buildLabModule(bool isMobile) {
+class DashboardLabPage extends StatelessWidget {
+  final DashboardController controller;
+  final VoidCallback onAddAppointment;
+
+  const DashboardLabPage({super.key, required this.controller, required this.onAddAppointment});
+
+  @override
+  Widget build(BuildContext context) {
+    bool isMobile = MediaQuery.of(context).size.width < 800;
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(), 
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -223,29 +201,12 @@ class _DashboardPageState extends State<DashboardPage> {
         children: [
           const SizedBox(height: 10),
           isMobile 
-          ? Column(
-              children: [
-                AccountActivitiesCardWidget(controller: _controller, onStateChanged: () => setState(() {})),
-                const SizedBox(height: 16),
-                HubStatusCardWidget(controller: _controller),
-              ],
-            )
-          : Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(child: AccountActivitiesCardWidget(controller: _controller, onStateChanged: () => setState(() {}))),
-                const SizedBox(width: 16),
-                Expanded(child: HubStatusCardWidget(controller: _controller)),
-              ],
-            ),
+          ? Column(children: [AccountActivitiesCardWidget(controller: controller, onStateChanged: () {}), const SizedBox(height: 16), HubStatusCardWidget(controller: controller)])
+          : Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Expanded(child: AccountActivitiesCardWidget(controller: controller, onStateChanged: () {})), const SizedBox(width: 16), Expanded(child: HubStatusCardWidget(controller: controller))]),
           const SizedBox(height: 20),
-          MainChartCardWidget(controller: _controller), 
+          MainChartCardWidget(controller: controller), 
           const SizedBox(height: 20),
-          CalendarCardWidget(
-            controller: _controller,
-            onStateChanged: () => setState(() {}),
-            onAddAppointmentTap: () => _showAddAppointmentSheet(),
-          ),
+          CalendarCardWidget(controller: controller, onStateChanged: () {}, onAddAppointmentTap: onAddAppointment),
           const SizedBox(height: 20),
         ],
       ),

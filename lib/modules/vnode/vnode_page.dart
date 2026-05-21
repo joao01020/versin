@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:versin/app/routes/app_routes.dart'; // Importação do sistema de rotas
 
 class VNodePage extends StatefulWidget {
+  // Rota estática definida para referência centralizada
+  static const String routeName = AppRoutes.vnode;
+
   const VNodePage({super.key});
 
   @override
@@ -167,7 +171,7 @@ class _VNodePageState extends State<VNodePage> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             ),
-            onPressed: () => print("Upload clicado"),
+            onPressed: () {},
             child: const Text("Postar", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
           ),
         ],
@@ -190,7 +194,6 @@ class _VNodePageState extends State<VNodePage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // HEADER DO POST (Usuário)
           Row(
             children: [
               CircleAvatar(
@@ -209,7 +212,6 @@ class _VNodePageState extends State<VNodePage> {
           ),
           const SizedBox(height: 16),
 
-          // PLAYER BOX (Título da música e controles)
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
@@ -236,7 +238,6 @@ class _VNodePageState extends State<VNodePage> {
                     children: [
                       Text(post["trackTitle"], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
                       const SizedBox(height: 6),
-                      // Barra de progresso do áudio simulada
                       SliderTheme(
                         data: SliderTheme.of(context).copyWith(
                           trackHeight: 3,
@@ -263,7 +264,6 @@ class _VNodePageState extends State<VNodePage> {
           ),
           const SizedBox(height: 14),
 
-          // BOTÕES DE AÇÃO (Curtir, Comentar, Compartilhar)
           Row(
             children: [
               _buildActionButton(
@@ -286,7 +286,6 @@ class _VNodePageState extends State<VNodePage> {
                 iconColor: Colors.white54,
                 onTap: () {
                   setState(() => post["shares"]++);
-                  print("Link da música copiado!");
                 },
               ),
             ],
@@ -295,11 +294,9 @@ class _VNodePageState extends State<VNodePage> {
           Divider(height: 1, thickness: 1, color: Colors.white.withOpacity(0.04)),
           const SizedBox(height: 14),
 
-          // SEÇÃO DE COMENTÁRIOS DA MÚSICA
           const Text("Comentários", style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
           const SizedBox(height: 10),
           
-          // Lista interna de comentários salvos
           ListView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -313,17 +310,10 @@ class _VNodePageState extends State<VNodePage> {
                   children: [
                     Text("${comment["author"]}: ", style: TextStyle(color: accentNeon, fontSize: 13, fontWeight: FontWeight.bold)),
                     Expanded(
-                      child: RichText(
-                        text: TextSpan(
-                          children: [
-                            TextSpan(text: comment["text"] + " ", style: const TextStyle(color: Colors.white70, fontSize: 13)),
-                          ],
-                        ),
-                      ),
+                      child: Text(comment["text"], style: const TextStyle(color: Colors.white70, fontSize: 13)),
                     ),
-                    // Clique no timestamp para pular/sinalizar o trecho
                     GestureDetector(
-                      onTap: () => print("Pulando player para o trecho: ${comment["timestamp"]}"),
+                      onTap: () {},
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(color: primaryPurple.withOpacity(0.3), borderRadius: BorderRadius.circular(4)),
@@ -340,12 +330,10 @@ class _VNodePageState extends State<VNodePage> {
           ),
           const SizedBox(height: 12),
 
-          // CAMPO PARA ENVIAR NOVO COMENTÁRIO COM SELEÇÃO DE TRECHO
           Row(
             children: [
-              // Seletor para marcar o trecho atual da música
               PopupMenuButton<String>(
-                color: deepBg, // Corrigido: propriedade correta para o background do menu
+                color: deepBg,
                 onSelected: (String value) {
                   setState(() => _selectedTimestamps[postId] = value);
                 },
@@ -358,7 +346,7 @@ class _VNodePageState extends State<VNodePage> {
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.timer_outlined, color: accentNeon, size: 14), // Corrigido: Ícone válido
+                      Icon(Icons.timer_outlined, color: accentNeon, size: 14),
                       const SizedBox(width: 4),
                       Text(_selectedTimestamps[postId] ?? "00:00", style: const TextStyle(color: Colors.white, fontSize: 11)),
                     ],
@@ -372,7 +360,6 @@ class _VNodePageState extends State<VNodePage> {
                 ],
               ),
               const SizedBox(width: 10),
-              // Campo de Input de texto
               Expanded(
                 child: TextField(
                   controller: _commentControllers[postId],
@@ -406,7 +393,6 @@ class _VNodePageState extends State<VNodePage> {
     );
   }
 
-  // WIDGET AUXILIAR: BOTÃO DE AÇÃO RAPIDA
   Widget _buildActionButton({required IconData icon, required String label, required Color iconColor, required VoidCallback onTap}) {
     return GestureDetector(
       onTap: onTap,
@@ -420,7 +406,6 @@ class _VNodePageState extends State<VNodePage> {
     );
   }
 
-  // WIDGET AUXILIAR: TÍTULO DE SEÇÃO
   Widget _buildSectionTitle(String title) {
     return Padding(
       padding: const EdgeInsets.only(left: 4, bottom: 10),

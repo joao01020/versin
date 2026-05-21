@@ -1,6 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:versin/app/locator.dart'; // Importação do locator
+import 'package:versin/app/routes/app_routes.dart'; // Importação do sistema de rotas
+import 'package:versin/modules/dashboard/controllers/dashboard_controller.dart';
 
 class MatchPage extends StatefulWidget {
+  // Rota estática definida para referência centralizada
+  static const String routeName = AppRoutes.match;
+
   const MatchPage({super.key});
 
   @override
@@ -8,9 +14,8 @@ class MatchPage extends StatefulWidget {
 }
 
 class _MatchPageState extends State<MatchPage> {
-  // CORES DO TEMA
-  final Color accentNeon = const Color(0xFFE040FB);
-  final Color primaryPurple = const Color(0xFF6A1B9A);
+  // Buscamos a instância única do controller via GetIt
+  final DashboardController controller = sl<DashboardController>();
 
   // MOCK DE USUÁRIOS PARA O MATCH
   final List<Map<String, dynamic>> _profiles = [
@@ -30,54 +35,59 @@ class _MatchPageState extends State<MatchPage> {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // CABEÇALHO DA PÁGINA
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "Novas Conexões",
-                    style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  Text(
-                    "Encontre artistas com o seu flow",
-                    style: TextStyle(color: Colors.white38, fontSize: 12),
-                  ),
-                ],
-              ),
-              IconButton(
-                icon: Icon(Icons.tune, color: accentNeon),
-                onPressed: () {}, // Filtros de busca
-              )
-            ],
-          ),
-          const SizedBox(height: 24),
+    // Adicionado Scaffold para manter a consistência da navegação e tema global
+    return Scaffold(
+      backgroundColor: const Color(0xFF0D0B1F),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 20),
+            // CABEÇALHO DA PÁGINA
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Novas Conexões",
+                      style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      "Encontre artistas com o seu flow",
+                      style: TextStyle(color: Colors.white38, fontSize: 12),
+                    ),
+                  ],
+                ),
+                IconButton(
+                  icon: Icon(Icons.tune, color: controller.accentNeon),
+                  onPressed: () {}, // Filtros de busca
+                )
+              ],
+            ),
+            const SizedBox(height: 24),
 
-          // CARD DE DESTAQUE (MATCH PRINCIPAL)
-          _buildDiscoveryCard(),
+            // CARD DE DESTAQUE (MATCH PRINCIPAL)
+            _buildDiscoveryCard(),
 
-          const SizedBox(height: 24),
+            const SizedBox(height: 24),
 
-          // SEÇÃO DE RECOMENDADOS
-          const Text(
-            "Recomendados para você",
-            style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 16),
+            // SEÇÃO DE RECOMENDADOS
+            const Text(
+              "Recomendados para você",
+              style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
 
-          // LISTA DE PERFIS
-          Column(
-            children: _profiles.map((p) => _buildProfileTile(p)).toList(),
-          ),
-          const SizedBox(height: 30),
-        ],
+            // LISTA DE PERFIS
+            Column(
+              children: _profiles.map((p) => _buildProfileTile(p)).toList(),
+            ),
+            const SizedBox(height: 30),
+          ],
+        ),
       ),
     );
   }
@@ -90,7 +100,7 @@ class _MatchPageState extends State<MatchPage> {
         borderRadius: BorderRadius.circular(24),
         gradient: LinearGradient(
           begin: Alignment.bottomRight,
-          colors: [primaryPurple.withOpacity(0.8), Colors.black54],
+          colors: [controller.primaryPurple.withOpacity(0.8), Colors.black54],
         ),
         image: const DecorationImage(
           image: NetworkImage("https://images.unsplash.com/photo-1514525253361-bee8718a7439?q=80&w=500"),
@@ -112,7 +122,7 @@ class _MatchPageState extends State<MatchPage> {
                   style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(width: 8),
-                Icon(Icons.verified, color: accentNeon, size: 18),
+                Icon(Icons.verified, color: controller.accentNeon, size: 18),
               ],
             ),
             const Text(
@@ -124,12 +134,12 @@ class _MatchPageState extends State<MatchPage> {
               children: [
                 _buildActionButton(Icons.close, Colors.white24),
                 const SizedBox(width: 12),
-                _buildActionButton(Icons.favorite, accentNeon),
+                _buildActionButton(Icons.favorite, controller.accentNeon),
                 const Spacer(),
                 ElevatedButton(
                   onPressed: () {},
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: accentNeon,
+                    backgroundColor: controller.accentNeon,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                   child: const Text("OUVIR DEMO", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
@@ -167,7 +177,7 @@ class _MatchPageState extends State<MatchPage> {
         children: [
           CircleAvatar(
             radius: 25,
-            backgroundColor: primaryPurple,
+            backgroundColor: controller.primaryPurple,
             child: Text(profile['name'][0], style: const TextStyle(color: Colors.white)),
           ),
           const SizedBox(width: 16),
@@ -189,13 +199,13 @@ class _MatchPageState extends State<MatchPage> {
                 Row(
                   children: (profile['tags'] as List).map((t) => Padding(
                     padding: const EdgeInsets.only(right: 6),
-                    child: Text("#$t", style: TextStyle(color: accentNeon, fontSize: 10)),
+                    child: Text("#$t", style: TextStyle(color: controller.accentNeon, fontSize: 10)),
                   )).toList(),
                 )
               ],
             ),
           ),
-          Icon(Icons.arrow_forward_ios, color: Colors.white12, size: 14),
+          const Icon(Icons.arrow_forward_ios, color: Colors.white12, size: 14),
         ],
       ),
     );

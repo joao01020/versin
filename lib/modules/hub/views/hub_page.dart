@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:versin/app/routes/app_routes.dart'; // Importação das rotas
 import '../controllers/hub_telemetry_controller.dart';
 import '../widgets/master_search_card.dart';
 import '../widgets/navigation_hub_card.dart';
@@ -8,6 +9,9 @@ import '../widgets/chassi_components_list.dart';
 import '../widgets/integrity_spectrum_card.dart';
 
 class HubPage extends StatefulWidget {
+  // Rota estática definida para referência centralizada
+  static const String routeName = AppRoutes.hub;
+
   const HubPage({super.key});
 
   @override

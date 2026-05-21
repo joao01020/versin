@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:versin/app/locator.dart'; // Importação do locator
+import 'package:versin/modules/dashboard/controllers/dashboard_controller.dart';
 
 class MarketPage extends StatefulWidget {
   const MarketPage({super.key});
@@ -8,8 +10,8 @@ class MarketPage extends StatefulWidget {
 }
 
 class _MarketPageState extends State<MarketPage> {
-  final Color accentNeon = const Color(0xFFE040FB);
-  final Color primaryPurple = const Color(0xFF6A1B9A);
+  // Buscamos a instância única do controller via GetIt
+  final DashboardController controller = sl<DashboardController>();
 
   // Categorias de filtro
   final List<String> _categories = ["Todos", "Trap", "R&B", "Drill", "Pluggnb", "Lyrics"];
@@ -55,10 +57,11 @@ class _MarketPageState extends State<MarketPage> {
                   margin: const EdgeInsets.symmetric(horizontal: 4),
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   decoration: BoxDecoration(
-                    color: isSelected ? accentNeon : Colors.white.withOpacity(0.05),
+                    // Usa a cor do controller para consistência
+                    color: isSelected ? controller.accentNeon : Colors.white.withOpacity(0.05),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                      color: isSelected ? accentNeon : Colors.white10,
+                      color: isSelected ? controller.accentNeon : Colors.white10,
                     ),
                   ),
                   child: Center(
@@ -79,15 +82,15 @@ class _MarketPageState extends State<MarketPage> {
 
         const SizedBox(height: 20),
 
-        // CARD INDIVIDUAL EM TAMANHO MÉDIO CONTROLADO (Substituindo GridView temporariamente para testes)
+        // CARD INDIVIDUAL EM TAMANHO MÉDIO CONTROLADO
         Expanded(
           child: Padding(
             padding: const EdgeInsets.all(20),
             child: Align(
               alignment: Alignment.topLeft,
               child: SizedBox(
-                width: 240,  // Largura média definida para o card não esticar na tela desktop
-                height: 320, // Altura proporcional mantendo o aspecto clássico de card
+                width: 240, 
+                height: 320,
                 child: _buildMarketCard(0),
               ),
             ),
@@ -116,13 +119,14 @@ class _MarketPageState extends State<MarketPage> {
                 gradient: LinearGradient(
                   begin: Alignment.bottomCenter,
                   end: Alignment.topCenter,
-                  colors: [Colors.black, primaryPurple.withOpacity(0.5)],
+                  // Usa as cores do seu tema centralizado
+                  colors: [Colors.black, controller.primaryPurple.withOpacity(0.5)],
                 ),
               ),
               child: Stack(
                 alignment: Alignment.center,
                 children: [
-                  Icon(Icons.play_circle_fill, color: accentNeon.withOpacity(0.8), size: 40),
+                  Icon(Icons.play_circle_fill, color: controller.accentNeon.withOpacity(0.8), size: 40),
                   Positioned(
                     top: 8,
                     right: 8,
@@ -159,7 +163,7 @@ class _MarketPageState extends State<MarketPage> {
                   children: [
                     Text(
                       "R\$ 197,00",
-                      style: TextStyle(color: accentNeon, fontWeight: FontWeight.bold, fontSize: 13),
+                      style: TextStyle(color: controller.accentNeon, fontWeight: FontWeight.bold, fontSize: 13),
                     ),
                     const Icon(Icons.add_shopping_cart, color: Colors.white54, size: 16),
                   ],

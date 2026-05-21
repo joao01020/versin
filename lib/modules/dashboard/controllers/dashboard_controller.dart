@@ -1,16 +1,17 @@
 import 'package:flutter/material.dart';
-import '../repositories/dashboard_repository.dart'; // <-- Importa o repositório
-import '../data/models/hardware_status_model.dart'; // ⚡ IMPORT ADICIONADO: Para reconhecer o tipo do chassi
+import '../repositories/dashboard_repository.dart'; 
+import '../data/models/hardware_status_model.dart'; 
 
 /// [DashboardController] handles business logic, consuming data safely through repositories.
 /// [DashboardController] gerencia a lógica de negócios, consumindo dados de forma segura via repositórios.
-class DashboardController {
+class DashboardController extends ChangeNotifier {
   // Injecting the data repository / Injetando o repositório de dados
   final DashboardRepository _repository = DashboardRepository();
 
   // NAVIGATION & PAGE CONTROL
   late final PageController pageController;
-  int currentIndex = 0;
+  int _currentIndex = 0;
+  int get currentIndex => _currentIndex;
 
   // SYSTEM PALETTE & DESIGN COLORS
   final Color primaryPurple = const Color(0xFF6A1B9A);
@@ -36,33 +37,40 @@ class DashboardController {
 
   // EXPOSING THE STREAM FROM THE REPOSITORY / EXPOENDO O STREAM VINDO DO REPOSITÓRIO
   /// Stream fetching hardware real-time data from the backend repository layer.
-  // ⚡ RETORNO CORRIGIDO: Agora batendo perfeitamente com o tipo que vem do DashboardRepository
   Stream<List<HardwareStatusModel>> get hardwareStatusStream => _repository.getHardwareStatusStream();
 
   void init() {
-    pageController = PageController(initialPage: currentIndex);
+    pageController = PageController(initialPage: _currentIndex);
   }
 
-  void disposeController() {
+  @override
+  void dispose() {
     pageController.dispose();
+    super.dispose();
   }
 
   void navigationTap(int index) {
-    currentIndex = index;
-    pageController.animateToPage(
-      index,
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
-    );
+    if (_currentIndex != index) {
+      _currentIndex = index;
+      pageController.animateToPage(
+        index,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+      notifyListeners(); // Notifica a UI para atualizar o BottomNav e Header
+    }
   }
 
   void handlePageChange(int index) {
-    currentIndex = index;
+    if (_currentIndex != index) {
+      _currentIndex = index;
+      notifyListeners(); // Garante que a UI reflita a mudança após o swipe
+    }
   }
 
   String getModuleTitle() {
-    switch (currentIndex) {
-      case 0: return "Lab Module";
+    switch (_currentIndex) {
+      case 0: return "Dashboard";
       case 1: return "Match";
       case 2: return "Market";
       case 3: return "Wallet";
@@ -80,26 +88,39 @@ class DashboardController {
     return months[month - 1];
   }
 
-  void toggleProfileCard() => isProfileCardExpanded = !isProfileCardExpanded;
-  void toggleCalendarExpanded() => isCalendarExpanded = !isCalendarExpanded;
+  void toggleProfileCard() {
+    isProfileCardExpanded = !isProfileCardExpanded;
+    notifyListeners();
+  }
+  
+  void toggleCalendarExpanded() {
+    isCalendarExpanded = !isCalendarExpanded;
+    notifyListeners();
+  }
 
   void updateFocusedMonth(int newMonth) {
     focusedDay = DateTime(focusedDay.year, newMonth, 1);
     selectedDay = 1;
+    notifyListeners();
   }
 
   void updateFocusedYear(int newYear) {
     focusedDay = DateTime(newYear, focusedDay.month, 1);
     selectedDay = 1;
+    notifyListeners();
   }
 
   void navigateMonth({required bool forward}) {
     int nextMonth = forward ? focusedDay.month + 1 : focusedDay.month - 1;
     focusedDay = DateTime(focusedDay.year, nextMonth, 1);
     selectedDay = 1;
+    notifyListeners();
   }
 
-  void selectDay(int day) => selectedDay = day;
+  void selectDay(int day) {
+    selectedDay = day;
+    notifyListeners();
+  }
 
   void addAppointment({required String title, required String time}) {
     appointments.add({
@@ -109,6 +130,7 @@ class DashboardController {
       "time": time,
       "title": title,
     });
+    notifyListeners();
   }
 
   void pickProfileImage() => debugPrint("Abrir seletor de galeria local");

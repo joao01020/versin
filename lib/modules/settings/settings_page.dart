@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:versin/app/routes/app_routes.dart'; // Importação do sistema de rotas
 
 class SettingsPage extends StatefulWidget {
+  // Rota estática definida para referência centralizada
+  static const String routeName = AppRoutes.settings;
+
   const SettingsPage({super.key});
 
   @override
@@ -31,10 +35,10 @@ class _SettingsPageState extends State<SettingsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.transparent, // Permite visualizar o gradiente de fundo do Dashboard
+      backgroundColor: const Color(0xFF0D0B1F), // Fundo unificado do app
       body: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -61,7 +65,7 @@ class _SettingsPageState extends State<SettingsPage> {
             
             const SizedBox(height: 24),
 
-            // SEÇÃO: CONFIGURAÇÕES DO APLICATIVO (NOTIFICAÇÃO DE ÁUDIO REMOVIDA)
+            // SEÇÃO: CONFIGURAÇÕES DO APLICATIVO
             _buildSectionTitle("Preferências do Sistema"),
             _buildSettingsContainer(
               child: Column(

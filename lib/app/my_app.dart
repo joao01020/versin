@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'app_routes.dart';
-import 'auth_wrapper.dart';
+import 'package:versin/app/app_routes.dart'; // IMPORTAÇÃO QUE FALTAVA ADICIONADA AQUI
+import 'package:versin/app/auth_wrapper.dart';
 
 /// [MyApp] é o chassi e orquestrador global da interface do aplicativo.
 /// Ele define as configurações básicas de inicialização, identidade visual
@@ -17,7 +17,6 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       
       // Configuração base do Tema (Identidade Visual)
-      // Nota Sênior: Futuramente, este ThemeData deve ser extraído para `core/theme/`
       theme: ThemeData(
         useMaterial3: true,
         brightness: Brightness.dark,
@@ -26,7 +25,7 @@ class MyApp extends StatelessWidget {
         colorScheme: const ColorScheme.dark(
           primary: Color(0xFFE040FB),
           secondary: Color(0xFF00E5FF),
-          background: Color(0xFF0D0B1F),
+          surface: Color(0xFF0D0B1F),
         ),
       ),
 

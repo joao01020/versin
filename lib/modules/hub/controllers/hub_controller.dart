@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:versin/modules/hub/data/models/hub_mode_model.dart';
 import 'package:versin/modules/hub/data/repositories/hub_repository.dart';
-// 🔥 CAMINHO SEGURO E ABSOLUTO: Apontando exatamente para onde o arquivo está guardado
 import 'package:versin/modules/hub/data/datasources/hub_remote_datasource.dart'; 
 
 class HubController {

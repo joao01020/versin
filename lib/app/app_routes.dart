@@ -1,21 +1,15 @@
 import 'package:flutter/material.dart';
-import 'app_routes.dart';
-import 'auth_wrapper.dart'; // Importa o wrapper
+import 'package:versin/modules/login/views/login_page.dart';
+import 'package:versin/modules/dashboard/views/dashboard_page.dart';
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class AppRoutes {
+  // Deixamos apenas as strings que serão chamadas via Navigator.pushNamed
+  static const String login = '/login';
+  static const String dashboard = '/dashboard';
 
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Versin',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark(),
-      
-      // Agora o app SEMPRE começa pelo Wrapper, e ele decide o resto!
-      home: const AuthWrapper(), 
-      
-      routes: AppRoutes.routes,
-    );
-  }
+  static Map<String, WidgetBuilder> get routes => {
+    // 🚨 Sem a rota '/' aqui dentro! O 'home: const AuthWrapper()' no my_app.dart já cuida disso.
+    login: (context) => const LoginPage(), 
+    dashboard: (context) => const DashboardPage(),
+  };
 }

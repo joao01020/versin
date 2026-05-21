@@ -8,10 +8,10 @@ import '../widgets/dashboard_header_widget.dart';
 import '../widgets/account_activities_card_widget.dart';
 import '../widgets/hub_status_card_widget.dart';
 import '../widgets/main_chart_card_widget.dart';
-import '../widgets/calendar_card_widget.dart'; // <-- Novo Widget Importado!
+import '../widgets/calendar_card_widget.dart';
 
 // ECOSYSTEM MODULES IMPORTS
-import 'package:versin/features/rhymes/presentation/pages/chat_page.dart';
+import 'package:versin/modules/chat/views/chat_page.dart'; 
 import 'package:versin/modules/hub/views/hub_page.dart';
 import 'package:versin/modules/match/match_page.dart';
 import 'package:versin/modules/wallet/wallet_page.dart';
@@ -150,7 +150,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 currentIndex: _controller.currentIndex,
                 onTap: (index) {
                   setState(() => _controller.navigationTap(index));
-                }, 
+                },
                 selectedItemColor: _controller.accentNeon,
                 unselectedItemColor: Colors.white24,
                 showSelectedLabels: false,
@@ -190,19 +190,17 @@ class _DashboardPageState extends State<DashboardPage> {
                       Expanded(
                         child: PageView(
                           controller: _controller.pageController,
-                          onPageChanged: (index) {
-                            setState(() => _controller.handlePageChange(index));
-                          }, 
+                          onPageChanged: (index) => setState(() => _controller.handlePageChange(index)), 
                           children: [
-                            _buildLabModule(isMobile), 
-                            const MatchPage(),         
-                            const MarketPage(),        
-                            const WalletPage(),        
-                            const ChatPage(),          
-                            const ShowcasePage(),      
-                            const HubPage(),           
-                            const VNodePage(),         
-                            const SettingsPage(),      
+                            _buildLabModule(constraints.maxWidth < 800), // Dash
+                            MatchPage(),                                 // Removido const
+                            MarketPage(),                                // Removido const
+                            WalletPage(),                                // Removido const
+                            ChatPage(),                                  // Removido const
+                            ShowcasePage(),                              // Removido const
+                            HubPage(),                                   // Removido const
+                            VNodePage(),                                 // Removido const
+                            SettingsPage(),                              // Removido const
                           ],
                         ),
                       ),
@@ -243,7 +241,6 @@ class _DashboardPageState extends State<DashboardPage> {
           const SizedBox(height: 20),
           MainChartCardWidget(controller: _controller), 
           const SizedBox(height: 20),
-          // CALLING INTERACTIVE CALENDAR / CHAMANDO O CALENDÁRIO INTERATIVO ISOLADO
           CalendarCardWidget(
             controller: _controller,
             onStateChanged: () => setState(() {}),

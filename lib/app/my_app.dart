@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:versin/app/app_routes.dart'; // IMPORTAÇÃO QUE FALTAVA ADICIONADA AQUI
+import 'package:versin/app/routes/app_routes.dart'; // IMPORTAÇÃO QUE FALTAVA ADICIONADA AQUI
 import 'package:versin/app/auth_wrapper.dart';
 
 /// [MyApp] é o chassi e orquestrador global da interface do aplicativo.

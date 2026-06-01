@@ -15,8 +15,10 @@ import '../widgets/calendar_card_widget.dart';
 // ECOSYSTEM MODULES IMPORTS
 import 'package:versin/modules/chat/views/chat_page.dart'; 
 import 'package:versin/modules/hub/views/hub_page.dart';
-import 'package:versin/modules/match/match_page.dart';
-import 'package:versin/modules/wallet/wallet_page.dart';
+// EN: Updated path targeting the newly structured modular layout location
+// PT: Caminho atualizado apontando para o local da nova estrutura modular
+import 'package:versin/modules/match/views/match_page.dart';
+import 'package:versin/modules/wallet/views/wallet_page.dart';
 import 'package:versin/modules/market/market_page.dart'; 
 import 'package:versin/modules/showcase/showcase_page.dart';
 import 'package:versin/modules/vnode/vnode_page.dart'; 
@@ -163,13 +165,13 @@ class _DashboardPageState extends State<DashboardPage> {
                           children: [
                             DashboardLabPage(controller: _controller, onAddAppointment: _showAddAppointmentSheet),
                             const MatchPage(),
-                            const MarketPage(),
+                            MarketPage(),
                             const WalletPage(),
                             const ChatPage(),
-                            const ShowcasePage(),
+                            ShowcasePage(),
                             const HubPage(),
-                            const VNodePage(),
-                            const SettingsPage(),
+                            VNodePage(),
+                            SettingsPage(),
                           ],
                         ),
                       ),

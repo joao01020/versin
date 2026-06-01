@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart'; // Import necessário para verificar kDebugMode
 import 'package:flutter/material.dart';
 import 'package:versin/modules/login/controllers/login_controller.dart';
 import 'package:versin/modules/login/widgets/login_header_logo.dart';
@@ -22,7 +23,6 @@ class _LoginPageState extends State<LoginPage> {
   @override
   void initState() {
     super.initState();
-    // Ativa os listeners nativos do controller para monitorar input e rodar o debounce
     _controller.initListeners();
   }
 
@@ -58,9 +58,19 @@ class _LoginPageState extends State<LoginPage> {
                     primaryPurple: primaryPurple,
                     accentNeon: accentNeon,
                   ),
+                  
+                  // MODO DEV: Botão de bypass que só aparece em Debug Mode
+                  if (kDebugMode) ...[
+                    const SizedBox(height: 10),
+                    TextButton(
+                      onPressed: () => Navigator.pushReplacementNamed(context, '/dashboard'),
+                      child: Text("DEV MODE: Bypass p/ Dashboard", style: TextStyle(color: accentNeon.withOpacity(0.6), fontSize: 10)),
+                    ),
+                  ],
+
                   const SizedBox(height: 40),
 
-                  // BOTÃO GOOGLE CONECTADO AO CONTROLLER
+                  // BOTÃO GOOGLE
                   CustomSocialButton(
                     label: "Entrar com o Google",
                     isGoogle: true,
@@ -68,7 +78,7 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                   const SizedBox(height: 12),
 
-                  // BOTÃO GITHUB CONECTADO AO CONTROLLER
+                  // BOTÃO GITHUB
                   CustomSocialButton(
                     label: "Conectar via GitHub",
                     isGoogle: false,
@@ -115,7 +125,7 @@ class _LoginPageState extends State<LoginPage> {
                     },
                   ),
 
-                  // PAINEL FORMULÁRIO COM ANIMAÇÃO CROSSFADE
+                  // PAINEL FORMULÁRIO
                   ValueListenableBuilder<bool>(
                     valueListenable: _controller.isLocalFieldsExpanded,
                     builder: (context, expanded, _) {
@@ -156,7 +166,6 @@ class _LoginPageState extends State<LoginPage> {
                                 ),
                                 const SizedBox(height: 16),
                                 
-                                // O ENDEREÇO DA WALLET REAGE EM TEMPO REAL AO INPUT DO USERNAME
                                 ValueListenableBuilder<bool>(
                                   valueListenable: _controller.isUsernameAvailable,
                                   builder: (context, _, __) {
@@ -173,7 +182,6 @@ class _LoginPageState extends State<LoginPage> {
                                   },
                                 ),
                                 
-                                // SEÇÃO DE CONFIRMAÇÃO CONDICIONAL REATIVA
                                 ValueListenableBuilder<bool>(
                                   valueListenable: _controller.isUsernameAvailable,
                                   builder: (context, available, _) {
@@ -197,7 +205,7 @@ class _LoginPageState extends State<LoginPage> {
                                 ),
                                 const SizedBox(height: 24),
 
-                                // BOTÃO SUBMIT CONDICIONAL REATIVO COM FEEDBACK DE LOADING
+                                // BOTÃO SUBMIT
                                 ValueListenableBuilder<bool>(
                                   valueListenable: _controller.isLoading,
                                   builder: (context, loading, _) {

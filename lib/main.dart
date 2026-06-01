@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:get_it/get_it.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_web_plugins/url_strategy.dart'; // Importação para URLs limpas (sem #)
@@ -16,6 +17,9 @@ import 'package:versin/app/my_app.dart';
 // Importação do serviço de sincronização
 import 'package:versin/core/services/sync_manager.dart';
 
+// Importação do controller para checagem de segurança
+import 'package:versin/modules/dashboard/controllers/dashboard_controller.dart';
+
 void main() async {
   // Inicialização essencial do framework
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,8 +27,10 @@ void main() async {
   // 0. Configura estratégia de URL para remover o # da Web
   usePathUrlStrategy();
 
-  // 1. Inicializa o Gerenciador de Dependências (GetIt)
-  setupLocator();
+  // 1. Inicializa o Gerenciador de Dependências (GetIt) com proteção contra duplicidade
+  if (!GetIt.instance.isRegistered<DashboardController>()) {
+    setupLocator();
+  }
 
   // 2. 🛡️ INICIALIZAÇÃO DO SQFLITE PROTEGIDA CONTRA O WEB
   if (!kIsWeb) {

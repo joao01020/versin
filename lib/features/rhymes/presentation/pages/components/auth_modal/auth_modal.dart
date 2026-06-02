@@ -1,28 +1,46 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:async';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart'
+    show
+        kIsWeb;
 import 'package:sqflite/sqflite.dart';
 
 // Importação da persistência core do Versin
 import 'package:versin/core/database/database_helper.dart';
 
-class AuthModal extends StatefulWidget {
-  const AuthModal({super.key});
+class AuthModal
+    extends
+        StatefulWidget {
+  const AuthModal({
+    super.key,
+  });
 
-  static void show(BuildContext context) {
+  static void show(
+    BuildContext context,
+  ) {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const AuthModal(),
+      builder:
+          (
+            context,
+          ) => const AuthModal(),
     );
   }
 
   @override
-  State<AuthModal> createState() => _AuthModalState();
+  State<
+    AuthModal
+  >
+  createState() => _AuthModalState();
 }
 
-class _AuthModalState extends State<AuthModal> {
+class _AuthModalState
+    extends
+        State<
+          AuthModal
+        > {
   bool _isLoading = false;
   bool _isExpanded = false;
   bool _registrationSuccess = false;
@@ -35,7 +53,13 @@ class _AuthModalState extends State<AuthModal> {
   Timer? _debounce;
 
   // --- PERSISTÊNCIA LOCAL (SQLITE) ---
-  Future<void> _saveLocalProfile(String userId, String username) async {
+  Future<
+    void
+  >
+  _saveLocalProfile(
+    String userId,
+    String username,
+  ) async {
     try {
       final db = await DatabaseHelper.instance.database;
       await db.insert(
@@ -44,57 +68,105 @@ class _AuthModalState extends State<AuthModal> {
           'id': userId,
           'name': username,
           'wallet': "wallet@$username",
-          'synced': 1 // Indica que já está sincronizado com a nuvem Genesis
+          'synced': 1, // Indica que já está sincronizado com a nuvem Genesis
         },
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
-    } catch (e) {
-      debugPrint("Erro ao salvar perfil local: $e");
+    } catch (
+      e
+    ) {
+      debugPrint(
+        "Erro ao salvar perfil local: $e",
+      );
     }
   }
 
   // --- VERIFICAÇÃO DE DISPONIBILIDADE NO SUPABASE ---
-  Future<void> _checkWalletAvailability(String value) async {
+  Future<
+    void
+  >
+  _checkWalletAvailability(
+    String value,
+  ) async {
     if (value.isEmpty) return;
-    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    if (_debounce?.isActive ??
+        false)
+      _debounce!.cancel();
 
-    _debounce = Timer(const Duration(milliseconds: 500), () async {
-      try {
-        final res = await Supabase.instance.client
-            .from('profiles')
-            .select('username')
-            .eq('username', value.trim())
-            .maybeSingle();
-        
-        if (mounted) {
-          setState(() => _isWalletAvailable = res == null);
+    _debounce = Timer(
+      const Duration(
+        milliseconds: 500,
+      ),
+      () async {
+        try {
+          final res = await Supabase.instance.client
+              .from(
+                'profiles',
+              )
+              .select(
+                'username',
+              )
+              .eq(
+                'username',
+                value.trim(),
+              )
+              .maybeSingle();
+
+          if (mounted) {
+            setState(
+              () => _isWalletAvailable =
+                  res ==
+                  null,
+            );
+          }
+        } catch (
+          e
+        ) {
+          debugPrint(
+            "Erro na checagem: $e",
+          );
         }
-      } catch (e) {
-        debugPrint("Erro na checagem: $e");
-      }
-    });
+      },
+    );
   }
 
-  Future<void> _handleSocialLogin(OAuthProvider provider) async {
+  Future<
+    void
+  >
+  _handleSocialLogin(
+    OAuthProvider provider,
+  ) async {
     try {
       await Supabase.instance.client.auth.signInWithOAuth(
         provider,
-        redirectTo: kIsWeb ? null : 'io.supabase.versin://callback',
+        redirectTo: kIsWeb
+            ? null
+            : 'io.supabase.versin://callback',
       );
-    } catch (e) {
-      debugPrint("Erro Social: $e");
+    } catch (
+      e
+    ) {
+      debugPrint(
+        "Erro Social: $e",
+      );
     }
   }
 
   // --- REGISTRO COM PERSISTÊNCIA E SINCRONIA ---
-  Future<void> _handleEmailGenesis() async {
+  Future<
+    void
+  >
+  _handleEmailGenesis() async {
     final username = _usernameController.text.trim();
-    if (username.isEmpty || !_isWalletAvailable) return;
+    if (username.isEmpty ||
+        !_isWalletAvailable)
+      return;
 
-    setState(() => _isLoading = true);
+    setState(
+      () => _isLoading = true,
+    );
     try {
-      final String generatedWallet =
-          "0x${DateTime.now().millisecondsSinceEpoch}vrs";
+      final String generatedWallet = "0x${DateTime.now().millisecondsSinceEpoch}vrs";
 
       final AuthResponse res = await Supabase.instance.client.auth.signUp(
         email: _emailController.text.trim(),
@@ -105,25 +177,46 @@ class _AuthModalState extends State<AuthModal> {
         },
       );
 
-      if (res.user != null) {
+      if (res.user !=
+          null) {
         // Grava na persistência local SQLite imediatamente
-        await _saveLocalProfile(res.user!.id, username);
+        await _saveLocalProfile(
+          res.user!.id,
+          username,
+        );
 
-        setState(() {
-          _isLoading = false;
-          _registrationSuccess = true;
-        });
+        setState(
+          () {
+            _isLoading = false;
+            _registrationSuccess = true;
+          },
+        );
 
         // Delay para feedback visual de sucesso
-        await Future.delayed(const Duration(seconds: 2));
-        if (mounted) Navigator.pop(context);
+        await Future.delayed(
+          const Duration(
+            seconds: 2,
+          ),
+        );
+        if (mounted)
+          Navigator.pop(
+            context,
+          );
       }
-    } catch (e) {
-      setState(() => _isLoading = false);
+    } catch (
+      e
+    ) {
+      setState(
+        () => _isLoading = false,
+      );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(
           SnackBar(
-            content: Text("Erro: ${e.toString()}"),
+            content: Text(
+              "Erro: ${e.toString()}",
+            ),
             backgroundColor: Colors.redAccent,
           ),
         );
@@ -132,19 +225,36 @@ class _AuthModalState extends State<AuthModal> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(
+    BuildContext context,
+  ) {
     return Dialog(
-      backgroundColor: const Color(0xFF0A0A0A),
+      backgroundColor: const Color(
+        0xFF0A0A0A,
+      ),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(24),
-        side: BorderSide(color: Colors.purpleAccent.withOpacity(0.3), width: 1),
+        borderRadius: BorderRadius.circular(
+          24,
+        ),
+        side: BorderSide(
+          color: Colors.purpleAccent.withValues(
+            alpha: 0.3,
+          ),
+          width: 1,
+        ),
       ),
       child: AnimatedSize(
-        duration: const Duration(milliseconds: 300),
+        duration: const Duration(
+          milliseconds: 300,
+        ),
         child: Container(
-          padding: const EdgeInsets.all(28.0),
+          padding: const EdgeInsets.all(
+            28.0,
+          ),
           width: 420,
-          child: _registrationSuccess ? _buildSuccessView() : _buildMainView(),
+          child: _registrationSuccess
+              ? _buildSuccessView()
+              : _buildMainView(),
         ),
       ),
     );
@@ -159,7 +269,9 @@ class _AuthModalState extends State<AuthModal> {
           color: Colors.greenAccent,
           size: 64,
         ),
-        const SizedBox(height: 24),
+        const SizedBox(
+          height: 24,
+        ),
         const Text(
           "ACESSO GARANTIDO",
           style: TextStyle(
@@ -168,13 +280,20 @@ class _AuthModalState extends State<AuthModal> {
             letterSpacing: 2,
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(
+          height: 12,
+        ),
         const Text(
           "Sua identidade foi criptografada e salva localmente.\nVerifique seu e-mail para ativar.",
           textAlign: TextAlign.center,
-          style: TextStyle(color: Colors.grey, fontSize: 13),
+          style: TextStyle(
+            color: Colors.grey,
+            fontSize: 13,
+          ),
         ),
-        const SizedBox(height: 24),
+        const SizedBox(
+          height: 24,
+        ),
         const LinearProgressIndicator(
           color: Colors.greenAccent,
           backgroundColor: Colors.white10,
@@ -187,8 +306,14 @@ class _AuthModalState extends State<AuthModal> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Icon(Icons.token_outlined, color: Colors.purpleAccent, size: 54),
-        const SizedBox(height: 16),
+        const Icon(
+          Icons.token_outlined,
+          color: Colors.purpleAccent,
+          size: 54,
+        ),
+        const SizedBox(
+          height: 16,
+        ),
         const Text(
           "VERSIN GENESIS",
           style: TextStyle(
@@ -198,7 +323,9 @@ class _AuthModalState extends State<AuthModal> {
             letterSpacing: 2,
           ),
         ),
-        const SizedBox(height: 32),
+        const SizedBox(
+          height: 32,
+        ),
 
         if (!_isExpanded) ...[
           _buildActionButton(
@@ -206,38 +333,67 @@ class _AuthModalState extends State<AuthModal> {
             icon: Icons.email_rounded,
             color: Colors.purpleAccent,
             textColor: Colors.black,
-            onPressed: () => setState(() => _isExpanded = true),
+            onPressed: () => setState(
+              () => _isExpanded = true,
+            ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(
+            height: 24,
+          ),
           Row(
             children: [
-              Expanded(child: Divider(color: Colors.white.withOpacity(0.1))),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16),
-                child: Text(
-                  "ENTRAR COM",
-                  style: TextStyle(color: Colors.grey, fontSize: 10),
+              Expanded(
+                child: Divider(
+                  color: Colors.white.withValues(
+                    alpha: 0.1,
+                  ),
                 ),
               ),
-              Expanded(child: Divider(color: Colors.white.withOpacity(0.1))),
+              const Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: 16,
+                ),
+                child: Text(
+                  "ENTRAR COM",
+                  style: TextStyle(
+                    color: Colors.grey,
+                    fontSize: 10,
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Divider(
+                  color: Colors.white.withValues(
+                    alpha: 0.1,
+                  ),
+                ),
+              ),
             ],
           ),
-          const SizedBox(height: 24),
+          const SizedBox(
+            height: 24,
+          ),
           Row(
             children: [
               Expanded(
                 child: _buildSocialButton(
                   label: "GITHUB",
                   icon: Icons.code_rounded,
-                  onPressed: () => _handleSocialLogin(OAuthProvider.github),
+                  onPressed: () => _handleSocialLogin(
+                    OAuthProvider.github,
+                  ),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(
+                width: 12,
+              ),
               Expanded(
                 child: _buildSocialButton(
                   label: "GOOGLE",
                   icon: Icons.g_mobiledata_rounded,
-                  onPressed: () => _handleSocialLogin(OAuthProvider.google),
+                  onPressed: () => _handleSocialLogin(
+                    OAuthProvider.google,
+                  ),
                 ),
               ),
             ],
@@ -250,7 +406,9 @@ class _AuthModalState extends State<AuthModal> {
             label: "E-mail",
             icon: Icons.alternate_email_rounded,
           ),
-          const SizedBox(height: 16),
+          const SizedBox(
+            height: 16,
+          ),
           _buildTextField(
             controller: _usernameController,
             label: "Identidade",
@@ -259,22 +417,30 @@ class _AuthModalState extends State<AuthModal> {
             onChanged: _checkWalletAvailability,
             helperText: _usernameController.text.isEmpty
                 ? null
-                : (_isWalletAvailable ? "Disponível ✅" : "Indisponível ❌"),
+                : (_isWalletAvailable
+                      ? "Disponível ✅"
+                      : "Indisponível ❌"),
             helperColor: _isWalletAvailable
                 ? Colors.greenAccent
                 : Colors.redAccent,
           ),
-          const SizedBox(height: 16),
+          const SizedBox(
+            height: 16,
+          ),
           _buildTextField(
             controller: _passwordController,
             label: "Senha",
             icon: Icons.lock_person_outlined,
             isPassword: true,
           ),
-          const SizedBox(height: 24),
+          const SizedBox(
+            height: 24,
+          ),
 
           if (_isLoading)
-            const CircularProgressIndicator(color: Colors.purpleAccent)
+            const CircularProgressIndicator(
+              color: Colors.purpleAccent,
+            )
           else
             _buildActionButton(
               label: "FINALIZAR REGISTRO",
@@ -284,19 +450,31 @@ class _AuthModalState extends State<AuthModal> {
             ),
 
           TextButton(
-            onPressed: () => setState(() => _isExpanded = false),
+            onPressed: () => setState(
+              () => _isExpanded = false,
+            ),
             child: const Text(
               "Voltar",
-              style: TextStyle(color: Colors.grey, fontSize: 12),
+              style: TextStyle(
+                color: Colors.grey,
+                fontSize: 12,
+              ),
             ),
           ),
         ],
-        const SizedBox(height: 8),
+        const SizedBox(
+          height: 8,
+        ),
         TextButton(
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => Navigator.pop(
+            context,
+          ),
           child: const Text(
             "Sair",
-            style: TextStyle(color: Colors.grey, fontSize: 12),
+            style: TextStyle(
+              color: Colors.grey,
+              fontSize: 12,
+            ),
           ),
         ),
       ],
@@ -313,16 +491,32 @@ class _AuthModalState extends State<AuthModal> {
     return ElevatedButton.icon(
       style: ElevatedButton.styleFrom(
         backgroundColor: color,
-        minimumSize: const Size(double.infinity, 54),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        minimumSize: const Size(
+          double.infinity,
+          54,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(
+            14,
+          ),
+        ),
       ),
       onPressed: onPressed,
-      icon: icon != null
-          ? Icon(icon, color: textColor, size: 20)
+      icon:
+          icon !=
+              null
+          ? Icon(
+              icon,
+              color: textColor,
+              size: 20,
+            )
           : const SizedBox.shrink(),
       label: Text(
         label,
-        style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
+        style: TextStyle(
+          color: textColor,
+          fontWeight: FontWeight.bold,
+        ),
       ),
     );
   }
@@ -334,15 +528,33 @@ class _AuthModalState extends State<AuthModal> {
   }) {
     return OutlinedButton.icon(
       style: OutlinedButton.styleFrom(
-        minimumSize: const Size(double.infinity, 50),
-        side: BorderSide(color: Colors.white.withOpacity(0.1)),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        minimumSize: const Size(
+          double.infinity,
+          50,
+        ),
+        side: BorderSide(
+          color: Colors.white.withValues(
+            alpha: 0.1,
+          ),
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(
+            14,
+          ),
+        ),
       ),
       onPressed: onPressed,
-      icon: Icon(icon, color: Colors.white, size: 20),
+      icon: Icon(
+        icon,
+        color: Colors.white,
+        size: 20,
+      ),
       label: Text(
         label,
-        style: const TextStyle(color: Colors.white, fontSize: 12),
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 12,
+        ),
       ),
     );
   }
@@ -355,28 +567,54 @@ class _AuthModalState extends State<AuthModal> {
     String? prefixText,
     String? helperText,
     Color? helperColor,
-    Function(String)? onChanged,
+    Function(
+      String,
+    )?
+    onChanged,
   }) {
     return TextField(
       controller: controller,
       obscureText: isPassword,
       onChanged: onChanged,
-      style: const TextStyle(color: Colors.white, fontSize: 14),
+      style: const TextStyle(
+        color: Colors.white,
+        fontSize: 14,
+      ),
       decoration: InputDecoration(
         labelText: label,
         prefixText: prefixText,
-        prefixIcon: Icon(icon, color: Colors.grey, size: 18),
+        prefixIcon: Icon(
+          icon,
+          color: Colors.grey,
+          size: 18,
+        ),
         helperText: helperText,
-        helperStyle: TextStyle(color: helperColor ?? Colors.grey, fontSize: 11),
+        helperStyle: TextStyle(
+          color:
+              helperColor ??
+              Colors.grey,
+          fontSize: 11,
+        ),
         filled: true,
-        fillColor: Colors.white.withOpacity(0.03),
+        fillColor: Colors.white.withValues(
+          alpha: 0.03,
+        ),
         enabledBorder: OutlineInputBorder(
-          borderSide: const BorderSide(color: Colors.transparent),
-          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(
+            color: Colors.transparent,
+          ),
+          borderRadius: BorderRadius.circular(
+            14,
+          ),
         ),
         focusedBorder: OutlineInputBorder(
-          borderSide: const BorderSide(color: Colors.purpleAccent, width: 1),
-          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(
+            color: Colors.purpleAccent,
+            width: 1,
+          ),
+          borderRadius: BorderRadius.circular(
+            14,
+          ),
         ),
       ),
     );

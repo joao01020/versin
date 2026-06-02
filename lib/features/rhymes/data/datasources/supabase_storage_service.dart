@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:versin/features/rhymes/data/datasources/utils/hash_helper.dart';
 
@@ -5,14 +6,24 @@ class SupabaseStorageService {
   final _supabase = Supabase.instance.client;
 
   /// Registra a obra completa, gera o Hash real e salva rimas utilizadas
-  Future<void> registerWorkInSupa(
+  Future<
+    void
+  >
+  registerWorkInSupa(
     String title,
     String content,
     String username, {
-    List<String>? usedRhymes,
+    List<
+      String
+    >?
+    usedRhymes,
   }) async {
     final user = _supabase.auth.currentUser;
-    if (user == null) throw Exception("Usuário não autenticado");
+    if (user ==
+        null)
+      throw Exception(
+        "Usuário não autenticado",
+      );
 
     final wallet = "wallet@$username";
 
@@ -28,38 +39,57 @@ class SupabaseStorageService {
       'content': content,
       'original_hash': hash,
       'current_owner_wallet': wallet,
-      'author_id': user.id, // Mantido author_id conforme estrutura de works
+      'author_id': user.id,
       'created_at': DateTime.now().toIso8601String(),
       'status': 'original',
       'meta_data': {
-        'used_rhymes': usedRhymes ?? [],
-        'versin_version': '2.8.0-production', // Atualizado para a versão do Schema
+        'used_rhymes':
+            usedRhymes ??
+            [],
+        'versin_version': '2.8.0-production',
       },
     };
 
     try {
-      await _supabase.from('works').insert(newWork);
+      await _supabase
+          .from(
+            'works',
+          )
+          .insert(
+            newWork,
+          );
 
-      // Lógica de incremento de score global via RPC
-      if (usedRhymes != null && usedRhymes.isNotEmpty) {
+      if (usedRhymes !=
+              null &&
+          usedRhymes.isNotEmpty) {
         for (var rhyme in usedRhymes) {
           await _supabase.rpc(
             'increment_word_score',
-            params: {'word_param': rhyme.toLowerCase()},
+            params: {
+              'word_param': rhyme.toLowerCase(),
+            },
           );
         }
       }
 
-      print("🚀 Obra registrada e assinada: $hash");
-    } catch (e) {
-      print("❌ Erro ao registrar obra: $e");
+      debugPrint(
+        "🚀 Obra registrada e assinada: $hash",
+      );
+    } catch (
+      e
+    ) {
+      debugPrint(
+        "❌ Erro ao registrar obra: $e",
+      );
       rethrow;
     }
   }
 
   /// Salva uma letra no histórico (Utilizado pelo botão Finalizar)
-  /// Atualizado para incluir BPM e metadados do Schema V2.8
-  Future<void> saveLyric({
+  Future<
+    void
+  >
+  saveLyric({
     required String content,
     required String hash,
     int bpm = 120,
@@ -68,58 +98,110 @@ class SupabaseStorageService {
     String? structure,
   }) async {
     final user = _supabase.auth.currentUser;
-    if (user == null) return;
+    if (user ==
+        null)
+      return;
 
     try {
-      await _supabase.from('lyrics_history').insert({
-        'user_id': 
-        'content': content,
-        'hash_signature': hash,
-        'bpm': bpm,
-        'vibe': vibe,
-        'theme': theme,
-        'structure': structure,
-        'created_at': DateTime.now().toIso8601String(),
-      });
-      print("✅ Letra salva no histórico do Versin.");
-    } catch (e) {
-      print("⚠️ Erro ao salvar histórico: $e");
+      await _supabase
+          .from(
+            'lyrics_history',
+          )
+          .insert(
+            {
+              'user_id': user.id, // Corrigido: valor do ID adicionado
+              'content': content,
+              'hash_signature': hash,
+              'bpm': bpm,
+              'vibe': vibe,
+              'theme': theme,
+              'structure': structure,
+              'created_at': DateTime.now().toIso8601String(),
+            },
+          );
+      debugPrint(
+        "✅ Letra salva no histórico do Versin.",
+      );
+    } catch (
+      e
+    ) {
+      debugPrint(
+        "⚠️ Erro ao salvar histórico: $e",
+      );
     }
   }
 
   /// Transfere a posse de uma obra assinada
-  Future<void> transferOwnership(
+  Future<
+    void
+  >
+  transferOwnership(
     String workHash,
     String newDestinationWallet,
   ) async {
     try {
       await _supabase
-          .from('works')
-          .update({
-            'current_owner_wallet': newDestinationWallet,
-            'status': 'transferred',
-            'transferred_at': DateTime.now().toIso8601String(),
-          })
-          .eq('original_hash', workHash);
-      print("✅ Sucesso: Transferido para a carteira $newDestinationWallet");
-    } catch (e) {
-      print("❌ Falha na transferência: $e");
+          .from(
+            'works',
+          )
+          .update(
+            {
+              'current_owner_wallet': newDestinationWallet,
+              'status': 'transferred',
+              'transferred_at': DateTime.now().toIso8601String(),
+            },
+          )
+          .eq(
+            'original_hash',
+            workHash,
+          );
+      debugPrint(
+        "✅ Sucesso: Transferido para a carteira $newDestinationWallet",
+      );
+    } catch (
+      e
+    ) {
+      debugPrint(
+        "❌ Falha na transferência: $e",
+      );
       rethrow;
     }
   }
 
   /// Lista obras por carteira do proprietário
-  Future<List<dynamic>> listWorksByOwner(String username) async {
+  Future<
+    List<
+      dynamic
+    >
+  >
+  listWorksByOwner(
+    String username,
+  ) async {
     final wallet = "wallet@$username";
     try {
       final response = await _supabase
-          .from('works')
+          .from(
+            'works',
+          )
           .select()
-          .eq('current_owner_wallet', wallet)
-          .order('created_at', ascending: false);
-      return response as List<dynamic>;
-    } catch (e) {
-      print("⚠️ Nenhuma obra encontrada ou erro na busca: $e");
+          .eq(
+            'current_owner_wallet',
+            wallet,
+          )
+          .order(
+            'created_at',
+            ascending: false,
+          );
+      return response
+          as List<
+            dynamic
+          >;
+    } catch (
+      e
+    ) {
+      debugPrint(
+        "⚠️ Nenhuma obra encontrada ou erro na busca: $e",
+      );
       return [];
     }
   }

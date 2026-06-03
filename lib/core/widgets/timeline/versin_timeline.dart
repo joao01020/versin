@@ -12,12 +12,18 @@ class VersinTimeline
     rimas,
   )?
   onRimaFinalizada;
+  // NOVO: Callback disparado a cada letra digitada no bloco atual
+  final Function(
+    String texto,
+  )?
+  onTextChanged;
 
   const VersinTimeline({
     super.key,
     required this.currentStep,
     required this.activeColor,
     this.onRimaFinalizada,
+    this.onTextChanged,
   });
 
   @override
@@ -40,6 +46,7 @@ class _VersinTimelineState
   >
   _rimasData = [];
   int _idCounter = 0;
+  final int _maxRimas = 17;
 
   @override
   void initState() {
@@ -48,6 +55,10 @@ class _VersinTimelineState
   }
 
   void _injetarNovaRimaInline() {
+    if (_rimasData.length >=
+        _maxRimas)
+      return;
+
     final int currentId = _idCounter++;
     final controller = TextEditingController();
     final focusNode = FocusNode();
@@ -60,6 +71,7 @@ class _VersinTimelineState
             'controller': controller,
             'focusNode': focusNode,
             'isNew': true,
+            'isAdded': false,
           },
         );
       },
@@ -72,13 +84,18 @@ class _VersinTimelineState
       () {
         if (mounted) {
           setState(
-            () => _rimasData.firstWhere(
-              (
-                e,
-              ) =>
-                  e['id'] ==
-                  currentId,
-            )['isNew'] = false,
+            () {
+              final index = _rimasData.indexWhere(
+                (
+                  e,
+                ) =>
+                    e['id'] ==
+                    currentId,
+              );
+              if (index !=
+                  -1)
+                _rimasData[index]['isNew'] = false;
+            },
           );
         }
       },
@@ -89,6 +106,90 @@ class _VersinTimelineState
         _,
       ) => focusNode.requestFocus(),
     );
+  }
+
+  void _confirmarRima(
+    int id,
+  ) {
+    setState(
+      () {
+        final index = _rimasData.indexWhere(
+          (
+            e,
+          ) =>
+              e['id'] ==
+              id,
+        );
+        if (index !=
+                -1 &&
+            _rimasData[index]['controller'].text.isNotEmpty) {
+          _rimasData[index]['isAdded'] = true;
+        }
+      },
+    );
+
+    _injetarNovaRimaInline();
+    _notificarParent();
+  }
+
+  void _removerRima(
+    int id,
+  ) {
+    setState(
+      () {
+        final index = _rimasData.indexWhere(
+          (
+            e,
+          ) =>
+              e['id'] ==
+              id,
+        );
+        if (index !=
+            -1) {
+          _rimasData[index]['controller'].dispose();
+          _rimasData[index]['focusNode'].dispose();
+          _rimasData.removeAt(
+            index,
+          );
+        }
+
+        if (_rimasData
+                .where(
+                  (
+                    e,
+                  ) => !e['isAdded'],
+                )
+                .isEmpty &&
+            _rimasData.length <
+                _maxRimas) {
+          _injetarNovaRimaInline();
+        }
+      },
+    );
+    _notificarParent();
+  }
+
+  void _notificarParent() {
+    if (widget.onRimaFinalizada !=
+        null) {
+      final rimasConcluidas = _rimasData
+          .where(
+            (
+              e,
+            ) => e['isAdded'],
+          )
+          .map<
+            String
+          >(
+            (
+              e,
+            ) => e['controller'].text,
+          )
+          .toList();
+      widget.onRimaFinalizada!(
+        rimasConcluidas,
+      );
+    }
   }
 
   @override
@@ -118,6 +219,7 @@ class _VersinTimelineState
             painter: TimelinePainter(
               itemCount: _rimasData.length,
               activeColor: widget.activeColor,
+              maxItems: _maxRimas,
             ),
           ),
         ),
@@ -138,6 +240,29 @@ class _VersinTimelineState
                   final bool isNew =
                       rima['isNew'] ??
                       false;
+                  final bool isAdded =
+                      rima['isAdded'] ??
+                      false;
+
+                  final bgColor = isAdded
+                      ? Colors.white.withValues(
+                          alpha: 0.03,
+                        )
+                      : widget.activeColor.withValues(
+                          alpha: isNew
+                              ? 0.15
+                              : 0.05,
+                        );
+
+                  final borderColor = isAdded
+                      ? Colors.white.withValues(
+                          alpha: 0.1,
+                        )
+                      : widget.activeColor.withValues(
+                          alpha: isNew
+                              ? 0.5
+                              : 0.15,
+                        );
 
                   return AnimatedContainer(
                     duration: const Duration(
@@ -150,23 +275,17 @@ class _VersinTimelineState
                       minWidth: 70,
                     ),
                     decoration: BoxDecoration(
-                      color: widget.activeColor.withValues(
-                        alpha: isNew
-                            ? 0.15
-                            : 0.05,
-                      ),
+                      color: bgColor,
                       borderRadius: BorderRadius.circular(
                         12,
                       ),
                       border: Border.all(
-                        color: widget.activeColor.withValues(
-                          alpha: isNew
-                              ? 0.5
-                              : 0.15,
-                        ),
+                        color: borderColor,
                         width: 1.2,
                       ),
-                      boxShadow: isNew
+                      boxShadow:
+                          (isNew &&
+                              !isAdded)
                           ? [
                               BoxShadow(
                                 color: widget.activeColor.withValues(
@@ -178,29 +297,69 @@ class _VersinTimelineState
                             ]
                           : [],
                     ),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
+                    padding: const EdgeInsets.only(
+                      left: 16,
+                      right: 8,
                     ),
                     child: Center(
-                      child: IntrinsicWidth(
-                        child: TextField(
-                          controller: rima['controller'],
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 13,
-                          ),
-                          decoration: const InputDecoration(
-                            border: InputBorder.none,
-                            hintText: "Rima...",
-                            hintStyle: TextStyle(
-                              color: Colors.white24,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IntrinsicWidth(
+                            child: TextField(
+                              controller: rima['controller'],
+                              focusNode: rima['focusNode'],
+                              enabled: !isAdded,
+                              // AQUI: Conecta a escrita do usuário com o callback
+                              onChanged: widget.onTextChanged,
+                              style: TextStyle(
+                                color: isAdded
+                                    ? Colors.white54
+                                    : Colors.white,
+                                fontSize: 13,
+                              ),
+                              decoration: InputDecoration(
+                                border: InputBorder.none,
+                                hintText: "Rima...",
+                                hintStyle: TextStyle(
+                                  color: isAdded
+                                      ? Colors.transparent
+                                      : Colors.white24,
+                                ),
+                                isDense: true,
+                                contentPadding: EdgeInsets.zero,
+                              ),
+                              onSubmitted:
+                                  (
+                                    _,
+                                  ) => _confirmarRima(
+                                    rima['id'],
+                                  ),
                             ),
                           ),
-                          onSubmitted:
-                              (
-                                _,
-                              ) => _injetarNovaRimaInline(),
-                        ),
+
+                          if (isAdded ||
+                              _rimasData.length >
+                                  1) ...[
+                            const SizedBox(
+                              width: 8,
+                            ),
+                            GestureDetector(
+                              onTap: () => _removerRima(
+                                rima['id'],
+                              ),
+                              child: Icon(
+                                Icons.close_rounded,
+                                size: 16,
+                                color: isAdded
+                                    ? Colors.white30
+                                    : widget.activeColor.withValues(
+                                        alpha: 0.5,
+                                      ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ),
                   );
@@ -217,10 +376,12 @@ class TimelinePainter
         CustomPainter {
   final int itemCount;
   final Color activeColor;
+  final int maxItems;
 
   TimelinePainter({
     required this.itemCount,
     required this.activeColor,
+    required this.maxItems,
   });
 
   @override
@@ -230,7 +391,8 @@ class TimelinePainter
   ) {
     final double spacing =
         size.width /
-        4;
+        (maxItems -
+            1);
     final double y =
         size.height /
         2;
@@ -239,6 +401,7 @@ class TimelinePainter
       ..color = Colors.white10
       ..strokeWidth = 2
       ..strokeCap = StrokeCap.round;
+
     final paintActive = Paint()
       ..color = activeColor
       ..strokeWidth = 2
@@ -257,8 +420,11 @@ class TimelinePainter
     );
 
     double progressWidth =
-        ((itemCount -
-                    1) *
+        ((itemCount >
+                        0
+                    ? itemCount -
+                          1
+                    : 0) *
                 spacing)
             .clamp(
               0.0,
@@ -279,7 +445,7 @@ class TimelinePainter
     for (
       int i = 0;
       i <
-          5;
+          maxItems;
       i++
     ) {
       double x =
@@ -321,6 +487,7 @@ class TimelinePainter
                 )
           ..style = PaintingStyle.fill,
       );
+
       canvas.drawCircle(
         Offset(
           x,
@@ -343,5 +510,7 @@ class TimelinePainter
     covariant TimelinePainter oldDelegate,
   ) =>
       oldDelegate.itemCount !=
-      itemCount;
+          itemCount ||
+      oldDelegate.maxItems !=
+          maxItems;
 }

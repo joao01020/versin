@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:versin/features/rhymes/presentation/controller/rhymes_controller.dart';
 import 'package:versin/core/models/rhyme_model.dart';
 import '../data/rhyme_library_manager.dart';
+// Importe o BrainController para o cast de segurança
+import 'package:versin/modules/brain/controller/brain_controller.dart';
+import 'package:versin/modules/brain/views/brain_hub_page.dart';
 
 class RhymeLibraryPage
     extends
@@ -32,13 +35,11 @@ class _RhymeLibraryPageState
     super.dispose();
   }
 
-  /// Triggered when the user taps to import a library file
   Future<
     void
   >
   _importLibrary() async {
     final importedWords = await RhymeLibraryManager.importFromFile();
-
     if (importedWords.isNotEmpty) {
       for (var word in importedWords) {
         widget.controller.addWord(
@@ -46,21 +47,22 @@ class _RhymeLibraryPageState
           false,
         );
       }
-      if (mounted)
+      if (mounted) {
         _showSnackBar(
           "Sucesso! ${importedWords.length} rimas importadas.",
           Colors.purpleAccent,
         );
+      }
     } else {
-      if (mounted)
+      if (mounted) {
         _showSnackBar(
           "Erro ao ler o arquivo.",
           Colors.redAccent,
         );
+      }
     }
   }
 
-  /// Triggered when the user initiates a backup
   Future<
     void
   >
@@ -68,7 +70,6 @@ class _RhymeLibraryPageState
     final path = await RhymeLibraryManager.exportToBackup(
       widget.controller.vocabulary,
     );
-
     if (mounted) {
       if (path !=
           null) {
@@ -140,6 +141,15 @@ class _RhymeLibraryPageState
           ),
         ),
         actions: [
+          // NAVEGAÇÃO DESABILITADA: Funcionalidade em construção
+          IconButton(
+            icon: const Icon(
+              Icons.construction,
+              color: Colors.grey,
+            ),
+            onPressed: null, // Torna o botão não clicável
+            tooltip: "Funcionalidade em construção",
+          ),
           IconButton(
             icon: const Icon(
               Icons.download_for_offline,
@@ -393,12 +403,10 @@ class _RhymeLibraryPageState
           ),
         ),
         trailing: IconButton(
-          icon: Icon(
+          icon: const Icon(
             Icons.delete_outline,
-            color: Colors.white.withValues(
-              alpha: 0.1,
-            ),
-            size: 20,
+            color: Colors.redAccent,
+            size: 22,
           ),
           onPressed: () => widget.controller.removeWord(
             index,

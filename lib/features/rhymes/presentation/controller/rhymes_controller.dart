@@ -5,10 +5,12 @@ import 'package:flutter/material.dart';
 // Importe o modelo correto
 import 'package:versin/core/models/rhyme_model.dart';
 
-// USE IMPORTS BASEADOS NO PROJETO PARA EVITAR ERROS DE PASTA
+// Imports baseados no projeto
 import 'package:versin/features/rhymes/data/repositories/rhymes_repository.dart';
 import 'package:versin/features/rhymes/domain/services/audio_service.dart';
 
+/// RhymesController: Classe base para a gestão de rimas e estado do estúdio.
+/// O BrainController deve herdar desta classe para estender suas funcionalidades.
 class RhymesController
     extends
         ChangeNotifier {
@@ -64,6 +66,7 @@ class RhymesController
     >
   >
   trendingWords = [];
+
   String? _userApiKey = "VERSIN-PRO-TRIAL-2026-FREE";
   String? get userApiKey => _userApiKey;
 
@@ -86,11 +89,9 @@ class RhymesController
         0,
         Rhyme(
           word: p,
-          isPriority: false,
+          isPriority: priority,
         ),
       );
-
-      // NOTIFICAÇÃO ESSENCIAL PARA A UI ATUALIZAR
       notifyListeners();
 
       try {
@@ -176,9 +177,8 @@ class RhymesController
     String text,
   ) {
     if (_debounce?.isActive ??
-        false) {
+        false)
       _debounce!.cancel();
-    }
 
     _processarProgressoTecnico(
       text,
@@ -217,16 +217,12 @@ class RhymesController
                   item,
                 ) {
                   String wordInVocab = item.word.trim().toLowerCase();
-
-                  bool isRhyme = wordInVocab.endsWith(
-                    sufixo,
-                  );
-                  bool isAutocomplete = wordInVocab.startsWith(
-                    lastWord,
-                  );
-
-                  return isRhyme ||
-                      isAutocomplete;
+                  return wordInVocab.endsWith(
+                        sufixo,
+                      ) ||
+                      wordInVocab.startsWith(
+                        lastWord,
+                      );
                 },
               )
               .map(
@@ -245,7 +241,6 @@ class RhymesController
         } else {
           _suggestionsList = [];
         }
-
         notifyListeners();
       },
     );
@@ -380,11 +375,10 @@ class RhymesController
     if (bpm !=
         null) {
       currentBpm = bpm;
-      if (isBpmPlaying) {
+      if (isBpmPlaying)
         _audioService.startMetronome(
           currentBpm,
         );
-      }
     }
     if (vibe !=
         null)
@@ -404,12 +398,9 @@ class RhymesController
     notifyListeners();
   }
 
-  Color getActiveColor() {
-    // Retorna a cor padrão do app já que os modos específicos foram removidos
-    return const Color(
-      0xFFE100FF,
-    );
-  }
+  Color getActiveColor() => const Color(
+    0xFFE100FF,
+  );
 
   void clearSuggestions() {
     _suggestionsList = [];

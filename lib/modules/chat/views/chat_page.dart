@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:get_it/get_it.dart'; // Importação essencial para o GetIt
 
 // Importação da nova página
 import 'package:versin/modules/rhymelibrary/views/rhyme_library_page.dart';
@@ -7,6 +8,7 @@ import 'package:versin/modules/rhymelibrary/views/rhyme_library_page.dart';
 import 'package:versin/modules/chat/controllers/chat_controller.dart';
 import 'package:versin/modules/chat/domain/repositories/chat_repository.dart';
 import 'package:versin/features/rhymes/presentation/controller/rhymes_controller.dart';
+import 'package:versin/modules/brain/controller/brain_controller.dart'; // Importe o BrainController
 
 // CORE WIDGETS
 import 'package:versin/core/widgets/timeline/versin_timeline.dart';
@@ -53,7 +55,11 @@ class _ChatPageState
   void initState() {
     super.initState();
 
-    _rhymesController = RhymesController();
+    // BUSCA A INSTÂNCIA DO CÉREBRO NO GETIT (Resolve o erro de tipo)
+    _rhymesController =
+        GetIt.I<
+          BrainController
+        >();
 
     _controller = ChatController(
       repository: ChatRepositoryImpl(),
@@ -79,7 +85,7 @@ class _ChatPageState
   @override
   void dispose() {
     _controller.dispose();
-    _rhymesController.dispose();
+    // NÃO damos dispose no _rhymesController aqui, pois ele é um Singleton gerido pelo GetIt
     super.dispose();
   }
 
@@ -131,7 +137,6 @@ class _ChatPageState
             final rhymesCtrl = _rhymesController;
             final activeColor = rhymesCtrl.getActiveColor();
 
-            // Cálculo da posição do cursor
             final textPainter =
                 TextPainter(
                   text: TextSpan(
@@ -165,11 +170,8 @@ class _ChatPageState
                 0xFF0F0F0F,
               ),
               body: SafeArea(
-                // ENVELOPAMOS TUDO EM UM STACK MESTRE
-                // Isso garante que o balão flutue sobre toda a tela e receba cliques
                 child: Stack(
                   children: [
-                    // CONTEÚDO PRINCIPAL (EM BACKGROUND)
                     Column(
                       children: [
                         VersinTimeline(
@@ -180,7 +182,6 @@ class _ChatPageState
                                 rimas,
                               ) {},
                         ),
-
                         Stack(
                           alignment: Alignment.centerRight,
                           children: [
@@ -212,7 +213,6 @@ class _ChatPageState
                             ),
                           ],
                         ),
-
                         Expanded(
                           child: ChatListView(
                             isInitializing: _controller.isInitializing,
@@ -234,7 +234,6 @@ class _ChatPageState
                             secondsActive: rhymesCtrl.connectionSeconds,
                           ),
                         ),
-
                         StudioToolbar(
                           isConfigFinished: true,
                           projectName: _controller.projectName,
@@ -293,8 +292,6 @@ class _ChatPageState
                                 vibe: val,
                               ),
                         ),
-
-                        // ÁREA DE INPUT
                         Stack(
                           alignment: Alignment.centerRight,
                           children: [
@@ -326,17 +323,13 @@ class _ChatPageState
                         ),
                       ],
                     ),
-
-                    // O BALÃO DE SUGESTÃO AGORA FICA NA CAMADA SUPERIOR
-                    // Ele pode ser clicado livremente porque faz parte do Stack principal
                     if (rhymesCtrl.suggestions.isNotEmpty)
                       Positioned(
                         left: cursorPositionLeft,
-                        bottom: 75, // Altura exata para flutuar acima da barra de input
+                        bottom: 75,
                         child: SuggestionBalloon(
                           suggestion: _controller.getCurrentSuggestion(),
                           onTap: () {
-                            // Lógica para substituir a letra incompleta pela rima escolhida
                             final suggestion = _controller.getCurrentSuggestion();
                             final text = _controller.messageController.text;
                             final words = text.trimRight().split(
@@ -344,23 +337,19 @@ class _ChatPageState
                                 r'\s+',
                               ),
                             );
-
                             if (words.isNotEmpty) {
-                              words.removeLast(); // Tira a parte da palavra sendo digitada
+                              words.removeLast();
                               words.add(
                                 suggestion,
-                              ); // Coloca a palavra inteira
-
-                              final newText = "${words.join(' ')} "; // Adiciona o espaço extra pro flow não parar
-
+                              );
+                              final newText = "${words.join(' ')} ";
                               _controller.messageController.value = TextEditingValue(
                                 text: newText,
                                 selection: TextSelection.collapsed(
                                   offset: newText.length,
-                                ), // Joga o cursor pro fim
+                                ),
                               );
                             }
-
                             rhymesCtrl.clearSuggestions();
                           },
                           onDismiss: () => rhymesCtrl.clearSuggestions(),

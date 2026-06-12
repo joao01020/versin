@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:versin/modules/chat/domain/repositories/chat_repository.dart';
 import 'package:versin/features/rhymes/presentation/controller/rhymes_controller.dart';
+import 'package:versin/modules/brain/controller/brain_controller.dart';
 
-// --- MODEL IN-LINE (Evita problemas de caminhos e cache no compilador) ---
-
-enum ChatRole { user, assistant }
+// --- MODEL IN-LINE ---
+enum ChatRole {
+  user,
+  assistant,
+}
 
 class ChatMessage {
   final ChatRole role;
@@ -17,44 +20,79 @@ class ChatMessage {
     required this.content,
     DateTime? timestamp,
     this.customWidget,
-  }) : timestamp = timestamp ?? DateTime.now();
+  }) : timestamp =
+           timestamp ??
+           DateTime.now();
 
-  factory ChatMessage.fromJson(Map<String, dynamic> json) {
+  factory ChatMessage.fromJson(
+    Map<
+      String,
+      dynamic
+    >
+    json,
+  ) {
     return ChatMessage(
-      role: json['role'] == 'user' ? ChatRole.user : ChatRole.assistant,
-      content: json['content'] ?? '',
-      timestamp: json['timestamp'] != null 
-          ? DateTime.parse(json['timestamp']) 
+      role:
+          json['role'] ==
+              'user'
+          ? ChatRole.user
+          : ChatRole.assistant,
+      content:
+          json['content'] ??
+          '',
+      timestamp:
+          json['timestamp'] !=
+              null
+          ? DateTime.parse(
+              json['timestamp'],
+            )
           : DateTime.now(),
     );
   }
 
-  Map<String, dynamic> toJson() => {
-        'role': role.name,
-        'content': content,
-        'timestamp': timestamp.toIso8601String(),
-      };
+  Map<
+    String,
+    dynamic
+  >
+  toJson() => {
+    'role': role.name,
+    'content': content,
+    'timestamp': timestamp.toIso8601String(),
+  };
 
-  bool get isUser => role == ChatRole.user;
+  bool get isUser =>
+      role ==
+      ChatRole.user;
 }
 
 // --- CHAT CONTROLLER ---
 
-class ChatController extends ChangeNotifier {
+class ChatController
+    extends
+        ChangeNotifier {
   final ChatRepository repository;
   final RhymesController rhymesController;
-  
+
+  BrainController? get brain =>
+      rhymesController
+          is BrainController
+      ? rhymesController
+            as BrainController
+      : null;
+
   final TextEditingController messageController = TextEditingController();
   final ScrollController scrollController = ScrollController();
-  
-  List<ChatMessage> messages = [];
+
+  List<
+    ChatMessage
+  >
+  messages = [];
   bool isAiTyping = false;
-  bool isInitializing = false;
+  final bool isInitializing = false; // Corrigido para final conforme sugestão do linter
   String projectName = "SEM TÍTULO";
   String lastConfirmedStructure = "";
   int currentSuggestionIndex = 0;
-  
-  // Controle interno sênior para evitar memory leaks ao atualizar estados assíncronos
+
   bool _isDisposed = false;
 
   ChatController({
@@ -62,7 +100,6 @@ class ChatController extends ChangeNotifier {
     required this.rhymesController,
   });
 
-  // Evita chamadas de estado em componentes destruídos
   @override
   void notifyListeners() {
     if (!_isDisposed) {
@@ -72,91 +109,100 @@ class ChatController extends ChangeNotifier {
 
   // --- COMPATIBILITY METHODS ---
 
-  void nextSuggestion() => updateSuggestionIndex(currentSuggestionIndex + 1);
-  
-  void previousSuggestion() => updateSuggestionIndex(currentSuggestionIndex - 1);
+  void nextSuggestion() => updateSuggestionIndex(
+    currentSuggestionIndex +
+        1,
+  );
 
-  Future<void> processMessage(String message) async {
+  void previousSuggestion() => updateSuggestionIndex(
+    currentSuggestionIndex -
+        1,
+  );
+
+  Future<
+    void
+  >
+  processMessage(
+    String message,
+  ) async {
     messageController.text = message;
     await sendMessage();
   }
 
-  void sendStructureToChat(List<String> structure) {
-    final structureText = structure.join(" - ");
-    messages.add(ChatMessage(
-      role: ChatRole.assistant, 
-      content: "Estrutura definida: $structureText",
-    ));
+  void sendStructureToChat(
+    List<
+      String
+    >
+    structure,
+  ) {
+    final structureText = structure.join(
+      " - ",
+    );
+    messages.add(
+      ChatMessage(
+        role: ChatRole.assistant,
+        content: "Estrutura definida: $structureText",
+      ),
+    );
     notifyListeners();
     _scrollToBottom();
   }
 
-  void showStudioQuickMenu(BuildContext context, String title, List<String> options, Function(String) onSelect) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: const Color(0xFF15122C),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (context) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-              ),
-              ...options.map((option) => ListTile(
-                    title: Text(option, style: const TextStyle(color: Colors.white70)),
-                    onTap: () {
-                      onSelect(option);
-                      Navigator.pop(context);
-                    },
-                  )),
-            ],
-          ),
-        );
-      },
-    );
-  }
+  // --- MESSAGES LOGIC ---
 
-  void toggleBpm() {
-    rhymesController.isBpmPlaying = !rhymesController.isBpmPlaying;
-    notifyListeners();
-  }
-
-  // --- MESSAGES LOGIC (IA INTEGRADA) ---
-
-  Future<void> sendMessage() async {
+  Future<
+    void
+  >
+  sendMessage() async {
     final text = messageController.text.trim();
     if (text.isEmpty) return;
 
-    // Adiciona entrada do usuário localmente na UI
-    messages.add(ChatMessage(role: ChatRole.user, content: text));
+    messages.add(
+      ChatMessage(
+        role: ChatRole.user,
+        content: text,
+      ),
+    );
     messageController.clear();
     isAiTyping = true;
     notifyListeners();
     _scrollToBottom();
 
     try {
-      // SÊNIOR: Consome a engine estável do RhymesController, injetando chaves e contexto de estúdio (BPM/Vibe)
-      final Map<String, String> aiResponse = await rhymesController.fetchAiResponse(text);
-      
-      if (aiResponse.isNotEmpty && aiResponse['content'] != null && aiResponse['content']!.isNotEmpty) {
-        messages.add(ChatMessage(
-          role: ChatRole.assistant,
-          content: aiResponse['content']!,
-        ));
+      final Map<
+        String,
+        String
+      >
+      aiResponse = await rhymesController.fetchAiResponse(
+        text,
+      );
+
+      if (aiResponse.isNotEmpty &&
+          aiResponse['content'] !=
+              null) {
+        messages.add(
+          ChatMessage(
+            role: ChatRole.assistant,
+            content: aiResponse['content']!,
+          ),
+        );
       } else {
-        messages.add(ChatMessage(
-          role: ChatRole.assistant,
-          content: "O sinal do estúdio VERSIN retornou uma resposta em branco.",
-        ));
+        messages.add(
+          ChatMessage(
+            role: ChatRole.assistant,
+            content: "Resposta em branco.",
+          ),
+        );
       }
-    } catch (e) {
-      messages.add(ChatMessage(
-        role: ChatRole.assistant, 
-        content: "Conexão instável com a rede Versin. Verifique os parâmetros do beat.",
-      ));
+    } catch (
+      e
+    ) {
+      messages.add(
+        ChatMessage(
+          role: ChatRole.assistant,
+          content: "Erro de conexão.",
+        ),
+      );
     } finally {
       isAiTyping = false;
       notifyListeners();
@@ -164,61 +210,134 @@ class ChatController extends ChangeNotifier {
     }
   }
 
-  // --- TEXT AND SUGGESTIONS LOGIC ---
+  // --- AUXILIARY LOGIC ---
 
-  void addWordToText(String word) {
-    final currentText = messageController.text;
-    messageController.text = "$currentText $word ";
-    messageController.selection = TextSelection.fromPosition(
-      TextPosition(offset: messageController.text.length),
-    );
+  void addWordToText(
+    String word,
+  ) {
+    messageController.text = "${messageController.text.trim()} $word ";
     notifyListeners();
   }
 
-  void updateSuggestionIndex(int index) {
-    currentSuggestionIndex = index;
-    notifyListeners();
+  void updateSuggestionIndex(
+    int index,
+  ) {
+    final total = rhymesController.suggestions.length;
+    if (total >
+        0) {
+      currentSuggestionIndex =
+          index %
+          total;
+      if (currentSuggestionIndex <
+          0)
+        currentSuggestionIndex += total;
+      notifyListeners();
+    }
   }
 
   String getCurrentSuggestion() {
     final suggestions = rhymesController.suggestions;
-    if (suggestions.isEmpty) return "Métrica";
-    return suggestions[currentSuggestionIndex % suggestions.length];
+    return suggestions.isNotEmpty
+        ? suggestions[currentSuggestionIndex %
+              suggestions.length]
+        : "Métrica";
   }
 
-  // --- PROJECT LOGIC ---
-
-  void saveStructure(String structure) {
+  void saveStructure(
+    String structure,
+  ) {
     lastConfirmedStructure = structure;
     notifyListeners();
   }
 
-  void editProjectName(BuildContext context) {
-    final nameController = TextEditingController(text: projectName);
+  void toggleBpm() {
+    rhymesController.isBpmPlaying = !rhymesController.isBpmPlaying;
+    notifyListeners();
+  }
+
+  void editProjectName(
+    BuildContext context,
+  ) {
+    final nameController = TextEditingController(
+      text: projectName,
+    );
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF15122C),
-        title: const Text("Nome do Projeto", style: TextStyle(color: Colors.white)),
-        content: TextField(
-          controller: nameController,
-          style: const TextStyle(color: Colors.white),
-          decoration: const InputDecoration(hintText: "Insira o título", hintStyle: TextStyle(color: Colors.white30)),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancelar")),
-          TextButton(
-            onPressed: () {
-              if (nameController.text.trim().isNotEmpty) {
-                projectName = nameController.text.trim();
-                notifyListeners();
-              }
-              Navigator.pop(context);
-            },
-            child: const Text("Salvar"),
+      builder:
+          (
+            context,
+          ) => AlertDialog(
+            title: const Text(
+              "Nome do Projeto",
+            ),
+            content: TextField(
+              controller: nameController,
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(
+                  context,
+                ),
+                child: const Text(
+                  "Cancelar",
+                ),
+              ),
+              TextButton(
+                onPressed: () {
+                  projectName = nameController.text.trim();
+                  notifyListeners();
+                  Navigator.pop(
+                    context,
+                  );
+                },
+                child: const Text(
+                  "Salvar",
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+    );
+  }
+
+  void showStudioQuickMenu(
+    BuildContext context,
+    String title,
+    List<
+      String
+    >
+    options,
+    Function(
+      String,
+    )
+    onSelect,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      builder:
+          (
+            context,
+          ) => Column(
+            mainAxisSize: MainAxisSize.min,
+            children: options
+                .map(
+                  (
+                    opt,
+                  ) => ListTile(
+                    title: Text(
+                      opt,
+                    ),
+                    onTap: () {
+                      onSelect(
+                        opt,
+                      );
+                      Navigator.pop(
+                        context,
+                      );
+                    },
+                  ),
+                )
+                .toList(),
+          ),
     );
   }
 
@@ -226,33 +345,38 @@ class ChatController extends ChangeNotifier {
 
   void _scrollToBottom() {
     if (_isDisposed) return;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (scrollController.hasClients) {
-        scrollController.animateTo(
-          scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300), 
-          curve: Curves.easeOut,
-        );
-      }
-    });
+    WidgetsBinding.instance.addPostFrameCallback(
+      (
+        _,
+      ) {
+        if (scrollController.hasClients) {
+          scrollController.animateTo(
+            scrollController.position.maxScrollExtent,
+            duration: const Duration(
+              milliseconds: 300,
+            ),
+            curve: Curves.easeOut,
+          );
+        }
+      },
+    );
   }
 
-  Future<void> initChatSession(BuildContext context) async {
-    if (messages.isNotEmpty) return; 
-
-    isInitializing = true;
-    notifyListeners();
-
-    await Future.delayed(const Duration(milliseconds: 1200));
-
-    messages.add(ChatMessage(
-      role: ChatRole.assistant,
-      content: "VERSIN GENESIS: Conexão estabelecida com o estúdio. "
-    ));
-
-    isInitializing = false;
-    notifyListeners();
-    _scrollToBottom();
+  Future<
+    void
+  >
+  initChatSession(
+    BuildContext context,
+  ) async {
+    if (messages.isEmpty) {
+      messages.add(
+        ChatMessage(
+          role: ChatRole.assistant,
+          content: "VERSIN GENESIS: Conexão estabelecida.",
+        ),
+      );
+      notifyListeners();
+    }
   }
 
   @override

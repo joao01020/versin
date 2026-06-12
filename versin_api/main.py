@@ -1,75 +1,91 @@
-from fastapi import FastAPI, Depends, HTTPException
+import os
+from pathlib import Path
+from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException
 from core.config import settings
 from core.security import get_safe_key
 from models.schemas import ChatRequest
 from services.ai_service import AIService
 from services.prompt_engine import create_producer_prompt
 from services.quota_service import QuotaService
+from services.safety_service import SafetyService
+from services.rate_limiter import RateLimiter
+
+# Carregamento robusto das variáveis de ambiente na raiz
+BASE_DIR = Path(__file__).resolve().parent
+load_dotenv(dotenv_path=BASE_DIR / ".env")
 
 # Inicialização da aplicação
 app = FastAPI(title=settings.PROJECT_NAME)
 
-# Instância única do serviço de quota para controle de uso
+# Instâncias de serviços globais
 quota_service = QuotaService()
-
-# Dependência para injetar o serviço de IA com a chave segura
-def get_ai_service(data: ChatRequest):
-    key = get_safe_key(data.private_api_key, settings.GROQ_API_KEY)
-    if not key:
-        raise HTTPException(status_code=500, detail="API Key not configured.")
-    return AIService(key)
+safety_service = SafetyService()
+limiter = RateLimiter(requests_per_minute=5)
 
 @app.get("/")
 async def health_check():
-    """Rota de Health Check para manter o serviço ativo."""
     return {"status": "online", "message": f"{settings.PROJECT_NAME} is operational"}
 
 @app.post("/chat")
-async def chat_versin(
-    data: ChatRequest, 
-    ai: AIService = Depends(get_ai_service)
-):
-    """Rota principal com verificação de quota e processamento de IA."""
-    
-    # 1. Validação de Limite (Fail-Fast)
+async def chat_versin(data: ChatRequest):
+    """Rota principal com fluxo de execução linear e seguro."""
+
+    # 1. Proteção contra Abuso (Rate Limiting)
+    await limiter.check_rate_limit(data.user_id)
+
+    # 2. Validação de Limite de Créditos
     if not await quota_service.check_limit(data.user_id):
         raise HTTPException(
-            status_code=429, 
+            status_code=429,
             detail="Usage limit exceeded. Please acquire more credits."
         )
-    
-    # 2. Seleção de modelo (Pro vs Normal)
+
+    # 3. Inicialização do serviço de IA dentro da rota
+    api_key = get_safe_key(data.private_api_key, settings.GROQ_API_KEY)
+    if not api_key:
+        raise HTTPException(status_code=500, detail="API Key not configured.")
+    ai = AIService(api_key)
+
+    # 4. Sanitização da Entrada
+    clean_message = safety_service.sanitize_input(data.message)
+
+    # 5. Definição de modelo
     model = "llama-3.3-70b-versatile" if data.private_api_key else "llama-3.1-8b-instant"
-    
-    # 3. Geração de prompt
+
+    # 6. Geração de prompt
     prompt = create_producer_prompt(
-        context=data.history_context or {}, 
+        context=data.history_context or {},
         rhymes=data.current_list or []
     )
-    
+
     try:
-        # 4. Execução da análise via serviço de IA
-        result = await ai.get_analysis(model, prompt, data.message)
-        
-        # 5. Registro de consumo (1 request = 50 unidades de quota)
+        # 7. Execução da análise
+        result = await ai.get_analysis(model, prompt, clean_message)
+
+        # 8. Validação de Segurança da Saída
+        if not safety_service.is_content_safe(result):
+            return {
+                "role": "assistant",
+                "content": "Analysis blocked due to safety policies.",
+                "impact_level": 1
+            }
+
+        # 9. Registro de consumo
         await quota_service.register_usage(data.user_id, 50)
-        
+
         return {
             "role": "assistant",
-            "content": result.get("content", "No feedback available."),
-            "is_acceptable": result.get("is_acceptable", False),
-            "impact_level": result.get("impact_level", 1),
-            "feedback_reason": result.get("feedback_reason", "Analysis complete.")
+            "content": result.get("content") or "No feedback available.",
+            "is_acceptable": bool(result.get("is_acceptable", False)),
+            "impact_level": int(result.get("impact_level", 1)),
+            "feedback_reason": result.get("feedback_reason") or "Analysis complete."
         }
-        
+
     except Exception as e:
-        # Log de erro para rastreabilidade
+        # Logamos o erro internamente para você ver no terminal, mas devolvemos uma mensagem genérica para o usuário
         print(f"CRITICAL ERROR: {str(e)}")
-        return {
-            "role": "assistant", 
-            "content": "Brain connection error. Please try again.", 
-            "impact_level": 1
-        }
+        raise HTTPException(status_code=500, detail="Brain connection error.")
 
 if __name__ == "__main__":
     import uvicorn

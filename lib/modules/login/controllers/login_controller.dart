@@ -26,6 +26,11 @@ class LoginController {
 
   Timer? _debounce;
 
+  /// Método de conveniência para bypass em ambiente de desenvolvimento
+  void bypassToDashboard(BuildContext context) {
+    Navigator.pushReplacementNamed(context, '/dashboard');
+  }
+
   void initListeners() {
     userController.addListener(() {
       final text = userController.text.trim().toLowerCase();

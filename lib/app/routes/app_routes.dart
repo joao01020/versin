@@ -9,8 +9,9 @@ import 'package:versin/modules/dashboard/views/calendar/calendar_page.dart';
 // Módulos do Ecossistema
 import 'package:versin/modules/chat/views/chat_page.dart';
 import 'package:versin/modules/hub/views/hub_page.dart';
-import 'package:versin/modules/match/match_page.dart';
-import 'package:versin/modules/wallet/wallet_page.dart';
+import 'package:versin/modules/match/views/match_page.dart'; 
+import 'package:versin/modules/wallet/views/wallet_page.dart';
+import 'package:versin/modules/wallet/views/royalties_page.dart';
 import 'package:versin/modules/market/market_page.dart';
 import 'package:versin/modules/showcase/showcase_page.dart';
 import 'package:versin/modules/vnode/vnode_page.dart';
@@ -28,6 +29,7 @@ class AppRoutes {
   static const String hub = '/hub';
   static const String match = '/match';
   static const String wallet = '/wallet';
+  static const String royalties = '/royalties';
   static const String market = '/market';
   static const String showcase = '/showcase';
   static const String vnode = '/vnode';
@@ -45,9 +47,10 @@ class AppRoutes {
     hub: (context) => const HubPage(),
     match: (context) => const MatchPage(),
     wallet: (context) => const WalletPage(),
-    market: (context) => const MarketPage(),
-    showcase: (context) => const ShowcasePage(),
-    vnode: (context) => const VNodePage(),
-    settings: (context) => const SettingsPage(),
+    royalties: (context) => const RoyaltiesPage(),
+    market: (context) => MarketPage(),
+    showcase: (context) => ShowcasePage(),
+    vnode: (context) => VNodePage(),
+    settings: (context) => SettingsPage(),
   };
 }

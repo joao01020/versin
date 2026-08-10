@@ -1,23 +1,21 @@
-import 'package:flutter/material.dart';
-import 'package:file_picker/file_picker.dart';
-import 'package:record/record.dart';
 import 'dart:convert';
-import 'package:crypto/crypto.dart';
-import 'dart:async';
 
-// Bibliotecas para PDF e Data
+import 'package:crypto/crypto.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
-import 'package:intl/intl.dart';
+import 'package:record/record.dart';
 
-// --- LÓGICA DE AUTORIA E HASH ---
 class AuthorHash {
   static String generateSignature(
     String title,
     String content,
   ) {
-    final data = "$title|$content|VERSIN_SECURE_KEY";
+    final data = '$title|$content|VERSIN_SECURE_KEY';
+
     return sha256
         .convert(
           utf8.encode(
@@ -28,7 +26,6 @@ class AuthorHash {
   }
 }
 
-// --- MODELO ---
 enum UserRole {
   artista,
   beatmaker,
@@ -37,14 +34,14 @@ enum UserRole {
 }
 
 class MatchCardModel {
-  String id;
-  UserRole role;
-  UserRole seeking;
-  String? fileName;
-  String? fileHash;
-  DateTime timestamp;
+  final String id;
+  final UserRole role;
+  final UserRole seeking;
+  final String? fileName;
+  final String? fileHash;
+  final DateTime timestamp;
 
-  MatchCardModel({
+  const MatchCardModel({
     required this.id,
     required this.role,
     required this.seeking,
@@ -73,11 +70,13 @@ class _MatchPageState
         State<
           MatchPage
         > {
-  List<
+  final AudioRecorder _recorder = AudioRecorder();
+
+  final List<
     MatchCardModel
   >
   catalog = [];
-  final AudioRecorder _recorder = AudioRecorder();
+
   bool _isRecording = false;
 
   @override
@@ -86,7 +85,6 @@ class _MatchPageState
     super.dispose();
   }
 
-  // --- FUNÇÃO PARA CRIAR O DOCUMENTO PDF OFICIAL ---
   Future<
     pw.Document
   >
@@ -94,12 +92,14 @@ class _MatchPageState
     MatchCardModel item,
   ) async {
     final pdf = pw.Document();
-    final dateStr =
+
+    final date =
         DateFormat(
           'dd/MM/yyyy HH:mm:ss',
         ).format(
           item.timestamp,
         );
+
     final shortId = item.id.hashCode.abs().toString().padLeft(
       8,
       '0',
@@ -110,162 +110,198 @@ class _MatchPageState
         pageFormat: PdfPageFormat.a4,
         build:
             (
-              pw.Context context,
-            ) => pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                pw.Row(
-                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                  children: [
-                    pw.Text(
-                      "VERSIN DIGITAL ASSET PROTECTION",
-                      style: pw.TextStyle(
-                        fontSize: 10,
-                        fontWeight: pw.FontWeight.bold,
-                        color: PdfColors.grey700,
-                      ),
-                    ),
-                    pw.Text(
-                      "ID REGISTRO: #$shortId",
-                      style: pw.TextStyle(
-                        fontSize: 10,
-                        color: PdfColors.grey600,
-                      ),
-                    ),
-                  ],
-                ),
-                pw.SizedBox(
-                  height: 20,
-                ),
-                pw.Header(
-                  level: 0,
-                  child: pw.Text(
-                    "CERTIFICADO DE REGISTRO E ANTERIORIDADE",
-                    style: pw.TextStyle(
-                      fontSize: 22,
-                      fontWeight: pw.FontWeight.bold,
-                    ),
-                  ),
-                ),
-                pw.Divider(
-                  thickness: 2,
-                ),
-                pw.SizedBox(
-                  height: 20,
-                ),
-                pw.Text(
-                  "DADOS DO REGISTRO:",
-                  style: pw.TextStyle(
-                    fontWeight: pw.FontWeight.bold,
-                    fontSize: 14,
-                  ),
-                ),
-                pw.SizedBox(
-                  height: 10,
-                ),
-                pw.Bullet(
-                  text: "ARQUIVO: ${item.fileName}",
-                ),
-                pw.Bullet(
-                  text: "DATA/HORA: $dateStr",
-                ),
-                pw.Bullet(
-                  text: "PAPEL DECLARADO: ${item.role.name.toUpperCase()}",
-                ),
-                pw.Bullet(
-                  text: "STATUS: VALIDADO VIA SHA-256",
-                ),
-                pw.SizedBox(
-                  height: 30,
-                ),
-                pw.Container(
-                  padding: const pw.EdgeInsets.all(
-                    15,
-                  ),
-                  decoration: pw.BoxDecoration(
-                    color: PdfColors.grey100,
-                    border: pw.Border.all(
-                      color: PdfColors.grey300,
-                    ),
-                  ),
-                  child: pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+              _,
+            ) {
+              return pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                     children: [
                       pw.Text(
-                        "ASSINATURA CRIPTOGRÁFICA (HASH):",
+                        'VERSIN DIGITAL ASSET PROTECTION',
                         style: pw.TextStyle(
-                          fontWeight: pw.FontWeight.bold,
                           fontSize: 10,
+                          fontWeight: pw.FontWeight.bold,
+                          color: PdfColors.grey700,
                         ),
                       ),
-                      pw.SizedBox(
-                        height: 5,
-                      ),
                       pw.Text(
-                        item.fileHash ??
-                            "GRAVACAO DIRETA (BIOMETRIA DE VOZ)",
-                        style: pw.TextStyle(
-                          fontSize: 9,
-                          font: pw.Font.courier(),
+                        'ID REGISTRO: #$shortId',
+                        style: const pw.TextStyle(
+                          fontSize: 10,
+                          color: PdfColors.grey600,
                         ),
                       ),
                     ],
                   ),
-                ),
-                pw.SizedBox(
-                  height: 40,
-                ),
-                pw.Text(
-                  "DECLARAÇÃO JURÍDICA:",
-                  style: pw.TextStyle(
-                    fontWeight: pw.FontWeight.bold,
-                    fontSize: 10,
+
+                  pw.SizedBox(
+                    height: 20,
                   ),
-                ),
-                pw.Text(
-                  "O detentor deste certificado declara, sob as penas da lei, ser o autor ou detentor legítimo dos direitos da obra acima descrita, registrada nesta data através do motor de hashing SHA-256 via Versin Match Engine. Este documento serve como prova de anterioridade temporal.",
-                  style: pw.TextStyle(
-                    fontSize: 9,
-                    color: PdfColors.grey800,
-                  ),
-                  textAlign: pw.TextAlign.justify,
-                ),
-                pw.Spacer(),
-                pw.Divider(),
-                pw.Align(
-                  alignment: pw.Alignment.center,
-                  child: pw.Text(
-                    "Documento gerado eletronicamente via Versin Engine - Osasco, SP",
-                    style: pw.TextStyle(
-                      fontSize: 8,
-                      color: PdfColors.grey500,
+
+                  pw.Header(
+                    level: 0,
+                    child: pw.Text(
+                      'CERTIFICADO DE REGISTRO E ANTERIORIDADE',
+                      style: pw.TextStyle(
+                        fontSize: 22,
+                        fontWeight: pw.FontWeight.bold,
+                      ),
                     ),
                   ),
-                ),
-              ],
-            ),
+
+                  pw.Divider(
+                    thickness: 2,
+                  ),
+                  pw.SizedBox(
+                    height: 20,
+                  ),
+
+                  pw.Text(
+                    'DADOS DO REGISTRO:',
+                    style: pw.TextStyle(
+                      fontSize: 14,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+
+                  pw.SizedBox(
+                    height: 10,
+                  ),
+
+                  pw.Bullet(
+                    text: 'ARQUIVO: ${item.fileName}',
+                  ),
+                  pw.Bullet(
+                    text: 'DATA/HORA: $date',
+                  ),
+                  pw.Bullet(
+                    text: 'PAPEL DECLARADO: ${item.role.name.toUpperCase()}',
+                  ),
+                  pw.Bullet(
+                    text: 'STATUS: VALIDADO VIA SHA-256',
+                  ),
+
+                  pw.SizedBox(
+                    height: 30,
+                  ),
+
+                  pw.Container(
+                    padding: const pw.EdgeInsets.all(
+                      15,
+                    ),
+                    decoration: pw.BoxDecoration(
+                      color: PdfColors.grey100,
+                      border: pw.Border.all(
+                        color: PdfColors.grey300,
+                      ),
+                    ),
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text(
+                          'ASSINATURA CRIPTOGRÁFICA (HASH):',
+                          style: pw.TextStyle(
+                            fontSize: 10,
+                            fontWeight: pw.FontWeight.bold,
+                          ),
+                        ),
+                        pw.SizedBox(
+                          height: 5,
+                        ),
+                        pw.Text(
+                          item.fileHash ??
+                              'GRAVACAO DIRETA (BIOMETRIA DE VOZ)',
+                          style: pw.TextStyle(
+                            fontSize: 9,
+                            font: pw.Font.courier(),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  pw.SizedBox(
+                    height: 40,
+                  ),
+
+                  pw.Text(
+                    'DECLARAÇÃO JURÍDICA:',
+                    style: pw.TextStyle(
+                      fontSize: 10,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+
+                  pw.Text(
+                    'O detentor deste certificado declara, sob as penas da lei, '
+                    'ser o autor ou detentor legítimo dos direitos da obra acima '
+                    'descrita, registrada nesta data através do motor de hashing '
+                    'SHA-256 via Versin Match Engine. Este documento serve como '
+                    'prova de anterioridade temporal.',
+                    textAlign: pw.TextAlign.justify,
+                    style: const pw.TextStyle(
+                      fontSize: 9,
+                      color: PdfColors.grey800,
+                    ),
+                  ),
+
+                  pw.Spacer(),
+                  pw.Divider(),
+
+                  pw.Align(
+                    alignment: pw.Alignment.center,
+                    child: pw.Text(
+                      'Documento gerado eletronicamente via Versin Engine - Osasco, SP',
+                      style: const pw.TextStyle(
+                        fontSize: 8,
+                        color: PdfColors.grey500,
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
       ),
     );
+
     return pdf;
   }
 
-  void _viewDocument(
+  Future<
+    void
+  >
+  _viewDocument(
     MatchCardModel item,
   ) async {
     final pdf = await _generatePdf(
       item,
     );
 
-    Navigator.push(
+    if (!mounted) {
+      return;
+    }
+
+    final shortId =
+        item.id.length >
+            5
+        ? item.id.substring(
+            0,
+            5,
+          )
+        : item.id;
+
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder:
             (
-              context,
+              _,
             ) => Scaffold(
               appBar: AppBar(
                 title: Text(
-                  "Certificado: ${item.fileName}",
+                  'Certificado: ${item.fileName}',
                 ),
                 backgroundColor: const Color(
                   0xFF1A1A1A,
@@ -274,13 +310,13 @@ class _MatchPageState
               body: PdfPreview(
                 build:
                     (
-                      format,
+                      _,
                     ) => pdf.save(),
                 allowPrinting: true,
                 allowSharing: true,
                 canChangePageFormat: false,
                 initialPageFormat: PdfPageFormat.a4,
-                pdfFileName: "Certificado_Versin_${item.id.substring(0, 5)}.pdf",
+                pdfFileName: 'Certificado_Versin_$shortId.pdf',
               ),
             ),
       ),
@@ -291,32 +327,50 @@ class _MatchPageState
     void
   >
   _handleRecording() async {
-    if (await _recorder.hasPermission()) {
-      if (_isRecording) {
-        final path = await _recorder.stop();
-        setState(
-          () => _isRecording = false,
-        );
-        if (path !=
-            null) {
-          _registerEntry(
-            "Vocal_Gravado_${DateTime.now().millisecond}.m4a",
-            null,
-            UserRole.interprete,
-            UserRole.compositor,
-          );
-        }
-      } else {
-        const config = RecordConfig();
-        await _recorder.start(
-          config,
-          path: 'recording.m4a',
-        );
-        setState(
-          () => _isRecording = true,
+    if (!await _recorder.hasPermission()) {
+      return;
+    }
+
+    if (_isRecording) {
+      final path = await _recorder.stop();
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(
+        () {
+          _isRecording = false;
+        },
+      );
+
+      if (path !=
+          null) {
+        _registerEntry(
+          'Vocal_Gravado_${DateTime.now().millisecond}.m4a',
+          null,
+          UserRole.interprete,
+          UserRole.compositor,
         );
       }
+
+      return;
     }
+
+    await _recorder.start(
+      const RecordConfig(),
+      path: 'recording.m4a',
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(
+      () {
+        _isRecording = true;
+      },
+    );
   }
 
   void _registerEntry(
@@ -347,7 +401,7 @@ class _MatchPageState
   >
   _pickFile() async {
     try {
-      FilePickerResult? result = await FilePicker.platform.pickFiles(
+      final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: [
           'mp3',
@@ -356,33 +410,34 @@ class _MatchPageState
         ],
       );
 
-      if (result !=
-          null) {
-        PlatformFile file = result.files.first;
-        if (file.extension ==
-            'txt') {
-          final hash = AuthorHash.generateSignature(
-            file.name,
-            file.size.toString(),
-          );
-          _showRoleSelection(
-            file,
-            hash,
-            true,
-          );
-        } else {
-          _showRoleSelection(
-            file,
-            null,
-            false,
-          );
-        }
+      if (result ==
+              null ||
+          !mounted) {
+        return;
       }
+
+      final file = result.files.first;
+      final isText =
+          file.extension?.toLowerCase() ==
+          'txt';
+
+      final hash = AuthorHash.generateSignature(
+        file.name,
+        file.size.toString(),
+      );
+
+      _showRoleSelection(
+        file,
+        isText
+            ? hash
+            : null,
+        isText,
+      );
     } catch (
       e
     ) {
       debugPrint(
-        "Erro: $e",
+        'Erro ao selecionar arquivo: $e',
       );
     }
   }
@@ -392,7 +447,9 @@ class _MatchPageState
     String? hash,
     bool isText,
   ) {
-    showModalBottomSheet(
+    showModalBottomSheet<
+      void
+    >(
       context: context,
       backgroundColor: const Color(
         0xFF1A1A1A,
@@ -406,111 +463,96 @@ class _MatchPageState
       ),
       builder:
           (
-            context,
-          ) => Column(
-            mainAxisSize: MainAxisSize.min,
-            children: isText
-                ? [
-                    ListTile(
-                      leading: const Icon(
-                        Icons.mic,
+            sheetContext,
+          ) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: isText
+                  ? [
+                      _buildRoleOption(
+                        context: sheetContext,
+                        file: file,
+                        hash: hash,
+                        icon: Icons.mic,
                         color: Colors.pinkAccent,
+                        title: 'Artista',
+                        role: UserRole.artista,
+                        seeking: UserRole.beatmaker,
                       ),
-                      title: const Text(
-                        "Artista",
-                        style: TextStyle(
-                          color: Colors.white,
-                        ),
-                      ),
-                      onTap: () {
-                        _registerEntry(
-                          file.name,
-                          hash,
-                          UserRole.artista,
-                          UserRole.beatmaker,
-                        );
-                        Navigator.pop(
-                          context,
-                        );
-                      },
-                    ),
-                    ListTile(
-                      leading: const Icon(
-                        Icons.history_edu,
+                      _buildRoleOption(
+                        context: sheetContext,
+                        file: file,
+                        hash: hash,
+                        icon: Icons.history_edu,
                         color: Colors.orangeAccent,
+                        title: 'Compositor',
+                        role: UserRole.compositor,
+                        seeking: UserRole.artista,
                       ),
-                      title: const Text(
-                        "Compositor",
-                        style: TextStyle(
-                          color: Colors.white,
-                        ),
-                      ),
-                      onTap: () {
-                        _registerEntry(
-                          file.name,
-                          hash,
-                          UserRole.compositor,
-                          UserRole.artista,
-                        );
-                        Navigator.pop(
-                          context,
-                        );
-                      },
-                    ),
-                  ]
-                : [
-                    ListTile(
-                      leading: const Icon(
-                        Icons.audiotrack,
-                        color: Colors.blueAccent,
-                      ),
-                      title: const Text(
-                        "Beatmaker",
-                        style: TextStyle(
-                          color: Colors.white,
-                        ),
-                      ),
-                      onTap: () {
-                        final h = AuthorHash.generateSignature(
+                    ]
+                  : [
+                      _buildRoleOption(
+                        context: sheetContext,
+                        file: file,
+                        hash: AuthorHash.generateSignature(
                           file.name,
                           file.size.toString(),
-                        );
-                        _registerEntry(
-                          file.name,
-                          h,
-                          UserRole.beatmaker,
-                          UserRole.artista,
-                        );
-                        Navigator.pop(
-                          context,
-                        );
-                      },
-                    ),
-                    ListTile(
-                      leading: const Icon(
-                        Icons.record_voice_over,
-                        color: Colors.cyanAccent,
-                      ),
-                      title: const Text(
-                        "Intérprete",
-                        style: TextStyle(
-                          color: Colors.white,
                         ),
+                        icon: Icons.audiotrack,
+                        color: Colors.blueAccent,
+                        title: 'Beatmaker',
+                        role: UserRole.beatmaker,
+                        seeking: UserRole.artista,
                       ),
-                      onTap: () {
-                        _registerEntry(
-                          file.name,
-                          null,
-                          UserRole.interprete,
-                          UserRole.compositor,
-                        );
-                        Navigator.pop(
-                          context,
-                        );
-                      },
-                    ),
-                  ],
-          ),
+                      _buildRoleOption(
+                        context: sheetContext,
+                        file: file,
+                        hash: null,
+                        icon: Icons.record_voice_over,
+                        color: Colors.cyanAccent,
+                        title: 'Intérprete',
+                        role: UserRole.interprete,
+                        seeking: UserRole.compositor,
+                      ),
+                    ],
+            );
+          },
+    );
+  }
+
+  Widget _buildRoleOption({
+    required BuildContext context,
+    required PlatformFile file,
+    required String? hash,
+    required IconData icon,
+    required Color color,
+    required String title,
+    required UserRole role,
+    required UserRole seeking,
+  }) {
+    return ListTile(
+      leading: Icon(
+        icon,
+        color: color,
+      ),
+      title: Text(
+        title,
+        style: const TextStyle(
+          color: Colors.white,
+        ),
+      ),
+      onTap: () {
+        _registerEntry(
+          file.name,
+          hash,
+          role,
+          seeking,
+        );
+
+        Navigator.pop(
+          context,
+        );
+      },
     );
   }
 
@@ -524,7 +566,7 @@ class _MatchPageState
       ),
       appBar: AppBar(
         title: const Text(
-          "VERSIN MATCH ENGINE",
+          'VERSIN MATCH ENGINE',
           style: TextStyle(
             fontSize: 10,
             letterSpacing: 2,
@@ -540,7 +582,7 @@ class _MatchPageState
           _buildUploadArea(),
           Expanded(
             child: catalog.isEmpty
-                ? _buildEmptyState() // RESGATE DO "ESPERANDO ARQUIVOS"
+                ? _buildEmptyState()
                 : ListView.builder(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 16,
@@ -548,19 +590,29 @@ class _MatchPageState
                     itemCount: catalog.length,
                     itemBuilder:
                         (
-                          context,
+                          _,
                           index,
-                        ) => _MatchCard(
-                          item: catalog[index],
-                          onDelete: () => setState(
-                            () => catalog.removeAt(
-                              index,
-                            ),
-                          ),
-                          onView: () => _viewDocument(
-                            catalog[index],
-                          ),
-                        ),
+                        ) {
+                          final item = catalog[index];
+
+                          return _MatchCard(
+                            item: item,
+                            onDelete: () {
+                              setState(
+                                () {
+                                  catalog.removeAt(
+                                    index,
+                                  );
+                                },
+                              );
+                            },
+                            onView: () {
+                              _viewDocument(
+                                item,
+                              );
+                            },
+                          );
+                        },
                   ),
           ),
         ],
@@ -568,7 +620,6 @@ class _MatchPageState
     );
   }
 
-  // --- ESTADO VISUAL DE ESPERA ---
   Widget _buildEmptyState() {
     return Center(
       child: Column(
@@ -582,7 +633,6 @@ class _MatchPageState
               shape: BoxShape.circle,
               border: Border.all(
                 color: Colors.white10,
-                width: 1,
               ),
             ),
             child: const Icon(
@@ -595,7 +645,7 @@ class _MatchPageState
             height: 16,
           ),
           const Text(
-            "ESPERANDO ARQUIVOS",
+            'ESPERANDO ARQUIVOS',
             style: TextStyle(
               color: Colors.white12,
               letterSpacing: 4,
@@ -607,7 +657,7 @@ class _MatchPageState
             height: 8,
           ),
           const Text(
-            "Suba um beat ou grave sua voz para registrar",
+            'Suba um beat ou grave sua voz para registrar',
             style: TextStyle(
               color: Colors.white10,
               fontSize: 10,
@@ -638,8 +688,8 @@ class _MatchPageState
                     15,
                   ),
                   border: Border.all(
-                    color: Colors.white.withOpacity(
-                      0.05,
+                    color: Colors.white.withValues(
+                      alpha: 0.05,
                     ),
                   ),
                 ),
@@ -654,7 +704,7 @@ class _MatchPageState
                       height: 4,
                     ),
                     Text(
-                      "UPLOAD",
+                      'UPLOAD',
                       style: TextStyle(
                         color: Colors.white38,
                         fontSize: 9,
@@ -666,9 +716,11 @@ class _MatchPageState
               ),
             ),
           ),
+
           const SizedBox(
             width: 12,
           ),
+
           GestureDetector(
             onTap: _handleRecording,
             child: Container(
@@ -676,8 +728,8 @@ class _MatchPageState
               height: 80,
               decoration: BoxDecoration(
                 color: _isRecording
-                    ? Colors.redAccent.withOpacity(
-                        0.1,
+                    ? Colors.redAccent.withValues(
+                        alpha: 0.1,
                       )
                     : const Color(
                         0xFF1A1A1A,
@@ -688,8 +740,8 @@ class _MatchPageState
                 border: Border.all(
                   color: _isRecording
                       ? Colors.redAccent
-                      : Colors.cyanAccent.withOpacity(
-                          0.1,
+                      : Colors.cyanAccent.withValues(
+                          alpha: 0.1,
                         ),
                 ),
               ),
@@ -709,8 +761,8 @@ class _MatchPageState
                   ),
                   Text(
                     _isRecording
-                        ? "PARAR"
-                        : "GRAVAR",
+                        ? 'PARAR'
+                        : 'GRAVAR',
                     style: TextStyle(
                       color: _isRecording
                           ? Colors.redAccent
@@ -746,7 +798,7 @@ class _MatchCard
   Widget build(
     BuildContext context,
   ) {
-    final dateStr =
+    final date =
         DateFormat(
           'dd/MM HH:mm',
         ).format(
@@ -768,8 +820,8 @@ class _MatchCard
           15,
         ),
         border: Border.all(
-          color: Colors.white.withOpacity(
-            0.03,
+          color: Colors.white.withValues(
+            alpha: 0.03,
           ),
         ),
       ),
@@ -780,7 +832,7 @@ class _MatchCard
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                dateStr,
+                date,
                 style: const TextStyle(
                   color: Colors.white24,
                   fontSize: 10,
@@ -789,25 +841,26 @@ class _MatchCard
               Row(
                 children: [
                   IconButton(
+                    onPressed: onView,
                     icon: const Icon(
                       Icons.verified_user,
                       color: Colors.purpleAccent,
                       size: 20,
                     ),
-                    onPressed: onView,
                   ),
                   IconButton(
+                    onPressed: onDelete,
                     icon: const Icon(
                       Icons.delete_outline,
                       color: Colors.white24,
                       size: 20,
                     ),
-                    onPressed: onDelete,
                   ),
                 ],
               ),
             ],
           ),
+
           Text(
             item.fileName ??
                 'Arquivo',
@@ -817,17 +870,19 @@ class _MatchCard
               fontWeight: FontWeight.bold,
             ),
           ),
+
           const SizedBox(
             height: 8,
           ),
+
           Container(
             padding: const EdgeInsets.symmetric(
               horizontal: 8,
               vertical: 4,
             ),
             decoration: BoxDecoration(
-              color: Colors.cyanAccent.withOpacity(
-                0.05,
+              color: Colors.cyanAccent.withValues(
+                alpha: 0.05,
               ),
               borderRadius: BorderRadius.circular(
                 4,
@@ -843,9 +898,11 @@ class _MatchCard
               ),
             ),
           ),
+
           const SizedBox(
             height: 12,
           ),
+
           Container(
             padding: const EdgeInsets.all(
               10,
@@ -860,7 +917,7 @@ class _MatchCard
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  "SHA-256 PROVA DIGITAL",
+                  'SHA-256 PROVA DIGITAL',
                   style: TextStyle(
                     color: Colors.white38,
                     fontSize: 7,
@@ -872,7 +929,7 @@ class _MatchCard
                 ),
                 SelectableText(
                   item.fileHash ??
-                      "BIOMETRIA DE VOZ ATIVA",
+                      'BIOMETRIA DE VOZ ATIVA',
                   style: const TextStyle(
                     color: Colors.greenAccent,
                     fontSize: 8,

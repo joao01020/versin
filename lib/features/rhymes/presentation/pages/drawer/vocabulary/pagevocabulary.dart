@@ -1,14 +1,16 @@
 import 'dart:io';
-import 'package:flutter/material.dart';
+
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:versin/features/rhymes/presentation/controller/rhymes_controller.dart';
 import 'package:versin/core/models/rhyme_model.dart';
+import 'package:versin/features/rhymes/presentation/controller/rhymes_controller.dart';
 
 class VocabularioPage
     extends
         StatefulWidget {
   final RhymesController controller;
+
   const VocabularioPage({
     super.key,
     required this.controller,
@@ -26,7 +28,7 @@ class PageVocabulary
         State<
           VocabularioPage
         > {
-  final _textController = TextEditingController();
+  final TextEditingController _textController = TextEditingController();
 
   @override
   void dispose() {
@@ -34,13 +36,12 @@ class PageVocabulary
     super.dispose();
   }
 
-  // --- LÓGICA: IMPORTAR ARQUIVO (.txt ou .md) ---
   Future<
     void
   >
   _importFile() async {
     try {
-      FilePickerResult? result = await FilePicker.platform.pickFiles(
+      final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: [
           'txt',
@@ -48,93 +49,104 @@ class PageVocabulary
         ],
       );
 
-      if (result !=
-              null &&
-          result.files.single.path !=
-              null) {
-        final file = File(
-          result.files.single.path!,
-        );
-        final String content = await file.readAsString();
-        final List<
-          String
-        >
-        importedRhymes = content.split(
-          RegExp(
-            r'[,\n;]',
-          ),
+      final path = result?.files.single.path;
+
+      if (path ==
+          null) {
+        return;
+      }
+
+      final content = await File(
+        path,
+      ).readAsString();
+      final importedRhymes = content.split(
+        RegExp(
+          r'[,\n;]',
+        ),
+      );
+
+      int count = 0;
+
+      for (final rhyme in importedRhymes) {
+        final cleanRhyme = rhyme.trim().toLowerCase();
+
+        if (cleanRhyme.isEmpty) {
+          continue;
+        }
+
+        widget.controller.addWord(
+          cleanRhyme,
+          false,
         );
 
-        int count = 0;
-        for (var rhyme in importedRhymes) {
-          String cleanRhyme = rhyme.trim().toLowerCase();
-          if (cleanRhyme.isNotEmpty) {
-            widget.controller.addWord(
-              cleanRhyme,
-              false,
-            );
-            count++;
-          }
-        }
-        if (mounted)
-          _showSnackBar(
-            "Sucesso! $count rimas importadas.",
-            Colors.purpleAccent,
-          );
+        count++;
+      }
+
+      if (mounted) {
+        _showSnackBar(
+          'Sucesso! $count rimas importadas.',
+          Colors.purpleAccent,
+        );
       }
     } catch (
       e
     ) {
-      if (mounted)
+      if (mounted) {
         _showSnackBar(
-          "Erro ao ler o arquivo.",
+          'Erro ao ler o arquivo.',
           Colors.redAccent,
         );
+      }
     }
   }
 
-  // --- LÓGICA: EXPORTAR PARA BACKUP ---
   Future<
     void
   >
   _exportToTxt() async {
     try {
-      final Directory? downloadsDir = await getDownloadsDirectory();
+      final downloadsDir = await getDownloadsDirectory();
+
       if (downloadsDir ==
-          null)
+          null) {
         return;
+      }
 
-      final String path = "${downloadsDir.path}/versin_backup_${DateTime.now().millisecondsSinceEpoch}.txt";
-      final File file = File(
-        path,
-      );
+      final path = '${downloadsDir.path}/versin_backup_${DateTime.now().millisecondsSinceEpoch}.txt';
 
-      StringBuffer buffer = StringBuffer();
-      buffer.writeln(
-        "--- BACKUP VERSIN: VOCABULÁRIO ---\n",
-      );
-      for (var rhyme in widget.controller.vocabulary) {
+      final buffer = StringBuffer()
+        ..writeln(
+          '--- BACKUP VERSIN: VOCABULÁRIO ---',
+        )
+        ..writeln();
+
+      for (final rhyme in widget.controller.vocabulary) {
         buffer.writeln(
           rhyme.word,
         );
       }
 
-      await file.writeAsString(
+      await File(
+        path,
+      ).writeAsString(
         buffer.toString(),
       );
-      if (mounted)
+
+      if (mounted) {
         _showSnackBar(
-          "Arquivo salvo em: $path",
+          'Arquivo salvo em: $path',
           Colors.greenAccent,
         );
+      }
     } catch (
       e
     ) {
-      if (mounted)
+      if (mounted) {
         _showSnackBar(
-          "Erro na exportação.",
+          'Erro na exportação.',
           Colors.redAccent,
         );
+      }
     }
   }
 
@@ -160,16 +172,21 @@ class PageVocabulary
 
   void _confirmAddition() {
     final text = _textController.text.trim();
-    if (text.isNotEmpty) {
-      widget.controller.addWord(
-        text,
-        false,
-      );
-      _textController.clear();
-      FocusScope.of(
-        context,
-      ).unfocus();
+
+    if (text.isEmpty) {
+      return;
     }
+
+    widget.controller.addWord(
+      text,
+      false,
+    );
+
+    _textController.clear();
+
+    FocusScope.of(
+      context,
+    ).unfocus();
   }
 
   @override
@@ -207,7 +224,6 @@ class PageVocabulary
       ),
       body: Column(
         children: [
-          // CABEÇALHO E ÁREA DE IMPORTAÇÃO ROXA
           Padding(
             padding: const EdgeInsets.symmetric(
               horizontal: 20,
@@ -215,7 +231,7 @@ class PageVocabulary
             child: Column(
               children: [
                 const Text(
-                  "BIBLIOTECA DE RIMAS",
+                  'BIBLIOTECA DE RIMAS',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 16,
@@ -223,11 +239,11 @@ class PageVocabulary
                     letterSpacing: 2,
                   ),
                 ),
+
                 const SizedBox(
                   height: 24,
                 ),
 
-                // ÁREA DE IMPORTAÇÃO EM ROXO
                 GestureDetector(
                   onTap: _importFile,
                   child: Container(
@@ -256,11 +272,13 @@ class PageVocabulary
                           color: Colors.purpleAccent,
                           size: 38,
                         ),
+
                         const SizedBox(
                           height: 12,
                         ),
+
                         const Text(
-                          "IMPORTAR BANCO DE RIMAS",
+                          'IMPORTAR BANCO DE RIMAS',
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 13,
@@ -268,11 +286,13 @@ class PageVocabulary
                             letterSpacing: 1.2,
                           ),
                         ),
+
                         const SizedBox(
                           height: 6,
                         ),
+
                         Text(
-                          "Clique aqui para enviar .txt ou .md",
+                          'Clique aqui para enviar .txt ou .md',
                           style: TextStyle(
                             color: Colors.white.withValues(
                               alpha: 0.4,
@@ -288,7 +308,6 @@ class PageVocabulary
             ),
           ),
 
-          // LISTA DE RIMAS
           Expanded(
             child: ListenableBuilder(
               listenable: widget.controller,
@@ -298,10 +317,11 @@ class PageVocabulary
                     _,
                   ) {
                     final vocab = widget.controller.vocabulary;
+
                     if (vocab.isEmpty) {
                       return Center(
                         child: Text(
-                          "Sua lista está vazia.",
+                          'Sua lista está vazia.',
                           style: TextStyle(
                             color: Colors.white.withValues(
                               alpha: 0.1,
@@ -310,6 +330,7 @@ class PageVocabulary
                         ),
                       );
                     }
+
                     return ListView.builder(
                       padding: const EdgeInsets.only(
                         top: 20,
@@ -318,7 +339,7 @@ class PageVocabulary
                       itemCount: vocab.length,
                       itemBuilder:
                           (
-                            context,
+                            _,
                             index,
                           ) => _buildRhymeTile(
                             vocab[index],
@@ -329,7 +350,6 @@ class PageVocabulary
             ),
           ),
 
-          // ÁREA DE INPUT FIXA NA BASE
           _buildInputArea(),
         ],
       ),
@@ -339,14 +359,14 @@ class PageVocabulary
   Widget _buildInputArea() {
     return Container(
       padding: EdgeInsets.only(
+        left: 16,
+        right: 16,
+        top: 12,
         bottom:
             MediaQuery.of(
               context,
             ).padding.bottom +
             16,
-        left: 16,
-        right: 16,
-        top: 12,
       ),
       decoration: const BoxDecoration(
         color: Color(
@@ -369,15 +389,15 @@ class PageVocabulary
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.purpleAccent,
                 foregroundColor: Colors.white,
+                elevation: 0,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(
                     14,
                   ),
                 ),
-                elevation: 0,
               ),
               child: const Text(
-                "+ ADICIONAR À LISTA",
+                '+ ADICIONAR À LISTA',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   letterSpacing: 1,
@@ -385,9 +405,11 @@ class PageVocabulary
               ),
             ),
           ),
+
           const SizedBox(
             height: 12,
           ),
+
           Container(
             padding: const EdgeInsets.symmetric(
               horizontal: 16,
@@ -410,7 +432,7 @@ class PageVocabulary
                 color: Colors.white,
               ),
               decoration: const InputDecoration(
-                hintText: "Digite uma nova rima...",
+                hintText: 'Digite uma nova rima...',
                 hintStyle: TextStyle(
                   color: Colors.white24,
                   fontSize: 14,
@@ -460,9 +482,11 @@ class PageVocabulary
             ),
             size: 20,
           ),
-          onPressed: () => widget.controller.removeWord(
-            index,
-          ),
+          onPressed: () {
+            widget.controller.removeWord(
+              index,
+            );
+          },
         ),
       ),
     );

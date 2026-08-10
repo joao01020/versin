@@ -1,57 +1,38 @@
 import 'dart:async';
 import 'dart:convert';
+
 import 'package:flutter/material.dart';
-
-// Importe o modelo correto
 import 'package:versin/core/models/rhyme_model.dart';
-
-// Imports baseados no projeto
 import 'package:versin/features/rhymes/data/repositories/rhymes_repository.dart';
 import 'package:versin/features/rhymes/domain/services/audio_service.dart';
+import 'package:versin/modules/chat/views/components/suggestion_balloon/controllers/suggestion_controller.dart';
 
-/// RhymesController: Classe base para a gestão de rimas e estado do estúdio.
-/// O BrainController deve herdar desta classe para estender suas funcionalidades.
 class RhymesController
     extends
         ChangeNotifier {
   final RhymesRepository _repository = RhymesRepository();
   final AudioService _audioService = AudioService();
 
+  final SuggestionController suggestionController = SuggestionController();
+
   Timer? _debounce;
   Timer? _connectionTimer;
 
-  // --- ESTADOS ---
-  List<
-    String
-  >
-  _suggestionsList = [];
-  List<
-    String
-  >
-  get suggestions => _suggestionsList;
-
   bool _isLoading = false;
-  bool get isLoading => _isLoading;
-  int connectionSeconds = 0;
 
   int _currentStep = 1;
-  int get currentStep => _currentStep;
   double _stepProgress = 0.0;
-  double get stepProgress => _stepProgress;
 
+  String? _userApiKey = 'VERSIN-PRO-TRIAL-2026-FREE';
+
+  int connectionSeconds = 0;
   double starProgress = 0.0;
-  double get fireProgress =>
-      (starProgress *
-              0.7)
-          .clamp(
-            0.0,
-            1.0,
-          );
 
-  String currentFeedback = "Comece a escrever para validar sua letra...";
+  String currentFeedback = 'Comece a escrever para validar sua letra...';
 
-  String selectedTechnique = "Melódico";
-  String selectedVibe = "Calmo";
+  String selectedTechnique = 'Melódico';
+  String selectedVibe = 'Calmo';
+
   int currentBpm = 120;
   bool isBpmPlaying = false;
 
@@ -67,66 +48,99 @@ class RhymesController
   >
   trendingWords = [];
 
-  String? _userApiKey = "VERSIN-PRO-TRIAL-2026-FREE";
+  List<
+    String
+  >
+  get suggestions => suggestionController.suggestions;
+
+  bool get isLoading => _isLoading;
+  int get currentStep => _currentStep;
+  double get stepProgress => _stepProgress;
   String? get userApiKey => _userApiKey;
 
-  // --- MÉTODOS DE DADOS ---
+  double get fireProgress =>
+      (starProgress *
+              0.7)
+          .clamp(
+            0.0,
+            1.0,
+          );
 
-  void addWord(
+  Future<
+    void
+  >
+  addWord(
     String word,
     bool priority,
   ) async {
-    String p = word.trim().toLowerCase();
-    if (p.isNotEmpty &&
-        !vocabulary.any(
-          (
-            r,
-          ) =>
-              r.word ==
-              p,
-        )) {
-      vocabulary.insert(
-        0,
-        Rhyme(
-          word: p,
-          isPriority: priority,
-        ),
-      );
-      notifyListeners();
+    final normalized = word.trim().toLowerCase();
 
-      try {
-        await _repository.saveWord(
-          p,
-        );
-      } catch (
-        e
-      ) {
-        debugPrint(
-          "Erro ao salvar palavra: $e",
-        );
-      }
+    if (normalized.isEmpty ||
+        vocabulary.any(
+          (
+            rhyme,
+          ) =>
+              rhyme.word ==
+              normalized,
+        )) {
+      return;
+    }
+
+    vocabulary.insert(
+      0,
+      Rhyme(
+        word: normalized,
+        isPriority: priority,
+      ),
+    );
+
+    notifyListeners();
+
+    try {
+      await _repository.saveWord(
+        normalized,
+      );
+    } catch (
+      e
+    ) {
+      debugPrint(
+        'Erro ao salvar palavra: $e',
+      );
     }
   }
 
-  void removeWord(
+  Future<
+    void
+  >
+  removeWord(
     int index,
   ) async {
-    if (index >=
-            0 &&
-        index <
+    if (index <
+            0 ||
+        index >=
             vocabulary.length) {
-      final wordToRemove = vocabulary[index].word;
-      vocabulary.removeAt(
-        index,
-      );
-      notifyListeners();
+      return;
+    }
+
+    final word = vocabulary[index].word;
+
+    vocabulary.removeAt(
+      index,
+    );
+    notifyListeners();
+
+    try {
       await _repository.deleteWord(
-        wordToRemove,
+        word,
+      );
+    } catch (
+      e
+    ) {
+      debugPrint(
+        'Erro ao remover palavra: $e',
       );
     }
   }
-
-  // --- MÉTODOS DE INICIALIZAÇÃO E GAMIFICAÇÃO ---
 
   Future<
     void
@@ -134,21 +148,22 @@ class RhymesController
   fetchTrendingWords() async {
     trendingWords = [
       {
-        "word": "Flow",
-        "count": 150,
+        'word': 'Flow',
+        'count': 150,
       },
       {
-        "word": "Beat",
-        "count": 120,
+        'word': 'Beat',
+        'count': 120,
       },
     ];
+
     notifyListeners();
   }
 
   void updateGamification(
-    double v,
+    double value,
   ) {
-    starProgress = v;
+    starProgress = value;
     notifyListeners();
   }
 
@@ -159,9 +174,9 @@ class RhymesController
     notifyListeners();
   }
 
-  // --- LÓGICA DO METRÔNOMO ---
   void toggleMetronome() {
     isBpmPlaying = !isBpmPlaying;
+
     if (isBpmPlaying) {
       _audioService.startMetronome(
         currentBpm,
@@ -169,18 +184,20 @@ class RhymesController
     } else {
       _audioService.stopMetronome();
     }
+
     notifyListeners();
   }
 
-  // --- LÓGICA DE DIGITAÇÃO ---
   void onTextChanged(
     String text,
   ) {
-    if (_debounce?.isActive ??
-        false)
-      _debounce!.cancel();
+    _debounce?.cancel();
 
     _processarProgressoTecnico(
+      text,
+    );
+
+    suggestionController.updateFromText(
       text,
     );
 
@@ -189,58 +206,69 @@ class RhymesController
         milliseconds: 300,
       ),
       () {
-        String t = text.trim().toLowerCase();
+        final normalized = text.trim().toLowerCase();
 
-        if (t.isEmpty) {
-          _suggestionsList = [];
+        if (normalized.isEmpty) {
+          suggestionController.clearSuggestions();
           notifyListeners();
           return;
         }
 
-        final words = t.split(
+        final words = normalized.split(
           RegExp(
             r'\s+',
           ),
         );
+
         final lastWord = words.last;
 
-        if (lastWord.length >=
+        if (lastWord.length <
             2) {
-          String sufixo = lastWord.substring(
-            lastWord.length -
-                2,
-          );
+          if (suggestionController.suggestions.isEmpty) {
+            suggestionController.clearSuggestions();
+          }
 
-          _suggestionsList = vocabulary
-              .where(
-                (
-                  item,
-                ) {
-                  String wordInVocab = item.word.trim().toLowerCase();
-                  return wordInVocab.endsWith(
-                        sufixo,
-                      ) ||
-                      wordInVocab.startsWith(
-                        lastWord,
-                      );
-                },
-              )
-              .map(
-                (
-                  item,
-                ) => item.word.trim(),
-              )
-              .where(
-                (
-                  word,
-                ) =>
-                    word !=
-                    lastWord,
-              )
-              .toList();
-        } else {
-          _suggestionsList = [];
+          notifyListeners();
+          return;
         }
+
+        final suffix = lastWord.substring(
+          lastWord.length -
+              2,
+        );
+
+        final localSuggestions = vocabulary
+            .map(
+              (
+                item,
+              ) => item.word.trim().toLowerCase(),
+            )
+            .where(
+              (
+                word,
+              ) =>
+                  word !=
+                      lastWord &&
+                  (word.endsWith(
+                        suffix,
+                      ) ||
+                      word.startsWith(
+                        lastWord,
+                      )),
+            )
+            .toList();
+
+        if (localSuggestions.isNotEmpty) {
+          final combined = {
+            ...suggestionController.suggestions,
+            ...localSuggestions,
+          }.toList();
+
+          suggestionController.setSuggestions(
+            combined,
+          );
+        }
+
         notifyListeners();
       },
     );
@@ -251,31 +279,36 @@ class RhymesController
   ) {
     if (texto.trim().isEmpty) {
       starProgress = 0.0;
-      currentFeedback = "Comece a escrever para validar sua letra...";
-    } else {
-      currentFeedback = "Versin analisando seu flow...";
-      final totalLinhas = texto
-          .split(
-            '\n',
-          )
-          .where(
-            (
-              l,
-            ) => l.trim().isNotEmpty,
-          )
-          .length;
-      starProgress =
-          (totalLinhas /
-                  10)
-              .clamp(
-                0.0,
-                3.0,
-              );
+      currentFeedback = 'Comece a escrever para validar sua letra...';
+
+      notifyListeners();
+      return;
     }
+
+    currentFeedback = 'Versin analisando seu flow...';
+
+    final totalLinhas = texto
+        .split(
+          '\n',
+        )
+        .where(
+          (
+            linha,
+          ) => linha.trim().isNotEmpty,
+        )
+        .length;
+
+    starProgress =
+        (totalLinhas /
+                10)
+            .clamp(
+              0.0,
+              3.0,
+            );
+
     notifyListeners();
   }
 
-  // --- CONEXÃO COM IA ---
   Future<
     Map<
       String,
@@ -287,14 +320,17 @@ class RhymesController
   ) async {
     _isLoading = true;
     connectionSeconds = 0;
+
     notifyListeners();
+
+    _connectionTimer?.cancel();
 
     _connectionTimer = Timer.periodic(
       const Duration(
         seconds: 1,
       ),
       (
-        timer,
+        _,
       ) {
         connectionSeconds++;
         notifyListeners();
@@ -307,8 +343,8 @@ class RhymesController
         currentList: vocabulary
             .map(
               (
-                r,
-              ) => r.word,
+                rhyme,
+              ) => rhyme.word,
             )
             .toList(),
         apiKey: _userApiKey,
@@ -319,33 +355,39 @@ class RhymesController
         },
       );
 
-      _connectionTimer?.cancel();
-
-      if (response.statusCode ==
+      if (response.statusCode !=
           200) {
-        final data = jsonDecode(
-          response.body,
-        );
         return {
-          "role": "assistant",
-          "content":
-              data['content'] ??
-              "",
+          'role': 'assistant',
+          'content': 'Erro no servidor (Status: ${response.statusCode})',
         };
       }
+
+      final data = jsonDecode(
+        response.body,
+      );
+
       return {
-        "role": "assistant",
-        "content": "Erro no servidor (Status: ${response.statusCode})",
+        'role': 'assistant',
+        'content':
+            data['content']?.toString() ??
+            '',
       };
     } catch (
       e
     ) {
-      _connectionTimer?.cancel();
+      debugPrint(
+        'Erro na conexão com IA: $e',
+      );
+
       return {
-        "role": "assistant",
-        "content": "Conexão instável. Tente novamente!",
+        'role': 'assistant',
+        'content': 'Conexão instável. Tente novamente!',
       };
     } finally {
+      _connectionTimer?.cancel();
+      _connectionTimer = null;
+
       _isLoading = false;
       notifyListeners();
     }
@@ -357,12 +399,13 @@ class RhymesController
   carregarDadosUsuario() async {
     try {
       vocabulary = await _repository.fetchVocabulary();
+
       notifyListeners();
     } catch (
       e
     ) {
       debugPrint(
-        "Erro ao carregar vocabulário: $e",
+        'Erro ao carregar vocabulário: $e',
       );
     }
   }
@@ -375,35 +418,45 @@ class RhymesController
     if (bpm !=
         null) {
       currentBpm = bpm;
-      if (isBpmPlaying)
+
+      if (isBpmPlaying) {
         _audioService.startMetronome(
           currentBpm,
         );
+      }
     }
+
     if (vibe !=
-        null)
+        null) {
       selectedVibe = vibe;
+    }
+
     if (technique !=
-        null)
+        null) {
       selectedTechnique = technique;
+    }
+
     notifyListeners();
   }
 
   void updateProgress(
-    int s,
-    double p,
+    int step,
+    double progress,
   ) {
-    _currentStep = s;
-    _stepProgress = p;
+    _currentStep = step;
+    _stepProgress = progress;
+
     notifyListeners();
   }
 
-  Color getActiveColor() => const Color(
-    0xFFE100FF,
-  );
+  Color getActiveColor() {
+    return const Color(
+      0xFFE100FF,
+    );
+  }
 
   void clearSuggestions() {
-    _suggestionsList = [];
+    suggestionController.clearSuggestions();
     notifyListeners();
   }
 
@@ -411,7 +464,10 @@ class RhymesController
   void dispose() {
     _debounce?.cancel();
     _connectionTimer?.cancel();
+
     _audioService.dispose();
+    suggestionController.dispose();
+
     super.dispose();
   }
 }

@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 
-class ThermometerFeedback extends StatelessWidget {
-  final double starProgress; // 0.0 a 3.0
-  final double fireProgress; // 0.0 a 3.0
-  final String
-  feedbackText; // Adicionei para exibir o comentário abaixo dos ícones
+class ThermometerFeedback
+    extends
+        StatelessWidget {
+  final double starProgress;
+  final double fireProgress;
+  final String feedbackText;
 
   const ThermometerFeedback({
     super.key,
@@ -14,57 +15,79 @@ class ThermometerFeedback extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    // Se o progresso de fogo começou, as estrelas são ocultadas
-    bool isFirePhase = fireProgress > 0.05;
+  Widget build(
+    BuildContext context,
+  ) {
+    final isFirePhase =
+        fireProgress >
+        0.05;
+    final progress = isFirePhase
+        ? fireProgress
+        : starProgress;
+    final icon = isFirePhase
+        ? Icons.local_fire_department_rounded
+        : Icons.star_rounded;
+    final color = isFirePhase
+        ? Colors.deepOrangeAccent
+        : Colors.purpleAccent;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 18),
+          padding: const EdgeInsets.symmetric(
+            vertical: 10,
+            horizontal: 18,
+          ),
           decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.5),
-            borderRadius: BorderRadius.circular(30),
-            border: Border.all(color: Colors.white.withOpacity(0.1), width: 1),
+            color: Colors.black.withValues(
+              alpha: 0.5,
+            ),
+            borderRadius: BorderRadius.circular(
+              30,
+            ),
+            border: Border.all(
+              color: Colors.white.withValues(
+                alpha: 0.1,
+              ),
+            ),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: isFirePhase
-                ? List.generate(3, (index) {
-                    double iconProgress = (fireProgress - index).clamp(
-                      0.0,
-                      1.0,
-                    );
-                    return _GradualIcon(
-                      icon: Icons.local_fire_department_rounded,
-                      percentage: iconProgress,
-                      color: Colors.deepOrangeAccent,
-                    );
-                  })
-                : List.generate(3, (index) {
-                    double iconProgress = (starProgress - index).clamp(
-                      0.0,
-                      1.0,
-                    );
-                    return _GradualIcon(
-                      icon: Icons.star_rounded,
-                      percentage: iconProgress,
-                      color: Colors.purpleAccent,
-                    );
-                  }),
+            children: List.generate(
+              3,
+              (
+                index,
+              ) => _GradualIcon(
+                icon: icon,
+                percentage:
+                    (progress -
+                            index)
+                        .clamp(
+                          0.0,
+                          1.0,
+                        ),
+                color: color,
+              ),
+            ),
           ),
         ),
-        const SizedBox(height: 12),
-        // Exibição do feedback técnico
+
+        const SizedBox(
+          height: 12,
+        ),
+
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 40),
+          padding: const EdgeInsets.symmetric(
+            horizontal: 40,
+          ),
           child: Text(
             feedbackText,
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: isFirePhase ? Colors.orangeAccent : Colors.white70,
+              color: isFirePhase
+                  ? Colors.orangeAccent
+                  : Colors.white70,
               fontSize: 13,
               fontWeight: FontWeight.w500,
               letterSpacing: 0.3,
@@ -76,9 +99,11 @@ class ThermometerFeedback extends StatelessWidget {
   }
 }
 
-class _GradualIcon extends StatelessWidget {
+class _GradualIcon
+    extends
+        StatelessWidget {
   final IconData icon;
-  final double percentage; // 0.0 a 1.0
+  final double percentage;
   final Color color;
 
   const _GradualIcon({
@@ -88,20 +113,43 @@ class _GradualIcon extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(
+    BuildContext context,
+  ) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 4,
+      ),
       child: ShaderMask(
         blendMode: BlendMode.srcIn,
-        shaderCallback: (rect) {
-          return LinearGradient(
-            begin: Alignment.bottomCenter,
-            end: Alignment.topCenter,
-            stops: [percentage, percentage],
-            colors: [color, Colors.white.withOpacity(0.2)],
-          ).createShader(rect);
-        },
-        child: Icon(icon, size: 32, color: Colors.white),
+        shaderCallback:
+            (
+              rect,
+            ) =>
+                LinearGradient(
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                  stops: [
+                    percentage,
+                    percentage,
+                  ],
+                  colors: [
+                    color,
+                    Colors.white.withValues(
+                      alpha: 0.2,
+                    ),
+                  ],
+                ).createShader(
+                  rect,
+                ),
+        child: const SizedBox(
+          width: 32,
+          height: 32,
+          child: Icon(
+            Icons.star,
+            color: Colors.white,
+          ),
+        ),
       ),
     );
   }

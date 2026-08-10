@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+
 import '../controllers/wallet_controller.dart';
 
-class QuickActionButtonWidget extends StatelessWidget {
+class QuickActionButtonWidget
+    extends
+        StatelessWidget {
   final WalletController controller;
   final IconData icon;
   final String label;
@@ -16,7 +19,11 @@ class QuickActionButtonWidget extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(
+    BuildContext context,
+  ) {
+    final accent = controller.accentNeon;
+
     return Column(
       children: [
         Material(
@@ -24,21 +31,45 @@ class QuickActionButtonWidget extends StatelessWidget {
           child: InkWell(
             onTap: onTap,
             customBorder: const CircleBorder(),
-            splashColor: controller.accentNeon.withOpacity(0.15),
-            highlightColor: controller.accentNeon.withOpacity(0.05),
+            splashColor: accent.withValues(
+              alpha: 0.15,
+            ),
+            highlightColor: accent.withValues(
+              alpha: 0.05,
+            ),
             child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.05),
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white.withOpacity(0.1)),
+              padding: const EdgeInsets.all(
+                16,
               ),
-              child: Icon(icon, color: controller.accentNeon, size: 24),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(
+                  alpha: 0.05,
+                ),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: Colors.white.withValues(
+                    alpha: 0.1,
+                  ),
+                ),
+              ),
+              child: Icon(
+                icon,
+                color: accent,
+                size: 24,
+              ),
             ),
           ),
         ),
-        const SizedBox(height: 8),
-        Text(label, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+        const SizedBox(
+          height: 8,
+        ),
+        Text(
+          label,
+          style: const TextStyle(
+            color: Colors.white70,
+            fontSize: 12,
+          ),
+        ),
       ],
     );
   }

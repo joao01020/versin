@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:get_it/get_it.dart'; // Importação essencial para o GetIt
+import 'package:get_it/get_it.dart';
 
 // Importação da nova página
 import 'package:versin/modules/rhymelibrary/views/rhyme_library_page.dart';
@@ -8,8 +8,9 @@ import 'package:versin/modules/rhymelibrary/views/rhyme_library_page.dart';
 import 'package:versin/modules/chat/controllers/chat_controller.dart';
 import 'package:versin/modules/chat/domain/repositories/chat_repository.dart';
 import 'package:versin/features/rhymes/presentation/controller/rhymes_controller.dart';
-import 'package:versin/modules/brain/controller/brain_controller.dart'; // Importe o BrainController
-
+import 'package:versin/modules/brain/controller/brain_controller.dart';
+// Adicione este import na parte superior do seu ChatPage.dart
+import 'package:versin/modules/chat/views/components/suggestion_balloon/controllers/suggestion_controller.dart';
 // CORE WIDGETS
 import 'package:versin/core/widgets/timeline/versin_timeline.dart';
 import 'package:versin/core/widgets/metronome/metronome_player.dart';
@@ -55,7 +56,7 @@ class _ChatPageState
   void initState() {
     super.initState();
 
-    // BUSCA A INSTÂNCIA DO CÉREBRO NO GETIT (Resolve o erro de tipo)
+    // Resolve a dependência do BrainController via GetIt
     _rhymesController =
         GetIt.I<
           BrainController
@@ -85,7 +86,6 @@ class _ChatPageState
   @override
   void dispose() {
     _controller.dispose();
-    // NÃO damos dispose no _rhymesController aqui, pois ele é um Singleton gerido pelo GetIt
     super.dispose();
   }
 
@@ -328,6 +328,7 @@ class _ChatPageState
                         left: cursorPositionLeft,
                         bottom: 75,
                         child: SuggestionBalloon(
+                          controller: rhymesCtrl.suggestionController,
                           suggestion: _controller.getCurrentSuggestion(),
                           onTap: () {
                             final suggestion = _controller.getCurrentSuggestion();
@@ -353,8 +354,6 @@ class _ChatPageState
                             rhymesCtrl.clearSuggestions();
                           },
                           onDismiss: () => rhymesCtrl.clearSuggestions(),
-                          onNext: _controller.nextSuggestion,
-                          onPrevious: _controller.previousSuggestion,
                           onAddCommand: () {
                             final word = _controller.getCurrentSuggestion();
                             rhymesCtrl.clearSuggestions();

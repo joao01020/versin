@@ -1,10 +1,12 @@
 import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:versin/app/locator.dart';
 import 'package:versin/modules/dashboard/controllers/dashboard_controller.dart';
+
 import '../models/match_user_entity.dart';
 
 class MatchController
@@ -15,7 +17,6 @@ class MatchController
         DashboardController
       >();
 
-  // Stream para notificar a View sobre um novo match criado
   final StreamController<
     String
   >
@@ -23,13 +24,10 @@ class MatchController
       StreamController<
         String
       >.broadcast();
-  Stream<
-    String
-  >
-  get matchEventStream => _matchEventController.stream;
 
-  Color get accentNeon => _dashboardController.accentNeon;
-  Color get primaryPurple => _dashboardController.primaryPurple;
+  Timer? _countdownTimer;
+  Timer? _searchTimeoutTimer;
+  StreamSubscription? _matchSubscription;
 
   bool isLoading = true;
   MatchUserEntity? discoveryUser;
@@ -37,17 +35,25 @@ class MatchController
     MatchUserEntity
   >
   recommendedUsers = [];
+  int remainingSeconds = 1200;
 
-  Timer? _countdownTimer;
-  Timer? _searchTimeoutTimer;
-  StreamSubscription? _matchSubscription;
+  Stream<
+    String
+  >
+  get matchEventStream => _matchEventController.stream;
 
-  // Lógica de ID de usuário segura para Git
-  String? get currentUserId {
-    if (kDebugMode) {
-      return dotenv.env['DEBUG_USER_ID'];
+  Color get accentNeon => _dashboardController.accentNeon;
+
+  Color get primaryPurple => _dashboardController.primaryPurple;
+
+  String? get currentUserId => kDebugMode
+      ? dotenv.env['DEBUG_USER_ID']
+      : Supabase.instance.client.auth.currentUser?.id;
+
+  void safeNotify() {
+    if (hasListeners) {
+      notifyListeners();
     }
-    return Supabase.instance.client.auth.currentUser?.id;
   }
 
   void initMatchSession(
@@ -57,12 +63,9 @@ class MatchController
     discoveryUser = null;
     recommendedUsers = [];
 
-    _countdownTimer?.cancel();
-    _searchTimeoutTimer?.cancel();
-
+    _cancelTimers();
     _startRealtimeMatchListener();
-
-    notifyListeners();
+    safeNotify();
 
     _searchTimeoutTimer = Timer(
       const Duration(
@@ -74,18 +77,22 @@ class MatchController
                 null &&
             recommendedUsers.isEmpty) {
           isLoading = false;
-          notifyListeners();
+          safeNotify();
         }
       },
     );
   }
 
   void _startRealtimeMatchListener() {
-    if (currentUserId ==
-        null)
+    final userId = currentUserId;
+
+    if (userId ==
+        null) {
       return;
+    }
 
     _matchSubscription?.cancel();
+
     _matchSubscription = Supabase.instance.client
         .from(
           'favorites',
@@ -97,31 +104,22 @@ class MatchController
         )
         .eq(
           'target_user_id',
-          currentUserId!,
+          userId,
         )
         .listen(
           (
-            List<
-              Map<
-                String,
-                dynamic
-              >
-            >
             snapshot,
           ) {
-            if (snapshot.isNotEmpty) {
-              final lastMatch = snapshot.last;
-              debugPrint(
-                "Instant Match received: $lastMatch",
-              );
-
-              checkAndStartNetworking(
-                currentUserId!,
-                lastMatch['sender_id'],
-              );
-
-              notifyListeners();
+            if (snapshot.isEmpty) {
+              return;
             }
+
+            final lastMatch = snapshot.last;
+
+            checkAndStartNetworking(
+              userId,
+              lastMatch['sender_id'],
+            );
           },
         );
   }
@@ -135,12 +133,7 @@ class MatchController
   ) async {
     final supabase = Supabase.instance.client;
 
-    debugPrint(
-      "🔍 Verificando match mútuo entre $myId e $otherId",
-    );
-
-    // Consulta robusta usando OR com AND para buscar ambos os lados
-    final response = await supabase
+    final matches = await supabase
         .from(
           'favorites',
         )
@@ -148,89 +141,62 @@ class MatchController
           '*',
         )
         .or(
-          'and(sender_id.eq.$myId,target_user_id.eq.$otherId),and(sender_id.eq.$otherId,target_user_id.eq.$myId)',
+          'and(sender_id.eq.$myId,target_user_id.eq.$otherId),'
+          'and(sender_id.eq.$otherId,target_user_id.eq.$myId)',
         );
 
-    final List<
-      dynamic
-    >
-    matches =
-        response
-            as List<
-              dynamic
-            >;
-    debugPrint(
-      "🔍 Registros de like encontrados: ${matches.length}",
-    );
-
-    // Se temos pelo menos 2 registros, o match é mútuo
-    if (matches.length >=
+    if (matches.length <
         2) {
-      debugPrint(
-        "✅ MATCH MÚTUO CONFIRMADO!",
-      );
+      return false;
+    }
 
-      // Verifica se já existe um projeto para evitar duplicatas
-      final existingProject = await supabase
-          .from(
-            'projects',
-          )
-          .select(
-            'id',
-          )
-          .contains(
-            'members',
-            [
-              myId,
-              otherId,
-            ],
-          )
-          .maybeSingle();
+    final existingProject = await supabase
+        .from(
+          'projects',
+        )
+        .select(
+          'id',
+        )
+        .contains(
+          'members',
+          [
+            myId,
+            otherId,
+          ],
+        )
+        .maybeSingle();
 
-      if (existingProject !=
-          null) {
-        debugPrint(
-          "ℹ️ Projeto já existente: ${existingProject['id']}",
-        );
-        _matchEventController.add(
-          existingProject['id'],
-        );
-        return true;
-      }
-
-      final newProject = await supabase
-          .from(
-            'projects',
-          )
-          .insert(
-            {
-              'title': 'Studio Session',
-              'members': [
-                myId,
-                otherId,
-              ],
-              'status': 'active',
-            },
-          )
-          .select()
-          .single();
-
-      debugPrint(
-        "🚀 Networking room successfully created: ${newProject['id']}",
-      );
-
-      // Emite o ID do projeto recém-criado para a View navegar
+    if (existingProject !=
+        null) {
       _matchEventController.add(
-        newProject['id'],
+        existingProject['id'],
       );
 
       return true;
     }
 
-    debugPrint(
-      "⏳ Ainda não há match mútuo confirmado.",
+    final newProject = await supabase
+        .from(
+          'projects',
+        )
+        .insert(
+          {
+            'title': 'Studio Session',
+            'members': [
+              myId,
+              otherId,
+            ],
+            'status': 'active',
+          },
+        )
+        .select()
+        .single();
+
+    _matchEventController.add(
+      newProject['id'],
     );
-    return false;
+
+    return true;
   }
 
   Future<
@@ -239,9 +205,12 @@ class MatchController
   registerLike(
     String targetId,
   ) async {
-    if (currentUserId ==
-        null)
+    final userId = currentUserId;
+
+    if (userId ==
+        null) {
       return;
+    }
 
     try {
       await Supabase.instance.client
@@ -250,18 +219,15 @@ class MatchController
           )
           .insert(
             {
-              'sender_id': currentUserId,
+              'sender_id': userId,
               'target_user_id': targetId,
             },
           );
-      debugPrint(
-        "👍 Like registrado com sucesso para $targetId",
-      );
     } catch (
       e
     ) {
       debugPrint(
-        "⚠️ Erro ao registrar like: $e",
+        '⚠️ Erro ao registrar like: $e',
       );
     }
   }
@@ -270,10 +236,12 @@ class MatchController
     MatchUserEntity user,
   ) {
     _searchTimeoutTimer?.cancel();
+
     discoveryUser = user;
     isLoading = false;
+
     startConnectionTimer();
-    notifyListeners();
+    safeNotify();
   }
 
   void updateRecommendedUsers(
@@ -283,17 +251,21 @@ class MatchController
     users,
   ) {
     _searchTimeoutTimer?.cancel();
+
     recommendedUsers = users;
+
     if (discoveryUser !=
         null) {
       isLoading = false;
     }
-    notifyListeners();
+
+    safeNotify();
   }
 
   void startConnectionTimer() {
     _countdownTimer?.cancel();
     remainingSeconds = 1200;
+
     _countdownTimer = Timer.periodic(
       const Duration(
         seconds: 1,
@@ -304,22 +276,30 @@ class MatchController
         if (remainingSeconds >
             0) {
           remainingSeconds--;
-          notifyListeners();
-        } else {
-          _countdownTimer?.cancel();
+          safeNotify();
+          return;
         }
+
+        timer.cancel();
       },
     );
   }
 
-  int remainingSeconds = 1200;
+  void _cancelTimers() {
+    _countdownTimer?.cancel();
+    _searchTimeoutTimer?.cancel();
+  }
 
   String generateProvisionalContractHash(
     String userA,
     String userB,
   ) {
-    final timestamp = DateTime.now().millisecondsSinceEpoch;
-    return "VRSN-${userA.hashCode ^ userB.hashCode}-$timestamp";
+    final hash =
+        userA.hashCode ^
+        userB.hashCode;
+
+    return 'VRSN-$hash-'
+        '${DateTime.now().millisecondsSinceEpoch}';
   }
 
   VoidCallback get openFilters => () {};
@@ -328,10 +308,10 @@ class MatchController
 
   @override
   void dispose() {
-    _countdownTimer?.cancel();
-    _searchTimeoutTimer?.cancel();
+    _cancelTimers();
     _matchSubscription?.cancel();
-    _matchEventController.close(); // Fecha o stream corretamente
+    _matchEventController.close();
+
     super.dispose();
   }
 }

@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+
 import '../controllers/hub_telemetry_controller.dart';
 
-class IntegritySpectrumCard extends StatelessWidget {
+class IntegritySpectrumCard
+    extends
+        StatelessWidget {
   final HubTelemetryController controller;
   final bool online;
 
@@ -12,16 +15,30 @@ class IntegritySpectrumCard extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    const Color hardwareRed = Color(0xFFFF2A6D);
+  Widget build(
+    BuildContext context,
+  ) {
+    const hardwareRed = Color(
+      0xFFFF2A6D,
+    );
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(
+        20,
+      ),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.01),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withOpacity(0.03)),
+        color: Colors.white.withValues(
+          alpha: 0.01,
+        ),
+        borderRadius: BorderRadius.circular(
+          20,
+        ),
+        border: Border.all(
+          color: Colors.white.withValues(
+            alpha: 0.03,
+          ),
+        ),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -31,43 +48,70 @@ class IntegritySpectrumCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  "STATUS E CONEXÃO LOCAL", 
-                  style: TextStyle(color: Colors.white60, fontSize: 11, fontWeight: FontWeight.bold),
+                  'STATUS E CONEXÃO LOCAL',
+                  style: TextStyle(
+                    color: Colors.white60,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(
+                  height: 2,
+                ),
                 Text(
-                  online ? "Firmware rodando em ambiente seguro estável" : "Aguardando sincronia via cabo/barramento local",
-                  style: const TextStyle(color: Colors.white24, fontSize: 9),
+                  online
+                      ? 'Firmware rodando em ambiente seguro estável'
+                      : 'Aguardando sincronia via cabo/barramento local',
+                  style: const TextStyle(
+                    color: Colors.white24,
+                    fontSize: 9,
+                  ),
                 ),
               ],
             ),
           ),
+
           if (online)
-            ValueListenableBuilder<bool>(
+            ValueListenableBuilder<
+              bool
+            >(
               valueListenable: controller.isDisconnecting,
-              builder: (context, disconnecting, _) {
-                return TextButton.icon(
-                  style: TextButton.styleFrom(foregroundColor: hardwareRed),
-                  onPressed: () {
-                    // 🔥 Dispara a Solução 2: Limpa animações, conexões locais e joga offline no Supabase
-                    controller.triggerManualDisconnect();
+              builder:
+                  (
+                    _,
+                    disconnecting,
+                    _,
+                  ) {
+                    return TextButton.icon(
+                      style: TextButton.styleFrom(
+                        foregroundColor: hardwareRed,
+                      ),
+                      onPressed: disconnecting
+                          ? null
+                          : controller.triggerManualDisconnect,
+                      icon: disconnecting
+                          ? const SizedBox(
+                              width: 12,
+                              height: 12,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 1.5,
+                                color: Colors.redAccent,
+                              ),
+                            )
+                          : const Icon(
+                              Icons.power_settings_new,
+                              size: 14,
+                            ),
+                      label: const Text(
+                        'FORÇAR OFFLINE',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    );
                   },
-                  icon: disconnecting 
-                      ? const SizedBox(
-                          width: 12, 
-                          height: 12, 
-                          child: CircularProgressIndicator(
-                            strokeWidth: 1.5, 
-                            valueColor: AlwaysStoppedAnimation(Colors.redAccent),
-                          ),
-                        )
-                      : const Icon(Icons.power_settings_new, size: 14),
-                  label: const Text(
-                    "FORÇAR OFFLINE", 
-                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.5),
-                  ),
-                );
-              },
             ),
         ],
       ),

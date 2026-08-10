@@ -2,6 +2,9 @@
 cmake_minimum_required(VERSION 3.13)
 project(runner LANGUAGES CXX)
 
+if(NOT DEFINED FLUTTER_TARGET_PLATFORM OR "${FLUTTER_TARGET_PLATFORM}" STREQUAL "")
+  set(FLUTTER_TARGET_PLATFORM "linux-x64")
+endif()
 # The name of the executable created for the application. Change this to change
 # the on-disk name of your application.
 set(BINARY_NAME "versin")

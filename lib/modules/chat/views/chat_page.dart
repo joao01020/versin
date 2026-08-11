@@ -82,8 +82,13 @@ class _ChatPageState
   @override
   void dispose() {
     _controller.dispose();
+
     super.dispose();
   }
+
+  // ============================================================
+  // VOZ
+  // ============================================================
 
   void _abrirPainelDeVoz(
     BuildContext context,
@@ -110,6 +115,10 @@ class _ChatPageState
           },
     );
   }
+
+  // ============================================================
+  // TIMELINE
+  // ============================================================
 
   Future<
     void
@@ -147,6 +156,10 @@ class _ChatPageState
     );
   }
 
+  // ============================================================
+  // BIBLIOTECA
+  // ============================================================
+
   void _abrirBiblioteca() {
     Navigator.push(
       context,
@@ -154,12 +167,18 @@ class _ChatPageState
         builder:
             (
               _,
-            ) => RhymeLibraryPage(
-              controller: _rhymesController,
-            ),
+            ) {
+              return RhymeLibraryPage(
+                controller: _rhymesController,
+              );
+            },
       ),
     );
   }
+
+  // ============================================================
+  // BUILD
+  // ============================================================
 
   @override
   Widget build(
@@ -233,6 +252,9 @@ class _ChatPageState
                   children: [
                     Column(
                       children: [
+                        // ==================================================
+                        // TIMELINE
+                        // ==================================================
                         VersinTimeline(
                           currentStep: rhymesCtrl.currentStep,
                           activeColor: activeColor,
@@ -242,6 +264,9 @@ class _ChatPageState
                           onTextChanged: rhymesCtrl.onTextChanged,
                         ),
 
+                        // ==================================================
+                        // HEADER
+                        // ==================================================
                         Stack(
                           alignment: Alignment.centerRight,
                           children: [
@@ -249,6 +274,7 @@ class _ChatPageState
                               activeColor: activeColor,
                               rhymesController: rhymesCtrl,
                             ),
+
                             Positioned(
                               right: 16,
                               child: IconButton(
@@ -262,6 +288,9 @@ class _ChatPageState
                           ],
                         ),
 
+                        // ==================================================
+                        // CHAT
+                        // ==================================================
                         Expanded(
                           child: ChatListView(
                             isInitializing: _controller.isInitializing,
@@ -284,6 +313,9 @@ class _ChatPageState
                           ),
                         ),
 
+                        // ==================================================
+                        // TOOLBAR
+                        // ==================================================
                         StudioToolbar(
                           isConfigFinished: true,
                           projectName: _controller.projectName,
@@ -357,6 +389,9 @@ class _ChatPageState
                               },
                         ),
 
+                        // ==================================================
+                        // INPUT
+                        // ==================================================
                         Stack(
                           alignment: Alignment.centerRight,
                           children: [
@@ -364,12 +399,17 @@ class _ChatPageState
                               messageController: _controller.messageController,
                               rhymesController: rhymesCtrl,
                               activeColor: activeColor,
+
+                              // NOVO:
+                              creationStage: _controller.creationStage,
+
                               onSend:
                                   (
                                     _,
                                   ) {
                                     _controller.sendMessage();
                                   },
+
                               currentSuggestionIndex: _controller.currentSuggestionIndex,
                               onUpdateSuggestionIndex: _controller.updateSuggestionIndex,
                               onAddRhyme: _controller.addWordToText,
@@ -381,6 +421,9 @@ class _ChatPageState
                               },
                             ),
 
+                            // ===============================================
+                            // METRÔNOMO
+                            // ===============================================
                             Positioned(
                               right: 55,
                               child: MetronomePlayer(
@@ -394,13 +437,22 @@ class _ChatPageState
                       ],
                     ),
 
-                    if (rhymesCtrl.suggestions.isNotEmpty)
+                    // ====================================================
+                    // SUGESTÃO
+                    // ====================================================
+                    if (_controller.creationStage ==
+                            ChatCreationStage.writing &&
+                        rhymesCtrl.suggestions.isNotEmpty)
                       Positioned(
                         left: cursorPositionLeft,
                         bottom: 75,
                         child: SuggestionBalloon(
                           controller: rhymesCtrl.suggestionController,
                           suggestion: _controller.getCurrentSuggestion(),
+
+                          // =============================================
+                          // USAR SUGESTÃO
+                          // =============================================
                           onTap: () {
                             final suggestion = _controller.getCurrentSuggestion();
 
@@ -431,9 +483,17 @@ class _ChatPageState
 
                             rhymesCtrl.clearSuggestions();
                           },
+
+                          // =============================================
+                          // FECHAR
+                          // =============================================
                           onDismiss: () {
                             rhymesCtrl.clearSuggestions();
                           },
+
+                          // =============================================
+                          // PEDIR AJUDA À IA
+                          // =============================================
                           onAddCommand: () {
                             final word = _controller.getCurrentSuggestion();
 

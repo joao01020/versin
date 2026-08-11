@@ -1,25 +1,31 @@
 import 'package:flutter/material.dart';
 
+import 'package:versin/modules/chat/controllers/chat_controller.dart';
+
 class ChatBottomBar
     extends
         StatelessWidget {
   final TextEditingController messageController;
   final dynamic rhymesController;
   final Color activeColor;
-  // CORREÇÃO: Variável isRhymeMode removida daqui
-  final Function(
-    String,
-  )
+
+  final ChatCreationStage creationStage;
+
+  final ValueChanged<
+    String
+  >
   onSend;
+
   final int currentSuggestionIndex;
-  final Function(
-    int,
-  )
+  final ValueChanged<
+    int
+  >
   onUpdateSuggestionIndex;
-  final Function(
-    String,
-  )
+  final ValueChanged<
+    String
+  >
   onAddRhyme;
+
   final VoidCallback? onMicPressed;
 
   const ChatBottomBar({
@@ -27,13 +33,25 @@ class ChatBottomBar
     required this.messageController,
     required this.rhymesController,
     required this.activeColor,
-    // CORREÇÃO: Removido o required this.isRhymeMode daqui
+    required this.creationStage,
     required this.onSend,
     required this.currentSuggestionIndex,
     required this.onUpdateSuggestionIndex,
     required this.onAddRhyme,
     this.onMicPressed,
   });
+
+  bool get _isImagination =>
+      creationStage ==
+      ChatCreationStage.imagination;
+
+  String get _hintText {
+    if (_isImagination) {
+      return 'Descreva a cena, sensação ou palavras soltas...';
+    }
+
+    return 'Escreva sua letra...';
+  }
 
   @override
   Widget build(
@@ -57,7 +75,9 @@ class ChatBottomBar
       ),
       child: Row(
         children: [
-          // Campo de Texto Principal
+          // =====================================================
+          // CAMPO DE TEXTO
+          // =====================================================
           Expanded(
             child: Container(
               height: 48,
@@ -72,34 +92,54 @@ class ChatBottomBar
                   24,
                 ),
                 border: Border.all(
-                  color: Colors.white.withValues(
-                    alpha: 0.05,
-                  ),
+                  color: _isImagination
+                      ? activeColor.withValues(
+                          alpha: 0.12,
+                        )
+                      : Colors.white.withValues(
+                          alpha: 0.05,
+                        ),
                 ),
               ),
               child: TextField(
                 controller: messageController,
-                // Agora o campo avisa o controller sobre qualquer texto digitado!
+                keyboardType: TextInputType.multiline,
+                textInputAction: TextInputAction.newline,
+                maxLines: 1,
                 onChanged:
                     (
                       text,
                     ) {
+                      // Durante a descrição inicial não precisamos
+                      // procurar rimas/autocomplete.
+                      if (_isImagination) {
+                        return;
+                      }
+
                       rhymesController.onTextChanged(
                         text,
                       );
+                    },
+                onSubmitted:
+                    (
+                      _,
+                    ) {
+                      _sendMessage();
                     },
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 15,
                 ),
-                decoration: const InputDecoration(
-                  hintText: "Escreva sua rima...",
+                decoration: InputDecoration(
+                  hintText: _hintText,
                   hintStyle: TextStyle(
-                    color: Colors.white30,
-                    fontSize: 15,
+                    color: _isImagination
+                        ? Colors.white38
+                        : Colors.white30,
+                    fontSize: 14,
                   ),
                   border: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(
+                  contentPadding: const EdgeInsets.symmetric(
                     vertical: 14,
                   ),
                 ),
@@ -107,7 +147,9 @@ class ChatBottomBar
             ),
           ),
 
-          // GRUPO DE BOTÕES
+          // =====================================================
+          // BOTÕES
+          // =====================================================
           Padding(
             padding: const EdgeInsets.only(
               left: 8,
@@ -115,7 +157,9 @@ class ChatBottomBar
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // 1. Microfone
+                // =================================================
+                // MICROFONE
+                // =================================================
                 if (onMicPressed !=
                     null)
                   IconButton(
@@ -127,29 +171,28 @@ class ChatBottomBar
                     onPressed: onMicPressed,
                   ),
 
-                // 2. ESPAÇO RESERVADO PARA O METRÔNOMO
+                // =================================================
+                // ESPAÇO DO METRÔNOMO
+                // =================================================
                 const SizedBox(
                   width: 50,
                 ),
 
-                // 3. Botão de Enviar
+                // =================================================
+                // ENVIAR
+                // =================================================
                 IconButton(
-                  icon: const Icon(
-                    Icons.send_rounded,
+                  icon: Icon(
+                    _isImagination
+                        ? Icons.arrow_forward_rounded
+                        : Icons.send_rounded,
                   ),
                   color: activeColor,
                   iconSize: 28,
-                  onPressed: () {
-                    final text = messageController.text.trim();
-                    if (text.isNotEmpty) {
-                      onSend(
-                        text,
-                      );
-                      messageController.clear();
-                      // Limpa as sugestões quando a mensagem é enviada
-                      rhymesController.clearSuggestions();
-                    }
-                  },
+                  tooltip: _isImagination
+                      ? 'Continuar'
+                      : 'Enviar',
+                  onPressed: _sendMessage,
                 ),
               ],
             ),
@@ -157,5 +200,27 @@ class ChatBottomBar
         ],
       ),
     );
+  }
+
+  // =============================================================
+  // ENVIAR MENSAGEM
+  // =============================================================
+
+  void _sendMessage() {
+    final text = messageController.text.trim();
+
+    if (text.isEmpty) {
+      return;
+    }
+
+    onSend(
+      text,
+    );
+
+    messageController.clear();
+
+    if (!_isImagination) {
+      rhymesController.clearSuggestions();
+    }
   }
 }

@@ -1,13 +1,32 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+
 import 'package:versin/modules/chat/domain/repositories/chat_repository.dart';
 import 'package:versin/features/rhymes/presentation/controller/rhymes_controller.dart';
 import 'package:versin/modules/brain/controller/brain_controller.dart';
 
-// --- MODEL IN-LINE ---
+// ============================================================
+// PAPEL DA MENSAGEM
+// ============================================================
+
 enum ChatRole {
   user,
   assistant,
 }
+
+// ============================================================
+// ETAPA DA CRIAÇÃO
+// ============================================================
+
+enum ChatCreationStage {
+  imagination,
+  writing,
+}
+
+// ============================================================
+// MENSAGEM
+// ============================================================
 
 class ChatMessage {
   final ChatRole role;
@@ -38,7 +57,7 @@ class ChatMessage {
           ? ChatRole.user
           : ChatRole.assistant,
       content:
-          json['content'] ??
+          json['content']?.toString() ??
           '',
       timestamp:
           json['timestamp'] !=
@@ -54,18 +73,22 @@ class ChatMessage {
     String,
     dynamic
   >
-  toJson() => {
-    'role': role.name,
-    'content': content,
-    'timestamp': timestamp.toIso8601String(),
-  };
+  toJson() {
+    return {
+      'role': role.name,
+      'content': content,
+      'timestamp': timestamp.toIso8601String(),
+    };
+  }
 
   bool get isUser =>
       role ==
       ChatRole.user;
 }
 
-// --- CHAT CONTROLLER ---
+// ============================================================
+// CHAT CONTROLLER
+// ============================================================
 
 class ChatController
     extends
@@ -81,17 +104,27 @@ class ChatController
       : null;
 
   final TextEditingController messageController = TextEditingController();
+
   final ScrollController scrollController = ScrollController();
 
-  List<
+  final List<
     ChatMessage
   >
   messages = [];
+
+  ChatCreationStage creationStage = ChatCreationStage.imagination;
+
   bool isAiTyping = false;
-  final bool isInitializing = false; // Corrigido para final conforme sugestão do linter
-  String projectName = "SEM TÍTULO";
-  String lastConfirmedStructure = "";
+
+  final bool isInitializing = false;
+
+  String projectName = 'SEM TÍTULO';
+
+  String lastConfirmedStructure = '';
+
   int currentSuggestionIndex = 0;
+
+  Timer? _creativeHelpTimer;
 
   bool _isDisposed = false;
 
@@ -100,6 +133,89 @@ class ChatController
     required this.rhymesController,
   });
 
+  // ============================================================
+  // PALAVRAS IGNORADAS NA EXTRAÇÃO INICIAL
+  // ============================================================
+
+  static const Set<
+    String
+  >
+  _stopWords = {
+    'a',
+    'ao',
+    'aos',
+    'aquela',
+    'aquele',
+    'aqueles',
+    'aquilo',
+    'as',
+    'até',
+    'com',
+    'como',
+    'da',
+    'das',
+    'de',
+    'dela',
+    'dele',
+    'deles',
+    'depois',
+    'do',
+    'dos',
+    'e',
+    'ela',
+    'ele',
+    'eles',
+    'em',
+    'essa',
+    'esse',
+    'esta',
+    'está',
+    'estava',
+    'este',
+    'eu',
+    'fica',
+    'fico',
+    'foi',
+    'já',
+    'lá',
+    'mais',
+    'mas',
+    'me',
+    'meu',
+    'minha',
+    'muito',
+    'na',
+    'nas',
+    'no',
+    'nos',
+    'o',
+    'os',
+    'ou',
+    'para',
+    'pela',
+    'pelo',
+    'por',
+    'porque',
+    'que',
+    'se',
+    'sem',
+    'só',
+    'sou',
+    'sua',
+    'também',
+    'tem',
+    'tenho',
+    'um',
+    'uma',
+    'vai',
+    'vejo',
+    'você',
+  };
+
+  // ============================================================
+  // NOTIFY
+  // ============================================================
+
   @override
   void notifyListeners() {
     if (!_isDisposed) {
@@ -107,17 +223,60 @@ class ChatController
     }
   }
 
-  // --- COMPATIBILITY METHODS ---
+  // ============================================================
+  // SUGESTÕES
+  // ============================================================
 
-  void nextSuggestion() => updateSuggestionIndex(
-    currentSuggestionIndex +
-        1,
-  );
+  void nextSuggestion() {
+    updateSuggestionIndex(
+      currentSuggestionIndex +
+          1,
+    );
+  }
 
-  void previousSuggestion() => updateSuggestionIndex(
-    currentSuggestionIndex -
-        1,
-  );
+  void previousSuggestion() {
+    updateSuggestionIndex(
+      currentSuggestionIndex -
+          1,
+    );
+  }
+
+  void updateSuggestionIndex(
+    int index,
+  ) {
+    final total = rhymesController.suggestions.length;
+
+    if (total ==
+        0) {
+      return;
+    }
+
+    currentSuggestionIndex =
+        index %
+        total;
+
+    if (currentSuggestionIndex <
+        0) {
+      currentSuggestionIndex += total;
+    }
+
+    notifyListeners();
+  }
+
+  String getCurrentSuggestion() {
+    final suggestions = rhymesController.suggestions;
+
+    if (suggestions.isEmpty) {
+      return 'Métrica';
+    }
+
+    return suggestions[currentSuggestionIndex %
+        suggestions.length];
+  }
+
+  // ============================================================
+  // PROCESSAR MENSAGEM EXTERNA
+  // ============================================================
 
   Future<
     void
@@ -126,8 +285,254 @@ class ChatController
     String message,
   ) async {
     messageController.text = message;
+
     await sendMessage();
   }
+
+  // ============================================================
+  // ENVIO
+  // ============================================================
+
+  Future<
+    void
+  >
+  sendMessage() async {
+    final text = messageController.text.trim();
+
+    if (text.isEmpty) {
+      return;
+    }
+
+    _cancelCreativeHelp();
+
+    messages.add(
+      ChatMessage(
+        role: ChatRole.user,
+        content: text,
+      ),
+    );
+
+    messageController.clear();
+
+    notifyListeners();
+
+    _scrollToBottom();
+
+    // ========================================================
+    // PRIMEIRA ETAPA — IMAGINAÇÃO
+    // NÃO CHAMA IA
+    // ========================================================
+
+    if (creationStage ==
+        ChatCreationStage.imagination) {
+      await _processInitialImagination(
+        text,
+      );
+
+      return;
+    }
+
+    // ========================================================
+    // ETAPA NORMAL — IA
+    // ========================================================
+
+    await _sendToAi(
+      text,
+    );
+  }
+
+  // ============================================================
+  // PROCESSAR IMAGINAÇÃO INICIAL
+  // ============================================================
+
+  Future<
+    void
+  >
+  _processInitialImagination(
+    String text,
+  ) async {
+    final extractedWords = _extractCreativeWords(
+      text,
+    );
+
+    final addedCount = await rhymesController.addWords(
+      extractedWords,
+    );
+
+    creationStage = ChatCreationStage.writing;
+
+    if (extractedWords.isEmpty) {
+      messages.add(
+        ChatMessage(
+          role: ChatRole.assistant,
+          content:
+              'Entendi o caminho.\n\n'
+              'Agora começa a transformar essa imagem em palavras. '
+              'Não precisa se preocupar em rimar ainda.',
+        ),
+      );
+
+      notifyListeners();
+
+      _scrollToBottom();
+
+      return;
+    }
+
+    final wordsText = extractedWords.join(
+      ' • ',
+    );
+
+    final saveMessage =
+        addedCount >
+            0
+        ? 'Guardei $addedCount palavra${addedCount == 1 ? '' : 's'} nova${addedCount == 1 ? '' : 's'} na sua biblioteca.'
+        : 'Essas palavras já estavam na sua biblioteca.';
+
+    messages.add(
+      ChatMessage(
+        role: ChatRole.assistant,
+        content:
+            'Peguei algumas palavras da sua ideia:\n\n'
+            '$wordsText\n\n'
+            '$saveMessage\n\n'
+            'Agora começa a escrever. Você pode seguir essas palavras '
+            'ou deixar a música puxar outro caminho.',
+      ),
+    );
+
+    notifyListeners();
+
+    _scrollToBottom();
+  }
+
+  // ============================================================
+  // EXTRAÇÃO LOCAL
+  // ============================================================
+
+  List<
+    String
+  >
+  _extractCreativeWords(
+    String text,
+  ) {
+    final normalized = text.toLowerCase().replaceAll(
+      RegExp(
+        r'[^\p{L}\p{N}\s]',
+        unicode: true,
+      ),
+      ' ',
+    );
+
+    final words = normalized.split(
+      RegExp(
+        r'\s+',
+      ),
+    );
+
+    final extracted =
+        <
+          String
+        >[];
+
+    for (final rawWord in words) {
+      final word = rawWord.trim();
+
+      if (word.length <
+          4) {
+        continue;
+      }
+
+      if (_stopWords.contains(
+        word,
+      )) {
+        continue;
+      }
+
+      if (extracted.contains(
+        word,
+      )) {
+        continue;
+      }
+
+      extracted.add(
+        word,
+      );
+
+      if (extracted.length >=
+          8) {
+        break;
+      }
+    }
+
+    return extracted;
+  }
+
+  // ============================================================
+  // ENVIO PARA IA
+  // ============================================================
+
+  Future<
+    void
+  >
+  _sendToAi(
+    String text,
+  ) async {
+    isAiTyping = true;
+
+    notifyListeners();
+
+    _scrollToBottom();
+
+    try {
+      final response = await rhymesController.fetchAiResponse(
+        text,
+      );
+
+      final content = response['content'];
+
+      if (content !=
+              null &&
+          content.trim().isNotEmpty) {
+        messages.add(
+          ChatMessage(
+            role: ChatRole.assistant,
+            content: content,
+          ),
+        );
+      } else {
+        messages.add(
+          ChatMessage(
+            role: ChatRole.assistant,
+            content: 'Resposta em branco.',
+          ),
+        );
+      }
+    } catch (
+      e
+    ) {
+      debugPrint(
+        'Erro no ChatController: $e',
+      );
+
+      messages.add(
+        ChatMessage(
+          role: ChatRole.assistant,
+          content: 'Erro de conexão.',
+        ),
+      );
+    } finally {
+      isAiTyping = false;
+
+      notifyListeners();
+
+      _scrollToBottom();
+    }
+  }
+
+  // ============================================================
+  // ESTRUTURA
+  // ============================================================
 
   void sendStructureToChat(
     List<
@@ -136,124 +541,62 @@ class ChatController
     structure,
   ) {
     final structureText = structure.join(
-      " - ",
+      ' - ',
     );
+
     messages.add(
       ChatMessage(
         role: ChatRole.assistant,
-        content: "Estrutura definida: $structureText",
+        content: 'Estrutura definida: $structureText',
       ),
     );
+
     notifyListeners();
+
     _scrollToBottom();
-  }
-
-  // --- MESSAGES LOGIC ---
-
-  Future<
-    void
-  >
-  sendMessage() async {
-    final text = messageController.text.trim();
-    if (text.isEmpty) return;
-
-    messages.add(
-      ChatMessage(
-        role: ChatRole.user,
-        content: text,
-      ),
-    );
-    messageController.clear();
-    isAiTyping = true;
-    notifyListeners();
-    _scrollToBottom();
-
-    try {
-      final Map<
-        String,
-        String
-      >
-      aiResponse = await rhymesController.fetchAiResponse(
-        text,
-      );
-
-      if (aiResponse.isNotEmpty &&
-          aiResponse['content'] !=
-              null) {
-        messages.add(
-          ChatMessage(
-            role: ChatRole.assistant,
-            content: aiResponse['content']!,
-          ),
-        );
-      } else {
-        messages.add(
-          ChatMessage(
-            role: ChatRole.assistant,
-            content: "Resposta em branco.",
-          ),
-        );
-      }
-    } catch (
-      e
-    ) {
-      messages.add(
-        ChatMessage(
-          role: ChatRole.assistant,
-          content: "Erro de conexão.",
-        ),
-      );
-    } finally {
-      isAiTyping = false;
-      notifyListeners();
-      _scrollToBottom();
-    }
-  }
-
-  // --- AUXILIARY LOGIC ---
-
-  void addWordToText(
-    String word,
-  ) {
-    messageController.text = "${messageController.text.trim()} $word ";
-    notifyListeners();
-  }
-
-  void updateSuggestionIndex(
-    int index,
-  ) {
-    final total = rhymesController.suggestions.length;
-    if (total >
-        0) {
-      currentSuggestionIndex =
-          index %
-          total;
-      if (currentSuggestionIndex <
-          0)
-        currentSuggestionIndex += total;
-      notifyListeners();
-    }
-  }
-
-  String getCurrentSuggestion() {
-    final suggestions = rhymesController.suggestions;
-    return suggestions.isNotEmpty
-        ? suggestions[currentSuggestionIndex %
-              suggestions.length]
-        : "Métrica";
   }
 
   void saveStructure(
     String structure,
   ) {
     lastConfirmedStructure = structure;
+
     notifyListeners();
   }
 
-  void toggleBpm() {
-    rhymesController.isBpmPlaying = !rhymesController.isBpmPlaying;
+  // ============================================================
+  // TEXTO
+  // ============================================================
+
+  void addWordToText(
+    String word,
+  ) {
+    final current = messageController.text.trim();
+
+    messageController.text = current.isEmpty
+        ? '$word '
+        : '$current $word ';
+
+    messageController.selection = TextSelection.collapsed(
+      offset: messageController.text.length,
+    );
+
     notifyListeners();
   }
+
+  // ============================================================
+  // BPM
+  // ============================================================
+
+  void toggleBpm() {
+    rhymesController.isBpmPlaying = !rhymesController.isBpmPlaying;
+
+    notifyListeners();
+  }
+
+  // ============================================================
+  // PROJETO
+  // ============================================================
 
   void editProjectName(
     BuildContext context,
@@ -261,43 +604,58 @@ class ChatController
     final nameController = TextEditingController(
       text: projectName,
     );
+
     showDialog(
       context: context,
       builder:
           (
             context,
-          ) => AlertDialog(
-            title: const Text(
-              "Nome do Projeto",
-            ),
-            content: TextField(
-              controller: nameController,
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(
-                  context,
-                ),
-                child: const Text(
-                  "Cancelar",
-                ),
+          ) {
+            return AlertDialog(
+              title: const Text(
+                'Nome do Projeto',
               ),
-              TextButton(
-                onPressed: () {
-                  projectName = nameController.text.trim();
-                  notifyListeners();
-                  Navigator.pop(
-                    context,
-                  );
-                },
-                child: const Text(
-                  "Salvar",
-                ),
+              content: TextField(
+                controller: nameController,
               ),
-            ],
-          ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(
+                      context,
+                    );
+                  },
+                  child: const Text(
+                    'Cancelar',
+                  ),
+                ),
+                TextButton(
+                  onPressed: () {
+                    final name = nameController.text.trim();
+
+                    if (name.isNotEmpty) {
+                      projectName = name;
+                    }
+
+                    notifyListeners();
+
+                    Navigator.pop(
+                      context,
+                    );
+                  },
+                  child: const Text(
+                    'Salvar',
+                  ),
+                ),
+              ],
+            );
+          },
     );
   }
+
+  // ============================================================
+  // MENU RÁPIDO
+  // ============================================================
 
   void showStudioQuickMenu(
     BuildContext context,
@@ -316,51 +674,51 @@ class ChatController
       builder:
           (
             context,
-          ) => Column(
-            mainAxisSize: MainAxisSize.min,
-            children: options
-                .map(
-                  (
-                    opt,
-                  ) => ListTile(
-                    title: Text(
-                      opt,
+          ) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (title.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.all(
+                      16,
                     ),
-                    onTap: () {
-                      onSelect(
-                        opt,
-                      );
-                      Navigator.pop(
-                        context,
-                      );
-                    },
+                    child: Text(
+                      title,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
-                )
-                .toList(),
-          ),
+                ...options.map(
+                  (
+                    option,
+                  ) {
+                    return ListTile(
+                      title: Text(
+                        option,
+                      ),
+                      onTap: () {
+                        onSelect(
+                          option,
+                        );
+
+                        Navigator.pop(
+                          context,
+                        );
+                      },
+                    );
+                  },
+                ),
+              ],
+            );
+          },
     );
   }
 
-  // --- UTILITIES ---
-
-  void _scrollToBottom() {
-    if (_isDisposed) return;
-    WidgetsBinding.instance.addPostFrameCallback(
-      (
-        _,
-      ) {
-        if (scrollController.hasClients) {
-          scrollController.animateTo(
-            scrollController.position.maxScrollExtent,
-            duration: const Duration(
-              milliseconds: 300,
-            ),
-            curve: Curves.easeOut,
-          );
-        }
-      },
-    );
-  }
+  // ============================================================
+  // INICIALIZAÇÃO
+  // ============================================================
 
   Future<
     void
@@ -368,22 +726,123 @@ class ChatController
   initChatSession(
     BuildContext context,
   ) async {
-    if (messages.isEmpty) {
-      messages.add(
-        ChatMessage(
-          role: ChatRole.assistant,
-          content: "VERSIN GENESIS: Conexão estabelecida.",
-        ),
-      );
-      notifyListeners();
+    if (messages.isNotEmpty) {
+      return;
     }
+
+    creationStage = ChatCreationStage.imagination;
+
+    messages.add(
+      ChatMessage(
+        role: ChatRole.assistant,
+        content:
+            'O que você enxerga?\n\n'
+            'Não precisa pensar em uma música ainda.\n'
+            'Me diga a cena, sensação ou situação que está na sua cabeça.',
+      ),
+    );
+
+    notifyListeners();
+
+    _scrollToBottom();
+
+    _startCreativeHelpTimer();
   }
+
+  // ============================================================
+  // AJUDA APÓS 30 SEGUNDOS
+  // ============================================================
+
+  void _startCreativeHelpTimer() {
+    _creativeHelpTimer?.cancel();
+
+    _creativeHelpTimer = Timer(
+      const Duration(
+        seconds: 30,
+      ),
+      () {
+        if (_isDisposed) {
+          return;
+        }
+
+        final userAlreadyAnswered = messages.any(
+          (
+            message,
+          ) => message.isUser,
+        );
+
+        if (userAlreadyAnswered) {
+          return;
+        }
+
+        messages.add(
+          ChatMessage(
+            role: ChatRole.assistant,
+            content:
+                'Travou?\n\n'
+                'Pode jogar palavras soltas também.\n\n'
+                'Não precisam rimar e nem fazer sentido ainda.\n\n'
+                'Ex:\n'
+                'madrugada • carro • chuva • mensagem • vazio',
+          ),
+        );
+
+        notifyListeners();
+
+        _scrollToBottom();
+      },
+    );
+  }
+
+  void _cancelCreativeHelp() {
+    _creativeHelpTimer?.cancel();
+
+    _creativeHelpTimer = null;
+  }
+
+  // ============================================================
+  // SCROLL
+  // ============================================================
+
+  void _scrollToBottom() {
+    if (_isDisposed) {
+      return;
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback(
+      (
+        _,
+      ) {
+        if (_isDisposed ||
+            !scrollController.hasClients) {
+          return;
+        }
+
+        scrollController.animateTo(
+          scrollController.position.maxScrollExtent,
+          duration: const Duration(
+            milliseconds: 300,
+          ),
+          curve: Curves.easeOut,
+        );
+      },
+    );
+  }
+
+  // ============================================================
+  // DISPOSE
+  // ============================================================
 
   @override
   void dispose() {
     _isDisposed = true;
+
+    _creativeHelpTimer?.cancel();
+
     messageController.dispose();
+
     scrollController.dispose();
+
     super.dispose();
   }
 }

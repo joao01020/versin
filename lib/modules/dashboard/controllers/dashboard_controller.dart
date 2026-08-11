@@ -1,22 +1,17 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
-import '../repositories/dashboard_repository.dart';
-import '../data/models/hardware_status_model.dart';
 
-/// [DashboardController] handles business logic, consuming data safely through repositories.
-/// [DashboardController] gerencia a lógica de negócios, consumindo dados de forma segura via repositórios.
+import '../data/models/hardware_status_model.dart';
+import '../repositories/dashboard_repository.dart';
+
 class DashboardController
     extends
         ChangeNotifier {
-  // Injecting the data repository / Injetando o repositório de dados
   final DashboardRepository _repository = DashboardRepository();
 
-  // NAVIGATION & PAGE CONTROL
   late final PageController pageController;
-  int _currentIndex = 0;
-  int get currentIndex => _currentIndex;
 
-  // SYSTEM PALETTE & DESIGN COLORS
+  int _currentIndex = 0;
+
   final Color primaryPurple = const Color(
     0xFF6A1B9A,
   );
@@ -36,15 +31,15 @@ class DashboardController
     0xFF9C27B0,
   );
 
-  // STATES
   String? profileImagePath;
+
   bool isProfileCardExpanded = true;
   bool isCalendarExpanded = false;
-  bool hasActiveProject = false; // Adicionado para gerenciar projeto ativo
+  bool hasActiveProject = false;
+
   DateTime focusedDay = DateTime.now();
   int selectedDay = DateTime.now().day;
 
-  // APPOINTMENTS MOCK DATA
   final List<
     Map<
       String,
@@ -53,30 +48,30 @@ class DashboardController
   >
   appointments = [
     {
-      "day": DateTime.now().day,
-      "month": DateTime.now().month,
-      "year": DateTime.now().year,
-      "time": "14:00",
-      "title": "Sessão de Mixagem - Trap Beat",
+      'day': DateTime.now().day,
+      'month': DateTime.now().month,
+      'year': DateTime.now().year,
+      'time': '14:00',
+      'title': 'Sessão de Mixagem - Trap Beat',
     },
     {
-      "day": DateTime.now().day,
-      "month": DateTime.now().month,
-      "year": DateTime.now().year,
-      "time": "18:30",
-      "title": "Sync do banco com Supabase V2",
+      'day': DateTime.now().day,
+      'month': DateTime.now().month,
+      'year': DateTime.now().year,
+      'time': '18:30',
+      'title': 'Sync do banco com Supabase V2',
     },
     {
-      "day": 20,
-      "month": 5,
-      "year": 2026,
-      "time": "10:00",
-      "title": "Recuperar batidas antigas",
+      'day': 20,
+      'month': 5,
+      'year': 2026,
+      'time': '10:00',
+      'title': 'Recuperar batidas antigas',
     },
   ];
 
-  // EXPOSING THE STREAM FROM THE REPOSITORY / EXPOENDO O STREAM VINDO DO REPOSITÓRIO
-  /// Stream fetching hardware real-time data from the backend repository layer.
+  int get currentIndex => _currentIndex;
+
   Stream<
     List<
       HardwareStatusModel
@@ -88,91 +83,96 @@ class DashboardController
     pageController = PageController(
       initialPage: _currentIndex,
     );
-    // Simulação: verificação de projeto ativo ao iniciar
+
     _checkActiveProjects();
   }
 
-  // Lógica para verificar se há sessão ativa (conectar ao seu repositório aqui futuramente)
   void _checkActiveProjects() {
-    hasActiveProject = true; // Exemplo de estado ativo
+    hasActiveProject = true;
     notifyListeners();
-  }
-
-  @override
-  void dispose() {
-    pageController.dispose();
-    super.dispose();
   }
 
   void navigationTap(
     int index,
   ) {
-    if (_currentIndex !=
+    if (_currentIndex ==
         index) {
-      _currentIndex = index;
-      pageController.animateToPage(
-        index,
-        duration: const Duration(
-          milliseconds: 300,
-        ),
-        curve: Curves.easeInOut,
-      );
-      notifyListeners(); // Notifica a UI para atualizar o BottomNav e Header
+      return;
     }
+
+    _currentIndex = index;
+
+    pageController.animateToPage(
+      index,
+      duration: const Duration(
+        milliseconds: 300,
+      ),
+      curve: Curves.easeInOut,
+    );
+
+    notifyListeners();
   }
 
   void handlePageChange(
     int index,
   ) {
-    if (_currentIndex !=
+    if (_currentIndex ==
         index) {
-      _currentIndex = index;
-      notifyListeners(); // Garante que a UI reflita a mudança após o swipe
+      return;
     }
+
+    _currentIndex = index;
+    notifyListeners();
   }
 
   String getModuleTitle() {
-    switch (_currentIndex) {
-      case 0:
-        return "Dashboard";
-      case 1:
-        return "Match";
-      case 2:
-        return "Market";
-      case 3:
-        return "Wallet";
-      case 4:
-        return "Studio Chat";
-      case 5:
-        return "Showcase";
-      case 6:
-        return "Hardware Hub";
-      case 7:
-        return "VNode Network";
-      case 8:
-        return "Settings";
-      default:
-        return "Dashboard";
+    const titles = [
+      'Dashboard',
+      'Match',
+      'Market',
+      'Wallet',
+      'Studio Chat',
+      'Showcase',
+      'Hardware Hub',
+      'VNode Network',
+      'Settings',
+    ];
+
+    if (_currentIndex <
+            0 ||
+        _currentIndex >=
+            titles.length) {
+      return 'Dashboard';
     }
+
+    return titles[_currentIndex];
   }
 
   String getShortMonthName(
     int month,
   ) {
     const months = [
-      "Jan",
-      "Fev",
-      "Mar",
-      "Abr",
-      "Mai",
-      "Jun",
-      "Jul",
-      "Ago",
-      "Set",
-      "Out",
-      "Nov",
-      "Dez",
+      'Jan',
+      'Fev',
+      'Mar',
+      'Abr',
+      'Mai',
+      'Jun',
+      'Jul',
+      'Ago',
+      'Set',
+      'Out',
+      'Nov',
+      'Dez',
     ];
+
+    if (month <
+            1 ||
+        month >
+            12) {
+      return '';
+    }
+
     return months[month -
         1];
   }
@@ -195,6 +195,7 @@ class DashboardController
       newMonth,
       1,
     );
+
     selectedDay = 1;
     notifyListeners();
   }
@@ -207,6 +208,7 @@ class DashboardController
       focusedDay.month,
       1,
     );
+
     selectedDay = 1;
     notifyListeners();
   }
@@ -214,16 +216,15 @@ class DashboardController
   void navigateMonth({
     required bool forward,
   }) {
-    int nextMonth = forward
-        ? focusedDay.month +
-              1
-        : focusedDay.month -
-              1;
     focusedDay = DateTime(
       focusedDay.year,
-      nextMonth,
+      focusedDay.month +
+          (forward
+              ? 1
+              : -1),
       1,
     );
+
     selectedDay = 1;
     notifyListeners();
   }
@@ -241,17 +242,26 @@ class DashboardController
   }) {
     appointments.add(
       {
-        "day": selectedDay,
-        "month": focusedDay.month,
-        "year": focusedDay.year,
-        "time": time,
-        "title": title,
+        'day': selectedDay,
+        'month': focusedDay.month,
+        'year': focusedDay.year,
+        'time': time,
+        'title': title,
       },
     );
+
     notifyListeners();
   }
 
-  void pickProfileImage() => debugPrint(
-    "Abrir seletor de galeria local",
-  );
+  void pickProfileImage() {
+    debugPrint(
+      'Abrir seletor de galeria local',
+    );
+  }
+
+  @override
+  void dispose() {
+    pageController.dispose();
+    super.dispose();
+  }
 }

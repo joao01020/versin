@@ -351,6 +351,128 @@ class ChatController
   _processInitialImagination(
     String text,
   ) async {
+    final brainController = brain;
+
+    // ========================================================
+    // CAMINHO PRINCIPAL — BRAIN CONTROLLER + CREATIVE VISION
+    // ========================================================
+
+    if (brainController !=
+        null) {
+      final vision = brainController.analyzeCreativeInput(
+        text,
+      );
+
+      final originalWords = vision.originalWords;
+
+      final addedCount = await rhymesController.addWords(
+        originalWords,
+      );
+
+      creationStage = ChatCreationStage.writing;
+
+      if (vision.isEmpty) {
+        messages.add(
+          ChatMessage(
+            role: ChatRole.assistant,
+            content:
+                'Ainda está bem aberto — e tudo bem.\n\n'
+                'Joga mais algumas imagens, sensações ou palavras soltas. '
+                'Não precisa rimar nem tentar encontrar um tema agora.',
+          ),
+        );
+
+        notifyListeners();
+        _scrollToBottom();
+
+        return;
+      }
+
+      final originalText = originalWords.isNotEmpty
+          ? originalWords.join(
+              ' • ',
+            )
+          : '';
+
+      final discoveries = brainController.creativeDiscoveries;
+
+      final discoveriesText = discoveries.isNotEmpty
+          ? discoveries
+                .take(
+                  6,
+                )
+                .join(
+                  ' • ',
+                )
+          : '';
+
+      final saveMessage =
+          addedCount >
+              0
+          ? 'Guardei $addedCount palavra${addedCount == 1 ? '' : 's'} '
+                'da sua visão na biblioteca.'
+          : 'As palavras principais dessa visão já estavam na sua biblioteca.';
+
+      final buffer = StringBuffer();
+
+      buffer.writeln(
+        'Estou começando a enxergar algo aqui.',
+      );
+      buffer.writeln();
+
+      if (vision.summary.trim().isNotEmpty) {
+        buffer.writeln(
+          vision.summary.trim(),
+        );
+      }
+
+      if (originalText.isNotEmpty) {
+        buffer.writeln();
+        buffer.writeln(
+          'O que veio de você:',
+        );
+        buffer.writeln(
+          originalText,
+        );
+      }
+
+      if (discoveriesText.isNotEmpty) {
+        buffer.writeln();
+        buffer.writeln(
+          'Alguns caminhos que apareceram:',
+        );
+        buffer.writeln(
+          discoveriesText,
+        );
+      }
+
+      buffer.writeln();
+      buffer.writeln(
+        saveMessage,
+      );
+      buffer.writeln();
+      buffer.write(
+        'Agora começa a escrever sem tentar fechar a música cedo demais. '
+        'Use esses caminhos se eles fizerem sentido — ou quebra tudo e segue outro.',
+      );
+
+      messages.add(
+        ChatMessage(
+          role: ChatRole.assistant,
+          content: buffer.toString(),
+        ),
+      );
+
+      notifyListeners();
+      _scrollToBottom();
+
+      return;
+    }
+
+    // ========================================================
+    // FALLBACK — CASO NÃO EXISTA BRAIN CONTROLLER
+    // ========================================================
+
     final extractedWords = _extractCreativeWords(
       text,
     );
@@ -373,7 +495,6 @@ class ChatController
       );
 
       notifyListeners();
-
       _scrollToBottom();
 
       return;
@@ -386,7 +507,8 @@ class ChatController
     final saveMessage =
         addedCount >
             0
-        ? 'Guardei $addedCount palavra${addedCount == 1 ? '' : 's'} nova${addedCount == 1 ? '' : 's'} na sua biblioteca.'
+        ? 'Guardei $addedCount palavra${addedCount == 1 ? '' : 's'} '
+              'nova${addedCount == 1 ? '' : 's'} na sua biblioteca.'
         : 'Essas palavras já estavam na sua biblioteca.';
 
     messages.add(
@@ -402,7 +524,6 @@ class ChatController
     );
 
     notifyListeners();
-
     _scrollToBottom();
   }
 

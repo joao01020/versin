@@ -36,6 +36,7 @@ dependencies:
   sqlite3_flutter_libs: ^0.6.0+eol
   get_it: ^8.0.0
   fl_chart: ^1.2.0
+  desktop_multi_window: ^0.3.0
 
   
 dev_dependencies:

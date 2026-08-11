@@ -12,24 +12,37 @@ class DashboardController
 
   int _currentIndex = 0;
 
+  // ============================================================
+  // CORES
+  // ============================================================
+
   final Color primaryPurple = const Color(
     0xFF6A1B9A,
   );
+
   final Color deepBg = const Color(
     0xFF0D0B1F,
   );
+
   final Color accentNeon = const Color(
     0xFFE040FB,
   );
+
   final Color hackerGreen = const Color(
     0xFF00FF66,
   );
+
   final Color calendarBg = const Color(
     0xFF1E1E1E,
   );
+
   final Color calendarPurpleAccent = const Color(
     0xFF9C27B0,
   );
+
+  // ============================================================
+  // ESTADOS
+  // ============================================================
 
   String? profileImagePath;
 
@@ -38,7 +51,12 @@ class DashboardController
   bool hasActiveProject = false;
 
   DateTime focusedDay = DateTime.now();
+
   int selectedDay = DateTime.now().day;
+
+  // ============================================================
+  // COMPROMISSOS
+  // ============================================================
 
   final List<
     Map<
@@ -70,6 +88,10 @@ class DashboardController
     },
   ];
 
+  // ============================================================
+  // GETTERS
+  // ============================================================
+
   int get currentIndex => _currentIndex;
 
   Stream<
@@ -79,6 +101,10 @@ class DashboardController
   >
   get hardwareStatusStream => _repository.getHardwareStatusStream();
 
+  // ============================================================
+  // INIT
+  // ============================================================
+
   void init() {
     pageController = PageController(
       initialPage: _currentIndex,
@@ -87,10 +113,19 @@ class DashboardController
     _checkActiveProjects();
   }
 
+  // ============================================================
+  // PROJETO ATIVO
+  // ============================================================
+
   void _checkActiveProjects() {
     hasActiveProject = true;
+
     notifyListeners();
   }
+
+  // ============================================================
+  // NAVEGAÇÃO PELO MENU
+  // ============================================================
 
   void navigationTap(
     int index,
@@ -102,16 +137,18 @@ class DashboardController
 
     _currentIndex = index;
 
-    pageController.animateToPage(
-      index,
-      duration: const Duration(
-        milliseconds: 300,
-      ),
-      curve: Curves.easeInOut,
-    );
+    if (pageController.hasClients) {
+      pageController.jumpToPage(
+        index,
+      );
+    }
 
     notifyListeners();
   }
+
+  // ============================================================
+  // ALTERAÇÃO DO PAGEVIEW
+  // ============================================================
 
   void handlePageChange(
     int index,
@@ -122,31 +159,67 @@ class DashboardController
     }
 
     _currentIndex = index;
+
     notifyListeners();
   }
 
+  // ============================================================
+  // TÍTULO DO MÓDULO
+  // ============================================================
+  //
+  // 0 = Dashboard
+  // 1 = Match
+  // 2 = Market
+  // 3 = Wallet
+  // 4 = Chat
+  // 5 = Showcase
+  // 6 = Hardware Hub
+  // 7 = VNode Network
+  // 8 = Settings
+  // 9 = Studio
+  //
+  // ============================================================
+
   String getModuleTitle() {
-    const titles = [
-      'Dashboard',
-      'Match',
-      'Market',
-      'Wallet',
-      'Studio Chat',
-      'Showcase',
-      'Hardware Hub',
-      'VNode Network',
-      'Settings',
-    ];
+    switch (_currentIndex) {
+      case 0:
+        return 'Dashboard';
 
-    if (_currentIndex <
-            0 ||
-        _currentIndex >=
-            titles.length) {
-      return 'Dashboard';
+      case 1:
+        return 'Match';
+
+      case 2:
+        return 'Market';
+
+      case 3:
+        return 'Wallet';
+
+      case 4:
+        return 'Chat';
+
+      case 5:
+        return 'Showcase';
+
+      case 6:
+        return 'Hardware Hub';
+
+      case 7:
+        return 'VNode Network';
+
+      case 8:
+        return 'Settings';
+
+      case 9:
+        return 'Studio';
+
+      default:
+        return 'Dashboard';
     }
-
-    return titles[_currentIndex];
   }
+
+  // ============================================================
+  // MESES
+  // ============================================================
 
   String getShortMonthName(
     int month,
@@ -177,13 +250,23 @@ class DashboardController
         1];
   }
 
+  // ============================================================
+  // PERFIL
+  // ============================================================
+
   void toggleProfileCard() {
     isProfileCardExpanded = !isProfileCardExpanded;
+
     notifyListeners();
   }
 
+  // ============================================================
+  // CALENDÁRIO
+  // ============================================================
+
   void toggleCalendarExpanded() {
     isCalendarExpanded = !isCalendarExpanded;
+
     notifyListeners();
   }
 
@@ -197,6 +280,7 @@ class DashboardController
     );
 
     selectedDay = 1;
+
     notifyListeners();
   }
 
@@ -210,6 +294,7 @@ class DashboardController
     );
 
     selectedDay = 1;
+
     notifyListeners();
   }
 
@@ -226,6 +311,7 @@ class DashboardController
     );
 
     selectedDay = 1;
+
     notifyListeners();
   }
 
@@ -233,25 +319,43 @@ class DashboardController
     int day,
   ) {
     selectedDay = day;
+
     notifyListeners();
   }
+
+  // ============================================================
+  // COMPROMISSOS
+  // ============================================================
 
   void addAppointment({
     required String title,
     required String time,
   }) {
+    final normalizedTitle = title.trim();
+
+    final normalizedTime = time.trim();
+
+    if (normalizedTitle.isEmpty ||
+        normalizedTime.isEmpty) {
+      return;
+    }
+
     appointments.add(
       {
         'day': selectedDay,
         'month': focusedDay.month,
         'year': focusedDay.year,
-        'time': time,
-        'title': title,
+        'time': normalizedTime,
+        'title': normalizedTitle,
       },
     );
 
     notifyListeners();
   }
+
+  // ============================================================
+  // IMAGEM DE PERFIL
+  // ============================================================
 
   void pickProfileImage() {
     debugPrint(
@@ -259,9 +363,14 @@ class DashboardController
     );
   }
 
+  // ============================================================
+  // DISPOSE
+  // ============================================================
+
   @override
   void dispose() {
     pageController.dispose();
+
     super.dispose();
   }
 }

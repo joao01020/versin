@@ -1,11 +1,10 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 
 import 'package:versin/modules/brain/controller/brain_controller.dart';
 import 'package:versin/modules/studio/controllers/studio_controller.dart';
 import 'package:versin/modules/studio/models/mind_map_node.dart';
+import 'package:versin/modules/studio/services/studio_window_service.dart';
 import 'package:versin/modules/studio/widgets/lyric_editor.dart';
 import 'package:versin/modules/studio/widgets/mind_map.dart';
 import 'package:versin/modules/studio/widgets/song_word_timeline.dart';
@@ -22,14 +21,6 @@ class _StudioPageState extends State<StudioPage> {
   late final StudioController controller;
 
   final Color activeColor = const Color(0xFFE100FF);
-
-  // ============================================================
-  // POSIÇÃO DOS PAINÉIS FLUTUANTES
-  // ============================================================
-
-  Offset _lyricsFloatingPosition = const Offset(80, 90);
-
-  Offset _mindMapFloatingPosition = const Offset(360, 130);
 
   @override
   void initState() {
@@ -386,6 +377,77 @@ class _StudioPageState extends State<StudioPage> {
   }
 
   // ============================================================
+  // JANELA EXTERNA — LETRA
+  // ============================================================
+
+  Future<void> _detachLyrics() async {
+    if (controller.isLyricsDetached) {
+      await StudioWindowService.instance.showLyricsWindow();
+      return;
+    }
+
+    controller.detachLyrics();
+
+    try {
+      await StudioWindowService.instance.openLyricsWindow(
+        projectId: controller.title,
+      );
+    } catch (e) {
+      controller.dockLyrics();
+
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Não foi possível abrir a janela da letra: $e')),
+      );
+    }
+  }
+
+  // ============================================================
+  // JANELA EXTERNA — MAPA
+  // ============================================================
+
+  Future<void> _detachMindMap() async {
+    if (controller.isMindMapDetached) {
+      await StudioWindowService.instance.showMindMapWindow();
+      return;
+    }
+
+    controller.detachMindMap();
+
+    try {
+      await StudioWindowService.instance.openMindMapWindow(
+        projectId: controller.title,
+      );
+    } catch (e) {
+      controller.dockMindMap();
+
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Não foi possível abrir a janela do mapa: $e')),
+      );
+    }
+  }
+
+  // ============================================================
+  // ENCAIXAR TODOS OS PAINÉIS
+  // ============================================================
+
+  Future<void> _dockAllPanels() async {
+    await Future.wait([
+      StudioWindowService.instance.dockLyricsWindow(),
+      StudioWindowService.instance.dockMindMapWindow(),
+    ]);
+
+    controller.dockAllPanels();
+  }
+
+  // ============================================================
   // BUILD
   // ============================================================
 
@@ -397,73 +459,42 @@ class _StudioPageState extends State<StudioPage> {
         return Scaffold(
           backgroundColor: const Color(0xFF0D0D0D),
           body: SafeArea(
-            child: LayoutBuilder(
-              builder: (context, pageConstraints) {
-                final pageSize = Size(
-                  pageConstraints.maxWidth,
-                  pageConstraints.maxHeight,
-                );
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                children: [
+                  // =================================================
+                  // HEADER
+                  // =================================================
+                  _buildHeader(),
 
-                return Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    // =================================================
-                    // CONTEÚDO PRINCIPAL
-                    // =================================================
-                    Positioned.fill(
-                      child: Padding(
-                        padding: const EdgeInsets.all(14),
-                        child: Column(
-                          children: [
-                            // =========================================
-                            // HEADER
-                            // =========================================
-                            _buildHeader(),
+                  const SizedBox(height: 12),
 
-                            const SizedBox(height: 12),
-
-                            // =========================================
-                            // LETRA + MAPA
-                            // =========================================
-                            Expanded(
-                              child: LayoutBuilder(
-                                builder: (context, constraints) {
-                                  return _buildDockedWorkspace(constraints);
-                                },
-                              ),
-                            ),
-
-                            const SizedBox(height: 12),
-
-                            // =========================================
-                            // TIMELINE
-                            // =========================================
-                            SongWordTimeline(
-                              words: controller.timelineWords,
-                              activeColor: activeColor,
-                              isWordUsed: controller.isTimelineWordUsed,
-                              onRemoveWord: controller.removeTimelineWord,
-                              onAddWord: _showAddTimelineWordDialog,
-                            ),
-                          ],
-                        ),
-                      ),
+                  // =================================================
+                  // LETRA + MAPA
+                  // =================================================
+                  Expanded(
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        return _buildDockedWorkspace(constraints);
+                      },
                     ),
+                  ),
 
-                    // =================================================
-                    // LETRA DESTACADA
-                    // =================================================
-                    if (controller.isLyricsDetached)
-                      _buildFloatingLyricsPanel(pageSize),
+                  const SizedBox(height: 12),
 
-                    // =================================================
-                    // MAPA DESTACADO
-                    // =================================================
-                    if (controller.isMindMapDetached)
-                      _buildFloatingMindMapPanel(pageSize),
-                  ],
-                );
-              },
+                  // =================================================
+                  // TIMELINE
+                  // =================================================
+                  SongWordTimeline(
+                    words: controller.timelineWords,
+                    activeColor: activeColor,
+                    isWordUsed: controller.isTimelineWordUsed,
+                    onRemoveWord: controller.removeTimelineWord,
+                    onAddWord: _showAddTimelineWordDialog,
+                  ),
+                ],
+              ),
             ),
           ),
         );
@@ -489,7 +520,9 @@ class _StudioPageState extends State<StudioPage> {
     if (lyricsDetached && mapDetached) {
       return _DetachedWorkspacePlaceholder(
         activeColor: activeColor,
-        onDockAll: controller.dockAllPanels,
+        onDockAll: () {
+          _dockAllPanels();
+        },
       );
     }
 
@@ -501,7 +534,9 @@ class _StudioPageState extends State<StudioPage> {
       return _DockableHoverPanel(
         activeColor: activeColor,
         tooltip: 'Desencaixar Letra',
-        onDetach: controller.detachLyrics,
+        onDetach: () {
+          _detachLyrics();
+        },
         child: _buildLyricsEditor(),
       );
     }
@@ -514,7 +549,9 @@ class _StudioPageState extends State<StudioPage> {
       return _DockableHoverPanel(
         activeColor: activeColor,
         tooltip: 'Desencaixar Mapa',
-        onDetach: controller.detachMindMap,
+        onDetach: () {
+          _detachMindMap();
+        },
         child: _buildMindMap(),
       );
     }
@@ -530,7 +567,9 @@ class _StudioPageState extends State<StudioPage> {
             child: _DockableHoverPanel(
               activeColor: activeColor,
               tooltip: 'Desencaixar Letra',
-              onDetach: controller.detachLyrics,
+              onDetach: () {
+                _detachLyrics();
+              },
               child: _buildLyricsEditor(),
             ),
           ),
@@ -541,7 +580,9 @@ class _StudioPageState extends State<StudioPage> {
             child: _DockableHoverPanel(
               activeColor: activeColor,
               tooltip: 'Desencaixar Mapa',
-              onDetach: controller.detachMindMap,
+              onDetach: () {
+                _detachMindMap();
+              },
               child: _buildMindMap(),
             ),
           ),
@@ -556,7 +597,9 @@ class _StudioPageState extends State<StudioPage> {
           child: _DockableHoverPanel(
             activeColor: activeColor,
             tooltip: 'Desencaixar Letra',
-            onDetach: controller.detachLyrics,
+            onDetach: () {
+              _detachLyrics();
+            },
             child: _buildLyricsEditor(),
           ),
         ),
@@ -568,7 +611,9 @@ class _StudioPageState extends State<StudioPage> {
           child: _DockableHoverPanel(
             activeColor: activeColor,
             tooltip: 'Desencaixar Mapa',
-            onDetach: controller.detachMindMap,
+            onDetach: () {
+              _detachMindMap();
+            },
             child: _buildMindMap(),
           ),
         ),
@@ -609,86 +654,6 @@ class _StudioPageState extends State<StudioPage> {
       onAddNode: _showAddMindMapNodeDialog,
       onConnectNodes: controller.connectMindMapNodes,
     );
-  }
-
-  // ============================================================
-  // PAINEL FLUTUANTE — LETRA
-  // ============================================================
-
-  Widget _buildFloatingLyricsPanel(Size pageSize) {
-    final width = math.min(680.0, math.max(360.0, pageSize.width * 0.58));
-
-    final height = math.min(560.0, math.max(320.0, pageSize.height * 0.68));
-
-    return Positioned(
-      left: _lyricsFloatingPosition.dx,
-      top: _lyricsFloatingPosition.dy,
-      width: width,
-      height: height,
-      child: _FloatingStudioPanel(
-        title: 'LETRA',
-        activeColor: activeColor,
-        onDock: controller.dockLyrics,
-        onDrag: (delta) {
-          setState(() {
-            _lyricsFloatingPosition = _clampFloatingPosition(
-              _lyricsFloatingPosition + delta,
-              pageSize,
-              Size(width, height),
-            );
-          });
-        },
-        child: _buildLyricsEditor(),
-      ),
-    );
-  }
-
-  // ============================================================
-  // PAINEL FLUTUANTE — MAPA
-  // ============================================================
-
-  Widget _buildFloatingMindMapPanel(Size pageSize) {
-    final width = math.min(620.0, math.max(340.0, pageSize.width * 0.50));
-
-    final height = math.min(540.0, math.max(320.0, pageSize.height * 0.64));
-
-    return Positioned(
-      left: _mindMapFloatingPosition.dx,
-      top: _mindMapFloatingPosition.dy,
-      width: width,
-      height: height,
-      child: _FloatingStudioPanel(
-        title: 'MAPA',
-        activeColor: activeColor,
-        onDock: controller.dockMindMap,
-        onDrag: (delta) {
-          setState(() {
-            _mindMapFloatingPosition = _clampFloatingPosition(
-              _mindMapFloatingPosition + delta,
-              pageSize,
-              Size(width, height),
-            );
-          });
-        },
-        child: _buildMindMap(),
-      ),
-    );
-  }
-
-  // ============================================================
-  // LIMITAR POSIÇÃO DO PAINEL
-  // ============================================================
-
-  Offset _clampFloatingPosition(
-    Offset position,
-    Size pageSize,
-    Size panelSize,
-  ) {
-    final maxX = math.max(0.0, pageSize.width - panelSize.width);
-
-    final maxY = math.max(0.0, pageSize.height - panelSize.height);
-
-    return Offset(position.dx.clamp(0.0, maxX), position.dy.clamp(0.0, maxY));
   }
 
   // ============================================================
@@ -922,120 +887,6 @@ class _DockableHoverPanelState extends State<_DockableHoverPanel> {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-// ============================================================
-// PAINEL FLUTUANTE
-// ============================================================
-
-class _FloatingStudioPanel extends StatelessWidget {
-  final String title;
-
-  final Color activeColor;
-
-  final VoidCallback onDock;
-
-  final ValueChanged<Offset> onDrag;
-
-  final Widget child;
-
-  const _FloatingStudioPanel({
-    required this.title,
-    required this.activeColor,
-    required this.onDock,
-    required this.onDrag,
-    required this.child,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      elevation: 24,
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        decoration: BoxDecoration(
-          color: const Color(0xFF111111),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: activeColor.withValues(alpha: 0.32)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.45),
-              blurRadius: 28,
-              offset: const Offset(0, 12),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(16),
-          child: Column(
-            children: [
-              // =================================================
-              // BARRA DE ARRASTE
-              // =================================================
-              GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onPanUpdate: (details) {
-                  onDrag(details.delta);
-                },
-                child: MouseRegion(
-                  cursor: SystemMouseCursors.move,
-                  child: Container(
-                    height: 38,
-                    padding: const EdgeInsets.only(left: 12, right: 4),
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF171717),
-                      border: Border(bottom: BorderSide(color: Colors.white10)),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.drag_indicator_rounded,
-                          size: 16,
-                          color: Colors.white24,
-                        ),
-
-                        const SizedBox(width: 7),
-
-                        Text(
-                          title,
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1.0,
-                          ),
-                        ),
-
-                        const Spacer(),
-
-                        IconButton(
-                          tooltip: 'Encaixar novamente',
-                          onPressed: onDock,
-                          icon: Icon(
-                            Icons.call_merge_rounded,
-                            size: 17,
-                            color: activeColor,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-
-              // =================================================
-              // CONTEÚDO
-              // =================================================
-              Expanded(
-                child: Padding(padding: const EdgeInsets.all(8), child: child),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

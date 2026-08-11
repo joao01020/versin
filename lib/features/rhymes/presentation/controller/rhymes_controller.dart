@@ -40,6 +40,7 @@ class RhymesController
     Rhyme
   >
   vocabulary = [];
+
   List<
     Map<
       String,
@@ -54,8 +55,11 @@ class RhymesController
   get suggestions => suggestionController.suggestions;
 
   bool get isLoading => _isLoading;
+
   int get currentStep => _currentStep;
+
   double get stepProgress => _stepProgress;
+
   String? get userApiKey => _userApiKey;
 
   double get fireProgress =>
@@ -65,6 +69,10 @@ class RhymesController
             0.0,
             1.0,
           );
+
+  // =========================================================
+  // VOCABULÁRIO
+  // =========================================================
 
   Future<
     void
@@ -142,6 +150,10 @@ class RhymesController
     }
   }
 
+  // =========================================================
+  // TRENDING
+  // =========================================================
+
   Future<
     void
   >
@@ -160,6 +172,10 @@ class RhymesController
     notifyListeners();
   }
 
+  // =========================================================
+  // GAMIFICAÇÃO
+  // =========================================================
+
   void updateGamification(
     double value,
   ) {
@@ -167,12 +183,25 @@ class RhymesController
     notifyListeners();
   }
 
+  // =========================================================
+  // API KEY
+  // =========================================================
+
   void setApiKey(
     String key,
   ) {
-    _userApiKey = key;
+    final normalized = key.trim();
+
+    _userApiKey = normalized.isEmpty
+        ? null
+        : normalized;
+
     notifyListeners();
   }
+
+  // =========================================================
+  // METRÔNOMO
+  // =========================================================
 
   void toggleMetronome() {
     isBpmPlaying = !isBpmPlaying;
@@ -187,6 +216,10 @@ class RhymesController
 
     notifyListeners();
   }
+
+  // =========================================================
+  // TEXTO E SUGESTÕES
+  // =========================================================
 
   void onTextChanged(
     String text,
@@ -210,6 +243,7 @@ class RhymesController
 
         if (normalized.isEmpty) {
           suggestionController.clearSuggestions();
+
           notifyListeners();
           return;
         }
@@ -279,6 +313,7 @@ class RhymesController
   ) {
     if (texto.trim().isEmpty) {
       starProgress = 0.0;
+
       currentFeedback = 'Comece a escrever para validar sua letra...';
 
       notifyListeners();
@@ -309,6 +344,10 @@ class RhymesController
     notifyListeners();
   }
 
+  // =========================================================
+  // IA
+  // =========================================================
+
   Future<
     Map<
       String,
@@ -318,6 +357,15 @@ class RhymesController
   fetchAiResponse(
     String message,
   ) async {
+    final normalizedMessage = message.trim();
+
+    if (normalizedMessage.isEmpty) {
+      return {
+        'role': 'assistant',
+        'content': 'Digite uma mensagem antes de enviar.',
+      };
+    }
+
     _isLoading = true;
     connectionSeconds = 0;
 
@@ -338,8 +386,30 @@ class RhymesController
     );
 
     try {
+      debugPrint(
+        '',
+      );
+      debugPrint(
+        '================ IA REQUEST ================',
+      );
+      debugPrint(
+        'Mensagem: $normalizedMessage',
+      );
+      debugPrint(
+        'BPM: $currentBpm',
+      );
+      debugPrint(
+        'Vibe: $selectedVibe',
+      );
+      debugPrint(
+        'Técnica: $selectedTechnique',
+      );
+      debugPrint(
+        'Vocabulário: ${vocabulary.length} palavras',
+      );
+
       final response = await _repository.postChat(
-        message: message,
+        message: normalizedMessage,
         currentList: vocabulary
             .map(
               (
@@ -355,29 +425,114 @@ class RhymesController
         },
       );
 
-      if (response.statusCode !=
-          200) {
+      debugPrint(
+        '---------------- IA RESPONSE ----------------',
+      );
+      debugPrint(
+        'Status: ${response.statusCode}',
+      );
+      debugPrint(
+        'Body: ${response.body}',
+      );
+      debugPrint(
+        'Headers: ${response.headers}',
+      );
+      debugPrint(
+        '=============================================',
+      );
+
+      if (response.statusCode <
+              200 ||
+          response.statusCode >=
+              300) {
         return {
           'role': 'assistant',
-          'content': 'Erro no servidor (Status: ${response.statusCode})',
+          'content': _buildServerErrorMessage(
+            response.statusCode,
+            response.body,
+          ),
         };
       }
 
-      final data = jsonDecode(
+      final decoded = jsonDecode(
         response.body,
+      );
+
+      if (decoded
+          is! Map) {
+        debugPrint(
+          'Resposta da IA não é um objeto JSON.',
+        );
+
+        return {
+          'role': 'assistant',
+          'content': 'O servidor respondeu em um formato inválido.',
+        };
+      }
+
+      final data =
+          Map<
+            String,
+            dynamic
+          >.from(
+            decoded,
+          );
+
+      final content = data['content']?.toString().trim();
+
+      if (content ==
+              null ||
+          content.isEmpty) {
+        return {
+          'role': 'assistant',
+          'content': 'O servidor respondeu sem conteúdo.',
+        };
+      }
+
+      return {
+        'role': 'assistant',
+        'content': content,
+      };
+    } on FormatException catch (
+      e
+    ) {
+      debugPrint(
+        'Erro ao decodificar JSON da IA: $e',
       );
 
       return {
         'role': 'assistant',
-        'content':
-            data['content']?.toString() ??
-            '',
+        'content': 'O servidor respondeu em um formato inválido.',
       };
-    } catch (
+    } on TimeoutException catch (
       e
     ) {
       debugPrint(
-        'Erro na conexão com IA: $e',
+        'Timeout na conexão com IA: $e',
+      );
+
+      return {
+        'role': 'assistant',
+        'content': 'O servidor demorou demais para responder. Tente novamente.',
+      };
+    } catch (
+      e,
+      stackTrace
+    ) {
+      debugPrint(
+        '',
+      );
+      debugPrint(
+        '================ ERRO IA ====================',
+      );
+      debugPrint(
+        'Erro: $e',
+      );
+      debugPrint(
+        'Stack: $stackTrace',
+      );
+      debugPrint(
+        '=============================================',
       );
 
       return {
@@ -389,9 +544,105 @@ class RhymesController
       _connectionTimer = null;
 
       _isLoading = false;
+
       notifyListeners();
     }
   }
+
+  String _buildServerErrorMessage(
+    int statusCode,
+    String responseBody,
+  ) {
+    String? serverMessage;
+
+    try {
+      final decoded = jsonDecode(
+        responseBody,
+      );
+
+      if (decoded
+          is Map) {
+        final data =
+            Map<
+              String,
+              dynamic
+            >.from(
+              decoded,
+            );
+
+        serverMessage =
+            data['error']?.toString() ??
+            data['message']?.toString() ??
+            data['detail']?.toString();
+      }
+    } catch (
+      _
+    ) {
+      if (responseBody.trim().isNotEmpty) {
+        serverMessage = responseBody.trim();
+      }
+    }
+
+    switch (statusCode) {
+      case 401:
+        return serverMessage !=
+                null
+            ? 'Não autorizado: $serverMessage'
+            : 'Não autorizado. Verifique sua API Key.';
+
+      case 403:
+        return serverMessage !=
+                null
+            ? 'Acesso negado: $serverMessage'
+            : 'Acesso negado pelo servidor.';
+
+      case 404:
+        return serverMessage !=
+                null
+            ? 'Serviço não encontrado: $serverMessage'
+            : 'O serviço da IA não foi encontrado.';
+
+      case 429:
+        return serverMessage !=
+                null
+            ? 'Limite de requisições atingido: $serverMessage'
+            : 'Muitas requisições. Aguarde um pouco e tente novamente.';
+
+      case 500:
+        return serverMessage !=
+                null
+            ? 'Erro interno do servidor: $serverMessage'
+            : 'Erro interno do servidor.';
+
+      case 502:
+        return serverMessage !=
+                null
+            ? 'Gateway inválido: $serverMessage'
+            : 'O servidor intermediário falhou.';
+
+      case 503:
+        return serverMessage !=
+                null
+            ? 'Servidor temporariamente indisponível: $serverMessage'
+            : 'Servidor temporariamente indisponível. Tente novamente em instantes.';
+
+      case 504:
+        return serverMessage !=
+                null
+            ? 'Tempo limite do servidor: $serverMessage'
+            : 'O servidor demorou demais para responder.';
+
+      default:
+        return serverMessage !=
+                null
+            ? 'Erro no servidor ($statusCode): $serverMessage'
+            : 'Erro no servidor (Status: $statusCode)';
+    }
+  }
+
+  // =========================================================
+  // CARREGAMENTO DE DADOS
+  // =========================================================
 
   Future<
     void
@@ -409,6 +660,10 @@ class RhymesController
       );
     }
   }
+
+  // =========================================================
+  // CONFIGURAÇÕES DO ESTÚDIO
+  // =========================================================
 
   void updateStudioConfig({
     int? bpm,
@@ -459,6 +714,10 @@ class RhymesController
     suggestionController.clearSuggestions();
     notifyListeners();
   }
+
+  // =========================================================
+  // DISPOSE
+  // =========================================================
 
   @override
   void dispose() {

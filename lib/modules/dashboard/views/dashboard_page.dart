@@ -1,493 +1,533 @@
-import 'dart:io';
-
-import 'package:file_picker/file_picker.dart';
+import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:versin/core/models/rhyme_model.dart';
-import 'package:versin/features/rhymes/presentation/controller/rhymes_controller.dart';
+import 'package:versin/app/locator.dart';
+import 'package:versin/app/routes/app_routes.dart'; // Importação das rotas
 
-class VocabularioPage
+// CONTROLLER & WIDGETS IMPORTS
+import '../controllers/dashboard_controller.dart';
+import '../widgets/side_rail_widget.dart';
+import '../widgets/dashboard_header_widget.dart';
+import '../widgets/account_activities_card_widget.dart';
+import '../widgets/hub_status_card_widget.dart';
+import '../widgets/main_chart_card_widget.dart';
+import '../widgets/calendar_card_widget.dart';
+
+// ECOSYSTEM MODULES IMPORTS
+import 'package:versin/modules/chat/views/chat_page.dart';
+import 'package:versin/modules/hub/views/hub_page.dart';
+// EN: Updated path targeting the newly structured modular layout location
+// PT: Caminho atualizado apontando para o local da nova estrutura modular
+import 'package:versin/modules/match/views/match_page.dart';
+import 'package:versin/modules/wallet/views/wallet_page.dart';
+import 'package:versin/modules/market/market_page.dart';
+import 'package:versin/modules/showcase/showcase_page.dart';
+import 'package:versin/modules/vnode/vnode_page.dart';
+import 'package:versin/modules/settings/settings_page.dart';
+
+class DashboardPage
     extends
         StatefulWidget {
-  final RhymesController controller;
-
-  const VocabularioPage({
+  static const String routeName = '/';
+  const DashboardPage({
     super.key,
-    required this.controller,
   });
 
   @override
   State<
-    VocabularioPage
+    DashboardPage
   >
-  createState() => PageVocabulary();
+  createState() => _DashboardPageState();
 }
 
-class PageVocabulary
+class _DashboardPageState
     extends
         State<
-          VocabularioPage
+          DashboardPage
         > {
-  final TextEditingController _textController = TextEditingController();
+  final DashboardController _controller =
+      sl<
+        DashboardController
+      >();
+
+  // Mapeamento dos índices para as rotas nomeadas
+  final List<
+    String
+  >
+  _routes = [
+    '/',
+    AppRoutes.match,
+    AppRoutes.market,
+    AppRoutes.wallet,
+    AppRoutes.chat,
+    AppRoutes.showcase,
+    AppRoutes.hub,
+    AppRoutes.vnode,
+    AppRoutes.settings,
+  ];
 
   @override
-  void dispose() {
-    _textController.dispose();
-    super.dispose();
+  void initState() {
+    super.initState();
+    _controller.init();
   }
 
-  Future<
-    void
-  >
-  _importFile() async {
-    try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: [
-          'txt',
-          'md',
-        ],
-      );
-
-      final path = result?.files.single.path;
-
-      if (path ==
-          null) {
-        return;
-      }
-
-      final content = await File(
-        path,
-      ).readAsString();
-      final importedRhymes = content.split(
-        RegExp(
-          r'[,\n;]',
-        ),
-      );
-
-      int count = 0;
-
-      for (final rhyme in importedRhymes) {
-        final cleanRhyme = rhyme.trim().toLowerCase();
-
-        if (cleanRhyme.isEmpty) {
-          continue;
-        }
-
-        widget.controller.addWord(
-          cleanRhyme,
-          false,
-        );
-
-        count++;
-      }
-
-      if (mounted) {
-        _showSnackBar(
-          'Sucesso! $count rimas importadas.',
-          Colors.purpleAccent,
-        );
-      }
-    } catch (
-      e
-    ) {
-      if (mounted) {
-        _showSnackBar(
-          'Erro ao ler o arquivo.',
-          Colors.redAccent,
-        );
-      }
-    }
-  }
-
-  Future<
-    void
-  >
-  _exportToTxt() async {
-    try {
-      final downloadsDir = await getDownloadsDirectory();
-
-      if (downloadsDir ==
-          null) {
-        return;
-      }
-
-      final path = '${downloadsDir.path}/versin_backup_${DateTime.now().millisecondsSinceEpoch}.txt';
-
-      final buffer = StringBuffer()
-        ..writeln(
-          '--- BACKUP VERSIN: VOCABULÁRIO ---',
-        )
-        ..writeln();
-
-      for (final rhyme in widget.controller.vocabulary) {
-        buffer.writeln(
-          rhyme.word,
-        );
-      }
-
-      await File(
-        path,
-      ).writeAsString(
-        buffer.toString(),
-      );
-
-      if (mounted) {
-        _showSnackBar(
-          'Arquivo salvo em: $path',
-          Colors.greenAccent,
-        );
-      }
-    } catch (
-      e
-    ) {
-      if (mounted) {
-        _showSnackBar(
-          'Erro na exportação.',
-          Colors.redAccent,
-        );
-      }
-    }
-  }
-
-  void _showSnackBar(
-    String message,
-    Color color,
+  void _onNavigationTap(
+    int index,
   ) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(
-      SnackBar(
-        backgroundColor: color,
-        content: Text(
-          message,
-          style: const TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+    setState(
+      () => _controller.navigationTap(
+        index,
       ),
     );
+    // Navega para a rota correspondente via sistema de rotas do Flutter
+    if (index !=
+        0) {
+      Navigator.of(
+        context,
+      ).pushNamed(
+        _routes[index],
+      );
+    }
   }
 
-  void _confirmAddition() {
-    final text = _textController.text.trim();
-
-    if (text.isEmpty) {
-      return;
-    }
-
-    widget.controller.addWord(
-      text,
-      false,
+  void _showAddAppointmentSheet({
+    String? fixedTime,
+  }) {
+    final TextEditingController titleController = TextEditingController();
+    final now = DateTime.now();
+    final String defaultTime =
+        fixedTime ??
+        "${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}";
+    final TextEditingController timeController = TextEditingController(
+      text: defaultTime,
     );
 
-    _textController.clear();
-
-    FocusScope.of(
-      context,
-    ).unfocus();
-  }
-
-  @override
-  Widget build(
-    BuildContext context,
-  ) {
-    return Scaffold(
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
       backgroundColor: const Color(
-        0xFF0F0F0F,
+        0xFF15122C,
       ),
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back,
-            color: Colors.white,
-          ),
-          onPressed: () => Navigator.pop(
-            context,
-          ),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(
-              Icons.download_for_offline,
-              color: Colors.white24,
-            ),
-            onPressed: _exportToTxt,
-          ),
-          const SizedBox(
-            width: 8,
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 20,
-            ),
-            child: Column(
-              children: [
-                const Text(
-                  'BIBLIOTECA DE RIMAS',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 2,
-                  ),
-                ),
-
-                const SizedBox(
-                  height: 24,
-                ),
-
-                GestureDetector(
-                  onTap: _importFile,
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 30,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.purpleAccent.withValues(
-                        alpha: 0.08,
-                      ),
-                      borderRadius: BorderRadius.circular(
-                        20,
-                      ),
-                      border: Border.all(
-                        color: Colors.purpleAccent.withValues(
-                          alpha: 0.4,
-                        ),
-                        width: 1.5,
-                      ),
-                    ),
-                    child: Column(
-                      children: [
-                        const Icon(
-                          Icons.drive_folder_upload,
-                          color: Colors.purpleAccent,
-                          size: 38,
-                        ),
-
-                        const SizedBox(
-                          height: 12,
-                        ),
-
-                        const Text(
-                          'IMPORTAR BANCO DE RIMAS',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1.2,
-                          ),
-                        ),
-
-                        const SizedBox(
-                          height: 6,
-                        ),
-
-                        Text(
-                          'Clique aqui para enviar .txt ou .md',
-                          style: TextStyle(
-                            color: Colors.white.withValues(
-                              alpha: 0.4,
-                            ),
-                            fontSize: 11,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          Expanded(
-            child: ListenableBuilder(
-              listenable: widget.controller,
-              builder:
-                  (
-                    context,
-                    _,
-                  ) {
-                    final vocab = widget.controller.vocabulary;
-
-                    if (vocab.isEmpty) {
-                      return Center(
-                        child: Text(
-                          'Sua lista está vazia.',
-                          style: TextStyle(
-                            color: Colors.white.withValues(
-                              alpha: 0.1,
-                            ),
-                          ),
-                        ),
-                      );
-                    }
-
-                    return ListView.builder(
-                      padding: const EdgeInsets.only(
-                        top: 20,
-                        bottom: 130,
-                      ),
-                      itemCount: vocab.length,
-                      itemBuilder:
-                          (
-                            _,
-                            index,
-                          ) => _buildRhymeTile(
-                            vocab[index],
-                            index,
-                          ),
-                    );
-                  },
-            ),
-          ),
-
-          _buildInputArea(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInputArea() {
-    return Container(
-      padding: EdgeInsets.only(
-        left: 16,
-        right: 16,
-        top: 12,
-        bottom:
-            MediaQuery.of(
-              context,
-            ).padding.bottom +
-            16,
-      ),
-      decoration: const BoxDecoration(
-        color: Color(
-          0xFF141414,
-        ),
+      shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(
           top: Radius.circular(
             24,
           ),
         ),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SizedBox(
-            width: double.infinity,
-            height: 52,
-            child: ElevatedButton(
-              onPressed: _confirmAddition,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.purpleAccent,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(
-                    14,
+      builder:
+          (
+            context,
+          ) {
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom:
+                    MediaQuery.of(
+                      context,
+                    ).viewInsets.bottom +
+                    24,
+                top: 24,
+                left: 24,
+                right: 24,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        "NOVO COMPROMISSO - DIA ${_controller.selectedDay}/${_controller.focusedDay.month}",
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.0,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(
+                          Icons.close,
+                          color: Colors.white54,
+                          size: 20,
+                        ),
+                        onPressed: () => Navigator.pop(
+                          context,
+                        ),
+                      ),
+                    ],
                   ),
-                ),
+                  const SizedBox(
+                    height: 16,
+                  ),
+                  TextField(
+                    controller: titleController,
+                    style: const TextStyle(
+                      color: Colors.white,
+                    ),
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: Colors.white.withOpacity(
+                        0.05,
+                      ),
+                      hintText: "Descrição do compromisso",
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(
+                          12,
+                        ),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(
+                    height: 12,
+                  ),
+                  TextField(
+                    controller: timeController,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontFamily: 'monospace',
+                    ),
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: Colors.white.withOpacity(
+                        0.05,
+                      ),
+                      hintText: "Horário (HH:MM)",
+                      prefixIcon: const Icon(
+                        Icons.access_time,
+                        color: Colors.white38,
+                        size: 18,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(
+                          12,
+                        ),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(
+                    height: 20,
+                  ),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _controller.accentNeon,
+                        foregroundColor: Colors.black,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(
+                            12,
+                          ),
+                        ),
+                      ),
+                      onPressed: () {
+                        if (titleController.text.isNotEmpty &&
+                            timeController.text.isNotEmpty) {
+                          setState(
+                            () => _controller.addAppointment(
+                              title: titleController.text,
+                              time: timeController.text,
+                            ),
+                          );
+                          Navigator.pop(
+                            context,
+                          );
+                        }
+                      },
+                      child: const Text(
+                        "AGENDAR NO CHASSI",
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              child: const Text(
-                '+ ADICIONAR À LISTA',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1,
-                ),
-              ),
-            ),
-          ),
-
-          const SizedBox(
-            height: 12,
-          ),
-
-          Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 16,
-            ),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(
-                alpha: 0.05,
-              ),
-              borderRadius: BorderRadius.circular(
-                12,
-              ),
-            ),
-            child: TextField(
-              controller: _textController,
-              onSubmitted:
-                  (
-                    _,
-                  ) => _confirmAddition(),
-              style: const TextStyle(
-                color: Colors.white,
-              ),
-              decoration: const InputDecoration(
-                hintText: 'Digite uma nova rima...',
-                hintStyle: TextStyle(
-                  color: Colors.white24,
-                  fontSize: 14,
-                ),
-                border: InputBorder.none,
-              ),
-            ),
-          ),
-        ],
-      ),
+            );
+          },
     );
   }
 
-  Widget _buildRhymeTile(
-    Rhyme rhyme,
-    int index,
+  @override
+  Widget build(
+    BuildContext context,
   ) {
-    return Container(
-      margin: const EdgeInsets.symmetric(
-        horizontal: 20,
-        vertical: 4,
-      ),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(
-          alpha: 0.02,
-        ),
-        borderRadius: BorderRadius.circular(
-          12,
-        ),
-      ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-        ),
-        title: Text(
-          rhyme.word,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 15,
-          ),
-        ),
-        trailing: IconButton(
-          icon: Icon(
-            Icons.delete_outline,
-            color: Colors.white.withValues(
-              alpha: 0.1,
-            ),
-            size: 20,
-          ),
-          onPressed: () {
-            widget.controller.removeWord(
-              index,
+    return LayoutBuilder(
+      builder:
+          (
+            context,
+            constraints,
+          ) {
+            bool isMobile =
+                constraints.maxWidth <
+                800;
+
+            return Scaffold(
+              backgroundColor: Colors.black,
+              bottomNavigationBar: isMobile
+                  ? BottomNavigationBar(
+                      currentIndex: _controller.currentIndex,
+                      onTap: _onNavigationTap,
+                      selectedItemColor: _controller.accentNeon,
+                      unselectedItemColor: Colors.white24,
+                      type: BottomNavigationBarType.fixed,
+                      items: const [
+                        BottomNavigationBarItem(
+                          icon: Icon(
+                            Icons.dashboard_outlined,
+                          ),
+                          label: "Dash",
+                        ),
+                        BottomNavigationBarItem(
+                          icon: Icon(
+                            Icons.share_outlined,
+                          ),
+                          label: "Match",
+                        ),
+                        BottomNavigationBarItem(
+                          icon: Icon(
+                            Icons.local_mall_outlined,
+                          ),
+                          label: "Market",
+                        ),
+                        BottomNavigationBarItem(
+                          icon: Icon(
+                            Icons.account_balance_wallet_outlined,
+                          ),
+                          label: "Wallet",
+                        ),
+                        BottomNavigationBarItem(
+                          icon: Icon(
+                            Icons.mic_external_on_outlined,
+                          ),
+                          label: "Studio",
+                        ),
+                        BottomNavigationBarItem(
+                          icon: Icon(
+                            Icons.storefront_outlined,
+                          ),
+                          label: "Showcase",
+                        ),
+                        BottomNavigationBarItem(
+                          icon: Icon(
+                            Icons.settings_input_component,
+                          ),
+                          label: "Hub",
+                        ),
+                        BottomNavigationBarItem(
+                          icon: Icon(
+                            Icons.lan_outlined,
+                          ),
+                          label: "VNode",
+                        ),
+                        BottomNavigationBarItem(
+                          icon: Icon(
+                            Icons.settings_outlined,
+                          ),
+                          label: "Settings",
+                        ),
+                      ],
+                    )
+                  : null,
+              body: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      const Color(
+                        0xFF2E1A47,
+                      ),
+                      _controller.deepBg,
+                      Colors.black,
+                    ],
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    if (!isMobile)
+                      SideRailWidget(
+                        controller: _controller,
+                      ),
+                    Expanded(
+                      child: SafeArea(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            DashboardHeaderWidget(
+                              controller: _controller,
+                            ),
+                            Expanded(
+                              child: PageView(
+                                controller: _controller.pageController,
+                                onPageChanged:
+                                    (
+                                      index,
+                                    ) => setState(
+                                      () => _controller.handlePageChange(
+                                        index,
+                                      ),
+                                    ),
+                                children: [
+                                  DashboardLabPage(
+                                    controller: _controller,
+                                    onAddAppointment: _showAddAppointmentSheet,
+                                  ),
+                                  const MatchPage(),
+                                  MarketPage(),
+                                  const WalletPage(),
+                                  const ChatPage(),
+                                  ShowcasePage(),
+                                  const HubPage(),
+                                  VNodePage(),
+                                  SettingsPage(),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             );
           },
-        ),
+    );
+  }
+}
+
+class DashboardLabPage
+    extends
+        StatelessWidget {
+  final DashboardController controller;
+  final VoidCallback onAddAppointment;
+
+  const DashboardLabPage({
+    super.key,
+    required this.controller,
+    required this.onAddAppointment,
+  });
+
+  @override
+  Widget build(
+    BuildContext context,
+  ) {
+    bool isMobile =
+        MediaQuery.of(
+          context,
+        ).size.width <
+        800;
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 20,
+      ),
+      child: Column(
+        children: [
+          const SizedBox(
+            height: 10,
+          ),
+          // CARD DE PROJETO ATIVO
+          if (controller.hasActiveProject) ...[
+            Container(
+              padding: const EdgeInsets.all(
+                16,
+              ),
+              decoration: BoxDecoration(
+                color: Colors.green.withOpacity(
+                  0.1,
+                ),
+                borderRadius: BorderRadius.circular(
+                  16,
+                ),
+                border: Border.all(
+                  color: Colors.green.withOpacity(
+                    0.3,
+                  ),
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.fiber_manual_record,
+                    color: Colors.green,
+                    size: 12,
+                  ),
+                  const SizedBox(
+                    width: 8,
+                  ),
+                  Text(
+                    "Studio Session Ativa",
+                    style: TextStyle(
+                      color: Colors.green.shade300,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(
+              height: 16,
+            ),
+          ],
+          isMobile
+              ? Column(
+                  children: [
+                    AccountActivitiesCardWidget(
+                      controller: controller,
+                      onStateChanged: () {},
+                    ),
+                    const SizedBox(
+                      height: 16,
+                    ),
+                    HubStatusCardWidget(
+                      controller: controller,
+                    ),
+                  ],
+                )
+              : Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: AccountActivitiesCardWidget(
+                        controller: controller,
+                        onStateChanged: () {},
+                      ),
+                    ),
+                    const SizedBox(
+                      width: 16,
+                    ),
+                    Expanded(
+                      child: HubStatusCardWidget(
+                        controller: controller,
+                      ),
+                    ),
+                  ],
+                ),
+          const SizedBox(
+            height: 20,
+          ),
+          MainChartCardWidget(
+            controller: controller,
+          ),
+          const SizedBox(
+            height: 20,
+          ),
+          CalendarCardWidget(
+            controller: controller,
+            onStateChanged: () {},
+            onAddAppointmentTap: onAddAppointment,
+          ),
+          const SizedBox(
+            height: 20,
+          ),
+        ],
       ),
     );
   }

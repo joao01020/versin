@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+
 import 'package:versin/core/models/rhyme_model.dart';
 import 'package:versin/features/rhymes/data/repositories/rhymes_repository.dart';
 import 'package:versin/features/rhymes/domain/services/audio_service.dart';
@@ -9,6 +10,7 @@ import 'package:versin/modules/chat/views/components/suggestion_balloon/controll
 
 class RhymesController extends ChangeNotifier {
   final RhymesRepository _repository = RhymesRepository();
+
   final AudioService _audioService = AudioService();
 
   final SuggestionController suggestionController = SuggestionController();
@@ -17,6 +19,7 @@ class RhymesController extends ChangeNotifier {
   Timer? _connectionTimer;
 
   bool _isLoading = false;
+  bool _isVocabularyLoading = false;
 
   int _currentStep = 1;
   double _stepProgress = 0.0;
@@ -24,23 +27,36 @@ class RhymesController extends ChangeNotifier {
   String? _userApiKey = 'VERSIN-PRO-TRIAL-2026-FREE';
 
   int connectionSeconds = 0;
+
   double starProgress = 0.0;
 
   String currentFeedback = 'Comece a escrever para validar sua letra...';
 
   String selectedTechnique = 'Melódico';
+
   String selectedVibe = 'Calmo';
 
   int currentBpm = 120;
+
   bool isBpmPlaying = false;
+
+  // =========================================================
+  // VOCABULÁRIO CENTRAL
+  // =========================================================
 
   List<Rhyme> vocabulary = [];
 
   List<Map<String, dynamic>> trendingWords = [];
 
+  // =========================================================
+  // GETTERS
+  // =========================================================
+
   List<String> get suggestions => suggestionController.suggestions;
 
   bool get isLoading => _isLoading;
+
+  bool get isVocabularyLoading => _isVocabularyLoading;
 
   int get currentStep => _currentStep;
 
@@ -50,19 +66,51 @@ class RhymesController extends ChangeNotifier {
 
   double get fireProgress => (starProgress * 0.7).clamp(0.0, 1.0);
 
+  List<String> get vocabularyWords =>
+      vocabulary.map((rhyme) => rhyme.word).toList();
+
+  int get vocabularyCount => vocabulary.length;
+
   // =========================================================
-  // VOCABULÁRIO
+  // NORMALIZAÇÃO
+  // =========================================================
+
+  String _normalizeWord(String word) {
+    return word.trim().toLowerCase();
+  }
+
+  // =========================================================
+  // VERIFICAR PALAVRA
+  // =========================================================
+
+  bool containsWord(String word) {
+    final normalized = _normalizeWord(word);
+
+    if (normalized.isEmpty) {
+      return false;
+    }
+
+    return vocabulary.any((rhyme) => _normalizeWord(rhyme.word) == normalized);
+  }
+
+  // =========================================================
+  // ADICIONAR UMA PALAVRA
   // =========================================================
 
   Future<void> addWord(String word, bool priority) async {
-    final normalized = word.trim().toLowerCase();
+    final normalized = _normalizeWord(word);
 
-    if (normalized.isEmpty ||
-        vocabulary.any((rhyme) => rhyme.word == normalized)) {
+    if (normalized.isEmpty) {
       return;
     }
 
-    vocabulary.insert(0, Rhyme(word: normalized, isPriority: priority));
+    if (containsWord(normalized)) {
+      return;
+    }
+
+    final rhyme = Rhyme(word: normalized, isPriority: priority);
+
+    vocabulary.insert(0, rhyme);
 
     notifyListeners();
 
@@ -73,6 +121,42 @@ class RhymesController extends ChangeNotifier {
     }
   }
 
+  // =========================================================
+  // ADICIONAR VÁRIAS PALAVRAS
+  // =========================================================
+
+  Future<int> addWords(Iterable<String> words, {bool priority = false}) async {
+    int addedCount = 0;
+
+    final uniqueWords = <String>{};
+
+    for (final rawWord in words) {
+      final normalized = _normalizeWord(rawWord);
+
+      if (normalized.isEmpty) {
+        continue;
+      }
+
+      uniqueWords.add(normalized);
+    }
+
+    for (final word in uniqueWords) {
+      if (containsWord(word)) {
+        continue;
+      }
+
+      await addWord(word, priority);
+
+      addedCount++;
+    }
+
+    return addedCount;
+  }
+
+  // =========================================================
+  // REMOVER POR ÍNDICE
+  // =========================================================
+
   Future<void> removeWord(int index) async {
     if (index < 0 || index >= vocabulary.length) {
       return;
@@ -81,6 +165,7 @@ class RhymesController extends ChangeNotifier {
     final word = vocabulary[index].word;
 
     vocabulary.removeAt(index);
+
     notifyListeners();
 
     try {
@@ -88,6 +173,24 @@ class RhymesController extends ChangeNotifier {
     } catch (e) {
       debugPrint('Erro ao remover palavra: $e');
     }
+  }
+
+  // =========================================================
+  // REMOVER PELO TEXTO
+  // =========================================================
+
+  Future<void> removeWordByValue(String word) async {
+    final normalized = _normalizeWord(word);
+
+    final index = vocabulary.indexWhere(
+      (rhyme) => _normalizeWord(rhyme.word) == normalized,
+    );
+
+    if (index == -1) {
+      return;
+    }
+
+    await removeWord(index);
   }
 
   // =========================================================
@@ -109,6 +212,7 @@ class RhymesController extends ChangeNotifier {
 
   void updateGamification(double value) {
     starProgress = value;
+
     notifyListeners();
   }
 
@@ -158,10 +262,15 @@ class RhymesController extends ChangeNotifier {
         suggestionController.clearSuggestions();
 
         notifyListeners();
+
         return;
       }
 
       final words = normalized.split(RegExp(r'\s+'));
+
+      if (words.isEmpty) {
+        return;
+      }
 
       final lastWord = words.last;
 
@@ -171,6 +280,7 @@ class RhymesController extends ChangeNotifier {
         }
 
         notifyListeners();
+
         return;
       }
 
@@ -186,7 +296,7 @@ class RhymesController extends ChangeNotifier {
           .toList();
 
       if (localSuggestions.isNotEmpty) {
-        final combined = {
+        final combined = <String>{
           ...suggestionController.suggestions,
           ...localSuggestions,
         }.toList();
@@ -198,6 +308,10 @@ class RhymesController extends ChangeNotifier {
     });
   }
 
+  // =========================================================
+  // PROGRESSO TÉCNICO
+  // =========================================================
+
   void _processarProgressoTecnico(String texto) {
     if (texto.trim().isEmpty) {
       starProgress = 0.0;
@@ -205,6 +319,7 @@ class RhymesController extends ChangeNotifier {
       currentFeedback = 'Comece a escrever para validar sua letra...';
 
       notifyListeners();
+
       return;
     }
 
@@ -235,6 +350,7 @@ class RhymesController extends ChangeNotifier {
     }
 
     _isLoading = true;
+
     connectionSeconds = 0;
 
     notifyListeners();
@@ -243,6 +359,7 @@ class RhymesController extends ChangeNotifier {
 
     _connectionTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       connectionSeconds++;
+
       notifyListeners();
     });
 
@@ -257,7 +374,7 @@ class RhymesController extends ChangeNotifier {
 
       final response = await _repository.postChat(
         message: normalizedMessage,
-        currentList: vocabulary.map((rhyme) => rhyme.word).toList(),
+        currentList: vocabularyWords,
         apiKey: _userApiKey,
         context: {
           'bpm': currentBpm,
@@ -267,9 +384,13 @@ class RhymesController extends ChangeNotifier {
       );
 
       debugPrint('---------------- IA RESPONSE ----------------');
+
       debugPrint('Status: ${response.statusCode}');
+
       debugPrint('Body: ${response.body}');
+
       debugPrint('Headers: ${response.headers}');
+
       debugPrint('=============================================');
 
       if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -321,9 +442,13 @@ class RhymesController extends ChangeNotifier {
       };
     } catch (e, stackTrace) {
       debugPrint('');
+
       debugPrint('================ ERRO IA ====================');
+
       debugPrint('Erro: $e');
+
       debugPrint('Stack: $stackTrace');
+
       debugPrint('=============================================');
 
       return {
@@ -332,6 +457,7 @@ class RhymesController extends ChangeNotifier {
       };
     } finally {
       _connectionTimer?.cancel();
+
       _connectionTimer = null;
 
       _isLoading = false;
@@ -339,6 +465,10 @@ class RhymesController extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  // =========================================================
+  // ERRO DO SERVIDOR
+  // =========================================================
 
   String _buildServerErrorMessage(int statusCode, String responseBody) {
     String? serverMessage;
@@ -409,16 +539,45 @@ class RhymesController extends ChangeNotifier {
   }
 
   // =========================================================
-  // CARREGAMENTO DE DADOS
+  // CARREGAMENTO
   // =========================================================
 
   Future<void> carregarDadosUsuario() async {
+    if (_isVocabularyLoading) {
+      return;
+    }
+
+    _isVocabularyLoading = true;
+
+    notifyListeners();
+
     try {
-      vocabulary = await _repository.fetchVocabulary();
+      final loadedVocabulary = await _repository.fetchVocabulary();
+
+      final unique = <String, Rhyme>{};
+
+      for (final rhyme in loadedVocabulary) {
+        final normalized = _normalizeWord(rhyme.word);
+
+        if (normalized.isEmpty) {
+          continue;
+        }
+
+        unique[normalized] = Rhyme(
+          word: normalized,
+          isPriority: rhyme.isPriority,
+        );
+      }
+
+      vocabulary = unique.values.toList();
 
       notifyListeners();
     } catch (e) {
       debugPrint('Erro ao carregar vocabulário: $e');
+    } finally {
+      _isVocabularyLoading = false;
+
+      notifyListeners();
     }
   }
 
@@ -446,19 +605,33 @@ class RhymesController extends ChangeNotifier {
     notifyListeners();
   }
 
+  // =========================================================
+  // PROGRESSO
+  // =========================================================
+
   void updateProgress(int step, double progress) {
     _currentStep = step;
+
     _stepProgress = progress;
 
     notifyListeners();
   }
 
+  // =========================================================
+  // COR
+  // =========================================================
+
   Color getActiveColor() {
     return const Color(0xFFE100FF);
   }
 
+  // =========================================================
+  // LIMPAR SUGESTÕES
+  // =========================================================
+
   void clearSuggestions() {
     suggestionController.clearSuggestions();
+
     notifyListeners();
   }
 
@@ -472,6 +645,7 @@ class RhymesController extends ChangeNotifier {
     _connectionTimer?.cancel();
 
     _audioService.dispose();
+
     suggestionController.dispose();
 
     super.dispose();

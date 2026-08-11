@@ -1,55 +1,162 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
+
 import 'package:versin/features/rhymes/presentation/controller/rhymes_controller.dart';
 import 'package:versin/features/rhymes/presentation/pages/drawer/ai_memory/ai_memory_page.dart';
-import 'package:versin/features/rhymes/presentation/pages/drawer/rhyme_level/rhyme_level_page.dart';
-// Importação da nova página de perfil
 import 'package:versin/features/rhymes/presentation/pages/drawer/profile/profile_page.dart';
+import 'package:versin/features/rhymes/presentation/pages/drawer/rhyme_level/rhyme_level_page.dart';
 
-class SettingsPage extends StatefulWidget {
+class SettingsPage
+    extends
+        StatefulWidget {
   final RhymesController controller;
-  const SettingsPage({super.key, required this.controller});
+
+  const SettingsPage({
+    super.key,
+    required this.controller,
+  });
 
   @override
-  State<SettingsPage> createState() => PageSettings();
+  State<
+    SettingsPage
+  >
+  createState() => PageSettings();
 }
 
-class PageSettings extends State<SettingsPage> {
-  final _keyController = TextEditingController();
+class PageSettings
+    extends
+        State<
+          SettingsPage
+        > {
+  final TextEditingController _keyController = TextEditingController();
 
-  // Verifica se o usuário está logado no Supabase
-  bool get _isUserLoggedIn => Supabase.instance.client.auth.currentUser != null;
+  bool get _isUserLoggedIn =>
+      Supabase.instance.client.auth.currentUser !=
+      null;
 
-  Future<void> _handleSignOut() async {
+  @override
+  void dispose() {
+    _keyController.dispose();
+    super.dispose();
+  }
+
+  Future<
+    void
+  >
+  _handleSignOut() async {
     try {
       await Supabase.instance.client.auth.signOut();
-      if (mounted) {
-        Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+
+      if (!mounted) {
+        return;
       }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Erro ao sair: $e"),
-            backgroundColor: Colors.red,
+
+      Navigator.of(
+        context,
+      ).pushNamedAndRemoveUntil(
+        '/',
+        (
+          _,
+        ) => false,
+      );
+    } catch (
+      e
+    ) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Erro ao sair: $e',
           ),
-        );
-      }
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
-  Future<void> _openGoogleStudio() async {
-    final Uri url = Uri.parse('https://aistudio.google.com/');
-    if (!await launchUrl(url)) {
-      throw Exception('Não foi possível abrir o link');
+  Future<
+    void
+  >
+  _openGoogleStudio() async {
+    final url = Uri.parse(
+      'https://aistudio.google.com/',
+    );
+
+    if (!await launchUrl(
+      url,
+    )) {
+      throw Exception(
+        'Não foi possível abrir o link',
+      );
     }
+  }
+
+  void _saveApiKey() {
+    widget.controller.setApiKey(
+      _keyController.text.trim(),
+    );
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Chave salva! Modo Pro Ativado. 🚀',
+        ),
+      ),
+    );
+  }
+
+  void _openProfile() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder:
+            (
+              _,
+            ) => const ProfilePage(),
+      ),
+    );
+  }
+
+  void _openRhymeLevel() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder:
+            (
+              _,
+            ) => const RhymeLevelPage(),
+      ),
+    );
+  }
+
+  void _openAiMemory() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder:
+            (
+              _,
+            ) => const AIMemoryPage(),
+      ),
+    );
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(
+    BuildContext context,
+  ) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0F0F0F),
+      backgroundColor: const Color(
+        0xFF0F0F0F,
+      ),
       appBar: AppBar(
         title: const Text(
           'CONFIGURAÇÕES',
@@ -62,117 +169,134 @@ class PageSettings extends State<SettingsPage> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
-        iconTheme: const IconThemeData(color: Colors.purpleAccent),
+        iconTheme: const IconThemeData(
+          color: Colors.purpleAccent,
+        ),
       ),
       body: ListView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(
+          20,
+        ),
         children: [
-          // Seção de Perfil (Só aparece se logado)
           if (_isUserLoggedIn) ...[
-            _buildSectionTitle("Perfil"),
+            _buildSectionTitle(
+              'Perfil',
+            ),
             _settingsTile(
               Icons.person_outline,
-              "Meu Perfil",
-              "Ver nome, carteira wallet@ e foto",
-              () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const ProfilePage()),
-                );
-              },
+              'Meu Perfil',
+              'Ver nome, carteira wallet@ e foto',
+              _openProfile,
             ),
-            const SizedBox(height: 20),
+            const SizedBox(
+              height: 20,
+            ),
           ],
 
-          _buildSectionTitle("Versin Pro & Autonomia"),
+          _buildSectionTitle(
+            'Versin Pro & Autonomia',
+          ),
+
           _buildProCard(),
 
-          const SizedBox(height: 15),
+          const SizedBox(
+            height: 15,
+          ),
+
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 10,
+            ),
             child: TextField(
               controller: _keyController,
-              style: const TextStyle(color: Colors.white, fontSize: 14),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+              ),
               decoration: InputDecoration(
-                hintText: "Cole sua API Key aqui...",
-                hintStyle: const TextStyle(color: Colors.grey),
+                hintText: 'Cole sua API Key aqui...',
+                hintStyle: const TextStyle(
+                  color: Colors.grey,
+                ),
                 filled: true,
-                fillColor: const Color(0xFF1A1A1A),
+                fillColor: const Color(
+                  0xFF1A1A1A,
+                ),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(
+                    12,
+                  ),
                   borderSide: BorderSide.none,
                 ),
                 suffixIcon: IconButton(
+                  onPressed: _saveApiKey,
                   icon: const Icon(
                     Icons.check_circle,
                     color: Colors.purpleAccent,
                   ),
-                  onPressed: () {
-                    widget.controller.setApiKey(_keyController.text.trim());
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text("Chave salva! Modo Pro Ativado. 🚀"),
-                      ),
-                    );
-                  },
                 ),
               ),
             ),
           ),
 
-          const SizedBox(height: 25),
-          _buildSectionTitle("AI & Flow"),
-          _settingsTile(
-            Icons.auto_awesome_outlined,
-            "Nível de Rima",
-            "Configurar gênero, BPM e tom",
-            () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const RhymeLevelPage()),
-              );
-            },
-          ),
-          _settingsTile(
-            Icons.memory_outlined,
-            "Memória da IA",
-            "Gerenciar uso de contexto e cache",
-            () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const AIMemoryPage()),
-              );
-            },
+          const SizedBox(
+            height: 25,
           ),
 
-          const SizedBox(height: 20),
-          _buildSectionTitle("Aplicativo"),
+          _buildSectionTitle(
+            'AI & Flow',
+          ),
+
+          _settingsTile(
+            Icons.auto_awesome_outlined,
+            'Nível de Rima',
+            'Configurar gênero, BPM e tom',
+            _openRhymeLevel,
+          ),
+
+          _settingsTile(
+            Icons.memory_outlined,
+            'Memória da IA',
+            'Gerenciar uso de contexto e cache',
+            _openAiMemory,
+          ),
+
+          const SizedBox(
+            height: 20,
+          ),
+
+          _buildSectionTitle(
+            'Aplicativo',
+          ),
+
           _settingsTile(
             Icons.dark_mode_outlined,
-            "Tema",
-            "Escuro (Padrão)",
+            'Tema',
+            'Escuro (Padrão)',
             () {},
           ),
 
-          // Notificações (Só aparece se logado)
           if (_isUserLoggedIn)
             _settingsTile(
               Icons.notifications_none,
-              "Notificações",
-              "Gerenciar alertas",
+              'Notificações',
+              'Gerenciar alertas',
               () {},
             ),
 
-          const SizedBox(height: 40),
+          const SizedBox(
+            height: 40,
+          ),
 
-          // Sair da Conta (Só aparece se logado)
           if (_isUserLoggedIn)
             Center(
               child: TextButton(
                 onPressed: _handleSignOut,
                 child: const Text(
-                  "Sair da Conta",
-                  style: TextStyle(color: Colors.redAccent),
+                  'Sair da Conta',
+                  style: TextStyle(
+                    color: Colors.redAccent,
+                  ),
                 ),
               ),
             ),
@@ -183,65 +307,100 @@ class PageSettings extends State<SettingsPage> {
 
   Widget _buildProCard() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(
+        16,
+      ),
       decoration: BoxDecoration(
-        color: const Color(0xFF1A1A1A),
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: Colors.purpleAccent.withOpacity(0.2)),
+        color: const Color(
+          0xFF1A1A1A,
+        ),
+        borderRadius: BorderRadius.circular(
+          15,
+        ),
+        border: Border.all(
+          color: Colors.purpleAccent.withValues(
+            alpha: 0.2,
+          ),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            "🚀 O Próximo Nível do seu Flow",
+            '🚀 O Próximo Nível do seu Flow',
             style: TextStyle(
               color: Colors.white,
               fontWeight: FontWeight.bold,
               fontSize: 14,
             ),
           ),
-          const SizedBox(height: 8),
-          const Text(
-            "Cansou do limite diário? Use sua própria API Key para ter mensagens ilimitadas, "
-            "mais velocidade e segurança total.",
-            style: TextStyle(color: Colors.grey, fontSize: 12),
+
+          const SizedBox(
+            height: 8,
           ),
-          const SizedBox(height: 12),
+
           const Text(
-            "🎁 Teste Grátis (Copie e Cole):",
+            'Cansou do limite diário? Use sua própria API Key para ter mensagens ilimitadas, '
+            'mais velocidade e segurança total.',
+            style: TextStyle(
+              color: Colors.grey,
+              fontSize: 12,
+            ),
+          ),
+
+          const SizedBox(
+            height: 12,
+          ),
+
+          const Text(
+            '🎁 Teste Grátis (Copie e Cole):',
             style: TextStyle(
               color: Colors.purpleAccent,
               fontSize: 11,
               fontWeight: FontWeight.bold,
             ),
           ),
+
           const SelectableText(
-            "VERSIN-PRO-TRIAL-2026-FREE",
+            'VERSIN-PRO-TRIAL-2026-FREE',
             style: TextStyle(
               color: Colors.white,
               fontFamily: 'monospace',
               fontSize: 13,
             ),
           ),
-          const SizedBox(height: 15),
+
+          const SizedBox(
+            height: 15,
+          ),
+
           const Text(
-            "🛠️ Como conseguir minha chave?",
+            '🛠️ Como conseguir minha chave?',
             style: TextStyle(
               color: Colors.white,
               fontSize: 13,
               fontWeight: FontWeight.bold,
             ),
           ),
-          _stepText("1. Acesse o Google AI Studio"),
-          _stepText("2. Gere sua Key em 'Get API Key'"),
+
           _stepText(
-            "3. O Versin não lucra nada com isso, é sua ponte direta com a IA.",
+            '1. Acesse o Google AI Studio',
           ),
-          const SizedBox(height: 10),
+          _stepText(
+            "2. Gere sua Key em 'Get API Key'",
+          ),
+          _stepText(
+            '3. O Versin não lucra nada com isso, é sua ponte direta com a IA.',
+          ),
+
+          const SizedBox(
+            height: 10,
+          ),
+
           GestureDetector(
             onTap: _openGoogleStudio,
             child: const Text(
-              "👉 Abrir Google AI Studio",
+              '👉 Abrir Google AI Studio',
               style: TextStyle(
                 color: Colors.blueAccent,
                 fontSize: 12,
@@ -254,19 +413,31 @@ class PageSettings extends State<SettingsPage> {
     );
   }
 
-  Widget _stepText(String text) {
+  Widget _stepText(
+    String text,
+  ) {
     return Padding(
-      padding: const EdgeInsets.only(top: 4),
+      padding: const EdgeInsets.only(
+        top: 4,
+      ),
       child: Text(
-        "• $text",
-        style: const TextStyle(color: Colors.grey, fontSize: 11),
+        '• $text',
+        style: const TextStyle(
+          color: Colors.grey,
+          fontSize: 11,
+        ),
       ),
     );
   }
 
-  Widget _buildSectionTitle(String title) {
+  Widget _buildSectionTitle(
+    String title,
+  ) {
     return Padding(
-      padding: const EdgeInsets.only(left: 10, bottom: 10),
+      padding: const EdgeInsets.only(
+        left: 10,
+        bottom: 10,
+      ),
       child: Text(
         title,
         style: const TextStyle(
@@ -285,11 +456,22 @@ class PageSettings extends State<SettingsPage> {
     VoidCallback onTap,
   ) {
     return ListTile(
-      leading: Icon(icon, color: Colors.white70),
-      title: Text(title, style: const TextStyle(color: Colors.white)),
+      leading: Icon(
+        icon,
+        color: Colors.white70,
+      ),
+      title: Text(
+        title,
+        style: const TextStyle(
+          color: Colors.white,
+        ),
+      ),
       subtitle: Text(
         subtitle,
-        style: const TextStyle(color: Colors.grey, fontSize: 12),
+        style: const TextStyle(
+          color: Colors.grey,
+          fontSize: 12,
+        ),
       ),
       trailing: const Icon(
         Icons.arrow_forward_ios,

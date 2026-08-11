@@ -131,9 +131,13 @@ class _VersinTimelineState
 
     final item = _rimas[index];
 
-    if (item.controller.text.trim().isEmpty) {
+    final text = item.controller.text.trim();
+
+    if (text.isEmpty) {
       return;
     }
+
+    item.controller.text = text;
 
     setState(
       () {
@@ -204,13 +208,28 @@ class _VersinTimelineState
         .map(
           (
             rima,
-          ) => rima.controller.text,
+          ) => rima.controller.text.trim(),
+        )
+        .where(
+          (
+            rima,
+          ) => rima.isNotEmpty,
         )
         .toList();
 
     callback(
       completed,
     );
+  }
+
+  int get _completedCount {
+    return _rimas
+        .where(
+          (
+            rima,
+          ) => rima.isAdded,
+        )
+        .length;
   }
 
   @override
@@ -239,7 +258,7 @@ class _VersinTimelineState
           ),
           child: CustomPaint(
             painter: TimelinePainter(
-              itemCount: _rimas.length,
+              itemCount: _completedCount,
               activeColor: widget.activeColor,
               maxItems: _maxRimas,
             ),

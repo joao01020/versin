@@ -1,28 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 
-// Importação da nova página
-import 'package:versin/modules/rhymelibrary/views/rhyme_library_page.dart';
-
-// CONTROLLER E REPOSITÓRIO
-import 'package:versin/modules/chat/controllers/chat_controller.dart';
-import 'package:versin/modules/chat/domain/repositories/chat_repository.dart';
+import 'package:versin/core/widgets/metronome/metronome_player.dart';
+import 'package:versin/core/widgets/timeline/versin_timeline.dart';
 import 'package:versin/features/rhymes/presentation/controller/rhymes_controller.dart';
 import 'package:versin/modules/brain/controller/brain_controller.dart';
-// Adicione este import na parte superior do seu ChatPage.dart
-import 'package:versin/modules/chat/views/components/suggestion_balloon/controllers/suggestion_controller.dart';
-// CORE WIDGETS
-import 'package:versin/core/widgets/timeline/versin_timeline.dart';
-import 'package:versin/core/widgets/metronome/metronome_player.dart';
-
-// COMPONENTES LOCAIS
-import 'widgets/audio/voice_studio_panel.dart';
-import 'components/chat/input/chat_bottom_bar.dart';
-import 'components/editor/studio_toolbar.dart';
-import 'components/editor/structure_editor_modal.dart';
-import 'components/header/chat_header.dart';
+import 'package:versin/modules/chat/controllers/chat_controller.dart';
+import 'package:versin/modules/chat/domain/repositories/chat_repository.dart';
 import 'package:versin/modules/chat/views/components/chat/list/chat_list_view.dart';
 import 'package:versin/modules/chat/views/components/suggestion_balloon/suggestion_balloon.dart';
+import 'package:versin/modules/rhymelibrary/views/rhyme_library_page.dart';
+
+import 'components/chat/input/chat_bottom_bar.dart';
+import 'components/editor/structure_editor_modal.dart';
+import 'components/editor/studio_toolbar.dart';
+import 'components/header/chat_header.dart';
+import 'widgets/audio/voice_studio_panel.dart';
 
 class ChatPage
     extends
@@ -47,6 +40,7 @@ class _ChatPageState
         AutomaticKeepAliveClientMixin {
   late final ChatController _controller;
   late final RhymesController _rhymesController;
+
   bool _isSessionInitialized = false;
 
   @override
@@ -56,7 +50,6 @@ class _ChatPageState
   void initState() {
     super.initState();
 
-    // Resolve a dependência do BrainController via GetIt
     _rhymesController =
         GetIt.I<
           BrainController
@@ -79,6 +72,7 @@ class _ChatPageState
           }
         },
       );
+
       _isSessionInitialized = true;
     }
   }
@@ -93,23 +87,56 @@ class _ChatPageState
     BuildContext context,
     Color activeColor,
   ) {
-    showModalBottomSheet(
+    showModalBottomSheet<
+      void
+    >(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder:
           (
-            context,
+            _,
           ) {
             return VoiceStudioPanel(
               activeColor: activeColor,
               onFinished: () {
                 debugPrint(
-                  "Gravação concluída no VoiceStudioPanel.",
+                  'Gravação concluída no VoiceStudioPanel.',
                 );
               },
             );
           },
+    );
+  }
+
+  Future<
+    void
+  >
+  _salvarRimasDaTimeline(
+    List<
+      String
+    >
+    rimas,
+  ) async {
+    for (final rima in rimas) {
+      await _rhymesController.addWord(
+        rima,
+        false,
+      );
+    }
+  }
+
+  void _abrirBiblioteca() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder:
+            (
+              _,
+            ) => RhymeLibraryPage(
+              controller: _rhymesController,
+            ),
+      ),
     );
   }
 
@@ -152,11 +179,13 @@ class _ChatPageState
                   maxWidth: double.infinity,
                 );
 
-            final double screenWidth = MediaQuery.of(
+            final screenWidth = MediaQuery.sizeOf(
               context,
-            ).size.width;
-            final double baseLeftOffset = 33.0;
-            final double cursorPositionLeft =
+            ).width;
+
+            const baseLeftOffset = 33.0;
+
+            final cursorPositionLeft =
                 (baseLeftOffset +
                         textPainter.size.width)
                     .clamp(
@@ -177,11 +206,10 @@ class _ChatPageState
                         VersinTimeline(
                           currentStep: rhymesCtrl.currentStep,
                           activeColor: activeColor,
-                          onRimaFinalizada:
-                              (
-                                rimas,
-                              ) {},
+                          onRimaFinalizada: _salvarRimasDaTimeline,
+                          onTextChanged: rhymesCtrl.onTextChanged,
                         ),
+
                         Stack(
                           alignment: Alignment.centerRight,
                           children: [
@@ -192,27 +220,16 @@ class _ChatPageState
                             Positioned(
                               right: 16,
                               child: IconButton(
+                                onPressed: _abrirBiblioteca,
                                 icon: Icon(
                                   Icons.library_books,
                                   color: activeColor,
                                 ),
-                                onPressed: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder:
-                                          (
-                                            context,
-                                          ) => RhymeLibraryPage(
-                                            controller: _rhymesController,
-                                          ),
-                                    ),
-                                  );
-                                },
                               ),
                             ),
                           ],
                         ),
+
                         Expanded(
                           child: ChatListView(
                             isInitializing: _controller.isInitializing,
@@ -224,8 +241,8 @@ class _ChatPageState
                                   >
                                 >(
                                   (
-                                    m,
-                                  ) => m.toJson(),
+                                    message,
+                                  ) => message.toJson(),
                                 )
                                 .toList(),
                             isAiTyping: _controller.isAiTyping,
@@ -234,64 +251,80 @@ class _ChatPageState
                             secondsActive: rhymesCtrl.connectionSeconds,
                           ),
                         ),
+
                         StudioToolbar(
                           isConfigFinished: true,
                           projectName: _controller.projectName,
-                          onEditName: () => _controller.editProjectName(
-                            context,
-                          ),
+                          onEditName: () {
+                            _controller.editProjectName(
+                              context,
+                            );
+                          },
                           currentBpm: rhymesCtrl.currentBpm,
                           selectedVibe: rhymesCtrl.selectedVibe,
                           selectedTechnique: rhymesCtrl.selectedTechnique,
                           activeColor: activeColor,
-                          onShowStructure: () => StructureEditorModal.show(
-                            context: context,
-                            initialStructure: _controller.lastConfirmedStructure,
-                            activeColor: activeColor,
-                            onSave: _controller.saveStructure,
-                            onSendToChat: _controller.sendStructureToChat,
-                            showQuickMenu:
-                                (
-                                  title,
-                                  opts,
-                                  onSelect,
-                                ) => _controller.showStudioQuickMenu(
-                                  context,
-                                  title,
-                                  opts,
-                                  onSelect,
-                                ),
-                          ),
+                          onShowStructure: () {
+                            StructureEditorModal.show(
+                              context: context,
+                              initialStructure: _controller.lastConfirmedStructure,
+                              activeColor: activeColor,
+                              onSave: _controller.saveStructure,
+                              onSendToChat: _controller.sendStructureToChat,
+                              showQuickMenu:
+                                  (
+                                    title,
+                                    options,
+                                    onSelect,
+                                  ) {
+                                    _controller.showStudioQuickMenu(
+                                      context,
+                                      title,
+                                      options,
+                                      onSelect,
+                                    );
+                                  },
+                            );
+                          },
                           onShowMenu:
                               (
                                 title,
-                                opts,
+                                options,
                                 onSelect,
-                              ) => _controller.showStudioQuickMenu(
-                                context,
-                                title,
-                                opts,
-                                onSelect,
-                              ),
+                              ) {
+                                _controller.showStudioQuickMenu(
+                                  context,
+                                  title,
+                                  options,
+                                  onSelect,
+                                );
+                              },
                           onBpmChanged:
                               (
-                                val,
-                              ) => rhymesCtrl.updateStudioConfig(
-                                bpm: val,
-                              ),
+                                value,
+                              ) {
+                                rhymesCtrl.updateStudioConfig(
+                                  bpm: value,
+                                );
+                              },
                           onTechniqueChanged:
                               (
-                                val,
-                              ) => rhymesCtrl.updateStudioConfig(
-                                technique: val,
-                              ),
+                                value,
+                              ) {
+                                rhymesCtrl.updateStudioConfig(
+                                  technique: value,
+                                );
+                              },
                           onVibeChanged:
                               (
-                                val,
-                              ) => rhymesCtrl.updateStudioConfig(
-                                vibe: val,
-                              ),
+                                value,
+                              ) {
+                                rhymesCtrl.updateStudioConfig(
+                                  vibe: value,
+                                );
+                              },
                         ),
+
                         Stack(
                           alignment: Alignment.centerRight,
                           children: [
@@ -302,14 +335,18 @@ class _ChatPageState
                               onSend:
                                   (
                                     _,
-                                  ) => _controller.sendMessage(),
+                                  ) {
+                                    _controller.sendMessage();
+                                  },
                               currentSuggestionIndex: _controller.currentSuggestionIndex,
                               onUpdateSuggestionIndex: _controller.updateSuggestionIndex,
                               onAddRhyme: _controller.addWordToText,
-                              onMicPressed: () => _abrirPainelDeVoz(
-                                context,
-                                activeColor,
-                              ),
+                              onMicPressed: () {
+                                _abrirPainelDeVoz(
+                                  context,
+                                  activeColor,
+                                );
+                              },
                             ),
                             Positioned(
                               right: 55,
@@ -323,6 +360,7 @@ class _ChatPageState
                         ),
                       ],
                     ),
+
                     if (rhymesCtrl.suggestions.isNotEmpty)
                       Positioned(
                         left: cursorPositionLeft,
@@ -332,18 +370,23 @@ class _ChatPageState
                           suggestion: _controller.getCurrentSuggestion(),
                           onTap: () {
                             final suggestion = _controller.getCurrentSuggestion();
+
                             final text = _controller.messageController.text;
+
                             final words = text.trimRight().split(
                               RegExp(
                                 r'\s+',
                               ),
                             );
+
                             if (words.isNotEmpty) {
                               words.removeLast();
                               words.add(
                                 suggestion,
                               );
-                              final newText = "${words.join(' ')} ";
+
+                              final newText = '${words.join(' ')} ';
+
                               _controller.messageController.value = TextEditingValue(
                                 text: newText,
                                 selection: TextSelection.collapsed(
@@ -351,14 +394,19 @@ class _ChatPageState
                                 ),
                               );
                             }
+
                             rhymesCtrl.clearSuggestions();
                           },
-                          onDismiss: () => rhymesCtrl.clearSuggestions(),
+                          onDismiss: () {
+                            rhymesCtrl.clearSuggestions();
+                          },
                           onAddCommand: () {
                             final word = _controller.getCurrentSuggestion();
+
                             rhymesCtrl.clearSuggestions();
+
                             _controller.processMessage(
-                              "Me dê um exemplo de rima com: $word",
+                              'Me dê um exemplo de rima com: $word',
                             );
                           },
                         ),

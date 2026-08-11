@@ -11,6 +11,12 @@ import 'package:versin/modules/chat/views/components/chat/list/chat_list_view.da
 import 'package:versin/modules/chat/views/components/suggestion_balloon/suggestion_balloon.dart';
 import 'package:versin/modules/rhymelibrary/views/rhyme_library_page.dart';
 
+// ============================================================
+// STUDIO
+// ============================================================
+
+import 'package:versin/modules/studio/views/studio_page.dart';
+
 import 'components/chat/input/chat_bottom_bar.dart';
 import 'components/editor/structure_editor_modal.dart';
 import 'components/editor/studio_toolbar.dart';
@@ -39,12 +45,21 @@ class _ChatPageState
     with
         AutomaticKeepAliveClientMixin {
   late final ChatController _controller;
+
   late final RhymesController _rhymesController;
 
   bool _isSessionInitialized = false;
 
+  // ============================================================
+  // KEEP ALIVE
+  // ============================================================
+
   @override
   bool get wantKeepAlive => true;
+
+  // ============================================================
+  // INIT
+  // ============================================================
 
   @override
   void initState() {
@@ -67,11 +82,13 @@ class _ChatPageState
         (
           _,
         ) {
-          if (mounted) {
-            _controller.initChatSession(
-              context,
-            );
+          if (!mounted) {
+            return;
           }
+
+          _controller.initChatSession(
+            context,
+          );
         },
       );
 
@@ -79,11 +96,53 @@ class _ChatPageState
     }
   }
 
+  // ============================================================
+  // DISPOSE
+  // ============================================================
+
   @override
   void dispose() {
     _controller.dispose();
 
     super.dispose();
+  }
+
+  // ============================================================
+  // ABRIR STUDIO
+  // ============================================================
+
+  void _abrirStudio() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder:
+            (
+              _,
+            ) {
+              return const StudioPage();
+            },
+      ),
+    );
+  }
+
+  // ============================================================
+  // ABRIR BIBLIOTECA
+  // ============================================================
+
+  void _abrirBiblioteca() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder:
+            (
+              _,
+            ) {
+              return RhymeLibraryPage(
+                controller: _rhymesController,
+              );
+            },
+      ),
+    );
   }
 
   // ============================================================
@@ -138,12 +197,15 @@ class _ChatPageState
   _removerRimaTimeline(
     String rima,
   ) async {
+    final normalizedRhyme = rima.trim().toLowerCase();
+
     final index = _rhymesController.vocabulary.indexWhere(
       (
         item,
-      ) =>
-          item.word.trim().toLowerCase() ==
-          rima.trim().toLowerCase(),
+      ) {
+        return item.word.trim().toLowerCase() ==
+            normalizedRhyme;
+      },
     );
 
     if (index ==
@@ -153,26 +215,6 @@ class _ChatPageState
 
     await _rhymesController.removeWord(
       index,
-    );
-  }
-
-  // ============================================================
-  // BIBLIOTECA
-  // ============================================================
-
-  void _abrirBiblioteca() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder:
-            (
-              _,
-            ) {
-              return RhymeLibraryPage(
-                controller: _rhymesController,
-              );
-            },
-      ),
     );
   }
 
@@ -212,6 +254,10 @@ class _ChatPageState
                   ) => rhyme.word,
                 )
                 .toList();
+
+            // ======================================================
+            // POSIÇÃO DO BALÃO DE SUGESTÃO
+            // ======================================================
 
             final textPainter =
                 TextPainter(
@@ -275,14 +321,48 @@ class _ChatPageState
                               rhymesController: rhymesCtrl,
                             ),
 
+                            // ==============================================
+                            // AÇÕES DO HEADER
+                            // ==============================================
                             Positioned(
-                              right: 16,
-                              child: IconButton(
-                                onPressed: _abrirBiblioteca,
-                                icon: Icon(
-                                  Icons.library_books,
-                                  color: activeColor,
-                                ),
+                              right: 12,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  // ========================================
+                                  // STUDIO
+                                  // ========================================
+                                  Tooltip(
+                                    message: 'Abrir Studio',
+                                    child: IconButton(
+                                      onPressed: _abrirStudio,
+                                      icon: Icon(
+                                        Icons.edit_note_rounded,
+                                        color: activeColor,
+                                        size: 25,
+                                      ),
+                                    ),
+                                  ),
+
+                                  const SizedBox(
+                                    width: 2,
+                                  ),
+
+                                  // ========================================
+                                  // BIBLIOTECA
+                                  // ========================================
+                                  Tooltip(
+                                    message: 'Biblioteca de Rimas',
+                                    child: IconButton(
+                                      onPressed: _abrirBiblioteca,
+                                      icon: Icon(
+                                        Icons.library_books_outlined,
+                                        color: activeColor,
+                                        size: 22,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ],
@@ -294,8 +374,8 @@ class _ChatPageState
                         Expanded(
                           child: ChatListView(
                             isInitializing: _controller.isInitializing,
-                            messages: _controller.messages
-                                .map<
+                            messages:
+                                _controller.messages.map<
                                   Map<
                                     String,
                                     dynamic
@@ -303,9 +383,10 @@ class _ChatPageState
                                 >(
                                   (
                                     message,
-                                  ) => message.toJson(),
-                                )
-                                .toList(),
+                                  ) {
+                                    return message.toJson();
+                                  },
+                                ).toList(),
                             isAiTyping: _controller.isAiTyping,
                             scrollController: _controller.scrollController,
                             activeColor: activeColor,
@@ -328,6 +409,10 @@ class _ChatPageState
                           selectedVibe: rhymesCtrl.selectedVibe,
                           selectedTechnique: rhymesCtrl.selectedTechnique,
                           activeColor: activeColor,
+
+                          // ================================================
+                          // ESTRUTURA
+                          // ================================================
                           onShowStructure: () {
                             StructureEditorModal.show(
                               context: context,
@@ -350,6 +435,10 @@ class _ChatPageState
                                   },
                             );
                           },
+
+                          // ================================================
+                          // MENU
+                          // ================================================
                           onShowMenu:
                               (
                                 title,
@@ -363,6 +452,10 @@ class _ChatPageState
                                   onSelect,
                                 );
                               },
+
+                          // ================================================
+                          // BPM
+                          // ================================================
                           onBpmChanged:
                               (
                                 value,
@@ -371,6 +464,10 @@ class _ChatPageState
                                   bpm: value,
                                 );
                               },
+
+                          // ================================================
+                          // TÉCNICA
+                          // ================================================
                           onTechniqueChanged:
                               (
                                 value,
@@ -379,6 +476,10 @@ class _ChatPageState
                                   technique: value,
                                 );
                               },
+
+                          // ================================================
+                          // VIBE
+                          // ================================================
                           onVibeChanged:
                               (
                                 value,
@@ -399,10 +500,11 @@ class _ChatPageState
                               messageController: _controller.messageController,
                               rhymesController: rhymesCtrl,
                               activeColor: activeColor,
-
-                              // NOVO:
                               creationStage: _controller.creationStage,
 
+                              // ============================================
+                              // ENVIAR
+                              // ============================================
                               onSend:
                                   (
                                     _,
@@ -413,6 +515,10 @@ class _ChatPageState
                               currentSuggestionIndex: _controller.currentSuggestionIndex,
                               onUpdateSuggestionIndex: _controller.updateSuggestionIndex,
                               onAddRhyme: _controller.addWordToText,
+
+                              // ============================================
+                              // MICROFONE
+                              // ============================================
                               onMicPressed: () {
                                 _abrirPainelDeVoz(
                                   context,
@@ -492,7 +598,7 @@ class _ChatPageState
                           },
 
                           // =============================================
-                          // PEDIR AJUDA À IA
+                          // PEDIR EXEMPLO AO VERSIN
                           // =============================================
                           onAddCommand: () {
                             final word = _controller.getCurrentSuggestion();

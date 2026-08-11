@@ -5,12 +5,20 @@ class VersinTimeline
         StatefulWidget {
   final int currentStep;
   final Color activeColor;
+
+  final List<
+    String
+  >
+  savedRhymes;
+
   final ValueChanged<
-    List<
-      String
-    >
-  >?
-  onRimaFinalizada;
+    String
+  >
+  onAddRhyme;
+  final ValueChanged<
+    String
+  >
+  onRemoveRhyme;
   final ValueChanged<
     String
   >?
@@ -20,7 +28,9 @@ class VersinTimeline
     super.key,
     required this.currentStep,
     required this.activeColor,
-    this.onRimaFinalizada,
+    required this.savedRhymes,
+    required this.onAddRhyme,
+    required this.onRemoveRhyme,
     this.onTextChanged,
   });
 
@@ -48,68 +58,133 @@ class _VersinTimelineState
   @override
   void initState() {
     super.initState();
-    _injetarNovaRimaInline();
+
+    _syncFromSavedRhymes();
   }
 
-  void _injetarNovaRimaInline() {
-    if (_rimas.length >=
-        _maxRimas) {
-      return;
+  @override
+  void didUpdateWidget(
+    covariant VersinTimeline oldWidget,
+  ) {
+    super.didUpdateWidget(
+      oldWidget,
+    );
+
+    if (!_sameList(
+      oldWidget.savedRhymes,
+      widget.savedRhymes,
+    )) {
+      _syncFromSavedRhymes();
+    }
+  }
+
+  bool _sameList(
+    List<
+      String
+    >
+    a,
+    List<
+      String
+    >
+    b,
+  ) {
+    if (a.length !=
+        b.length) {
+      return false;
     }
 
-    final item = _RimaItem(
-      id: _idCounter++,
-      controller: TextEditingController(),
-      focusNode: FocusNode(),
-      isNew: true,
-    );
+    for (
+      int i = 0;
+      i <
+          a.length;
+      i++
+    ) {
+      if (a[i] !=
+          b[i]) {
+        return false;
+      }
+    }
 
-    setState(
-      () {
-        _rimas.add(
-          item,
-        );
-      },
-    );
+    return true;
+  }
 
-    Future.delayed(
-      const Duration(
-        milliseconds: 600,
-      ),
-      () {
-        if (!mounted) {
-          return;
-        }
-
-        final index = _rimas.indexWhere(
+  void _syncFromSavedRhymes() {
+    final saved = widget.savedRhymes
+        .map(
           (
             rima,
-          ) =>
-              rima.id ==
-              item.id,
-        );
+          ) => rima.trim(),
+        )
+        .where(
+          (
+            rima,
+          ) => rima.isNotEmpty,
+        )
+        .take(
+          _maxRimas,
+        )
+        .toList();
 
-        if (index ==
-            -1) {
-          return;
-        }
+    for (final item in _rimas) {
+      item.controller.dispose();
+      item.focusNode.dispose();
+    }
 
-        setState(
-          () {
-            _rimas[index].isNew = false;
-          },
-        );
-      },
-    );
+    _rimas.clear();
+
+    for (final rhyme in saved) {
+      _rimas.add(
+        _RimaItem(
+          id: _idCounter++,
+          controller: TextEditingController(
+            text: rhyme,
+          ),
+          focusNode: FocusNode(),
+          isAdded: true,
+        ),
+      );
+    }
+
+    if (_rimas.length <
+        _maxRimas) {
+      _rimas.add(
+        _createPendingRhyme(),
+      );
+    }
+
+    if (mounted) {
+      setState(
+        () {},
+      );
+    }
 
     WidgetsBinding.instance.addPostFrameCallback(
       (
         _,
       ) {
-        if (mounted) {
-          item.focusNode.requestFocus();
+        if (!mounted) {
+          return;
         }
+
+        final pending = _rimas
+            .where(
+              (
+                item,
+              ) => !item.isAdded,
+            )
+            .firstOrNull;
+
+        pending?.focusNode.requestFocus();
       },
+    );
+  }
+
+  _RimaItem _createPendingRhyme() {
+    return _RimaItem(
+      id: _idCounter++,
+      controller: TextEditingController(),
+      focusNode: FocusNode(),
+      isNew: true,
     );
   }
 
@@ -137,88 +212,40 @@ class _VersinTimelineState
       return;
     }
 
-    item.controller.text = text;
-
-    setState(
-      () {
-        item.isAdded = true;
-      },
+    final alreadyExists = widget.savedRhymes.any(
+      (
+        saved,
+      ) =>
+          saved.trim().toLowerCase() ==
+          text.toLowerCase(),
     );
 
-    _injetarNovaRimaInline();
-    _notificarParent();
+    if (alreadyExists) {
+      item.controller.clear();
+      return;
+    }
+
+    widget.onAddRhyme(
+      text,
+    );
   }
 
   void _removerRima(
-    int id,
+    _RimaItem item,
   ) {
-    final index = _rimas.indexWhere(
-      (
-        rima,
-      ) =>
-          rima.id ==
-          id,
-    );
-
-    if (index ==
-        -1) {
+    if (!item.isAdded) {
+      item.controller.clear();
       return;
     }
 
-    final item = _rimas.removeAt(
-      index,
-    );
+    final text = item.controller.text.trim();
 
-    item.controller.dispose();
-    item.focusNode.dispose();
-
-    final hasPending = _rimas.any(
-      (
-        rima,
-      ) => !rima.isAdded,
-    );
-
-    setState(
-      () {},
-    );
-
-    if (!hasPending &&
-        _rimas.length <
-            _maxRimas) {
-      _injetarNovaRimaInline();
-    }
-
-    _notificarParent();
-  }
-
-  void _notificarParent() {
-    final callback = widget.onRimaFinalizada;
-
-    if (callback ==
-        null) {
+    if (text.isEmpty) {
       return;
     }
 
-    final completed = _rimas
-        .where(
-          (
-            rima,
-          ) => rima.isAdded,
-        )
-        .map(
-          (
-            rima,
-          ) => rima.controller.text.trim(),
-        )
-        .where(
-          (
-            rima,
-          ) => rima.isNotEmpty,
-        )
-        .toList();
-
-    callback(
-      completed,
+    widget.onRemoveRhyme(
+      text,
     );
   }
 
@@ -384,7 +411,7 @@ class _VersinTimelineState
                             GestureDetector(
                               onTap: () {
                                 _removerRima(
-                                  rima.id,
+                                  rima,
                                 );
                               },
                               child: Icon(
@@ -517,9 +544,11 @@ class TimelinePainter
       final x =
           i *
           spacing;
+
       final isReached =
           i <
           itemCount;
+
       final position = Offset(
         x,
         y,
@@ -575,5 +604,23 @@ class TimelinePainter
             maxItems ||
         oldDelegate.activeColor !=
             activeColor;
+  }
+}
+
+extension _IterableFirstOrNull<
+  T
+>
+    on
+        Iterable<
+          T
+        > {
+  T? get firstOrNull {
+    final iterator = this.iterator;
+
+    if (!iterator.moveNext()) {
+      return null;
+    }
+
+    return iterator.current;
   }
 }

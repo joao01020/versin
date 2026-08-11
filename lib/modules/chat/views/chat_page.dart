@@ -60,6 +60,8 @@ class _ChatPageState
       rhymesController: _rhymesController,
     );
 
+    _rhymesController.carregarDadosUsuario();
+
     if (!_isSessionInitialized) {
       WidgetsBinding.instance.addPostFrameCallback(
         (
@@ -112,18 +114,37 @@ class _ChatPageState
   Future<
     void
   >
-  _salvarRimasDaTimeline(
-    List<
-      String
-    >
-    rimas,
+  _adicionarRimaTimeline(
+    String rima,
   ) async {
-    for (final rima in rimas) {
-      await _rhymesController.addWord(
-        rima,
-        false,
-      );
+    await _rhymesController.addWord(
+      rima,
+      false,
+    );
+  }
+
+  Future<
+    void
+  >
+  _removerRimaTimeline(
+    String rima,
+  ) async {
+    final index = _rhymesController.vocabulary.indexWhere(
+      (
+        item,
+      ) =>
+          item.word.trim().toLowerCase() ==
+          rima.trim().toLowerCase(),
+    );
+
+    if (index ==
+        -1) {
+      return;
     }
+
+    await _rhymesController.removeWord(
+      index,
+    );
   }
 
   void _abrirBiblioteca() {
@@ -162,7 +183,16 @@ class _ChatPageState
             _,
           ) {
             final rhymesCtrl = _rhymesController;
+
             final activeColor = rhymesCtrl.getActiveColor();
+
+            final savedRhymes = rhymesCtrl.vocabulary
+                .map(
+                  (
+                    rhyme,
+                  ) => rhyme.word,
+                )
+                .toList();
 
             final textPainter =
                 TextPainter(
@@ -206,7 +236,9 @@ class _ChatPageState
                         VersinTimeline(
                           currentStep: rhymesCtrl.currentStep,
                           activeColor: activeColor,
-                          onRimaFinalizada: _salvarRimasDaTimeline,
+                          savedRhymes: savedRhymes,
+                          onAddRhyme: _adicionarRimaTimeline,
+                          onRemoveRhyme: _removerRimaTimeline,
                           onTextChanged: rhymesCtrl.onTextChanged,
                         ),
 
@@ -348,6 +380,7 @@ class _ChatPageState
                                 );
                               },
                             ),
+
                             Positioned(
                               right: 55,
                               child: MetronomePlayer(
@@ -381,6 +414,7 @@ class _ChatPageState
 
                             if (words.isNotEmpty) {
                               words.removeLast();
+
                               words.add(
                                 suggestion,
                               );

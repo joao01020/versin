@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:versin/features/rhymes/presentation/controller/rhymes_controller.dart';
+
 import 'package:versin/core/models/rhyme_model.dart';
+import 'package:versin/features/rhymes/presentation/controller/rhymes_controller.dart';
+
 import '../data/rhyme_library_manager.dart';
-// Importe o BrainController para o cast de segurança
-import 'package:versin/modules/brain/controller/brain_controller.dart';
-import 'package:versin/modules/brain/views/brain_hub_page.dart';
 
 class RhymeLibraryPage
     extends
         StatefulWidget {
   final RhymesController controller;
+
   const RhymeLibraryPage({
     super.key,
     required this.controller,
@@ -27,7 +27,7 @@ class _RhymeLibraryPageState
         State<
           RhymeLibraryPage
         > {
-  final _textController = TextEditingController();
+  final TextEditingController _textController = TextEditingController();
 
   @override
   void dispose() {
@@ -39,27 +39,74 @@ class _RhymeLibraryPageState
     void
   >
   _importLibrary() async {
-    final importedWords = await RhymeLibraryManager.importFromFile();
-    if (importedWords.isNotEmpty) {
-      for (var word in importedWords) {
-        widget.controller.addWord(
-          word.toLowerCase(),
-          false,
-        );
-      }
-      if (mounted) {
+    try {
+      final importedWords = await RhymeLibraryManager.importFromFile();
+
+      if (importedWords.isEmpty) {
+        if (!mounted) {
+          return;
+        }
+
         _showSnackBar(
-          "Sucesso! ${importedWords.length} rimas importadas.",
-          Colors.purpleAccent,
-        );
-      }
-    } else {
-      if (mounted) {
-        _showSnackBar(
-          "Erro ao ler o arquivo.",
+          'Nenhuma rima encontrada no arquivo.',
           Colors.redAccent,
         );
+
+        return;
       }
+
+      int importedCount = 0;
+
+      for (final word in importedWords) {
+        final normalized = word.trim().toLowerCase();
+
+        if (normalized.isEmpty) {
+          continue;
+        }
+
+        final alreadyExists = widget.controller.vocabulary.any(
+          (
+            rhyme,
+          ) =>
+              rhyme.word.trim().toLowerCase() ==
+              normalized,
+        );
+
+        if (alreadyExists) {
+          continue;
+        }
+
+        await widget.controller.addWord(
+          normalized,
+          false,
+        );
+
+        importedCount++;
+      }
+
+      if (!mounted) {
+        return;
+      }
+
+      _showSnackBar(
+        '$importedCount rimas importadas.',
+        Colors.purpleAccent,
+      );
+    } catch (
+      e
+    ) {
+      debugPrint(
+        'Erro ao importar biblioteca: $e',
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      _showSnackBar(
+        'Erro ao ler o arquivo.',
+        Colors.redAccent,
+      );
     }
   }
 
@@ -67,22 +114,44 @@ class _RhymeLibraryPageState
     void
   >
   _exportLibrary() async {
-    final path = await RhymeLibraryManager.exportToBackup(
-      widget.controller.vocabulary,
-    );
-    if (mounted) {
-      if (path !=
+    try {
+      final path = await RhymeLibraryManager.exportToBackup(
+        widget.controller.vocabulary,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      if (path ==
           null) {
         _showSnackBar(
-          "Arquivo salvo em: $path",
-          Colors.greenAccent,
-        );
-      } else {
-        _showSnackBar(
-          "Erro na exportação.",
+          'Erro na exportação.',
           Colors.redAccent,
         );
+
+        return;
       }
+
+      _showSnackBar(
+        'Arquivo salvo em: $path',
+        Colors.greenAccent,
+      );
+    } catch (
+      e
+    ) {
+      debugPrint(
+        'Erro ao exportar biblioteca: $e',
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      _showSnackBar(
+        'Erro na exportação.',
+        Colors.redAccent,
+      );
     }
   }
 
@@ -106,18 +175,71 @@ class _RhymeLibraryPageState
     );
   }
 
-  void _confirmAddition() {
+  Future<
+    void
+  >
+  _confirmAddition() async {
     final text = _textController.text.trim();
-    if (text.isNotEmpty) {
-      widget.controller.addWord(
-        text,
-        false,
-      );
-      _textController.clear();
-      FocusScope.of(
-        context,
-      ).unfocus();
+
+    if (text.isEmpty) {
+      return;
     }
+
+    final normalized = text.toLowerCase();
+
+    final alreadyExists = widget.controller.vocabulary.any(
+      (
+        rhyme,
+      ) =>
+          rhyme.word.trim().toLowerCase() ==
+          normalized,
+    );
+
+    if (alreadyExists) {
+      if (!mounted) {
+        return;
+      }
+
+      _showSnackBar(
+        'Essa rima já está na lista.',
+        Colors.orangeAccent,
+      );
+
+      return;
+    }
+
+    await widget.controller.addWord(
+      normalized,
+      false,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    _textController.clear();
+
+    FocusScope.of(
+      context,
+    ).unfocus();
+  }
+
+  Future<
+    void
+  >
+  _removeRhyme(
+    int index,
+  ) async {
+    if (index <
+            0 ||
+        index >=
+            widget.controller.vocabulary.length) {
+      return;
+    }
+
+    await widget.controller.removeWord(
+      index,
+    );
   }
 
   @override
@@ -136,19 +258,20 @@ class _RhymeLibraryPageState
             Icons.arrow_back,
             color: Colors.white,
           ),
-          onPressed: () => Navigator.pop(
-            context,
-          ),
+          onPressed: () {
+            Navigator.pop(
+              context,
+            );
+          },
         ),
         actions: [
-          // NAVEGAÇÃO DESABILITADA: Funcionalidade em construção
           IconButton(
             icon: const Icon(
               Icons.construction,
               color: Colors.grey,
             ),
-            onPressed: null, // Torna o botão não clicável
-            tooltip: "Funcionalidade em construção",
+            onPressed: null,
+            tooltip: 'Funcionalidade em construção',
           ),
           IconButton(
             icon: const Icon(
@@ -171,7 +294,7 @@ class _RhymeLibraryPageState
             child: Column(
               children: [
                 const Text(
-                  "BIBLIOTECA DE RIMAS",
+                  'BIBLIOTECA DE RIMAS',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 16,
@@ -179,9 +302,11 @@ class _RhymeLibraryPageState
                     letterSpacing: 2,
                   ),
                 ),
+
                 const SizedBox(
                   height: 24,
                 ),
+
                 GestureDetector(
                   onTap: _importLibrary,
                   child: Container(
@@ -210,11 +335,13 @@ class _RhymeLibraryPageState
                           color: Colors.purpleAccent,
                           size: 38,
                         ),
+
                         const SizedBox(
                           height: 12,
                         ),
+
                         const Text(
-                          "IMPORTAR BANCO DE RIMAS",
+                          'IMPORTAR BANCO DE RIMAS',
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 13,
@@ -222,11 +349,13 @@ class _RhymeLibraryPageState
                             letterSpacing: 1.2,
                           ),
                         ),
+
                         const SizedBox(
                           height: 6,
                         ),
+
                         Text(
-                          "Clique aqui para enviar .txt ou .md",
+                          'Clique aqui para enviar .txt ou .md',
                           style: TextStyle(
                             color: Colors.white.withValues(
                               alpha: 0.4,
@@ -241,6 +370,7 @@ class _RhymeLibraryPageState
               ],
             ),
           ),
+
           Expanded(
             child: ListenableBuilder(
               listenable: widget.controller,
@@ -250,10 +380,11 @@ class _RhymeLibraryPageState
                     _,
                   ) {
                     final vocab = widget.controller.vocabulary;
+
                     if (vocab.isEmpty) {
                       return Center(
                         child: Text(
-                          "Sua lista está vazia.",
+                          'Sua lista está vazia.',
                           style: TextStyle(
                             color: Colors.white.withValues(
                               alpha: 0.1,
@@ -262,6 +393,7 @@ class _RhymeLibraryPageState
                         ),
                       );
                     }
+
                     return ListView.builder(
                       padding: const EdgeInsets.only(
                         top: 20,
@@ -272,14 +404,17 @@ class _RhymeLibraryPageState
                           (
                             context,
                             index,
-                          ) => _buildRhymeTile(
-                            vocab[index],
-                            index,
-                          ),
+                          ) {
+                            return _buildRhymeTile(
+                              vocab[index],
+                              index,
+                            );
+                          },
                     );
                   },
             ),
           ),
+
           _buildInputArea(),
         ],
       ),
@@ -289,14 +424,14 @@ class _RhymeLibraryPageState
   Widget _buildInputArea() {
     return Container(
       padding: EdgeInsets.only(
-        bottom:
-            MediaQuery.of(
-              context,
-            ).padding.bottom +
-            16,
         left: 16,
         right: 16,
         top: 12,
+        bottom:
+            MediaQuery.paddingOf(
+              context,
+            ).bottom +
+            16,
       ),
       decoration: const BoxDecoration(
         color: Color(
@@ -319,15 +454,15 @@ class _RhymeLibraryPageState
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.purpleAccent,
                 foregroundColor: Colors.white,
+                elevation: 0,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(
                     14,
                   ),
                 ),
-                elevation: 0,
               ),
               child: const Text(
-                "+ ADICIONAR À LISTA",
+                '+ ADICIONAR À LISTA',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   letterSpacing: 1,
@@ -335,9 +470,11 @@ class _RhymeLibraryPageState
               ),
             ),
           ),
+
           const SizedBox(
             height: 12,
           ),
+
           Container(
             padding: const EdgeInsets.symmetric(
               horizontal: 16,
@@ -355,12 +492,14 @@ class _RhymeLibraryPageState
               onSubmitted:
                   (
                     _,
-                  ) => _confirmAddition(),
+                  ) {
+                    _confirmAddition();
+                  },
               style: const TextStyle(
                 color: Colors.white,
               ),
               decoration: const InputDecoration(
-                hintText: "Digite uma nova rima...",
+                hintText: 'Digite uma nova rima...',
                 hintStyle: TextStyle(
                   color: Colors.white24,
                   fontSize: 14,
@@ -408,9 +547,11 @@ class _RhymeLibraryPageState
             color: Colors.redAccent,
             size: 22,
           ),
-          onPressed: () => widget.controller.removeWord(
-            index,
-          ),
+          onPressed: () {
+            _removeRhyme(
+              index,
+            );
+          },
         ),
       ),
     );

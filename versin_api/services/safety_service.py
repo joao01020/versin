@@ -6,7 +6,7 @@ class SafetyService:
 
     def is_content_safe(self, ai_response: dict) -> bool:
         # Exemplo: Se o conteúdo contiver palavras bloqueadas, rejeitamos
-        blocked_words = ["hack", "bomba", "ilícito"]
+        blocked_words = ["bomba", "ilícito"]
         content = ai_response.get("content", "").lower()
         
         for word in blocked_words:

@@ -1,11 +1,20 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import 'package:versin/features/rhymes/presentation/controller/rhymes_controller.dart';
 import 'package:versin/modules/studio/models/mind_map_node.dart';
 import 'package:versin/modules/studio/models/song_project.dart';
 
 class StudioController
     extends
         ChangeNotifier {
+  // ============================================================
+  // BANCO GLOBAL DE RIMAS
+  // ============================================================
+
+  final RhymesController rhymesController;
+
   // ============================================================
   // PROJETO ATUAL
   // ============================================================
@@ -56,6 +65,18 @@ class StudioController
   bool get isMapVisible => _isMapVisible;
 
   // ============================================================
+  // PAINÉIS DESTACÁVEIS
+  // ============================================================
+
+  bool _isLyricsDetached = false;
+
+  bool _isMindMapDetached = false;
+
+  bool get isLyricsDetached => _isLyricsDetached;
+
+  bool get isMindMapDetached => _isMindMapDetached;
+
+  // ============================================================
   // ALTERAÇÕES
   // ============================================================
 
@@ -63,11 +84,14 @@ class StudioController
 
   bool get hasUnsavedChanges => _hasUnsavedChanges;
 
+  bool _isDisposed = false;
+
   // ============================================================
   // CONSTRUTOR
   // ============================================================
 
   StudioController({
+    required this.rhymesController,
     SongProject? initialProject,
   }) : _project =
            initialProject ??
@@ -78,6 +102,28 @@ class StudioController
 
     lyricController.addListener(
       _onLyricsChanged,
+    );
+
+    rhymesController.addListener(
+      _onRhymesChanged,
+    );
+
+    // ==========================================================
+    // SINCRONIZAÇÃO INICIAL
+    // ==========================================================
+    //
+    // Se a biblioteca já estiver carregada quando o Studio abrir,
+    // as palavras entram imediatamente na Timeline do projeto.
+    //
+    // Se ainda não estiver carregada, _onRhymesChanged() fará
+    // essa sincronização assim que o BrainController terminar
+    // de buscar os dados.
+    //
+    // ==========================================================
+
+    _syncGlobalRhymesToTimeline(
+      notify: false,
+      markChanged: false,
     );
   }
 
@@ -114,6 +160,123 @@ class StudioController
   bool get hasTimelineWords => _project.timelineWords.isNotEmpty;
 
   bool get hasMindMap => _project.mindMapNodes.isNotEmpty;
+
+  // ============================================================
+  // BANCO GLOBAL DE RIMAS
+  // ============================================================
+
+  List<
+    String
+  >
+  get rhymeLibrary {
+    return List<
+      String
+    >.unmodifiable(
+      rhymesController.vocabulary
+          .map(
+            (
+              rhyme,
+            ) => rhyme.word.trim(),
+          )
+          .where(
+            (
+              word,
+            ) => word.isNotEmpty,
+          ),
+    );
+  }
+
+  bool hasLibraryWord(
+    String word,
+  ) {
+    final normalized = _normalizeWord(
+      word,
+    );
+
+    if (normalized.isEmpty) {
+      return false;
+    }
+
+    return rhymesController.vocabulary.any(
+      (
+        rhyme,
+      ) =>
+          _normalizeWord(
+            rhyme.word,
+          ) ==
+          normalized,
+    );
+  }
+
+  void _onRhymesChanged() {
+    final changed = _syncGlobalRhymesToTimeline(
+      notify: false,
+      markChanged: false,
+    );
+
+    // Mesmo quando nenhuma palavra nova entrou na Timeline,
+    // a Biblioteca pode ter mudado e a UI precisa refletir isso.
+    if (changed ||
+        !_isDisposed) {
+      notifyListeners();
+    }
+  }
+
+  // ============================================================
+  // SINCRONIZAR BANCO GLOBAL → TIMELINE DO STUDIO
+  // ============================================================
+
+  bool _syncGlobalRhymesToTimeline({
+    bool notify = true,
+    bool markChanged = true,
+  }) {
+    bool changed = false;
+
+    for (final rhyme in rhymesController.vocabulary) {
+      final word = rhyme.word.trim();
+
+      if (word.isEmpty) {
+        continue;
+      }
+
+      if (_project.hasTimelineWord(
+        word,
+      )) {
+        continue;
+      }
+
+      final added = _project.addTimelineWord(
+        word,
+      );
+
+      if (added) {
+        changed = true;
+      }
+    }
+
+    if (!changed) {
+      return false;
+    }
+
+    if (markChanged) {
+      _markChanged();
+    }
+
+    if (notify &&
+        !_isDisposed) {
+      notifyListeners();
+    }
+
+    return true;
+  }
+
+  // ============================================================
+  // SINCRONIZAR MANUALMENTE
+  // ============================================================
+
+  void syncGlobalRhymesToTimeline() {
+    _syncGlobalRhymesToTimeline();
+  }
 
   // ============================================================
   // LETRA
@@ -325,8 +488,22 @@ class StudioController
   bool addTimelineWord(
     String word,
   ) {
+    final normalized = word.trim();
+
+    if (normalized.isEmpty) {
+      return false;
+    }
+
     final added = _project.addTimelineWord(
-      word,
+      normalized,
+    );
+
+    // Toda palavra usada no Studio também passa a fazer parte
+    // do banco global compartilhado com Chat/Biblioteca.
+    unawaited(
+      _ensureWordInGlobalLibrary(
+        normalized,
+      ),
     );
 
     if (!added) {
@@ -338,6 +515,43 @@ class StudioController
     notifyListeners();
 
     return true;
+  }
+
+  Future<
+    void
+  >
+  _ensureWordInGlobalLibrary(
+    String word,
+  ) async {
+    final normalized = word.trim();
+
+    if (normalized.isEmpty ||
+        hasLibraryWord(
+          normalized,
+        )) {
+      return;
+    }
+
+    try {
+      await rhymesController.addWord(
+        normalized,
+        false,
+      );
+    } catch (
+      e
+    ) {
+      debugPrint(
+        'Erro ao sincronizar palavra do Studio com a biblioteca: $e',
+      );
+    }
+  }
+
+  bool addLibraryWordToTimeline(
+    String word,
+  ) {
+    return addTimelineWord(
+      word,
+    );
   }
 
   bool removeTimelineWord(
@@ -712,6 +926,82 @@ class StudioController
   }
 
   // ============================================================
+  // PAINEL LETRA — DESTACAR / ENCAIXAR
+  // ============================================================
+
+  void detachLyrics() {
+    if (_isLyricsDetached) {
+      return;
+    }
+
+    _isLyricsDetached = true;
+
+    notifyListeners();
+  }
+
+  void dockLyrics() {
+    if (!_isLyricsDetached) {
+      return;
+    }
+
+    _isLyricsDetached = false;
+
+    notifyListeners();
+  }
+
+  void toggleLyricsDetached() {
+    _isLyricsDetached = !_isLyricsDetached;
+
+    notifyListeners();
+  }
+
+  // ============================================================
+  // PAINEL MAPA — DESTACAR / ENCAIXAR
+  // ============================================================
+
+  void detachMindMap() {
+    if (_isMindMapDetached) {
+      return;
+    }
+
+    _isMindMapDetached = true;
+
+    notifyListeners();
+  }
+
+  void dockMindMap() {
+    if (!_isMindMapDetached) {
+      return;
+    }
+
+    _isMindMapDetached = false;
+
+    notifyListeners();
+  }
+
+  void toggleMindMapDetached() {
+    _isMindMapDetached = !_isMindMapDetached;
+
+    notifyListeners();
+  }
+
+  // ============================================================
+  // ENCAIXAR TODOS OS PAINÉIS
+  // ============================================================
+
+  void dockAllPanels() {
+    if (!_isLyricsDetached &&
+        !_isMindMapDetached) {
+      return;
+    }
+
+    _isLyricsDetached = false;
+    _isMindMapDetached = false;
+
+    notifyListeners();
+  }
+
+  // ============================================================
   // MAPA VISÍVEL
   // ============================================================
 
@@ -810,6 +1100,9 @@ class StudioController
     _selectedText = '';
     _selectedNodeId = null;
 
+    _isLyricsDetached = false;
+    _isMindMapDetached = false;
+
     _hasUnsavedChanges = false;
 
     notifyListeners();
@@ -881,12 +1174,24 @@ class StudioController
     return 'node-${DateTime.now().microsecondsSinceEpoch}';
   }
 
+  String _normalizeWord(
+    String value,
+  ) {
+    return value.trim().toLowerCase();
+  }
+
   // ============================================================
   // DISPOSE
   // ============================================================
 
   @override
   void dispose() {
+    _isDisposed = true;
+
+    rhymesController.removeListener(
+      _onRhymesChanged,
+    );
+
     lyricController.removeListener(
       _onLyricsChanged,
     );

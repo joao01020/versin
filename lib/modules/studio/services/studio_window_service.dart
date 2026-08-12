@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:desktop_multi_window/desktop_multi_window.dart';
@@ -161,7 +162,9 @@ class StudioWindowArguments {
 // ============================================================
 
 class StudioWindowService {
-  StudioWindowService._();
+  StudioWindowService._() {
+    _listenToWindowChanges();
+  }
 
   static final StudioWindowService instance = StudioWindowService._();
 
@@ -172,6 +175,21 @@ class StudioWindowService {
   WindowController? _lyricsWindow;
 
   WindowController? _mindMapWindow;
+
+  // ============================================================
+  // ESTADO
+  // ============================================================
+
+  StreamSubscription<
+    void
+  >?
+  _windowsSubscription;
+
+  bool _refreshing = false;
+
+  bool _openingLyrics = false;
+
+  bool _openingMindMap = false;
 
   // ============================================================
   // GETTERS
@@ -190,6 +208,40 @@ class StudioWindowService {
   String? get mindMapWindowId => _mindMapWindow?.windowId;
 
   // ============================================================
+  // ESCUTAR ALTERAÇÕES DAS JANELAS
+  // ============================================================
+  //
+  // onWindowsChanged avisa quando uma janela é criada
+  // ou destruída.
+  //
+  // Mesmo que normalmente usemos hide() ao encaixar,
+  // isso protege o serviço caso uma janela seja encerrada
+  // de outra forma.
+  //
+  // ============================================================
+
+  void _listenToWindowChanges() {
+    _windowsSubscription = onWindowsChanged.listen(
+      (
+        _,
+      ) {
+        unawaited(
+          refreshWindows(),
+        );
+      },
+      onError:
+          (
+            Object error,
+            StackTrace stackTrace,
+          ) {
+            debugPrint(
+              '[STUDIO WINDOW] Erro no monitor de janelas: $error',
+            );
+          },
+    );
+  }
+
+  // ============================================================
   // ABRIR LETRA
   // ============================================================
 
@@ -199,43 +251,58 @@ class StudioWindowService {
   openLyricsWindow({
     String? projectId,
   }) async {
-    final existing = await _findExistingWindow(
-      StudioWindowType.lyrics,
-    );
+    if (_openingLyrics) {
+      final existing = await _getLyricsWindow();
 
-    if (existing !=
-        null) {
-      _lyricsWindow = existing;
+      if (existing !=
+          null) {
+        await existing.show();
 
-      await existing.show();
-
-      debugPrint(
-        '[STUDIO WINDOW] Janela da letra reutilizada: '
-        '${existing.windowId}',
-      );
-
-      return existing;
+        return existing;
+      }
     }
 
-    final controller = await WindowController.create(
-      WindowConfiguration(
-        hiddenAtLaunch: true,
-        arguments: StudioWindowArguments.lyrics(
-          projectId: projectId,
+    _openingLyrics = true;
+
+    try {
+      final existing = await _getLyricsWindow();
+
+      if (existing !=
+          null) {
+        _lyricsWindow = existing;
+
+        await existing.show();
+
+        debugPrint(
+          '[STUDIO WINDOW] Janela da letra reutilizada: '
+          '${existing.windowId}',
+        );
+
+        return existing;
+      }
+
+      final controller = await WindowController.create(
+        WindowConfiguration(
+          hiddenAtLaunch: true,
+          arguments: StudioWindowArguments.lyrics(
+            projectId: projectId,
+          ),
         ),
-      ),
-    );
+      );
 
-    _lyricsWindow = controller;
+      _lyricsWindow = controller;
 
-    await controller.show();
+      await controller.show();
 
-    debugPrint(
-      '[STUDIO WINDOW] Janela da letra criada: '
-      '${controller.windowId}',
-    );
+      debugPrint(
+        '[STUDIO WINDOW] Janela da letra criada: '
+        '${controller.windowId}',
+      );
 
-    return controller;
+      return controller;
+    } finally {
+      _openingLyrics = false;
+    }
   }
 
   // ============================================================
@@ -248,43 +315,58 @@ class StudioWindowService {
   openMindMapWindow({
     String? projectId,
   }) async {
-    final existing = await _findExistingWindow(
-      StudioWindowType.mindMap,
-    );
+    if (_openingMindMap) {
+      final existing = await _getMindMapWindow();
 
-    if (existing !=
-        null) {
-      _mindMapWindow = existing;
+      if (existing !=
+          null) {
+        await existing.show();
 
-      await existing.show();
-
-      debugPrint(
-        '[STUDIO WINDOW] Janela do mapa reutilizada: '
-        '${existing.windowId}',
-      );
-
-      return existing;
+        return existing;
+      }
     }
 
-    final controller = await WindowController.create(
-      WindowConfiguration(
-        hiddenAtLaunch: true,
-        arguments: StudioWindowArguments.mindMap(
-          projectId: projectId,
+    _openingMindMap = true;
+
+    try {
+      final existing = await _getMindMapWindow();
+
+      if (existing !=
+          null) {
+        _mindMapWindow = existing;
+
+        await existing.show();
+
+        debugPrint(
+          '[STUDIO WINDOW] Janela do mapa reutilizada: '
+          '${existing.windowId}',
+        );
+
+        return existing;
+      }
+
+      final controller = await WindowController.create(
+        WindowConfiguration(
+          hiddenAtLaunch: true,
+          arguments: StudioWindowArguments.mindMap(
+            projectId: projectId,
+          ),
         ),
-      ),
-    );
+      );
 
-    _mindMapWindow = controller;
+      _mindMapWindow = controller;
 
-    await controller.show();
+      await controller.show();
 
-    debugPrint(
-      '[STUDIO WINDOW] Janela do mapa criada: '
-      '${controller.windowId}',
-    );
+      debugPrint(
+        '[STUDIO WINDOW] Janela do mapa criada: '
+        '${controller.windowId}',
+      );
 
-    return controller;
+      return controller;
+    } finally {
+      _openingMindMap = false;
+    }
   }
 
   // ============================================================
@@ -319,20 +401,32 @@ class StudioWindowService {
     void
   >
   showLyricsWindow() async {
-    final window =
-        _lyricsWindow ??
-        await _findExistingWindow(
-          StudioWindowType.lyrics,
-        );
+    final window = await _getLyricsWindow();
 
     if (window ==
         null) {
+      debugPrint(
+        '[STUDIO WINDOW] Nenhuma janela da letra disponível para mostrar.',
+      );
+
       return;
     }
 
     _lyricsWindow = window;
 
-    await window.show();
+    try {
+      await window.show();
+    } catch (
+      e
+    ) {
+      debugPrint(
+        '[STUDIO WINDOW] Erro ao mostrar janela da letra: $e',
+      );
+
+      _lyricsWindow = null;
+
+      rethrow;
+    }
   }
 
   // ============================================================
@@ -343,20 +437,32 @@ class StudioWindowService {
     void
   >
   showMindMapWindow() async {
-    final window =
-        _mindMapWindow ??
-        await _findExistingWindow(
-          StudioWindowType.mindMap,
-        );
+    final window = await _getMindMapWindow();
 
     if (window ==
         null) {
+      debugPrint(
+        '[STUDIO WINDOW] Nenhuma janela do mapa disponível para mostrar.',
+      );
+
       return;
     }
 
     _mindMapWindow = window;
 
-    await window.show();
+    try {
+      await window.show();
+    } catch (
+      e
+    ) {
+      debugPrint(
+        '[STUDIO WINDOW] Erro ao mostrar janela do mapa: $e',
+      );
+
+      _mindMapWindow = null;
+
+      rethrow;
+    }
   }
 
   // ============================================================
@@ -367,20 +473,32 @@ class StudioWindowService {
     void
   >
   hideLyricsWindow() async {
-    final window =
-        _lyricsWindow ??
-        await _findExistingWindow(
-          StudioWindowType.lyrics,
-        );
+    final window = await _getLyricsWindow();
 
     if (window ==
         null) {
+      _lyricsWindow = null;
+
       return;
     }
 
     _lyricsWindow = window;
 
-    await window.hide();
+    try {
+      await window.hide();
+
+      debugPrint(
+        '[STUDIO WINDOW] Janela da letra ocultada.',
+      );
+    } catch (
+      e
+    ) {
+      debugPrint(
+        '[STUDIO WINDOW] Erro ao ocultar janela da letra: $e',
+      );
+
+      _lyricsWindow = null;
+    }
   }
 
   // ============================================================
@@ -391,31 +509,46 @@ class StudioWindowService {
     void
   >
   hideMindMapWindow() async {
-    final window =
-        _mindMapWindow ??
-        await _findExistingWindow(
-          StudioWindowType.mindMap,
-        );
+    final window = await _getMindMapWindow();
 
     if (window ==
         null) {
+      _mindMapWindow = null;
+
       return;
     }
 
     _mindMapWindow = window;
 
-    await window.hide();
+    try {
+      await window.hide();
+
+      debugPrint(
+        '[STUDIO WINDOW] Janela do mapa ocultada.',
+      );
+    } catch (
+      e
+    ) {
+      debugPrint(
+        '[STUDIO WINDOW] Erro ao ocultar janela do mapa: $e',
+      );
+
+      _mindMapWindow = null;
+    }
   }
 
   // ============================================================
   // ENCAIXAR LETRA
   // ============================================================
   //
-  // Nesta primeira versão "encaixar" significa ocultar
-  // a janela externa.
+  // "Encaixar" NÃO fecha a janela.
   //
-  // Depois o StudioPage recebe a informação e volta a mostrar
-  // o painel LETRA dentro do layout principal.
+  // Apenas:
+  //
+  // 1. oculta a janela externa;
+  // 2. mantém o Flutter Engine vivo;
+  // 3. deixa o StudioController mostrar LETRA novamente;
+  // 4. permite reaproveitar a mesma janela no próximo detach.
   //
   // ============================================================
 
@@ -426,7 +559,7 @@ class StudioWindowService {
     await hideLyricsWindow();
 
     debugPrint(
-      '[STUDIO WINDOW] Letra preparada para encaixar.',
+      '[STUDIO WINDOW] Letra encaixada no Studio.',
     );
   }
 
@@ -441,8 +574,103 @@ class StudioWindowService {
     await hideMindMapWindow();
 
     debugPrint(
-      '[STUDIO WINDOW] Mapa preparado para encaixar.',
+      '[STUDIO WINDOW] Mapa encaixado no Studio.',
     );
+  }
+
+  // ============================================================
+  // OBTER LETRA
+  // ============================================================
+
+  Future<
+    WindowController?
+  >
+  _getLyricsWindow() async {
+    final cached = _lyricsWindow;
+
+    if (cached !=
+        null) {
+      final stillExists = await _windowExists(
+        cached.windowId,
+      );
+
+      if (stillExists) {
+        return cached;
+      }
+
+      _lyricsWindow = null;
+    }
+
+    final found = await _findExistingWindow(
+      StudioWindowType.lyrics,
+    );
+
+    _lyricsWindow = found;
+
+    return found;
+  }
+
+  // ============================================================
+  // OBTER MAPA
+  // ============================================================
+
+  Future<
+    WindowController?
+  >
+  _getMindMapWindow() async {
+    final cached = _mindMapWindow;
+
+    if (cached !=
+        null) {
+      final stillExists = await _windowExists(
+        cached.windowId,
+      );
+
+      if (stillExists) {
+        return cached;
+      }
+
+      _mindMapWindow = null;
+    }
+
+    final found = await _findExistingWindow(
+      StudioWindowType.mindMap,
+    );
+
+    _mindMapWindow = found;
+
+    return found;
+  }
+
+  // ============================================================
+  // VERIFICAR SE JANELA AINDA EXISTE
+  // ============================================================
+
+  Future<
+    bool
+  >
+  _windowExists(
+    String windowId,
+  ) async {
+    try {
+      final windows = await WindowController.getAll();
+
+      return windows.any(
+        (
+          window,
+        ) =>
+            window.windowId ==
+            windowId,
+      );
+    } catch (
+      e
+    ) {
+      debugPrint(
+        '[STUDIO WINDOW] Erro ao validar janela $windowId: $e',
+      );
+
+      return false;
+    }
   }
 
   // ============================================================
@@ -489,13 +717,50 @@ class StudioWindowService {
     void
   >
   refreshWindows() async {
-    _lyricsWindow = await _findExistingWindow(
-      StudioWindowType.lyrics,
-    );
+    if (_refreshing) {
+      return;
+    }
 
-    _mindMapWindow = await _findExistingWindow(
-      StudioWindowType.mindMap,
-    );
+    _refreshing = true;
+
+    try {
+      final windows = await WindowController.getAll();
+
+      WindowController? lyrics;
+
+      WindowController? mindMap;
+
+      for (final window in windows) {
+        final type = StudioWindowArguments.getType(
+          window.arguments,
+        );
+
+        switch (type) {
+          case StudioWindowType.lyrics:
+            lyrics ??= window;
+            break;
+
+          case StudioWindowType.mindMap:
+            mindMap ??= window;
+            break;
+
+          case null:
+            break;
+        }
+      }
+
+      _lyricsWindow = lyrics;
+
+      _mindMapWindow = mindMap;
+    } catch (
+      e
+    ) {
+      debugPrint(
+        '[STUDIO WINDOW] Erro ao atualizar referências: $e',
+      );
+    } finally {
+      _refreshing = false;
+    }
   }
 
   // ============================================================
@@ -514,5 +779,25 @@ class StudioWindowService {
     _lyricsWindow = null;
 
     _mindMapWindow = null;
+  }
+
+  // ============================================================
+  // DISPOSE DO SERVICE
+  // ============================================================
+  //
+  // Normalmente este singleton vive durante toda a aplicação.
+  // O método existe para testes ou encerramento controlado.
+  //
+  // ============================================================
+
+  Future<
+    void
+  >
+  dispose() async {
+    await _windowsSubscription?.cancel();
+
+    _windowsSubscription = null;
+
+    clearReferences();
   }
 }

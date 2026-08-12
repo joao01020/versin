@@ -23,6 +23,23 @@ class RhymesController
   bool _isLoading = false;
   bool _isVocabularyLoading = false;
 
+  // =========================================================
+  // QUOTA MENSAL DA IA
+  // =========================================================
+
+  double _aiUsagePercentage = 0.0;
+  double _aiUsageProgress = 0.0;
+
+  String _aiUsageLevel = 'normal';
+  String _aiUsageMessage = 'Uso normal da IA.';
+
+  bool _aiQuotaBlocked = false;
+  bool _aiCanUse = true;
+
+  int _aiUsedTokens = 0;
+  int _aiRemainingTokens = 100000;
+  int _aiLimitTokens = 100000;
+
   int _currentStep = 1;
   double _stepProgress = 0.0;
 
@@ -71,6 +88,24 @@ class RhymesController
   bool get isLoading => _isLoading;
 
   bool get isVocabularyLoading => _isVocabularyLoading;
+
+  double get aiUsagePercentage => _aiUsagePercentage;
+
+  double get aiUsageProgress => _aiUsageProgress;
+
+  String get aiUsageLevel => _aiUsageLevel;
+
+  String get aiUsageMessage => _aiUsageMessage;
+
+  bool get aiQuotaBlocked => _aiQuotaBlocked;
+
+  bool get aiCanUse => _aiCanUse;
+
+  int get aiUsedTokens => _aiUsedTokens;
+
+  int get aiRemainingTokens => _aiRemainingTokens;
+
+  int get aiLimitTokens => _aiLimitTokens;
 
   int get currentStep => _currentStep;
 
@@ -521,6 +556,158 @@ class RhymesController
   }
 
   // =========================================================
+  // QUOTA DA IA
+  // =========================================================
+
+  void updateAiQuotaFromMap(
+    Map<
+      String,
+      dynamic
+    >
+    quota, {
+    bool notify = true,
+  }) {
+    final percentageRaw = quota['usage_percentage'];
+    final progressRaw = quota['progress'];
+    final usedRaw = quota['used_tokens'];
+    final remainingRaw = quota['remaining_tokens'];
+    final limitRaw = quota['limit_tokens'];
+    final blockedRaw = quota['blocked'];
+    final canUseRaw = quota['can_use_ai'];
+
+    if (percentageRaw
+        is num) {
+      _aiUsagePercentage = percentageRaw.toDouble().clamp(
+        0.0,
+        100.0,
+      );
+    }
+
+    if (progressRaw
+        is num) {
+      _aiUsageProgress = progressRaw.toDouble().clamp(
+        0.0,
+        1.0,
+      );
+    } else {
+      _aiUsageProgress =
+          (_aiUsagePercentage /
+                  100)
+              .clamp(
+                0.0,
+                1.0,
+              );
+    }
+
+    _aiUsageLevel =
+        quota['level']?.toString().trim().toLowerCase() ??
+        _aiUsageLevel;
+
+    _aiUsageMessage =
+        quota['message']?.toString().trim() ??
+        _aiUsageMessage;
+
+    if (usedRaw
+        is num) {
+      _aiUsedTokens = usedRaw.toInt();
+    }
+
+    if (remainingRaw
+        is num) {
+      _aiRemainingTokens = remainingRaw.toInt();
+    }
+
+    if (limitRaw
+        is num) {
+      _aiLimitTokens = limitRaw.toInt();
+    }
+
+    if (blockedRaw
+        is bool) {
+      _aiQuotaBlocked = blockedRaw;
+    } else {
+      _aiQuotaBlocked =
+          _aiUsagePercentage >=
+          100.0;
+    }
+
+    if (canUseRaw
+        is bool) {
+      _aiCanUse = canUseRaw;
+    } else {
+      _aiCanUse = !_aiQuotaBlocked;
+    }
+
+    if (notify) {
+      notifyListeners();
+    }
+  }
+
+  void resetAiQuota({
+    bool notify = true,
+  }) {
+    _aiUsagePercentage = 0.0;
+    _aiUsageProgress = 0.0;
+
+    _aiUsageLevel = 'normal';
+    _aiUsageMessage = 'Uso normal da IA.';
+
+    _aiQuotaBlocked = false;
+    _aiCanUse = true;
+
+    _aiUsedTokens = 0;
+    _aiRemainingTokens = 100000;
+    _aiLimitTokens = 100000;
+
+    if (notify) {
+      notifyListeners();
+    }
+  }
+
+  void _tryUpdateAiQuota(
+    Map<
+      String,
+      dynamic
+    >
+    data,
+  ) {
+    dynamic rawQuota = data['quota'];
+
+    rawQuota ??= data['ai_quota'];
+    rawQuota ??= data['usage'];
+
+    if (rawQuota
+        is Map) {
+      updateAiQuotaFromMap(
+        Map<
+          String,
+          dynamic
+        >.from(
+          rawQuota,
+        ),
+        notify: false,
+      );
+
+      return;
+    }
+
+    if (data.containsKey(
+          'usage_percentage',
+        ) ||
+        data.containsKey(
+          'blocked',
+        ) ||
+        data.containsKey(
+          'can_use_ai',
+        )) {
+      updateAiQuotaFromMap(
+        data,
+        notify: false,
+      );
+    }
+  }
+
+  // =========================================================
   // IA
   // =========================================================
 
@@ -539,6 +726,16 @@ class RhymesController
       return {
         'role': 'assistant',
         'content': 'Digite uma mensagem antes de enviar.',
+      };
+    }
+
+    if (_aiQuotaBlocked ||
+        !_aiCanUse) {
+      return {
+        'role': 'assistant',
+        'content': _aiUsageMessage.isNotEmpty
+            ? _aiUsageMessage
+            : 'Limite mensal de IA atingido.',
       };
     }
 
@@ -654,6 +851,10 @@ class RhymesController
             decoded,
           );
 
+      _tryUpdateAiQuota(
+        data,
+      );
+
       final content = data['content']?.toString().trim();
 
       if (content ==
@@ -768,6 +969,38 @@ class RhymesController
       }
     }
 
+    final normalizedServerMessage = serverMessage?.toLowerCase();
+
+    final quotaReached =
+        statusCode ==
+            429 &&
+        normalizedServerMessage !=
+            null &&
+        (normalizedServerMessage.contains(
+              'limite mensal',
+            ) ||
+            normalizedServerMessage.contains(
+              'monthly',
+            ) ||
+            normalizedServerMessage.contains(
+              'quota',
+            ));
+
+    if (quotaReached) {
+      _aiQuotaBlocked = true;
+      _aiCanUse = false;
+      _aiUsagePercentage = 100.0;
+      _aiUsageProgress = 1.0;
+      _aiUsageLevel = 'blocked';
+
+      _aiUsageMessage =
+          serverMessage !=
+                  null &&
+              serverMessage.isNotEmpty
+          ? serverMessage
+          : 'Limite mensal de IA atingido.';
+    }
+
     switch (statusCode) {
       case 401:
         return serverMessage !=
@@ -788,6 +1021,10 @@ class RhymesController
             : 'O serviço da IA não foi encontrado.';
 
       case 429:
+        if (quotaReached) {
+          return _aiUsageMessage;
+        }
+
         return serverMessage !=
                 null
             ? 'Limite de requisições atingido: $serverMessage'

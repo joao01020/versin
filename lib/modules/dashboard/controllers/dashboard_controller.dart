@@ -186,19 +186,19 @@ class DashboardController
         return 'Dashboard';
 
       case 1:
-        return 'Match';
+        return 'Conectar';
 
       case 2:
-        return 'Market';
+        return 'Mercado';
 
       case 3:
-        return 'Wallet';
+        return 'Carteira';
 
       case 4:
-        return 'Chat';
+        return 'IA';
 
       case 5:
-        return 'Showcase';
+        return 'Armazenamento';
 
       case 6:
         return 'Hardware Hub';
@@ -207,10 +207,10 @@ class DashboardController
         return 'VNode Network';
 
       case 8:
-        return 'Settings';
+        return 'Ajustes';
 
       case 9:
-        return 'Studio';
+        return 'Estúdio';
 
       default:
         return 'Dashboard';

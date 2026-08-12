@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:desktop_multi_window/desktop_multi_window.dart';
 import 'package:flutter/material.dart';
+import 'package:window_manager/window_manager.dart';
 
 // ============================================================
 // JANELA EXTERNA DA LETRA
@@ -28,7 +30,9 @@ class _LyricsWindowState
     extends
         State<
           LyricsWindow
-        > {
+        >
+    with
+        WindowListener {
   // ============================================================
   // CANAL DE COMUNICAÇÃO ENTRE JANELAS
   // ============================================================
@@ -57,6 +61,10 @@ class _LyricsWindowState
   bool _isReady = false;
 
   bool _isSending = false;
+
+  bool _isDocking = false;
+
+  bool _windowManagerReady = false;
 
   int _characterCount = 0;
 
@@ -94,6 +102,8 @@ class _LyricsWindowState
 
     _configureChannel();
 
+    _initializeNativeWindow();
+
     WidgetsBinding.instance.addPostFrameCallback(
       (
         _,
@@ -110,6 +120,54 @@ class _LyricsWindowState
 
         _focusNode.requestFocus();
       },
+    );
+  }
+
+  // ============================================================
+  // WINDOW MANAGER
+  // ============================================================
+
+  Future<
+    void
+  >
+  _initializeNativeWindow() async {
+    try {
+      await windowManager.ensureInitialized();
+
+      if (!mounted) {
+        return;
+      }
+
+      windowManager.addListener(
+        this,
+      );
+
+      await windowManager.setPreventClose(
+        true,
+      );
+
+      _windowManagerReady = true;
+
+      debugPrint(
+        '[LYRICS WINDOW] Fechamento nativo interceptado.',
+      );
+    } catch (
+      e
+    ) {
+      debugPrint(
+        '[LYRICS WINDOW] Erro ao inicializar window_manager: $e',
+      );
+    }
+  }
+
+  // ============================================================
+  // X NATIVO
+  // ============================================================
+
+  @override
+  void onWindowClose() {
+    unawaited(
+      _dockWindow(),
     );
   }
 
@@ -216,7 +274,9 @@ class _LyricsWindowState
       return;
     }
 
-    _sendLyricsToMainWindow();
+    unawaited(
+      _sendLyricsToMainWindow(),
+    );
   }
 
   // ============================================================
@@ -266,10 +326,17 @@ class _LyricsWindowState
 
     _isUpdatingFromMainWindow = true;
 
+    final currentSelection = _lyricsController.selection;
+
+    final safeOffset = currentSelection.baseOffset.clamp(
+      0,
+      value.length,
+    );
+
     _lyricsController.value = TextEditingValue(
       text: value,
       selection: TextSelection.collapsed(
-        offset: value.length,
+        offset: safeOffset,
       ),
     );
 
@@ -292,6 +359,18 @@ class _LyricsWindowState
     void
   >
   _dockWindow() async {
+    if (_isDocking) {
+      return;
+    }
+
+    _isDocking = true;
+
+    if (mounted) {
+      setState(
+        () {},
+      );
+    }
+
     try {
       await _sendLyricsToMainWindow();
 
@@ -302,12 +381,32 @@ class _LyricsWindowState
           'lyrics': _lyricsController.text,
         },
       );
+
+      debugPrint(
+        '[LYRICS WINDOW] Solicitação de encaixe enviada.',
+      );
     } catch (
       e
     ) {
       debugPrint(
         '[LYRICS WINDOW] Erro ao encaixar janela: $e',
       );
+    } finally {
+      await Future<
+        void
+      >.delayed(
+        const Duration(
+          milliseconds: 200,
+        ),
+      );
+
+      _isDocking = false;
+
+      if (mounted) {
+        setState(
+          () {},
+        );
+      }
     }
   }
 
@@ -367,6 +466,12 @@ class _LyricsWindowState
 
   @override
   void dispose() {
+    if (_windowManagerReady) {
+      windowManager.removeListener(
+        this,
+      );
+    }
+
     _lyricsController.removeListener(
       _onLyricsChanged,
     );
@@ -463,10 +568,18 @@ class _LyricsWindowState
                     Tooltip(
                       message: 'Encaixar no Studio',
                       child: IconButton(
-                        onPressed: _dockWindow,
-                        icon: const Icon(
+                        onPressed: _isDocking
+                            ? null
+                            : () {
+                                unawaited(
+                                  _dockWindow(),
+                                );
+                              },
+                        icon: Icon(
                           Icons.call_merge_rounded,
-                          color: activeColor,
+                          color: _isDocking
+                              ? Colors.white24
+                              : activeColor,
                           size: 18,
                         ),
                       ),
@@ -567,9 +680,11 @@ class _LyricsWindowState
                       width: 6,
                     ),
 
-                    const Text(
-                      'SINCRONIZADO COM O STUDIO',
-                      style: TextStyle(
+                    Text(
+                      _isDocking
+                          ? 'ENCAIXANDO...'
+                          : 'SINCRONIZADO COM O STUDIO',
+                      style: const TextStyle(
                         color: Colors.white30,
                         fontSize: 9,
                         fontWeight: FontWeight.w600,

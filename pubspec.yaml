@@ -37,6 +37,13 @@ dependencies:
   get_it: ^8.0.0
   fl_chart: ^1.2.0
   desktop_multi_window: ^0.3.0
+  
+  window_manager:
+    git:
+      url: https://github.com/boyan01/window_manager.git
+      path: packages/window_manager
+      ref: 6fae92d21b4c80ce1b8f71c1190d7970cf722bd4
+
 
   
 dev_dependencies:

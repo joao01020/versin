@@ -176,7 +176,7 @@ class _StoragePageState
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Armazenamento',
+                  'Guardar:',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 18,

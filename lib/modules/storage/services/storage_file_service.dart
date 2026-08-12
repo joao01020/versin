@@ -364,6 +364,127 @@ class StorageFileService {
   }
 
   // ==========================================================
+  // SALVAR BEAT LOCALMENTE
+  // ==========================================================
+
+  Future<
+    StorageFileInfo
+  >
+  saveBeatLocally({
+    required String sourcePath,
+    required String workId,
+  }) async {
+    final sourceInfo = await inspectFile(
+      sourcePath,
+    );
+
+    final normalizedWorkId = workId.trim();
+
+    if (normalizedWorkId.isEmpty) {
+      throw ArgumentError(
+        'workId não pode ser vazio.',
+      );
+    }
+
+    final directory = await getLocalBeatsDirectory();
+
+    final destinationPath = '${directory.path}/$normalizedWorkId.${sourceInfo.extension}';
+
+    final destinationFile = File(
+      destinationPath,
+    );
+
+    if (await destinationFile.exists()) {
+      await destinationFile.delete();
+    }
+
+    await File(
+      sourceInfo.path,
+    ).copy(
+      destinationPath,
+    );
+
+    return inspectFile(
+      destinationPath,
+    );
+  }
+
+  // ==========================================================
+  // DIRETÓRIO LOCAL DOS BEATS
+  // ==========================================================
+
+  Future<
+    Directory
+  >
+  getLocalBeatsDirectory() async {
+    final home = Platform.environment['HOME'];
+
+    if (home ==
+            null ||
+        home.trim().isEmpty) {
+      throw StateError(
+        'Não foi possível identificar o diretório HOME.',
+      );
+    }
+
+    final directory = Directory(
+      '$home/.local/share/versin/storage/beats',
+    );
+
+    if (!await directory.exists()) {
+      await directory.create(
+        recursive: true,
+      );
+    }
+
+    return directory;
+  }
+
+  // ==========================================================
+  // VERIFICAR ARQUIVO LOCAL
+  // ==========================================================
+
+  Future<
+    bool
+  >
+  localFileExists(
+    String filePath,
+  ) async {
+    return exists(
+      filePath,
+    );
+  }
+
+  // ==========================================================
+  // APAGAR ARQUIVO LOCAL
+  // ==========================================================
+
+  Future<
+    bool
+  >
+  deleteLocalFile(
+    String filePath,
+  ) async {
+    final normalizedPath = filePath.trim();
+
+    if (normalizedPath.isEmpty) {
+      return false;
+    }
+
+    final file = File(
+      normalizedPath,
+    );
+
+    if (!await file.exists()) {
+      return false;
+    }
+
+    await file.delete();
+
+    return true;
+  }
+
+  // ==========================================================
   // FORMATAR TAMANHO
   // ==========================================================
 

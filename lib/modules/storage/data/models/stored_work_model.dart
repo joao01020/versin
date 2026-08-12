@@ -1,183 +1,38 @@
-// ============================================================
-// STORED WORK TYPE
-// ============================================================
-//
-// Define os tipos de obras que podem ser armazenadas.
-//
-// lyrics:
-//   Letra / composição textual.
-//
-// beat:
-//   Arquivo de áudio / beat.
-//
-// ============================================================
-
 enum StoredWorkType {
   lyrics,
   beat,
 }
 
-// ============================================================
-// STORED WORK MODEL
-// ============================================================
-//
-// Representa uma obra registrada no armazenamento do Versin.
-//
-// Este model não possui responsabilidade de:
-//
-// - gerar hash;
-// - salvar arquivos;
-// - acessar banco de dados;
-// - transferir propriedade;
-// - verificar integridade.
-//
-// Essas responsabilidades pertencem aos services,
-// repositories e controllers.
-//
-// ============================================================
-
 class StoredWorkModel {
-  // ==========================================================
-  // IDENTIFICAÇÃO
-  // ==========================================================
-
   final String id;
 
-  // ==========================================================
-  // USUÁRIO / AUTORIA
-  // ==========================================================
-  //
-  // originalAuthorUserId:
-  //   usuário que registrou originalmente a obra.
-  //
-  // ownerUserId:
-  //   proprietário atual da obra dentro do sistema.
-  //
-  // No primeiro registro:
-  //
-  // originalAuthorUserId == ownerUserId
-  //
-  // Caso exista uma transferência futura:
-  //
-  // originalAuthorUserId permanece igual.
-  // ownerUserId pode mudar.
-  //
-  // ==========================================================
-
   final String originalAuthorUserId;
-
   final String ownerUserId;
 
-  // ==========================================================
-  // TIPO
-  // ==========================================================
-
   final StoredWorkType type;
-
-  // ==========================================================
-  // INFORMAÇÕES DA OBRA
-  // ==========================================================
-
   final String title;
 
-  // ==========================================================
-  // HASH
-  // ==========================================================
-  //
-  // Exemplo:
-  //
-  // hashAlgorithm = SHA-256
-  //
-  // contentHash =
-  // 68f84d34b7c3...
-  //
-  // ==========================================================
-
   final String contentHash;
-
   final String hashAlgorithm;
 
-  // ==========================================================
-  // VERSÃO
-  // ==========================================================
-  //
-  // Uma obra registrada nunca deve ser sobrescrita.
-  //
-  // Caso o artista altere a obra e registre novamente:
-  //
-  // versão 1
-  // versão 2
-  // versão 3
-  //
-  // previousHash permite relacionar a versão atual
-  // com a versão anterior.
-  //
-  // ==========================================================
-
   final int version;
-
   final String? previousHash;
-
-  // ==========================================================
-  // INTEGRIDADE
-  // ==========================================================
 
   final bool integrityVerified;
 
-  // ==========================================================
-  // LETRA
-  // ==========================================================
-  //
-  // Usado somente quando:
-  //
-  // type == StoredWorkType.lyrics
-  //
-  // Futuramente esse conteúdo poderá ser armazenado
-  // criptografado no backend.
-  //
-  // ==========================================================
-
   final String? lyricsContent;
 
-  // ==========================================================
-  // BEAT
-  // ==========================================================
-  //
-  // Usado somente quando:
-  //
-  // type == StoredWorkType.beat
-  //
-  // O banco não precisa armazenar o arquivo inteiro.
-  //
-  // filePath aponta para o arquivo armazenado no Storage.
-  //
-  // ==========================================================
-
+  // Para beats, aponta para a cópia armazenada pelo Versin.
+  // Exemplo:
+  // ~/.local/share/versin/storage/beats/beat_123.wav
   final String? filePath;
-
   final String? fileName;
-
   final String? mimeType;
-
   final int? fileSizeBytes;
-
-  // ==========================================================
-  // METADADOS DO BEAT
-  // ==========================================================
-
   final int? bpm;
 
-  // ==========================================================
-  // DATAS
-  // ==========================================================
-
   final DateTime createdAt;
-
   final DateTime updatedAt;
-
-  // ==========================================================
-  // CONSTRUTOR
-  // ==========================================================
 
   const StoredWorkModel({
     required this.id,
@@ -200,10 +55,6 @@ class StoredWorkModel {
     this.bpm,
   });
 
-  // ==========================================================
-  // HELPERS DE TIPO
-  // ==========================================================
-
   bool get isLyrics =>
       type ==
       StoredWorkType.lyrics;
@@ -212,36 +63,20 @@ class StoredWorkModel {
       type ==
       StoredWorkType.beat;
 
-  // ==========================================================
-  // POSSUI VERSÃO ANTERIOR
-  // ==========================================================
-
   bool get hasPreviousVersion =>
       previousHash !=
           null &&
       previousHash!.isNotEmpty;
-
-  // ==========================================================
-  // POSSUI ARQUIVO
-  // ==========================================================
 
   bool get hasFile =>
       filePath !=
           null &&
       filePath!.isNotEmpty;
 
-  // ==========================================================
-  // POSSUI CONTEÚDO DE LETRA
-  // ==========================================================
-
   bool get hasLyricsContent =>
       lyricsContent !=
           null &&
       lyricsContent!.isNotEmpty;
-
-  // ==========================================================
-  // NOME DO TIPO
-  // ==========================================================
 
   String get typeName {
     switch (type) {
@@ -252,17 +87,6 @@ class StoredWorkModel {
         return 'Beat';
     }
   }
-
-  // ==========================================================
-  // CONVERTER TYPE PARA STRING
-  // ==========================================================
-  //
-  // Valor que será armazenado no banco:
-  //
-  // lyrics
-  // beat
-  //
-  // ==========================================================
 
   static String typeToString(
     StoredWorkType type,
@@ -275,10 +99,6 @@ class StoredWorkModel {
         return 'beat';
     }
   }
-
-  // ==========================================================
-  // CONVERTER STRING PARA TYPE
-  // ==========================================================
 
   static StoredWorkType typeFromString(
     String value,
@@ -297,17 +117,6 @@ class StoredWorkModel {
     }
   }
 
-  // ==========================================================
-  // TO MAP
-  // ==========================================================
-  //
-  // Formato preparado para persistência.
-  //
-  // Mantemos os nomes das colunas em snake_case,
-  // enquanto o Dart continua usando camelCase.
-  //
-  // ==========================================================
-
   Map<
     String,
     dynamic
@@ -315,48 +124,27 @@ class StoredWorkModel {
   toMap() {
     return {
       'id': id,
-
       'original_author_user_id': originalAuthorUserId,
-
       'owner_user_id': ownerUserId,
-
       'type': typeToString(
         type,
       ),
-
       'title': title,
-
       'content_hash': contentHash,
-
       'hash_algorithm': hashAlgorithm,
-
       'version': version,
-
       'previous_hash': previousHash,
-
       'integrity_verified': integrityVerified,
-
       'lyrics_content': lyricsContent,
-
       'file_path': filePath,
-
       'file_name': fileName,
-
       'mime_type': mimeType,
-
       'file_size_bytes': fileSizeBytes,
-
       'bpm': bpm,
-
       'created_at': createdAt.toIso8601String(),
-
       'updated_at': updatedAt.toIso8601String(),
     };
   }
-
-  // ==========================================================
-  // FROM MAP
-  // ==========================================================
 
   factory StoredWorkModel.fromMap(
     Map<
@@ -369,72 +157,51 @@ class StoredWorkModel {
       id:
           map['id']?.toString() ??
           '',
-
       originalAuthorUserId:
           map['original_author_user_id']?.toString() ??
           '',
-
       ownerUserId:
           map['owner_user_id']?.toString() ??
           '',
-
       type: typeFromString(
         map['type']?.toString() ??
             '',
       ),
-
       title:
           map['title']?.toString() ??
           '',
-
       contentHash:
           map['content_hash']?.toString() ??
           '',
-
       hashAlgorithm:
           map['hash_algorithm']?.toString() ??
           'SHA-256',
-
       version: _parseInt(
         map['version'],
         fallback: 1,
       ),
-
       previousHash: map['previous_hash']?.toString(),
-
       integrityVerified: _parseBool(
         map['integrity_verified'],
       ),
-
       lyricsContent: map['lyrics_content']?.toString(),
-
       filePath: map['file_path']?.toString(),
-
       fileName: map['file_name']?.toString(),
-
       mimeType: map['mime_type']?.toString(),
-
       fileSizeBytes: _parseNullableInt(
         map['file_size_bytes'],
       ),
-
       bpm: _parseNullableInt(
         map['bpm'],
       ),
-
       createdAt: _parseDateTime(
         map['created_at'],
       ),
-
       updatedAt: _parseDateTime(
         map['updated_at'],
       ),
     );
   }
-
-  // ==========================================================
-  // COPY WITH
-  // ==========================================================
 
   StoredWorkModel copyWith({
     String? id,
@@ -460,80 +227,59 @@ class StoredWorkModel {
       id:
           id ??
           this.id,
-
       originalAuthorUserId:
           originalAuthorUserId ??
           this.originalAuthorUserId,
-
       ownerUserId:
           ownerUserId ??
           this.ownerUserId,
-
       type:
           type ??
           this.type,
-
       title:
           title ??
           this.title,
-
       contentHash:
           contentHash ??
           this.contentHash,
-
       hashAlgorithm:
           hashAlgorithm ??
           this.hashAlgorithm,
-
       version:
           version ??
           this.version,
-
       previousHash:
           previousHash ??
           this.previousHash,
-
       integrityVerified:
           integrityVerified ??
           this.integrityVerified,
-
       lyricsContent:
           lyricsContent ??
           this.lyricsContent,
-
       filePath:
           filePath ??
           this.filePath,
-
       fileName:
           fileName ??
           this.fileName,
-
       mimeType:
           mimeType ??
           this.mimeType,
-
       fileSizeBytes:
           fileSizeBytes ??
           this.fileSizeBytes,
-
       bpm:
           bpm ??
           this.bpm,
-
       createdAt:
           createdAt ??
           this.createdAt,
-
       updatedAt:
           updatedAt ??
           this.updatedAt,
     );
   }
-
-  // ==========================================================
-  // PARSE INT
-  // ==========================================================
 
   static int _parseInt(
     dynamic value, {
@@ -550,10 +296,6 @@ class StoredWorkModel {
         ) ??
         fallback;
   }
-
-  // ==========================================================
-  // PARSE NULLABLE INT
-  // ==========================================================
 
   static int? _parseNullableInt(
     dynamic value,
@@ -572,10 +314,6 @@ class StoredWorkModel {
       value.toString(),
     );
   }
-
-  // ==========================================================
-  // PARSE BOOL
-  // ==========================================================
 
   static bool _parseBool(
     dynamic value,
@@ -599,10 +337,6 @@ class StoredWorkModel {
             '1';
   }
 
-  // ==========================================================
-  // PARSE DATETIME
-  // ==========================================================
-
   static DateTime _parseDateTime(
     dynamic value,
   ) {
@@ -611,21 +345,15 @@ class StoredWorkModel {
       return value;
     }
 
-    final parsed = DateTime.tryParse(
-      value?.toString() ??
-          '',
-    );
-
-    return parsed ??
+    return DateTime.tryParse(
+          value?.toString() ??
+              '',
+        ) ??
         DateTime.fromMillisecondsSinceEpoch(
           0,
           isUtc: true,
         );
   }
-
-  // ==========================================================
-  // DEBUG
-  // ==========================================================
 
   @override
   String toString() {

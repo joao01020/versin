@@ -1,6 +1,9 @@
 import 'package:get_it/get_it.dart';
 
-// --- CONTROLLERS ---
+// ============================================================
+// CONTROLLERS
+// ============================================================
+
 import '../modules/dashboard/controllers/dashboard_controller.dart';
 import '../modules/match/controllers/match_controllers.dart';
 import '../modules/wallet/controllers/wallet_controller.dart';
@@ -19,7 +22,19 @@ import 'package:versin/modules/brain/controller/brain_controller.dart';
 
 import 'package:versin/modules/studio/controllers/studio_controller.dart';
 
-// --- REPOSITÓRIOS ---
+// ============================================================
+// STORAGE
+// ============================================================
+
+import 'package:versin/modules/storage/controllers/storage_controller.dart';
+import 'package:versin/modules/storage/data/repositories/storage_repository.dart';
+import 'package:versin/modules/storage/services/storage_file_service.dart';
+import 'package:versin/modules/storage/services/storage_hash_service.dart';
+
+// ============================================================
+// REPOSITÓRIOS
+// ============================================================
+
 import '../modules/match/data/repositories/match_repository.dart';
 
 // ============================================================
@@ -144,6 +159,100 @@ setupLocator() {
       rhymesController:
           sl<
             BrainController
+          >(),
+    ),
+  );
+
+  // ==========================================================
+  // STORAGE MODULE
+  // ==========================================================
+  //
+  // Estrutura:
+  //
+  // StoragePage
+  //      ↓
+  // StorageController
+  //      ↓
+  // StorageRepository
+  //      ↓
+  // InMemoryStorageRepository
+  //
+  // Enquanto ainda não conectamos banco real, o repository
+  // em memória começa vazio.
+  //
+  // Depois podemos substituir:
+  //
+  // InMemoryStorageRepository
+  //
+  // por:
+  //
+  // SupabaseStorageRepository
+  //
+  // sem alterar o StorageController.
+  //
+  // ==========================================================
+
+  sl.registerLazySingleton<
+    StorageRepository
+  >(
+    () => InMemoryStorageRepository(),
+  );
+
+  // ==========================================================
+  // STORAGE HASH SERVICE
+  // ==========================================================
+  //
+  // Responsável por:
+  //
+  // - SHA-256 de letras
+  // - SHA-256 de arquivos
+  // - verificação de integridade
+  //
+  // ==========================================================
+
+  sl.registerLazySingleton<
+    StorageHashService
+  >(
+    () => StorageHashService(),
+  );
+
+  // ==========================================================
+  // STORAGE FILE SERVICE
+  // ==========================================================
+  //
+  // Responsável por:
+  //
+  // - selecionar beat
+  // - validar arquivo
+  // - ler metadados
+  // - tamanho
+  // - MIME
+  //
+  // ==========================================================
+
+  sl.registerLazySingleton<
+    StorageFileService
+  >(
+    () => StorageFileService(),
+  );
+
+  // ==========================================================
+  // STORAGE CONTROLLER
+  // ==========================================================
+  //
+  // IMPORTANTE:
+  //
+  // O repository precisa estar registrado ANTES do controller.
+  //
+  // ==========================================================
+
+  sl.registerLazySingleton<
+    StorageController
+  >(
+    () => StorageController(
+      repository:
+          sl<
+            StorageRepository
           >(),
     ),
   );

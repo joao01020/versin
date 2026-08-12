@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:desktop_multi_window/desktop_multi_window.dart';
 import 'package:flutter/material.dart';
+import 'package:window_manager/window_manager.dart';
 
 // ============================================================
 // JANELA EXTERNA DO MAPA MENTAL
@@ -26,16 +28,30 @@ import 'package:flutter/material.dart';
 //
 // ============================================================
 
-class MindMapWindow extends StatefulWidget {
+class MindMapWindow
+    extends
+        StatefulWidget {
   final String arguments;
 
-  const MindMapWindow({super.key, required this.arguments});
+  const MindMapWindow({
+    super.key,
+    required this.arguments,
+  });
 
   @override
-  State<MindMapWindow> createState() => _MindMapWindowState();
+  State<
+    MindMapWindow
+  >
+  createState() => _MindMapWindowState();
 }
 
-class _MindMapWindowState extends State<MindMapWindow> {
+class _MindMapWindowState
+    extends
+        State<
+          MindMapWindow
+        >
+    with
+        WindowListener {
   // ============================================================
   // CANAL
   // ============================================================
@@ -49,7 +65,9 @@ class _MindMapWindowState extends State<MindMapWindow> {
   // CONSTANTES VISUAIS
   // ============================================================
 
-  static const Color _activeColor = Color(0xFFE100FF);
+  static const Color _activeColor = Color(
+    0xFFE100FF,
+  );
 
   static const double _nodeWidth = 140;
 
@@ -74,7 +92,10 @@ class _MindMapWindowState extends State<MindMapWindow> {
   //
   // ============================================================
 
-  final List<_WindowMindMapNode> _nodes = [];
+  final List<
+    _WindowMindMapNode
+  >
+  _nodes = [];
 
   // ============================================================
   // ESTADO
@@ -85,6 +106,10 @@ class _MindMapWindowState extends State<MindMapWindow> {
   String? _hoveredNodeId;
 
   bool _isReady = false;
+
+  bool _isDocking = false;
+
+  bool _windowManagerReady = false;
 
   // ============================================================
   // CONEXÃO EM ANDAMENTO
@@ -116,36 +141,122 @@ class _MindMapWindowState extends State<MindMapWindow> {
   void initState() {
     super.initState();
 
-    _loadArguments(widget.arguments);
+    _loadArguments(
+      widget.arguments,
+    );
 
     _configureChannel();
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    _initializeNativeWindow();
+
+    WidgetsBinding.instance.addPostFrameCallback(
+      (
+        _,
+      ) {
+        if (!mounted) {
+          return;
+        }
+
+        setState(
+          () {
+            _isReady = true;
+          },
+        );
+
+        _requestLatestMap();
+      },
+    );
+  }
+
+  // ============================================================
+  // WINDOW MANAGER
+  // ============================================================
+  //
+  // O X nativo não destrói a janela imediatamente.
+  //
+  // Fluxo:
+  //
+  // X
+  // ↓
+  // onWindowClose()
+  // ↓
+  // _dockWindow()
+  // ↓
+  // dockMindMap
+  // ↓
+  // StudioController.dockMindMap()
+  // ↓
+  // StudioWindowService.hide()
+  //
+  // ============================================================
+
+  Future<
+    void
+  >
+  _initializeNativeWindow() async {
+    try {
+      await windowManager.ensureInitialized();
+
       if (!mounted) {
         return;
       }
 
-      setState(() {
-        _isReady = true;
-      });
+      windowManager.addListener(
+        this,
+      );
 
-      _requestLatestMap();
-    });
+      await windowManager.setPreventClose(
+        true,
+      );
+
+      _windowManagerReady = true;
+
+      debugPrint(
+        '[MIND MAP WINDOW] Fechamento nativo interceptado.',
+      );
+    } catch (
+      e
+    ) {
+      debugPrint(
+        '[MIND MAP WINDOW] Erro ao inicializar window_manager: $e',
+      );
+    }
+  }
+
+  // ============================================================
+  // X NATIVO
+  // ============================================================
+
+  @override
+  void onWindowClose() {
+    unawaited(
+      _dockWindow(),
+    );
   }
 
   // ============================================================
   // ARGUMENTOS INICIAIS
   // ============================================================
 
-  void _loadArguments(String raw) {
-    final data = _parseArguments(raw);
+  void _loadArguments(
+    String raw,
+  ) {
+    final data = _parseArguments(
+      raw,
+    );
 
-    _projectId = data['project_id']?.toString() ?? '';
+    _projectId =
+        data['project_id']?.toString() ??
+        '';
 
     final rawNodes = data['nodes'];
 
-    if (rawNodes is List) {
-      _replaceNodes(rawNodes, notify: false);
+    if (rawNodes
+        is List) {
+      _replaceNodes(
+        rawNodes,
+        notify: false,
+      );
     }
   }
 
@@ -153,74 +264,102 @@ class _MindMapWindowState extends State<MindMapWindow> {
   // CONFIGURAR CANAL
   // ============================================================
 
-  Future<void> _configureChannel() async {
+  Future<
+    void
+  >
+  _configureChannel() async {
     try {
-      await _channel.setMethodCallHandler((call) async {
-        switch (call.method) {
-          // ==================================================
-          // SUBSTITUIR MAPA COMPLETO
-          // ==================================================
+      await _channel.setMethodCallHandler(
+        (
+          call,
+        ) async {
+          switch (call.method) {
+            // ==================================================
+            // SUBSTITUIR MAPA COMPLETO
+            // ==================================================
 
-          case 'setMindMap':
-            final arguments = call.arguments;
+            case 'setMindMap':
+              final arguments = call.arguments;
 
-            if (arguments is Map) {
-              final data = Map<String, dynamic>.from(arguments);
+              if (arguments
+                  is Map) {
+                final data =
+                    Map<
+                      String,
+                      dynamic
+                    >.from(
+                      arguments,
+                    );
 
-              _projectId = data['project_id']?.toString() ?? _projectId;
+                _projectId =
+                    data['project_id']?.toString() ??
+                    _projectId;
 
-              final rawNodes = data['nodes'];
+                final rawNodes = data['nodes'];
 
-              if (rawNodes is List) {
-                _replaceNodes(rawNodes);
+                if (rawNodes
+                    is List) {
+                  _replaceNodes(
+                    rawNodes,
+                  );
+                }
               }
-            }
 
-            return true;
+              return true;
 
-          // ==================================================
-          // ATUALIZAR SOMENTE NÓS
-          // ==================================================
+            // ==================================================
+            // ATUALIZAR SOMENTE NÓS
+            // ==================================================
 
-          case 'setNodes':
-            final arguments = call.arguments;
+            case 'setNodes':
+              final arguments = call.arguments;
 
-            if (arguments is List) {
-              _replaceNodes(arguments);
-            }
+              if (arguments
+                  is List) {
+                _replaceNodes(
+                  arguments,
+                );
+              }
 
-            return true;
+              return true;
 
-          // ==================================================
-          // SELEÇÃO VINDO DO STUDIO
-          // ==================================================
+            // ==================================================
+            // SELEÇÃO VINDO DO STUDIO
+            // ==================================================
 
-          case 'selectNode':
-            final nodeId = call.arguments?.toString();
+            case 'selectNode':
+              final nodeId = call.arguments?.toString();
 
-            if (!mounted) {
-              return false;
-            }
+              if (!mounted) {
+                return false;
+              }
 
-            setState(() {
-              _selectedNodeId = nodeId;
-            });
+              setState(
+                () {
+                  _selectedNodeId = nodeId;
+                },
+              );
 
-            return true;
+              return true;
 
-          // ==================================================
-          // FOCO
-          // ==================================================
+            // ==================================================
+            // FOCO
+            // ==================================================
 
-          case 'focusMap':
-            return true;
+            case 'focusMap':
+              return true;
 
-          default:
-            return null;
-        }
-      });
-    } catch (e) {
-      debugPrint('[MIND MAP WINDOW] Erro ao configurar canal: $e');
+            default:
+              return null;
+          }
+        },
+      );
+    } catch (
+      e
+    ) {
+      debugPrint(
+        '[MIND MAP WINDOW] Erro ao configurar canal: $e',
+      );
     }
   }
 
@@ -228,11 +367,23 @@ class _MindMapWindowState extends State<MindMapWindow> {
   // PEDIR MAPA MAIS RECENTE
   // ============================================================
 
-  Future<void> _requestLatestMap() async {
+  Future<
+    void
+  >
+  _requestLatestMap() async {
     try {
-      await _channel.invokeMethod('requestMindMap', {'project_id': _projectId});
-    } catch (e) {
-      debugPrint('[MIND MAP WINDOW] Não foi possível solicitar o mapa: $e');
+      await _channel.invokeMethod(
+        'requestMindMap',
+        {
+          'project_id': _projectId,
+        },
+      );
+    } catch (
+      e
+    ) {
+      debugPrint(
+        '[MIND MAP WINDOW] Não foi possível solicitar o mapa: $e',
+      );
     }
   }
 
@@ -240,32 +391,67 @@ class _MindMapWindowState extends State<MindMapWindow> {
   // SUBSTITUIR NÓS LOCAIS
   // ============================================================
 
-  void _replaceNodes(List<dynamic> rawNodes, {bool notify = true}) {
-    final parsed = <_WindowMindMapNode>[];
+  void _replaceNodes(
+    List<
+      dynamic
+    >
+    rawNodes, {
+    bool notify = true,
+  }) {
+    final parsed =
+        <
+          _WindowMindMapNode
+        >[];
 
     for (final raw in rawNodes) {
-      if (raw is! Map) {
+      if (raw
+          is! Map) {
         continue;
       }
 
       try {
-        parsed.add(_WindowMindMapNode.fromMap(Map<String, dynamic>.from(raw)));
-      } catch (e) {
-        debugPrint('[MIND MAP WINDOW] Nó inválido ignorado: $e');
+        parsed.add(
+          _WindowMindMapNode.fromMap(
+            Map<
+              String,
+              dynamic
+            >.from(
+              raw,
+            ),
+          ),
+        );
+      } catch (
+        e
+      ) {
+        debugPrint(
+          '[MIND MAP WINDOW] Nó inválido ignorado: $e',
+        );
       }
     }
 
     _nodes
       ..clear()
-      ..addAll(parsed);
+      ..addAll(
+        parsed,
+      );
 
-    if (_selectedNodeId != null &&
-        !_nodes.any((node) => node.id == _selectedNodeId)) {
+    if (_selectedNodeId !=
+            null &&
+        !_nodes.any(
+          (
+            node,
+          ) =>
+              node.id ==
+              _selectedNodeId,
+        )) {
       _selectedNodeId = null;
     }
 
-    if (notify && mounted) {
-      setState(() {});
+    if (notify &&
+        mounted) {
+      setState(
+        () {},
+      );
     }
   }
 
@@ -273,25 +459,47 @@ class _MindMapWindowState extends State<MindMapWindow> {
   // MAP → JSON
   // ============================================================
 
-  Map<String, dynamic> _parseArguments(String raw) {
+  Map<
+    String,
+    dynamic
+  >
+  _parseArguments(
+    String raw,
+  ) {
     if (raw.trim().isEmpty) {
       return {};
     }
 
     try {
-      final decoded = jsonDecode(raw);
+      final decoded = jsonDecode(
+        raw,
+      );
 
-      if (decoded is Map<String, dynamic>) {
+      if (decoded
+          is Map<
+            String,
+            dynamic
+          >) {
         return decoded;
       }
 
-      if (decoded is Map) {
-        return Map<String, dynamic>.from(decoded);
+      if (decoded
+          is Map) {
+        return Map<
+          String,
+          dynamic
+        >.from(
+          decoded,
+        );
       }
 
       return {};
-    } catch (e) {
-      debugPrint('[MIND MAP WINDOW] Argumentos inválidos: $e');
+    } catch (
+      e
+    ) {
+      debugPrint(
+        '[MIND MAP WINDOW] Argumentos inválidos: $e',
+      );
 
       return {};
     }
@@ -301,111 +509,188 @@ class _MindMapWindowState extends State<MindMapWindow> {
   // GLOBAL → CANVAS
   // ============================================================
 
-  Offset _globalToCanvas(Offset globalPosition) {
+  Offset _globalToCanvas(
+    Offset globalPosition,
+  ) {
     final renderObject = _canvasKey.currentContext?.findRenderObject();
 
-    if (renderObject is! RenderBox) {
+    if (renderObject
+        is! RenderBox) {
       return globalPosition;
     }
 
-    return renderObject.globalToLocal(globalPosition);
+    return renderObject.globalToLocal(
+      globalPosition,
+    );
   }
 
   // ============================================================
   // SAFE POSITION
   // ============================================================
 
-  double _safeX(double x, double maxWidth) {
-    if (maxWidth <= _nodeWidth) {
+  double _safeX(
+    double x,
+    double maxWidth,
+  ) {
+    if (maxWidth <=
+        _nodeWidth) {
       return 0;
     }
 
-    return x.clamp(0.0, maxWidth - _nodeWidth);
+    return x.clamp(
+      0.0,
+      maxWidth -
+          _nodeWidth,
+    );
   }
 
-  double _safeY(double y, double maxHeight) {
-    if (maxHeight <= _nodeHeight) {
+  double _safeY(
+    double y,
+    double maxHeight,
+  ) {
+    if (maxHeight <=
+        _nodeHeight) {
       return 0;
     }
 
-    return y.clamp(0.0, maxHeight - _nodeHeight);
+    return y.clamp(
+      0.0,
+      maxHeight -
+          _nodeHeight,
+    );
   }
 
   // ============================================================
   // SELECIONAR NÓ
   // ============================================================
 
-  void _selectNode(String? nodeId) {
-    if (_selectedNodeId == nodeId) {
+  void _selectNode(
+    String? nodeId,
+  ) {
+    if (_selectedNodeId ==
+        nodeId) {
       return;
     }
 
-    setState(() {
-      _selectedNodeId = nodeId;
-    });
+    setState(
+      () {
+        _selectedNodeId = nodeId;
+      },
+    );
 
-    _sendToMain('selectMindMapNode', {
-      'project_id': _projectId,
-      'node_id': nodeId,
-    });
+    unawaited(
+      _sendToMain(
+        'selectMindMapNode',
+        {
+          'project_id': _projectId,
+          'node_id': nodeId,
+        },
+      ),
+    );
   }
 
   // ============================================================
   // MOVER NÓ
   // ============================================================
 
-  void _moveNode(_WindowMindMapNode node, Offset delta, Size canvasSize) {
-    final newX = _safeX(node.x + delta.dx, canvasSize.width);
+  void _moveNode(
+    _WindowMindMapNode node,
+    Offset delta,
+    Size canvasSize,
+  ) {
+    final newX = _safeX(
+      node.x +
+          delta.dx,
+      canvasSize.width,
+    );
 
-    final newY = _safeY(node.y + delta.dy, canvasSize.height);
+    final newY = _safeY(
+      node.y +
+          delta.dy,
+      canvasSize.height,
+    );
 
-    setState(() {
-      node.x = newX;
+    setState(
+      () {
+        node.x = newX;
 
-      node.y = newY;
-    });
+        node.y = newY;
+      },
+    );
 
-    _sendToMain('setMindMapNodePosition', {
-      'project_id': _projectId,
-      'node_id': node.id,
-      'x': newX,
-      'y': newY,
-    });
+    unawaited(
+      _sendToMain(
+        'setMindMapNodePosition',
+        {
+          'project_id': _projectId,
+          'node_id': node.id,
+          'x': newX,
+          'y': newY,
+        },
+      ),
+    );
   }
 
   // ============================================================
   // REMOVER NÓ
   // ============================================================
 
-  Future<void> _removeNode(_WindowMindMapNode node) async {
-    setState(() {
-      _nodes.removeWhere((item) => item.id == node.id);
+  Future<
+    void
+  >
+  _removeNode(
+    _WindowMindMapNode node,
+  ) async {
+    setState(
+      () {
+        _nodes.removeWhere(
+          (
+            item,
+          ) =>
+              item.id ==
+              node.id,
+        );
 
-      for (final other in _nodes) {
-        other.connections.remove(node.id);
-      }
+        for (final other in _nodes) {
+          other.connections.remove(
+            node.id,
+          );
+        }
 
-      if (_selectedNodeId == node.id) {
-        _selectedNodeId = null;
-      }
-    });
+        if (_selectedNodeId ==
+            node.id) {
+          _selectedNodeId = null;
+        }
+      },
+    );
 
-    await _sendToMain('removeMindMapNode', {
-      'project_id': _projectId,
-      'node_id': node.id,
-    });
+    await _sendToMain(
+      'removeMindMapNode',
+      {
+        'project_id': _projectId,
+        'node_id': node.id,
+      },
+    );
   }
 
   // ============================================================
   // ENVIAR NÓ PARA TIMELINE
   // ============================================================
 
-  Future<void> _addNodeToTimeline(_WindowMindMapNode node) async {
-    await _sendToMain('addMindMapNodeToTimeline', {
-      'project_id': _projectId,
-      'node_id': node.id,
-      'text': node.text,
-    });
+  Future<
+    void
+  >
+  _addNodeToTimeline(
+    _WindowMindMapNode node,
+  ) async {
+    await _sendToMain(
+      'addMindMapNodeToTimeline',
+      {
+        'project_id': _projectId,
+        'node_id': node.id,
+        'text': node.text,
+      },
+    );
   }
 
   // ============================================================
@@ -417,22 +702,50 @@ class _MindMapWindowState extends State<MindMapWindow> {
     _WindowMindMapPort port,
     Size canvasSize,
   ) {
-    final x = _safeX(node.x, canvasSize.width);
+    final x = _safeX(
+      node.x,
+      canvasSize.width,
+    );
 
-    final y = _safeY(node.y, canvasSize.height);
+    final y = _safeY(
+      node.y,
+      canvasSize.height,
+    );
 
     switch (port) {
       case _WindowMindMapPort.top:
-        return Offset(x + _nodeWidth / 2, y);
+        return Offset(
+          x +
+              _nodeWidth /
+                  2,
+          y,
+        );
 
       case _WindowMindMapPort.right:
-        return Offset(x + _nodeWidth, y + _nodeHeight / 2);
+        return Offset(
+          x +
+              _nodeWidth,
+          y +
+              _nodeHeight /
+                  2,
+        );
 
       case _WindowMindMapPort.bottom:
-        return Offset(x + _nodeWidth / 2, y + _nodeHeight);
+        return Offset(
+          x +
+              _nodeWidth /
+                  2,
+          y +
+              _nodeHeight,
+        );
 
       case _WindowMindMapPort.left:
-        return Offset(x, y + _nodeHeight / 2);
+        return Offset(
+          x,
+          y +
+              _nodeHeight /
+                  2,
+        );
     }
   }
 
@@ -446,19 +759,27 @@ class _MindMapWindowState extends State<MindMapWindow> {
     required DragStartDetails details,
     required Size canvasSize,
   }) {
-    setState(() {
-      _connectingFromNodeId = node.id;
+    setState(
+      () {
+        _connectingFromNodeId = node.id;
 
-      _connectingFromPort = port;
+        _connectingFromPort = port;
 
-      _connectionStart = _portPosition(node, port, canvasSize);
+        _connectionStart = _portPosition(
+          node,
+          port,
+          canvasSize,
+        );
 
-      _connectionCurrent = _globalToCanvas(details.globalPosition);
+        _connectionCurrent = _globalToCanvas(
+          details.globalPosition,
+        );
 
-      _hoveredTargetNodeId = null;
+        _hoveredTargetNodeId = null;
 
-      _hoveredTargetPort = null;
-    });
+        _hoveredTargetPort = null;
+      },
+    );
   }
 
   // ============================================================
@@ -469,49 +790,84 @@ class _MindMapWindowState extends State<MindMapWindow> {
     required DragUpdateDetails details,
     required Size canvasSize,
   }) {
-    final pointer = _globalToCanvas(details.globalPosition);
+    final pointer = _globalToCanvas(
+      details.globalPosition,
+    );
 
-    final target = _findNearestTarget(pointer, canvasSize);
+    final target = _findNearestTarget(
+      pointer,
+      canvasSize,
+    );
 
-    setState(() {
-      _connectionCurrent = pointer;
+    setState(
+      () {
+        _connectionCurrent = pointer;
 
-      _hoveredTargetNodeId = target?.node.id;
+        _hoveredTargetNodeId = target?.node.id;
 
-      _hoveredTargetPort = target?.port;
-    });
+        _hoveredTargetPort = target?.port;
+      },
+    );
   }
 
   // ============================================================
   // FINALIZAR CONEXÃO
   // ============================================================
 
-  Future<void> _finishConnection() async {
+  Future<
+    void
+  >
+  _finishConnection() async {
     final fromId = _connectingFromNodeId;
 
     final targetId = _hoveredTargetNodeId;
 
-    if (fromId != null && targetId != null && fromId != targetId) {
-      final from = _findNode(fromId);
+    if (fromId !=
+            null &&
+        targetId !=
+            null &&
+        fromId !=
+            targetId) {
+      final from = _findNode(
+        fromId,
+      );
 
-      final target = _findNode(targetId);
+      final target = _findNode(
+        targetId,
+      );
 
-      if (from != null && target != null) {
-        setState(() {
-          if (!from.connections.contains(target.id)) {
-            from.connections.add(target.id);
-          }
+      if (from !=
+              null &&
+          target !=
+              null) {
+        setState(
+          () {
+            if (!from.connections.contains(
+              target.id,
+            )) {
+              from.connections.add(
+                target.id,
+              );
+            }
 
-          if (!target.connections.contains(from.id)) {
-            target.connections.add(from.id);
-          }
-        });
+            if (!target.connections.contains(
+              from.id,
+            )) {
+              target.connections.add(
+                from.id,
+              );
+            }
+          },
+        );
 
-        await _sendToMain('connectMindMapNodes', {
-          'project_id': _projectId,
-          'first_node_id': fromId,
-          'second_node_id': targetId,
-        });
+        await _sendToMain(
+          'connectMindMapNodes',
+          {
+            'project_id': _projectId,
+            'first_node_id': fromId,
+            'second_node_id': targetId,
+          },
+        );
       }
     }
 
@@ -527,41 +883,57 @@ class _MindMapWindowState extends State<MindMapWindow> {
       return;
     }
 
-    setState(() {
-      _connectingFromNodeId = null;
+    setState(
+      () {
+        _connectingFromNodeId = null;
 
-      _connectingFromPort = null;
+        _connectingFromPort = null;
 
-      _connectionStart = null;
+        _connectionStart = null;
 
-      _connectionCurrent = null;
+        _connectionCurrent = null;
 
-      _hoveredTargetNodeId = null;
+        _hoveredTargetNodeId = null;
 
-      _hoveredTargetPort = null;
-    });
+        _hoveredTargetPort = null;
+      },
+    );
   }
 
   // ============================================================
   // TARGET MAIS PRÓXIMO
   // ============================================================
 
-  _WindowPortTarget? _findNearestTarget(Offset pointer, Size canvasSize) {
+  _WindowPortTarget? _findNearestTarget(
+    Offset pointer,
+    Size canvasSize,
+  ) {
     _WindowPortTarget? nearest;
 
     double nearestDistance = double.infinity;
 
     for (final node in _nodes) {
-      if (node.id == _connectingFromNodeId) {
+      if (node.id ==
+          _connectingFromNodeId) {
         continue;
       }
 
       for (final port in _WindowMindMapPort.values) {
-        final position = _portPosition(node, port, canvasSize);
+        final position = _portPosition(
+          node,
+          port,
+          canvasSize,
+        );
 
-        final distance = (pointer - position).distance;
+        final distance =
+            (pointer -
+                    position)
+                .distance;
 
-        if (distance <= _connectionSnapDistance && distance < nearestDistance) {
+        if (distance <=
+                _connectionSnapDistance &&
+            distance <
+                nearestDistance) {
           nearestDistance = distance;
 
           nearest = _WindowPortTarget(
@@ -580,16 +952,28 @@ class _MindMapWindowState extends State<MindMapWindow> {
   // PREVIEW END
   // ============================================================
 
-  Offset? _previewEnd(Size canvasSize) {
+  Offset? _previewEnd(
+    Size canvasSize,
+  ) {
     final targetId = _hoveredTargetNodeId;
 
     final targetPort = _hoveredTargetPort;
 
-    if (targetId != null && targetPort != null) {
-      final target = _findNode(targetId);
+    if (targetId !=
+            null &&
+        targetPort !=
+            null) {
+      final target = _findNode(
+        targetId,
+      );
 
-      if (target != null) {
-        return _portPosition(target, targetPort, canvasSize);
+      if (target !=
+          null) {
+        return _portPosition(
+          target,
+          targetPort,
+          canvasSize,
+        );
       }
     }
 
@@ -600,9 +984,12 @@ class _MindMapWindowState extends State<MindMapWindow> {
   // FIND NODE
   // ============================================================
 
-  _WindowMindMapNode? _findNode(String id) {
+  _WindowMindMapNode? _findNode(
+    String id,
+  ) {
     for (final node in _nodes) {
-      if (node.id == id) {
+      if (node.id ==
+          id) {
         return node;
       }
     }
@@ -614,26 +1001,105 @@ class _MindMapWindowState extends State<MindMapWindow> {
   // HANDLES VISÍVEIS
   // ============================================================
 
-  bool _showHandles(String nodeId) {
-    if (_connectingFromNodeId != null) {
-      return nodeId == _connectingFromNodeId || nodeId == _hoveredTargetNodeId;
+  bool _showHandles(
+    String nodeId,
+  ) {
+    if (_connectingFromNodeId !=
+        null) {
+      return nodeId ==
+              _connectingFromNodeId ||
+          nodeId ==
+              _hoveredTargetNodeId;
     }
 
-    return nodeId == _hoveredNodeId || nodeId == _selectedNodeId;
+    return nodeId ==
+            _hoveredNodeId ||
+        nodeId ==
+            _selectedNodeId;
   }
 
   // ============================================================
   // ENCAIXAR
   // ============================================================
 
-  Future<void> _dockWindow() async {
+  Future<
+    void
+  >
+  _dockWindow() async {
+    if (_isDocking) {
+      return;
+    }
+
+    _isDocking = true;
+
+    if (mounted) {
+      setState(
+        () {},
+      );
+    }
+
     try {
-      await _sendToMain('dockMindMap', {
-        'project_id': _projectId,
-        'nodes': _nodes.map((node) => node.toMap()).toList(),
-      });
-    } catch (e) {
-      debugPrint('[MIND MAP WINDOW] Erro ao encaixar: $e');
+      // ========================================================
+      // ENVIA O MAPA MAIS RECENTE PARA A JANELA PRINCIPAL
+      // ========================================================
+
+      await _sendToMain(
+        'dockMindMap',
+        {
+          'project_id': _projectId,
+          'nodes': _nodes
+              .map(
+                (
+                  node,
+                ) => node.toMap(),
+              )
+              .toList(),
+        },
+      );
+
+      // ========================================================
+      // NÃO CHAMAR windowManager.close()
+      // ========================================================
+      //
+      // O main.dart recebe dockMindMap e executa:
+      //
+      // controller.dockMindMap()
+      //
+      // e:
+      //
+      // StudioWindowService.instance.dockMindMapWindow()
+      //
+      // que oculta a janela.
+      //
+      // Assim o engine continua vivo e pode ser reutilizado.
+      //
+      // ========================================================
+
+      debugPrint(
+        '[MIND MAP WINDOW] Solicitação de encaixe enviada.',
+      );
+    } catch (
+      e
+    ) {
+      debugPrint(
+        '[MIND MAP WINDOW] Erro ao encaixar: $e',
+      );
+    } finally {
+      await Future<
+        void
+      >.delayed(
+        const Duration(
+          milliseconds: 200,
+        ),
+      );
+
+      _isDocking = false;
+
+      if (mounted) {
+        setState(
+          () {},
+        );
+      }
     }
   }
 
@@ -641,12 +1107,40 @@ class _MindMapWindowState extends State<MindMapWindow> {
   // ENVIAR PARA PRINCIPAL
   // ============================================================
 
-  Future<void> _sendToMain(String method, dynamic arguments) async {
+  Future<
+    void
+  >
+  _sendToMain(
+    String method,
+    dynamic arguments,
+  ) async {
     try {
-      await _channel.invokeMethod(method, arguments);
-    } catch (e) {
-      debugPrint('[MIND MAP WINDOW] $method falhou: $e');
+      await _channel.invokeMethod(
+        method,
+        arguments,
+      );
+    } catch (
+      e
+    ) {
+      debugPrint(
+        '[MIND MAP WINDOW] $method falhou: $e',
+      );
     }
+  }
+
+  // ============================================================
+  // DISPOSE
+  // ============================================================
+
+  @override
+  void dispose() {
+    if (_windowManagerReady) {
+      windowManager.removeListener(
+        this,
+      );
+    }
+
+    super.dispose();
   }
 
   // ============================================================
@@ -654,12 +1148,18 @@ class _MindMapWindowState extends State<MindMapWindow> {
   // ============================================================
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(
+    BuildContext context,
+  ) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark(useMaterial3: true),
+      theme: ThemeData.dark(
+        useMaterial3: true,
+      ),
       home: Scaffold(
-        backgroundColor: const Color(0xFF0D0D0D),
+        backgroundColor: const Color(
+          0xFF0D0D0D,
+        ),
         body: SafeArea(
           child: Column(
             children: [
@@ -675,7 +1175,9 @@ class _MindMapWindowState extends State<MindMapWindow> {
                 child: _isReady
                     ? _buildMap()
                     : const Center(
-                        child: CircularProgressIndicator(color: _activeColor),
+                        child: CircularProgressIndicator(
+                          color: _activeColor,
+                        ),
                       ),
               ),
 
@@ -697,10 +1199,18 @@ class _MindMapWindowState extends State<MindMapWindow> {
   Widget _buildHeader() {
     return Container(
       height: 48,
-      padding: const EdgeInsets.symmetric(horizontal: 14),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 14,
+      ),
       decoration: const BoxDecoration(
-        color: Color(0xFF111111),
-        border: Border(bottom: BorderSide(color: Colors.white10)),
+        color: Color(
+          0xFF111111,
+        ),
+        border: Border(
+          bottom: BorderSide(
+            color: Colors.white10,
+          ),
+        ),
       ),
       child: Row(
         children: [
@@ -710,7 +1220,9 @@ class _MindMapWindowState extends State<MindMapWindow> {
             color: _activeColor,
           ),
 
-          const SizedBox(width: 8),
+          const SizedBox(
+            width: 8,
+          ),
 
           const Text(
             'MAPA',
@@ -722,12 +1234,18 @@ class _MindMapWindowState extends State<MindMapWindow> {
             ),
           ),
 
-          if (_connectingFromNodeId != null) ...[
-            const SizedBox(width: 14),
+          if (_connectingFromNodeId !=
+              null) ...[
+            const SizedBox(
+              width: 14,
+            ),
 
             const Text(
               'Conectando...',
-              style: TextStyle(color: Colors.white38, fontSize: 10),
+              style: TextStyle(
+                color: Colors.white38,
+                fontSize: 10,
+              ),
             ),
 
             IconButton(
@@ -745,12 +1263,17 @@ class _MindMapWindowState extends State<MindMapWindow> {
 
           if (_projectId.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.only(right: 10),
+              padding: const EdgeInsets.only(
+                right: 10,
+              ),
               child: Text(
                 _projectId,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: Colors.white24, fontSize: 9),
+                style: const TextStyle(
+                  color: Colors.white24,
+                  fontSize: 9,
+                ),
               ),
             ),
 
@@ -769,10 +1292,18 @@ class _MindMapWindowState extends State<MindMapWindow> {
           Tooltip(
             message: 'Encaixar no Studio',
             child: IconButton(
-              onPressed: _dockWindow,
-              icon: const Icon(
+              onPressed: _isDocking
+                  ? null
+                  : () {
+                      unawaited(
+                        _dockWindow(),
+                      );
+                    },
+              icon: Icon(
                 Icons.call_merge_rounded,
-                color: _activeColor,
+                color: _isDocking
+                    ? Colors.white24
+                    : _activeColor,
                 size: 18,
               ),
             ),
@@ -792,13 +1323,22 @@ class _MindMapWindowState extends State<MindMapWindow> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.account_tree_outlined, size: 36, color: Colors.white24),
+            Icon(
+              Icons.account_tree_outlined,
+              size: 36,
+              color: Colors.white24,
+            ),
 
-            SizedBox(height: 12),
+            SizedBox(
+              height: 12,
+            ),
 
             Text(
               'Nenhum nó no mapa.',
-              style: TextStyle(color: Colors.white38, fontSize: 11),
+              style: TextStyle(
+                color: Colors.white38,
+                fontSize: 11,
+              ),
             ),
           ],
         ),
@@ -806,119 +1346,181 @@ class _MindMapWindowState extends State<MindMapWindow> {
     }
 
     return Padding(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(
+        12,
+      ),
       child: Container(
         decoration: BoxDecoration(
-          color: const Color(0xFF111111),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+          color: const Color(
+            0xFF111111,
+          ),
+          borderRadius: BorderRadius.circular(
+            16,
+          ),
+          border: Border.all(
+            color: Colors.white.withValues(
+              alpha: 0.05,
+            ),
+          ),
         ),
         child: LayoutBuilder(
-          builder: (context, constraints) {
-            final canvasSize = Size(
-              constraints.maxWidth,
-              constraints.maxHeight,
-            );
+          builder:
+              (
+                context,
+                constraints,
+              ) {
+                final canvasSize = Size(
+                  constraints.maxWidth,
+                  constraints.maxHeight,
+                );
 
-            return GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () {
-                if (_connectingFromNodeId != null) {
-                  _cancelConnection();
+                return GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () {
+                    if (_connectingFromNodeId !=
+                        null) {
+                      _cancelConnection();
 
-                  return;
-                }
+                      return;
+                    }
 
-                _selectNode(null);
-              },
-              child: ClipRect(
-                child: Stack(
-                  key: _canvasKey,
-                  clipBehavior: Clip.none,
-                  children: [
-                    // =========================================
-                    // CONEXÕES
-                    // =========================================
-                    Positioned.fill(
-                      child: IgnorePointer(
-                        child: CustomPaint(
-                          painter: _WindowConnectionsPainter(
-                            nodes: _nodes,
-                            activeColor: _activeColor,
-                            nodeWidth: _nodeWidth,
-                            nodeHeight: _nodeHeight,
-                            previewStart: _connectionStart,
-                            previewCurrent: _previewEnd(canvasSize),
+                    _selectNode(
+                      null,
+                    );
+                  },
+                  child: ClipRect(
+                    child: Stack(
+                      key: _canvasKey,
+                      clipBehavior: Clip.none,
+                      children: [
+                        // =========================================
+                        // CONEXÕES
+                        // =========================================
+                        Positioned.fill(
+                          child: IgnorePointer(
+                            child: CustomPaint(
+                              painter: _WindowConnectionsPainter(
+                                nodes: _nodes,
+                                activeColor: _activeColor,
+                                nodeWidth: _nodeWidth,
+                                nodeHeight: _nodeHeight,
+                                previewStart: _connectionStart,
+                                previewCurrent: _previewEnd(
+                                  canvasSize,
+                                ),
+                              ),
+                            ),
                           ),
                         ),
-                      ),
-                    ),
 
-                    // =========================================
-                    // NÓS
-                    // =========================================
-                    for (final node in _nodes)
-                      Positioned(
-                        left: _safeX(node.x, constraints.maxWidth),
-                        top: _safeY(node.y, constraints.maxHeight),
-                        child: _WindowNodeWithHandles(
-                          node: node,
-                          width: _nodeWidth,
-                          height: _nodeHeight,
-                          activeColor: _activeColor,
-                          selected: node.id == _selectedNodeId,
-                          showHandles: _showHandles(node.id),
-                          isConnectionSource: node.id == _connectingFromNodeId,
-                          highlightedTargetPort: node.id == _hoveredTargetNodeId
-                              ? _hoveredTargetPort
-                              : null,
-                          onHoverChanged: (hovered) {
-                            if (_connectingFromNodeId != null) {
-                              return;
-                            }
-
-                            setState(() {
-                              _hoveredNodeId = hovered ? node.id : null;
-                            });
-                          },
-                          onTap: () {
-                            _selectNode(node.id);
-                          },
-                          onMove: (delta) {
-                            if (_connectingFromNodeId != null) {
-                              return;
-                            }
-
-                            _moveNode(node, delta, canvasSize);
-                          },
-                          onRemove: () {
-                            _removeNode(node);
-                          },
-                          onAddToTimeline: () {
-                            _addNodeToTimeline(node);
-                          },
-                          onConnectionStart: (port, details) {
-                            _startConnection(
+                        // =========================================
+                        // NÓS
+                        // =========================================
+                        for (final node in _nodes)
+                          Positioned(
+                            left: _safeX(
+                              node.x,
+                              constraints.maxWidth,
+                            ),
+                            top: _safeY(
+                              node.y,
+                              constraints.maxHeight,
+                            ),
+                            child: _WindowNodeWithHandles(
                               node: node,
-                              port: port,
-                              details: details,
-                              canvasSize: canvasSize,
-                            );
-                          },
-                          onConnectionUpdate: (details) {
-                            _updateConnection(
-                              details: details,
-                              canvasSize: canvasSize,
-                            );
-                          },
-                          onConnectionEnd: _finishConnection,
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            );
-          },
+                              width: _nodeWidth,
+                              height: _nodeHeight,
+                              activeColor: _activeColor,
+                              selected:
+                                  node.id ==
+                                  _selectedNodeId,
+                              showHandles: _showHandles(
+                                node.id,
+                              ),
+                              isConnectionSource:
+                                  node.id ==
+                                  _connectingFromNodeId,
+                              highlightedTargetPort:
+                                  node.id ==
+                                      _hoveredTargetNodeId
+                                  ? _hoveredTargetPort
+                                  : null,
+                              onHoverChanged:
+                                  (
+                                    hovered,
+                                  ) {
+                                    if (_connectingFromNodeId !=
+                                        null) {
+                                      return;
+                                    }
+
+                                    setState(
+                                      () {
+                                        _hoveredNodeId = hovered
+                                            ? node.id
+                                            : null;
+                                      },
+                                    );
+                                  },
+                              onTap: () {
+                                _selectNode(
+                                  node.id,
+                                );
+                              },
+                              onMove:
+                                  (
+                                    delta,
+                                  ) {
+                                    if (_connectingFromNodeId !=
+                                        null) {
+                                      return;
+                                    }
+
+                                    _moveNode(
+                                      node,
+                                      delta,
+                                      canvasSize,
+                                    );
+                                  },
+                              onRemove: () {
+                                _removeNode(
+                                  node,
+                                );
+                              },
+                              onAddToTimeline: () {
+                                _addNodeToTimeline(
+                                  node,
+                                );
+                              },
+                              onConnectionStart:
+                                  (
+                                    port,
+                                    details,
+                                  ) {
+                                    _startConnection(
+                                      node: node,
+                                      port: port,
+                                      details: details,
+                                      canvasSize: canvasSize,
+                                    );
+                                  },
+                              onConnectionUpdate:
+                                  (
+                                    details,
+                                  ) {
+                                    _updateConnection(
+                                      details: details,
+                                      canvasSize: canvasSize,
+                                    );
+                                  },
+                              onConnectionEnd: _finishConnection,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                );
+              },
         ),
       ),
     );
@@ -931,10 +1533,18 @@ class _MindMapWindowState extends State<MindMapWindow> {
   Widget _buildStatusBar() {
     return Container(
       height: 32,
-      padding: const EdgeInsets.symmetric(horizontal: 14),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 14,
+      ),
       decoration: const BoxDecoration(
-        color: Color(0xFF111111),
-        border: Border(top: BorderSide(color: Colors.white10)),
+        color: Color(
+          0xFF111111,
+        ),
+        border: Border(
+          top: BorderSide(
+            color: Colors.white10,
+          ),
+        ),
       ),
       child: Row(
         children: [
@@ -942,16 +1552,22 @@ class _MindMapWindowState extends State<MindMapWindow> {
             width: 6,
             height: 6,
             decoration: const BoxDecoration(
-              color: Color(0xFF00FF66),
+              color: Color(
+                0xFF00FF66,
+              ),
               shape: BoxShape.circle,
             ),
           ),
 
-          const SizedBox(width: 6),
+          const SizedBox(
+            width: 6,
+          ),
 
-          const Text(
-            'MAPA EXTERNO',
-            style: TextStyle(
+          Text(
+            _isDocking
+                ? 'ENCAIXANDO...'
+                : 'MAPA EXTERNO',
+            style: const TextStyle(
               color: Colors.white30,
               fontSize: 9,
               fontWeight: FontWeight.w600,
@@ -963,7 +1579,10 @@ class _MindMapWindowState extends State<MindMapWindow> {
 
           Text(
             '${_nodes.length} nó${_nodes.length == 1 ? '' : 's'}',
-            style: const TextStyle(color: Colors.white24, fontSize: 9),
+            style: const TextStyle(
+              color: Colors.white24,
+              fontSize: 9,
+            ),
           ),
         ],
       ),
@@ -975,7 +1594,12 @@ class _MindMapWindowState extends State<MindMapWindow> {
 // PORTAS
 // ============================================================
 
-enum _WindowMindMapPort { top, right, bottom, left }
+enum _WindowMindMapPort {
+  top,
+  right,
+  bottom,
+  left,
+}
 
 // ============================================================
 // NÓ LOCAL
@@ -992,7 +1616,10 @@ class _WindowMindMapNode {
 
   double y;
 
-  final List<String> connections;
+  final List<
+    String
+  >
+  connections;
 
   _WindowMindMapNode({
     required this.id,
@@ -1003,41 +1630,86 @@ class _WindowMindMapNode {
     required this.connections,
   });
 
-  factory _WindowMindMapNode.fromMap(Map<String, dynamic> map) {
+  factory _WindowMindMapNode.fromMap(
+    Map<
+      String,
+      dynamic
+    >
+    map,
+  ) {
     final rawConnections = map['connections'];
 
     return _WindowMindMapNode(
-      id: map['id']?.toString() ?? '',
-      text: map['text']?.toString() ?? '',
-      type: (map['type'] ?? 'idea').toString(),
-      x: _asDouble(map['x']),
-      y: _asDouble(map['y']),
-      connections: rawConnections is List
+      id:
+          map['id']?.toString() ??
+          '',
+      text:
+          map['text']?.toString() ??
+          '',
+      type:
+          (map['type'] ??
+                  'idea')
+              .toString(),
+      x: _asDouble(
+        map['x'],
+      ),
+      y: _asDouble(
+        map['y'],
+      ),
+      connections:
+          rawConnections
+              is List
           ? rawConnections
-                .map((value) => value.toString())
-                .where((value) => value.isNotEmpty)
+                .map(
+                  (
+                    value,
+                  ) => value.toString(),
+                )
+                .where(
+                  (
+                    value,
+                  ) => value.isNotEmpty,
+                )
                 .toList()
-          : <String>[],
+          : <
+              String
+            >[],
     );
   }
 
-  Map<String, dynamic> toMap() {
+  Map<
+    String,
+    dynamic
+  >
+  toMap() {
     return {
       'id': id,
       'text': text,
       'type': type,
       'x': x,
       'y': y,
-      'connections': List<String>.from(connections),
+      'connections':
+          List<
+            String
+          >.from(
+            connections,
+          ),
     };
   }
 
-  static double _asDouble(dynamic value) {
-    if (value is num) {
+  static double _asDouble(
+    dynamic value,
+  ) {
+    if (value
+        is num) {
       return value.toDouble();
     }
 
-    return double.tryParse(value?.toString() ?? '') ?? 0;
+    return double.tryParse(
+          value?.toString() ??
+              '',
+        ) ??
+        0;
   }
 }
 
@@ -1063,7 +1735,9 @@ class _WindowPortTarget {
 // NÓ + HANDLES
 // ============================================================
 
-class _WindowNodeWithHandles extends StatelessWidget {
+class _WindowNodeWithHandles
+    extends
+        StatelessWidget {
   final _WindowMindMapNode node;
 
   final double width;
@@ -1080,20 +1754,32 @@ class _WindowNodeWithHandles extends StatelessWidget {
 
   final _WindowMindMapPort? highlightedTargetPort;
 
-  final ValueChanged<bool> onHoverChanged;
+  final ValueChanged<
+    bool
+  >
+  onHoverChanged;
 
   final VoidCallback onTap;
 
-  final ValueChanged<Offset> onMove;
+  final ValueChanged<
+    Offset
+  >
+  onMove;
 
   final VoidCallback onRemove;
 
   final VoidCallback onAddToTimeline;
 
-  final void Function(_WindowMindMapPort port, DragStartDetails details)
+  final void Function(
+    _WindowMindMapPort port,
+    DragStartDetails details,
+  )
   onConnectionStart;
 
-  final ValueChanged<DragUpdateDetails> onConnectionUpdate;
+  final ValueChanged<
+    DragUpdateDetails
+  >
+  onConnectionUpdate;
 
   final VoidCallback onConnectionEnd;
 
@@ -1117,14 +1803,26 @@ class _WindowNodeWithHandles extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(
+    BuildContext context,
+  ) {
     return MouseRegion(
-      onEnter: (_) {
-        onHoverChanged(true);
-      },
-      onExit: (_) {
-        onHoverChanged(false);
-      },
+      onEnter:
+          (
+            _,
+          ) {
+            onHoverChanged(
+              true,
+            );
+          },
+      onExit:
+          (
+            _,
+          ) {
+            onHoverChanged(
+              false,
+            );
+          },
       child: SizedBox(
         width: width,
         height: height,
@@ -1149,14 +1847,25 @@ class _WindowNodeWithHandles extends StatelessWidget {
                   port: port,
                   activeColor: activeColor,
                   highlighted:
-                      isConnectionSource || highlightedTargetPort == port,
-                  onPanStart: (details) {
-                    onConnectionStart(port, details);
-                  },
+                      isConnectionSource ||
+                      highlightedTargetPort ==
+                          port,
+                  onPanStart:
+                      (
+                        details,
+                      ) {
+                        onConnectionStart(
+                          port,
+                          details,
+                        );
+                      },
                   onPanUpdate: onConnectionUpdate,
-                  onPanEnd: (_) {
-                    onConnectionEnd();
-                  },
+                  onPanEnd:
+                      (
+                        _,
+                      ) {
+                        onConnectionEnd();
+                      },
                 ),
           ],
         ),
@@ -1169,7 +1878,9 @@ class _WindowNodeWithHandles extends StatelessWidget {
 // HANDLE
 // ============================================================
 
-class _WindowConnectionHandle extends StatelessWidget {
+class _WindowConnectionHandle
+    extends
+        StatelessWidget {
   static const double size = 12;
 
   final _WindowMindMapPort port;
@@ -1194,7 +1905,9 @@ class _WindowConnectionHandle extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(
+    BuildContext context,
+  ) {
     return Positioned(
       left: _left,
       right: _right,
@@ -1208,20 +1921,30 @@ class _WindowConnectionHandle extends StatelessWidget {
           onPanUpdate: onPanUpdate,
           onPanEnd: onPanEnd,
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 120),
+            duration: const Duration(
+              milliseconds: 120,
+            ),
             width: size,
             height: size,
             decoration: BoxDecoration(
-              color: highlighted ? activeColor : const Color(0xFF111111),
+              color: highlighted
+                  ? activeColor
+                  : const Color(
+                      0xFF111111,
+                    ),
               shape: BoxShape.circle,
               border: Border.all(
                 color: activeColor,
-                width: highlighted ? 2 : 1.4,
+                width: highlighted
+                    ? 2
+                    : 1.4,
               ),
               boxShadow: highlighted
                   ? [
                       BoxShadow(
-                        color: activeColor.withValues(alpha: 0.35),
+                        color: activeColor.withValues(
+                          alpha: 0.35,
+                        ),
                         blurRadius: 8,
                       ),
                     ]
@@ -1237,10 +1960,13 @@ class _WindowConnectionHandle extends StatelessWidget {
     switch (port) {
       case _WindowMindMapPort.top:
       case _WindowMindMapPort.bottom:
-        return 70 - size / 2;
+        return 70 -
+            size /
+                2;
 
       case _WindowMindMapPort.left:
-        return -size / 2;
+        return -size /
+            2;
 
       case _WindowMindMapPort.right:
         return null;
@@ -1250,7 +1976,8 @@ class _WindowConnectionHandle extends StatelessWidget {
   double? get _right {
     switch (port) {
       case _WindowMindMapPort.right:
-        return -size / 2;
+        return -size /
+            2;
 
       default:
         return null;
@@ -1260,11 +1987,14 @@ class _WindowConnectionHandle extends StatelessWidget {
   double? get _top {
     switch (port) {
       case _WindowMindMapPort.top:
-        return -size / 2;
+        return -size /
+            2;
 
       case _WindowMindMapPort.left:
       case _WindowMindMapPort.right:
-        return 38 - size / 2;
+        return 38 -
+            size /
+                2;
 
       case _WindowMindMapPort.bottom:
         return null;
@@ -1274,7 +2004,8 @@ class _WindowConnectionHandle extends StatelessWidget {
   double? get _bottom {
     switch (port) {
       case _WindowMindMapPort.bottom:
-        return -size / 2;
+        return -size /
+            2;
 
       default:
         return null;
@@ -1286,7 +2017,9 @@ class _WindowConnectionHandle extends StatelessWidget {
 // CARD DO NÓ
 // ============================================================
 
-class _WindowNodeCard extends StatelessWidget {
+class _WindowNodeCard
+    extends
+        StatelessWidget {
   final _WindowMindMapNode node;
 
   final Color activeColor;
@@ -1295,7 +2028,10 @@ class _WindowNodeCard extends StatelessWidget {
 
   final VoidCallback onTap;
 
-  final ValueChanged<Offset> onMove;
+  final ValueChanged<
+    Offset
+  >
+  onMove;
 
   final VoidCallback onRemove;
 
@@ -1312,48 +2048,81 @@ class _WindowNodeCard extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final nodeColor = _nodeColor(node.type, activeColor);
+  Widget build(
+    BuildContext context,
+  ) {
+    final nodeColor = _nodeColor(
+      node.type,
+      activeColor,
+    );
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
-      onPanUpdate: (details) {
-        onMove(details.delta);
-      },
+      onPanUpdate:
+          (
+            details,
+          ) {
+            onMove(
+              details.delta,
+            );
+          },
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
+        duration: const Duration(
+          milliseconds: 150,
+        ),
         width: double.infinity,
         height: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        padding: const EdgeInsets.symmetric(
+          horizontal: 10,
+          vertical: 7,
+        ),
         decoration: BoxDecoration(
           color: selected
-              ? nodeColor.withValues(alpha: 0.16)
-              : const Color(0xFF1A1A1A),
-          borderRadius: BorderRadius.circular(14),
+              ? nodeColor.withValues(
+                  alpha: 0.16,
+                )
+              : const Color(
+                  0xFF1A1A1A,
+                ),
+          borderRadius: BorderRadius.circular(
+            14,
+          ),
           border: Border.all(
             color: selected
-                ? nodeColor.withValues(alpha: 0.65)
-                : nodeColor.withValues(alpha: 0.20),
-            width: selected ? 1.4 : 1,
+                ? nodeColor.withValues(
+                    alpha: 0.65,
+                  )
+                : nodeColor.withValues(
+                    alpha: 0.20,
+                  ),
+            width: selected
+                ? 1.4
+                : 1,
           ),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
-              _nodeTypeLabel(node.type),
+              _nodeTypeLabel(
+                node.type,
+              ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                color: nodeColor.withValues(alpha: 0.72),
+                color: nodeColor.withValues(
+                  alpha: 0.72,
+                ),
                 fontSize: 8,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 0.5,
               ),
             ),
 
-            const SizedBox(height: 4),
+            const SizedBox(
+              height: 4,
+            ),
 
             Flexible(
               child: Text(
@@ -1371,7 +2140,9 @@ class _WindowNodeCard extends StatelessWidget {
             ),
 
             if (selected) ...[
-              const SizedBox(height: 4),
+              const SizedBox(
+                height: 4,
+              ),
 
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -1383,7 +2154,9 @@ class _WindowNodeCard extends StatelessWidget {
                     onTap: onAddToTimeline,
                   ),
 
-                  const SizedBox(width: 5),
+                  const SizedBox(
+                    width: 5,
+                  ),
 
                   _SmallNodeAction(
                     icon: Icons.delete_outline_rounded,
@@ -1405,7 +2178,9 @@ class _WindowNodeCard extends StatelessWidget {
 // AÇÃO PEQUENA
 // ============================================================
 
-class _SmallNodeAction extends StatelessWidget {
+class _SmallNodeAction
+    extends
+        StatelessWidget {
   final IconData icon;
 
   final String tooltip;
@@ -1422,15 +2197,27 @@ class _SmallNodeAction extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(
+    BuildContext context,
+  ) {
     return Tooltip(
       message: tooltip,
       child: InkWell(
-        borderRadius: BorderRadius.circular(7),
+        borderRadius: BorderRadius.circular(
+          7,
+        ),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(4),
-          child: Icon(icon, size: 13, color: color.withValues(alpha: 0.85)),
+          padding: const EdgeInsets.all(
+            4,
+          ),
+          child: Icon(
+            icon,
+            size: 13,
+            color: color.withValues(
+              alpha: 0.85,
+            ),
+          ),
         ),
       ),
     );
@@ -1441,8 +2228,13 @@ class _SmallNodeAction extends StatelessWidget {
 // CONEXÕES
 // ============================================================
 
-class _WindowConnectionsPainter extends CustomPainter {
-  final List<_WindowMindMapNode> nodes;
+class _WindowConnectionsPainter
+    extends
+        CustomPainter {
+  final List<
+    _WindowMindMapNode
+  >
+  nodes;
 
   final Color activeColor;
 
@@ -1464,13 +2256,23 @@ class _WindowConnectionsPainter extends CustomPainter {
   });
 
   @override
-  void paint(Canvas canvas, Size size) {
-    final nodeMap = {for (final node in nodes) node.id: node};
+  void paint(
+    Canvas canvas,
+    Size size,
+  ) {
+    final nodeMap = {
+      for (final node in nodes) node.id: node,
+    };
 
-    final drawn = <String>{};
+    final drawn =
+        <
+          String
+        >{};
 
     final linePaint = Paint()
-      ..color = activeColor.withValues(alpha: 0.24)
+      ..color = activeColor.withValues(
+        alpha: 0.24,
+      )
       ..strokeWidth = 1.5
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
@@ -1479,36 +2281,67 @@ class _WindowConnectionsPainter extends CustomPainter {
       for (final targetId in node.connections) {
         final target = nodeMap[targetId];
 
-        if (target == null) {
+        if (target ==
+            null) {
           continue;
         }
 
-        final ids = [node.id, target.id]..sort();
+        final ids = [
+          node.id,
+          target.id,
+        ]..sort();
 
         final key = '${ids[0]}-${ids[1]}';
 
-        if (!drawn.add(key)) {
+        if (!drawn.add(
+          key,
+        )) {
           continue;
         }
 
-        final start = _bestAnchor(from: node, to: target);
+        final start = _bestAnchor(
+          from: node,
+          to: target,
+        );
 
-        final end = _bestAnchor(from: target, to: node);
+        final end = _bestAnchor(
+          from: target,
+          to: node,
+        );
 
-        _drawCurve(canvas, start, end, linePaint);
+        _drawCurve(
+          canvas,
+          start,
+          end,
+          linePaint,
+        );
       }
     }
 
-    if (previewStart != null && previewCurrent != null) {
+    if (previewStart !=
+            null &&
+        previewCurrent !=
+            null) {
       final previewPaint = Paint()
-        ..color = activeColor.withValues(alpha: 0.78)
+        ..color = activeColor.withValues(
+          alpha: 0.78,
+        )
         ..strokeWidth = 2
         ..style = PaintingStyle.stroke
         ..strokeCap = StrokeCap.round;
 
-      _drawCurve(canvas, previewStart!, previewCurrent!, previewPaint);
+      _drawCurve(
+        canvas,
+        previewStart!,
+        previewCurrent!,
+        previewPaint,
+      );
 
-      canvas.drawCircle(previewCurrent!, 4, Paint()..color = activeColor);
+      canvas.drawCircle(
+        previewCurrent!,
+        4,
+        Paint()..color = activeColor,
+      );
     }
   }
 
@@ -1516,67 +2349,156 @@ class _WindowConnectionsPainter extends CustomPainter {
     required _WindowMindMapNode from,
     required _WindowMindMapNode to,
   }) {
-    final fromCenter = Offset(from.x + nodeWidth / 2, from.y + nodeHeight / 2);
+    final fromCenter = Offset(
+      from.x +
+          nodeWidth /
+              2,
+      from.y +
+          nodeHeight /
+              2,
+    );
 
-    final toCenter = Offset(to.x + nodeWidth / 2, to.y + nodeHeight / 2);
+    final toCenter = Offset(
+      to.x +
+          nodeWidth /
+              2,
+      to.y +
+          nodeHeight /
+              2,
+    );
 
-    final dx = toCenter.dx - fromCenter.dx;
+    final dx =
+        toCenter.dx -
+        fromCenter.dx;
 
-    final dy = toCenter.dy - fromCenter.dy;
+    final dy =
+        toCenter.dy -
+        fromCenter.dy;
 
-    if (dx.abs() >= dy.abs()) {
-      return dx >= 0
-          ? Offset(from.x + nodeWidth, from.y + nodeHeight / 2)
-          : Offset(from.x, from.y + nodeHeight / 2);
+    if (dx.abs() >=
+        dy.abs()) {
+      return dx >=
+              0
+          ? Offset(
+              from.x +
+                  nodeWidth,
+              from.y +
+                  nodeHeight /
+                      2,
+            )
+          : Offset(
+              from.x,
+              from.y +
+                  nodeHeight /
+                      2,
+            );
     }
 
-    return dy >= 0
-        ? Offset(from.x + nodeWidth / 2, from.y + nodeHeight)
-        : Offset(from.x + nodeWidth / 2, from.y);
+    return dy >=
+            0
+        ? Offset(
+            from.x +
+                nodeWidth /
+                    2,
+            from.y +
+                nodeHeight,
+          )
+        : Offset(
+            from.x +
+                nodeWidth /
+                    2,
+            from.y,
+          );
   }
 
-  void _drawCurve(Canvas canvas, Offset start, Offset end, Paint paint) {
+  void _drawCurve(
+    Canvas canvas,
+    Offset start,
+    Offset end,
+    Paint paint,
+  ) {
     final path = Path();
 
-    path.moveTo(start.dx, start.dy);
+    path.moveTo(
+      start.dx,
+      start.dy,
+    );
 
-    final dx = end.dx - start.dx;
+    final dx =
+        end.dx -
+        start.dx;
 
-    final dy = end.dy - start.dy;
+    final dy =
+        end.dy -
+        start.dy;
 
-    if (dx.abs() >= dy.abs()) {
-      final curve = math.max(40.0, dx.abs() * 0.35);
+    if (dx.abs() >=
+        dy.abs()) {
+      final curve = math.max(
+        40.0,
+        dx.abs() *
+            0.35,
+      );
 
       path.cubicTo(
-        start.dx + (dx >= 0 ? curve : -curve),
+        start.dx +
+            (dx >=
+                    0
+                ? curve
+                : -curve),
         start.dy,
-        end.dx - (dx >= 0 ? curve : -curve),
+        end.dx -
+            (dx >=
+                    0
+                ? curve
+                : -curve),
         end.dy,
         end.dx,
         end.dy,
       );
     } else {
-      final curve = math.max(40.0, dy.abs() * 0.35);
+      final curve = math.max(
+        40.0,
+        dy.abs() *
+            0.35,
+      );
 
       path.cubicTo(
         start.dx,
-        start.dy + (dy >= 0 ? curve : -curve),
+        start.dy +
+            (dy >=
+                    0
+                ? curve
+                : -curve),
         end.dx,
-        end.dy - (dy >= 0 ? curve : -curve),
+        end.dy -
+            (dy >=
+                    0
+                ? curve
+                : -curve),
         end.dx,
         end.dy,
       );
     }
 
-    canvas.drawPath(path, paint);
+    canvas.drawPath(
+      path,
+      paint,
+    );
   }
 
   @override
-  bool shouldRepaint(covariant _WindowConnectionsPainter oldDelegate) {
-    return oldDelegate.nodes != nodes ||
-        oldDelegate.previewStart != previewStart ||
-        oldDelegate.previewCurrent != previewCurrent ||
-        oldDelegate.activeColor != activeColor;
+  bool shouldRepaint(
+    covariant _WindowConnectionsPainter oldDelegate,
+  ) {
+    return oldDelegate.nodes !=
+            nodes ||
+        oldDelegate.previewStart !=
+            previewStart ||
+        oldDelegate.previewCurrent !=
+            previewCurrent ||
+        oldDelegate.activeColor !=
+            activeColor;
   }
 }
 
@@ -1584,7 +2506,11 @@ class _WindowConnectionsPainter extends CustomPainter {
 // TIPO → COR
 // ============================================================
 
-Color _nodeColor(String type, Color activeColor) {
+Color
+_nodeColor(
+  String type,
+  Color activeColor,
+) {
   switch (type.toLowerCase()) {
     case 'scene':
       return Colors.blueAccent;
@@ -1611,7 +2537,10 @@ Color _nodeColor(String type, Color activeColor) {
 // TIPO → LABEL
 // ============================================================
 
-String _nodeTypeLabel(String type) {
+String
+_nodeTypeLabel(
+  String type,
+) {
   switch (type.toLowerCase()) {
     case 'scene':
       return 'CENA';

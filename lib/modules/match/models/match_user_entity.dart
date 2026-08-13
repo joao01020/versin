@@ -1,10 +1,8 @@
-// EN: Pure Dart Entity - No external package imports needed here
-// PT: Entidade Pura em Dart - Nenhuma importação de pacote externo é necessária aqui
+import 'package:versin/modules/profile/models/music_role.dart';
 
-enum UserRole {
-  artist,
-  beatmaker,
-}
+// ============================================================
+// CONNECTION TYPE
+// ============================================================
 
 enum ConnectionType {
   chat,
@@ -12,30 +10,128 @@ enum ConnectionType {
   proximity,
 }
 
+// ============================================================
+// MATCH USER ENTITY
+// ============================================================
+//
+// Entidade de usuário utilizada pelo módulo Match.
+//
+// Agora utiliza:
+//
+// MusicRole
+//
+// em vez do antigo:
+//
+// UserRole
+//
+// Isso permite suportar:
+//
+// - Artista
+// - Beatmaker
+// - Produtor
+// - Compositor
+// - Eng. de Mixagem
+// - Eng. de Masterização
+// - Eng. de Gravação
+// - Instrumentista
+// - Sound Designer
+// - DJ
+//
+// ============================================================
+
 class MatchUserEntity {
+  // ============================================================
+  // IDENTIDADE
+  // ============================================================
+
   final String id;
+
   final String name;
-  final UserRole role;
+
+  // ============================================================
+  // PERFIL PROFISSIONAL
+  // ============================================================
+
+  /// Função principal do usuário.
+  ///
+  /// Exemplo:
+  ///
+  /// MusicRole.beatmaker
+  final MusicRole? primaryRole;
+
+  /// Todas as funções exercidas pelo usuário.
+  ///
+  /// Exemplo:
+  ///
+  /// [
+  ///   MusicRole.beatmaker,
+  ///   MusicRole.artist,
+  /// ]
+  final List<
+    MusicRole
+  >
+  roles;
+
+  /// Profissionais com quem este usuário deseja se conectar.
+  ///
+  /// Exemplo:
+  ///
+  /// [
+  ///   MusicRole.artist,
+  ///   MusicRole.composer,
+  /// ]
+  final List<
+    MusicRole
+  >
+  lookingForRoles;
+
+  // ============================================================
+  // PERFIL
+  // ============================================================
+
   final List<
     String
   >
   tags;
+
   final String bio;
-  final String showcaseMediaUrl; // EN: Showcase sample URL | PT: URL do trabalho em destaque na vitrine
-  final String showcaseDescription; // EN: Used by AI algorithm | PT: Usado pelo algoritmo da IA
+
+  final String showcaseMediaUrl;
+
+  final String showcaseDescription;
+
+  // ============================================================
+  // LOCALIZAÇÃO / STATUS
+  // ============================================================
+
   final double distanceKm;
+
   final bool isOnline;
 
-  // EN: Enhanced fields supporting the 20-min micro-session & protocol contract pipeline
-  // PT: Campos aprimorados suportando a micro-sessão de 20 minutos e o pipeline de contrato do protocolo
-  final ConnectionType preferredConnection; // EN: Defines if user is available for chat, video or proximity | PT: Define se está disponível para chat, vídeo ou proximidade
-  final DateTime? sessionStartedAt; // EN: Timestamp to validate the strict 20-minute window | PT: Timestamp para validar a janela estrita de 20 minutos
-  final String? provisionalHash; // EN: SHA/MD5 temporary workspace lock generated upon intent agreement | PT: Trava temporária do workspace gerada no acordo de intenção
+  // ============================================================
+  // CONEXÃO
+  // ============================================================
+
+  final ConnectionType preferredConnection;
+
+  // ============================================================
+  // SESSÃO
+  // ============================================================
+
+  final DateTime? sessionStartedAt;
+
+  final String? provisionalHash;
+
+  // ============================================================
+  // CONSTRUTOR
+  // ============================================================
 
   const MatchUserEntity({
     required this.id,
     required this.name,
-    required this.role,
+    required this.primaryRole,
+    required this.roles,
+    required this.lookingForRoles,
     required this.tags,
     required this.bio,
     required this.showcaseMediaUrl,
@@ -47,12 +143,134 @@ class MatchUserEntity {
     this.provisionalHash,
   });
 
-  // EN: CopyWith method to safely update immutable states inside the controller pipeline
-  // PT: Método copyWith para atualizar estados imutáveis com segurança dentro do pipeline do controller
+  // ============================================================
+  // LABEL DA FUNÇÃO PRINCIPAL
+  // ============================================================
+
+  String get primaryRoleLabel {
+    return primaryRole?.label ??
+        'Não informado';
+  }
+
+  // ============================================================
+  // POSSUI FUNÇÃO PRINCIPAL
+  // ============================================================
+
+  bool get hasPrimaryRole {
+    return primaryRole !=
+        null;
+  }
+
+  // ============================================================
+  // POSSUI FUNÇÕES
+  // ============================================================
+
+  bool get hasRoles {
+    return roles.isNotEmpty;
+  }
+
+  // ============================================================
+  // ESTÁ PROCURANDO PROFISSIONAIS
+  // ============================================================
+
+  bool get isLookingForProfessionals {
+    return lookingForRoles.isNotEmpty;
+  }
+
+  // ============================================================
+  // VERIFICAR SE EXERCE UMA FUNÇÃO
+  // ============================================================
+
+  bool hasRole(
+    MusicRole role,
+  ) {
+    return roles.contains(
+      role,
+    );
+  }
+
+  // ============================================================
+  // VERIFICAR SE PROCURA UMA FUNÇÃO
+  // ============================================================
+
+  bool isLookingFor(
+    MusicRole role,
+  ) {
+    return lookingForRoles.contains(
+      role,
+    );
+  }
+
+  // ============================================================
+  // COMPATIBILIDADE COM OUTRO USUÁRIO
+  // ============================================================
+
+  bool isInterestedIn(
+    MatchUserEntity other,
+  ) {
+    for (final role in other.roles) {
+      if (lookingForRoles.contains(
+        role,
+      )) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  // ============================================================
+  // MATCH MÚTUO
+  // ============================================================
+
+  bool hasMutualInterestWith(
+    MatchUserEntity other,
+  ) {
+    return isInterestedIn(
+          other,
+        ) &&
+        other.isInterestedIn(
+          this,
+        );
+  }
+
+  // ============================================================
+  // FUNÇÕES COMPATÍVEIS
+  // ============================================================
+
+  List<
+    MusicRole
+  >
+  matchingRolesWith(
+    MatchUserEntity other,
+  ) {
+    return other.roles
+        .where(
+          (
+            role,
+          ) => lookingForRoles.contains(
+            role,
+          ),
+        )
+        .toList();
+  }
+
+  // ============================================================
+  // COPY WITH
+  // ============================================================
+
   MatchUserEntity copyWith({
     String? id,
     String? name,
-    UserRole? role,
+    MusicRole? primaryRole,
+    List<
+      MusicRole
+    >?
+    roles,
+    List<
+      MusicRole
+    >?
+    lookingForRoles,
     List<
       String
     >?
@@ -70,39 +288,74 @@ class MatchUserEntity {
       id:
           id ??
           this.id,
+
       name:
           name ??
           this.name,
-      role:
-          role ??
-          this.role,
+
+      primaryRole:
+          primaryRole ??
+          this.primaryRole,
+
+      roles:
+          roles ??
+          this.roles,
+
+      lookingForRoles:
+          lookingForRoles ??
+          this.lookingForRoles,
+
       tags:
           tags ??
           this.tags,
+
       bio:
           bio ??
           this.bio,
+
       showcaseMediaUrl:
           showcaseMediaUrl ??
           this.showcaseMediaUrl,
+
       showcaseDescription:
           showcaseDescription ??
           this.showcaseDescription,
+
       distanceKm:
           distanceKm ??
           this.distanceKm,
+
       isOnline:
           isOnline ??
           this.isOnline,
+
       preferredConnection:
           preferredConnection ??
           this.preferredConnection,
+
       sessionStartedAt:
           sessionStartedAt ??
           this.sessionStartedAt,
+
       provisionalHash:
           provisionalHash ??
           this.provisionalHash,
     );
+  }
+
+  // ============================================================
+  // DEBUG
+  // ============================================================
+
+  @override
+  String toString() {
+    return 'MatchUserEntity('
+        'id: $id, '
+        'name: $name, '
+        'primaryRole: ${primaryRole?.key}, '
+        'roles: ${MusicRole.toKeys(roles)}, '
+        'lookingForRoles: ${MusicRole.toKeys(lookingForRoles)}, '
+        'isOnline: $isOnline'
+        ')';
   }
 }

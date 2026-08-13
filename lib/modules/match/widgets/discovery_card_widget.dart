@@ -1,13 +1,33 @@
 import 'package:flutter/material.dart';
+
 import '../controllers/match_controllers.dart';
 import '../models/match_user_entity.dart';
 import 'action_button_widget.dart';
-import '../../networking/views/networking_session_view.dart';
+
+// ============================================================
+// DISCOVERY CARD WIDGET
+// ============================================================
+//
+// Card principal do módulo Match.
+//
+// Exibe:
+//
+// - showcase;
+// - nome;
+// - função principal;
+// - bio;
+// - tipo de conexão;
+// - timer;
+// - profissionais procurados;
+// - ações.
+//
+// ============================================================
 
 class DiscoveryCardWidget
     extends
         StatefulWidget {
   final MatchController controller;
+
   final MatchUserEntity user;
 
   const DiscoveryCardWidget({
@@ -28,38 +48,91 @@ class _DiscoveryCardWidgetState
         State<
           DiscoveryCardWidget
         > {
+  // ============================================================
+  // ESTADO
+  // ============================================================
+
   bool _isWaitingForNetworking = false;
+
+  // ============================================================
+  // MATCH INTENT
+  // ============================================================
 
   Future<
     void
   >
   _handleMatchIntent() async {
-    // Verificação de segurança para obter o ID de forma estável
-    final String? userId = widget.controller.currentUserId;
+    final userId = widget.controller.currentUserId;
+
     if (userId ==
         null) {
       debugPrint(
-        "Erro: Usuário não está autenticado!",
+        '[DISCOVERY] Usuário não autenticado.',
       );
+
+      return;
+    }
+
+    if (_isWaitingForNetworking) {
       return;
     }
 
     setState(
-      () => _isWaitingForNetworking = true,
+      () {
+        _isWaitingForNetworking = true;
+      },
     );
 
-    // 1. Registra o like no Supabase
-    await widget.controller.registerLike(
-      widget.user.id,
-    );
+    try {
+      // ========================================================
+      // LIKE
+      // ========================================================
 
-    // 2. Tenta processar o match.
-    // A navegação agora é controlada pela MatchPage via listener do stream.
-    await widget.controller.checkAndStartNetworking(
-      userId,
-      widget.user.id,
-    );
+      await widget.controller.registerLike(
+        widget.user.id,
+      );
+
+      // ========================================================
+      // VERIFICAR MATCH MÚTUO
+      // ========================================================
+
+      final started = await widget.controller.checkAndStartNetworking(
+        userId,
+        widget.user.id,
+      );
+
+      // ========================================================
+      // SE AINDA NÃO É MATCH MÚTUO
+      // ========================================================
+
+      if (!started &&
+          mounted) {
+        setState(
+          () {
+            _isWaitingForNetworking = false;
+          },
+        );
+      }
+    } catch (
+      error
+    ) {
+      debugPrint(
+        '[DISCOVERY] Erro ao processar conexão: $error',
+      );
+
+      if (mounted) {
+        setState(
+          () {
+            _isWaitingForNetworking = false;
+          },
+        );
+      }
+    }
   }
+
+  // ============================================================
+  // CONNECTION ICON
+  // ============================================================
 
   IconData _getConnectionIcon(
     ConnectionType type,
@@ -67,12 +140,37 @@ class _DiscoveryCardWidgetState
     switch (type) {
       case ConnectionType.chat:
         return Icons.chat_bubble_outline;
+
       case ConnectionType.video:
         return Icons.videocam_outlined;
+
       case ConnectionType.proximity:
         return Icons.location_on_outlined;
     }
   }
+
+  // ============================================================
+  // CONNECTION LABEL
+  // ============================================================
+
+  String _getConnectionLabel(
+    ConnectionType type,
+  ) {
+    switch (type) {
+      case ConnectionType.chat:
+        return 'CHAT';
+
+      case ConnectionType.video:
+        return 'VÍDEO';
+
+      case ConnectionType.proximity:
+        return 'PROXIMIDADE';
+    }
+  }
+
+  // ============================================================
+  // BUILD
+  // ============================================================
 
   @override
   Widget build(
@@ -86,6 +184,7 @@ class _DiscoveryCardWidgetState
               2,
               '0',
             );
+
     final seconds =
         (widget.controller.remainingSeconds %
                 60)
@@ -96,7 +195,7 @@ class _DiscoveryCardWidgetState
             );
 
     return Container(
-      height: 220,
+      height: 250,
       width: double.infinity,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(
@@ -104,7 +203,7 @@ class _DiscoveryCardWidgetState
         ),
         border: Border.all(
           color: Colors.white.withValues(
-            alpha: 0.1,
+            alpha: 0.10,
           ),
         ),
       ),
@@ -114,11 +213,14 @@ class _DiscoveryCardWidgetState
         ),
         child: Stack(
           children: [
+            // ==================================================
+            // BACKGROUND
+            // ==================================================
             Positioned.fill(
               child: Image.network(
                 widget.user.showcaseMediaUrl.isNotEmpty
                     ? widget.user.showcaseMediaUrl
-                    : "https://images.unsplash.com/photo-1514525253361-bee8718a7439?q=80&w=500",
+                    : 'https://images.unsplash.com/photo-1514525253361-bee8718a7439?q=80&w=500',
                 fit: BoxFit.cover,
                 errorBuilder:
                     (
@@ -137,32 +239,50 @@ class _DiscoveryCardWidgetState
                     },
               ),
             ),
+
+            // ==================================================
+            // GRADIENT
+            // ==================================================
             Positioned.fill(
               child: Container(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.bottomRight,
+                    end: Alignment.topLeft,
                     colors: [
                       widget.controller.primaryPurple.withValues(
-                        alpha: 0.8,
+                        alpha: 0.85,
                       ),
-                      Colors.black54,
+                      Colors.black.withValues(
+                        alpha: 0.78,
+                      ),
+                      Colors.black26,
                     ],
                   ),
                 ),
               ),
             ),
+
+            // ==================================================
+            // CONTENT
+            // ==================================================
             Padding(
               padding: const EdgeInsets.all(
-                20.0,
+                20,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
+                  // ==================================================
+                  // TOP BAR
+                  // ==================================================
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
+                      // ==========================================
+                      // CONNECTION TYPE
+                      // ==========================================
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 8,
@@ -170,7 +290,7 @@ class _DiscoveryCardWidgetState
                         ),
                         decoration: BoxDecoration(
                           color: Colors.black.withValues(
-                            alpha: 0.4,
+                            alpha: 0.45,
                           ),
                           borderRadius: BorderRadius.circular(
                             8,
@@ -185,11 +305,15 @@ class _DiscoveryCardWidgetState
                               color: Colors.white70,
                               size: 14,
                             ),
+
                             const SizedBox(
                               width: 4,
                             ),
+
                             Text(
-                              widget.user.preferredConnection.name.toUpperCase(),
+                              _getConnectionLabel(
+                                widget.user.preferredConnection,
+                              ),
                               style: const TextStyle(
                                 color: Colors.white70,
                                 fontSize: 10,
@@ -200,6 +324,10 @@ class _DiscoveryCardWidgetState
                           ],
                         ),
                       ),
+
+                      // ==========================================
+                      // TIMER
+                      // ==========================================
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 8,
@@ -214,7 +342,7 @@ class _DiscoveryCardWidgetState
                           ),
                         ),
                         child: Text(
-                          "$minutes:$seconds",
+                          '$minutes:$seconds',
                           style: TextStyle(
                             color: widget.controller.accentNeon,
                             fontSize: 12,
@@ -224,20 +352,31 @@ class _DiscoveryCardWidgetState
                       ),
                     ],
                   ),
+
                   const Spacer(),
+
+                  // ==================================================
+                  // NOME
+                  // ==================================================
                   Row(
                     children: [
-                      Text(
-                        widget.user.name,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
+                      Flexible(
+                        child: Text(
+                          widget.user.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
+
                       const SizedBox(
                         width: 8,
                       ),
+
                       Icon(
                         Icons.verified,
                         color: widget.controller.accentNeon,
@@ -245,24 +384,70 @@ class _DiscoveryCardWidgetState
                       ),
                     ],
                   ),
+
+                  const SizedBox(
+                    height: 3,
+                  ),
+
+                  // ==================================================
+                  // FUNÇÃO PRINCIPAL
+                  // ==================================================
                   Text(
-                    widget.user.bio,
+                    widget.user.primaryRoleLabel,
+                    style: TextStyle(
+                      color: widget.controller.accentNeon,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+
+                  const SizedBox(
+                    height: 6,
+                  ),
+
+                  // ==================================================
+                  // BIO
+                  // ==================================================
+                  Text(
+                    widget.user.bio.trim().isEmpty
+                        ? 'Sem bio informada.'
+                        : widget.user.bio,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       color: Colors.white70,
                       fontSize: 12,
+                      height: 1.3,
                     ),
                   ),
+
+                  // ==================================================
+                  // QUEM PROCURA
+                  // ==================================================
+                  if (widget.user.lookingForRoles.isNotEmpty) ...[
+                    const SizedBox(
+                      height: 8,
+                    ),
+
+                    _buildLookingForRow(),
+                  ],
+
                   const SizedBox(
-                    height: 16,
+                    height: 14,
                   ),
+
+                  // ==================================================
+                  // AÇÕES
+                  // ==================================================
                   _isWaitingForNetworking
                       ? Container(
+                          width: double.infinity,
                           padding: const EdgeInsets.all(
                             12,
                           ),
                           decoration: BoxDecoration(
                             color: Colors.white.withValues(
-                              alpha: 0.1,
+                              alpha: 0.10,
                             ),
                             borderRadius: BorderRadius.circular(
                               12,
@@ -270,7 +455,7 @@ class _DiscoveryCardWidgetState
                           ),
                           child: const Center(
                             child: Text(
-                              "ESPERANDO NETWORKING...",
+                              'ESPERANDO NETWORKING...',
                               style: TextStyle(
                                 color: Colors.white70,
                                 fontSize: 12,
@@ -280,34 +465,58 @@ class _DiscoveryCardWidgetState
                         )
                       : Row(
                           children: [
+                            // ======================================
+                            // PASSAR
+                            // ======================================
                             ActionButtonWidget(
                               icon: Icons.close,
                               color: Colors.white24,
-                              onTap: () {},
+                              onTap: () {
+                                debugPrint(
+                                  '[DISCOVERY] Perfil ignorado: '
+                                  '${widget.user.id}',
+                                );
+                              },
                             ),
+
                             const SizedBox(
                               width: 12,
                             ),
+
+                            // ======================================
+                            // LIKE
+                            // ======================================
                             ActionButtonWidget(
                               icon: Icons.favorite,
                               color: widget.controller.accentNeon,
                               onTap: _handleMatchIntent,
                             ),
+
                             const Spacer(),
-                            ElevatedButton(
-                              onPressed: () => widget.controller.listenDemo(),
+
+                            // ======================================
+                            // DEMO
+                            // ======================================
+                            ElevatedButton.icon(
+                              onPressed: widget.controller.listenDemo,
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: widget.controller.accentNeon,
+                                foregroundColor: Colors.black,
+                                elevation: 0,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(
                                     12,
                                   ),
                                 ),
                               ),
-                              child: const Text(
-                                "OUVIR DEMO",
+                              icon: const Icon(
+                                Icons.play_arrow_rounded,
+                                size: 17,
+                              ),
+                              label: const Text(
+                                'OUVIR DEMO',
                                 style: TextStyle(
-                                  color: Colors.black,
+                                  fontSize: 10,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
@@ -320,6 +529,77 @@ class _DiscoveryCardWidgetState
           ],
         ),
       ),
+    );
+  }
+
+  // ============================================================
+  // QUEM PROCURA
+  // ============================================================
+
+  Widget _buildLookingForRow() {
+    final roles = widget.user.lookingForRoles;
+
+    final visibleRoles = roles.take(
+      3,
+    );
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        const Icon(
+          Icons.person_search_outlined,
+          color: Colors.white38,
+          size: 13,
+        ),
+
+        const SizedBox(
+          width: 5,
+        ),
+
+        const Text(
+          'Procura:',
+          style: TextStyle(
+            color: Colors.white38,
+            fontSize: 9,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+
+        const SizedBox(
+          width: 6,
+        ),
+
+        Expanded(
+          child: Text(
+            visibleRoles
+                .map(
+                  (
+                    role,
+                  ) => role.label,
+                )
+                .join(
+                  ' • ',
+                ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 9,
+            ),
+          ),
+        ),
+
+        if (roles.length >
+            3)
+          Text(
+            '+${roles.length - 3}',
+            style: TextStyle(
+              color: widget.controller.accentNeon,
+              fontSize: 9,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+      ],
     );
   }
 }

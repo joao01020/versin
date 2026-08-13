@@ -24,7 +24,7 @@ import 'package:versin/modules/wallet/views/wallet_page.dart';
 import 'package:versin/modules/market/market_page.dart';
 import 'package:versin/modules/storage/views/storage_page.dart';
 import 'package:versin/modules/vnode/vnode_page.dart';
-import 'package:versin/modules/settings/settings_page.dart';
+import 'package:versin/modules/settings/views/settings_page.dart';
 import 'package:versin/modules/studio/views/studio_page.dart';
 
 // ============================================================
@@ -176,7 +176,7 @@ class _DashboardPageState
 
     _DashboardMenuItem(
       originalIndex: 5,
-      label: 'Armazenamento',
+      label: 'Armazenar',
       icon: Icons.storefront_outlined,
       route: AppRoutes.storage,
       visible: DashboardMenuVisibility.showStorage,

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import 'package:versin/modules/login/data/repositories/auth_repository_impl.dart';
+import 'package:versin/modules/login/domain/repositories/auth_repository.dart';
+
 import '../data/models/hardware_status_model.dart';
 import '../repositories/dashboard_repository.dart';
 
@@ -8,7 +11,9 @@ class DashboardController
         ChangeNotifier {
   final DashboardRepository _repository = DashboardRepository();
 
-  late final PageController pageController;
+  final AuthRepository _authRepository = AuthRepositoryImpl();
+
+  PageController? _pageController;
 
   int _currentIndex = 0;
 
@@ -41,13 +46,27 @@ class DashboardController
   );
 
   // ============================================================
-  // ESTADOS
+  // PERFIL / ARTISTA
   // ============================================================
+
+  String _artistName = 'Artista';
+
+  bool _isLoadingArtistName = false;
+
+  String get artistName => _artistName;
+
+  bool get isLoadingArtistName => _isLoadingArtistName;
 
   String? profileImagePath;
 
+  // ============================================================
+  // ESTADOS
+  // ============================================================
+
   bool isProfileCardExpanded = true;
+
   bool isCalendarExpanded = false;
+
   bool hasActiveProject = false;
 
   DateTime focusedDay = DateTime.now();
@@ -94,6 +113,12 @@ class DashboardController
 
   int get currentIndex => _currentIndex;
 
+  PageController get pageController {
+    return _pageController ??= PageController(
+      initialPage: _currentIndex,
+    );
+  }
+
   Stream<
     List<
       HardwareStatusModel
@@ -105,12 +130,80 @@ class DashboardController
   // INIT
   // ============================================================
 
-  void init() {
-    pageController = PageController(
+  Future<
+    void
+  >
+  init() async {
+    _pageController ??= PageController(
       initialPage: _currentIndex,
     );
 
     _checkActiveProjects();
+
+    await loadArtistName();
+  }
+
+  // ============================================================
+  // CARREGAR NOME ARTÍSTICO
+  // ============================================================
+
+  Future<
+    void
+  >
+  loadArtistName() async {
+    if (_isLoadingArtistName) {
+      return;
+    }
+
+    _isLoadingArtistName = true;
+
+    notifyListeners();
+
+    try {
+      final name = await _authRepository.getArtistName();
+
+      if (name !=
+              null &&
+          name.trim().isNotEmpty) {
+        _artistName = name.trim();
+      } else {
+        _artistName = 'Artista';
+      }
+
+      debugPrint(
+        '[DASHBOARD] Nome artístico carregado: $_artistName',
+      );
+    } catch (
+      error
+    ) {
+      debugPrint(
+        '[DASHBOARD] Erro ao carregar nome artístico: $error',
+      );
+
+      _artistName = 'Artista';
+    } finally {
+      _isLoadingArtistName = false;
+
+      notifyListeners();
+    }
+  }
+
+  // ============================================================
+  // ATUALIZAR NOME ARTÍSTICO EM MEMÓRIA
+  // ============================================================
+
+  void updateArtistName(
+    String value,
+  ) {
+    final normalized = value.trim();
+
+    if (normalized.isEmpty) {
+      return;
+    }
+
+    _artistName = normalized;
+
+    notifyListeners();
   }
 
   // ============================================================
@@ -137,8 +230,12 @@ class DashboardController
 
     _currentIndex = index;
 
-    if (pageController.hasClients) {
-      pageController.jumpToPage(
+    final controller = _pageController;
+
+    if (controller !=
+            null &&
+        controller.hasClients) {
+      controller.jumpToPage(
         index,
       );
     }
@@ -165,19 +262,6 @@ class DashboardController
 
   // ============================================================
   // TÍTULO DO MÓDULO
-  // ============================================================
-  //
-  // 0 = Dashboard
-  // 1 = Match
-  // 2 = Market
-  // 3 = Wallet
-  // 4 = Chat
-  // 5 = Showcase
-  // 6 = Hardware Hub
-  // 7 = VNode Network
-  // 8 = Settings
-  // 9 = Studio
-  //
   // ============================================================
 
   String getModuleTitle() {
@@ -364,12 +448,48 @@ class DashboardController
   }
 
   // ============================================================
+  // RESET DO PAGE CONTROLLER
+  // ============================================================
+
+  void resetPageController() {
+    _pageController?.dispose();
+
+    _pageController = null;
+  }
+
+  // ============================================================
+  // RESET DE NAVEGAÇÃO
+  // ============================================================
+
+  void resetNavigation() {
+    _currentIndex = 0;
+
+    resetPageController();
+
+    notifyListeners();
+  }
+
+  // ============================================================
+  // RESET DO PERFIL
+  // ============================================================
+
+  void resetProfile() {
+    _artistName = 'Artista';
+
+    profileImagePath = null;
+
+    notifyListeners();
+  }
+
+  // ============================================================
   // DISPOSE
   // ============================================================
 
   @override
   void dispose() {
-    pageController.dispose();
+    _pageController?.dispose();
+
+    _pageController = null;
 
     super.dispose();
   }

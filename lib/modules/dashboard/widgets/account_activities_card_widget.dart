@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:versin/app/routes/app_routes.dart'; // Importação das rotas
+
+import 'package:versin/app/locator.dart';
+import 'package:versin/app/routes/app_routes.dart';
+import 'package:versin/modules/profile/controllers/professional_profile_controller.dart';
+
 import '../controllers/dashboard_controller.dart';
 
-/// [AccountActivitiesCardWidget] renders profile summary and recent system logs.
 class AccountActivitiesCardWidget
     extends
-        StatelessWidget {
+        StatefulWidget {
   final DashboardController controller;
+
   final VoidCallback onStateChanged;
 
   const AccountActivitiesCardWidget({
@@ -15,7 +19,36 @@ class AccountActivitiesCardWidget
     required this.onStateChanged,
   });
 
-  // Função para abrir o Modal de Notificações
+  @override
+  State<
+    AccountActivitiesCardWidget
+  >
+  createState() => _AccountActivitiesCardWidgetState();
+}
+
+class _AccountActivitiesCardWidgetState
+    extends
+        State<
+          AccountActivitiesCardWidget
+        > {
+  late final ProfessionalProfileController _profileController;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _profileController =
+        sl<
+          ProfessionalProfileController
+        >();
+
+    _profileController.load();
+  }
+
+  // ============================================================
+  // NOTIFICAÇÕES
+  // ============================================================
+
   void _showNotificationsModal(
     BuildContext context,
   ) {
@@ -58,7 +91,7 @@ class AccountActivitiesCardWidget
                   height: 20,
                 ),
                 const Text(
-                  "NOTIFICAÇÕES",
+                  'NOTIFICAÇÕES',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 18,
@@ -71,7 +104,7 @@ class AccountActivitiesCardWidget
                 const Expanded(
                   child: Center(
                     child: Text(
-                      "Nenhuma notificação nova.",
+                      'Nenhuma notificação nova.',
                       style: TextStyle(
                         color: Colors.white54,
                       ),
@@ -84,236 +117,279 @@ class AccountActivitiesCardWidget
     );
   }
 
+  // ============================================================
+  // BUILD
+  // ============================================================
+
   @override
   Widget build(
     BuildContext context,
   ) {
-    return Container(
-      padding: const EdgeInsets.all(
-        20,
-      ),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Color(
-              0xFF1F1A3A,
-            ),
-            Color(
-              0xFF0D0B1F,
-            ),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(
-          24,
-        ),
-        border: Border.all(
-          color: Colors.white.withValues(
-            alpha: 0.05,
-          ),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color:
-                const Color(
-                  0xFF1F1A3A,
-                ).withValues(
-                  alpha: 0.5,
-                ),
-            blurRadius: 10,
-            offset: const Offset(
-              0,
-              4,
-            ),
-          ),
+    return AnimatedBuilder(
+      animation: Listenable.merge(
+        [
+          widget.controller,
+          _profileController,
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              GestureDetector(
-                onTap: () {
-                  controller.toggleProfileCard();
-                  onStateChanged();
-                },
-                child: Icon(
-                  controller.isProfileCardExpanded
-                      ? Icons.keyboard_arrow_up
-                      : Icons.keyboard_arrow_down,
-                  color: Colors.white54,
-                  size: 22,
-                ),
-              ),
-            ],
-          ),
-          GestureDetector(
-            onTap: controller.pickProfileImage,
-            child: CircleAvatar(
-              radius: 36,
-              backgroundColor: const Color(
-                0xFFFFCC80,
-              ),
-              backgroundImage:
-                  controller.profileImagePath !=
-                      null
-                  ? NetworkImage(
-                      controller.profileImagePath!,
-                    )
-                  : null,
-              child:
-                  controller.profileImagePath ==
-                      null
-                  ? const Icon(
-                      Icons.person,
-                      color: Color(
-                        0xFF2E1A47,
-                      ),
-                      size: 40,
-                    )
-                  : null,
-            ),
-          ),
-          const SizedBox(
-            height: 14,
-          ),
-          const Text(
-            "Astryvo",
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 0.5,
-            ),
-          ),
-          const SizedBox(
-            height: 4,
-          ),
-          const Text(
-            "Beatmaker",
-            style: TextStyle(
-              color: Colors.white54,
-              fontSize: 12,
-              fontWeight: FontWeight.w400,
-            ),
-          ),
-          const SizedBox(
-            height: 20,
-          ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _buildCircularActionIcon(
-                context,
-                Icons.description_outlined,
-                route: AppRoutes.contracts,
-              ),
-              const SizedBox(
-                width: 16,
-              ),
-              _buildCircularActionIcon(
-                context,
-                Icons.calendar_today_outlined,
-                route: AppRoutes.calendar,
-              ),
-              const SizedBox(
-                width: 16,
-              ),
-              // Botão de notificação agora chama o Modal:
-              _buildCircularActionIcon(
-                context,
-                Icons.notifications_none_outlined,
-                hasNotification: true,
-                onTap: () => _showNotificationsModal(
-                  context,
-                ),
-              ),
-            ],
-          ),
-          if (controller.isProfileCardExpanded) ...[
-            const SizedBox(
-              height: 28,
-            ),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "Atividades Recentes",
-                    style: TextStyle(
-                      color: Colors.white.withValues(
-                        alpha: 0.8,
-                      ),
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(
-                    height: 4,
-                  ),
-                  Text(
-                    "${DateTime.now().day.toString().padLeft(2, '0')} ${controller.getShortMonthName(controller.focusedDay.month)} ${controller.focusedDay.year}",
-                    style: const TextStyle(
-                      color: Colors.white38,
-                      fontSize: 11,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(
-              height: 20,
-            ),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(
-                vertical: 24,
-                horizontal: 16,
+      builder:
+          (
+            context,
+            _,
+          ) {
+            return Container(
+              padding: const EdgeInsets.all(
+                20,
               ),
               decoration: BoxDecoration(
-                color: Colors.black.withValues(
-                  alpha: 0.2,
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color(
+                      0xFF1F1A3A,
+                    ),
+                    Color(
+                      0xFF0D0B1F,
+                    ),
+                  ],
                 ),
                 borderRadius: BorderRadius.circular(
-                  16,
+                  24,
                 ),
                 border: Border.all(
                   color: Colors.white.withValues(
-                    alpha: 0.02,
+                    alpha: 0.05,
                   ),
                 ),
               ),
-              child: const Column(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  Icon(
-                    Icons.history_toggle_off,
-                    color: Colors.white24,
-                    size: 28,
+                  // ==================================================
+                  // EXPANDIR
+                  // ==================================================
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      GestureDetector(
+                        onTap: () {
+                          widget.controller.toggleProfileCard();
+
+                          widget.onStateChanged();
+                        },
+                        child: Icon(
+                          widget.controller.isProfileCardExpanded
+                              ? Icons.keyboard_arrow_up
+                              : Icons.keyboard_arrow_down,
+                          color: Colors.white54,
+                          size: 22,
+                        ),
+                      ),
+                    ],
                   ),
-                  SizedBox(
-                    height: 8,
-                  ),
-                  Text(
-                    "Nenhuma atividade recente por aqui.",
-                    style: TextStyle(
-                      color: Colors.white38,
-                      fontSize: 11,
-                      fontStyle: FontStyle.italic,
+
+                  // ==================================================
+                  // AVATAR
+                  // ==================================================
+                  GestureDetector(
+                    onTap: widget.controller.pickProfileImage,
+                    child: CircleAvatar(
+                      radius: 36,
+                      backgroundColor: const Color(
+                        0xFFFFCC80,
+                      ),
+                      backgroundImage:
+                          widget.controller.profileImagePath !=
+                              null
+                          ? NetworkImage(
+                              widget.controller.profileImagePath!,
+                            )
+                          : null,
+                      child:
+                          widget.controller.profileImagePath ==
+                              null
+                          ? const Icon(
+                              Icons.person,
+                              color: Color(
+                                0xFF2E1A47,
+                              ),
+                              size: 40,
+                            )
+                          : null,
                     ),
-                    textAlign: TextAlign.center,
                   ),
+
+                  const SizedBox(
+                    height: 14,
+                  ),
+
+                  // ==================================================
+                  // NOME ARTÍSTICO
+                  // ==================================================
+                  Text(
+                    widget.controller.artistName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+
+                  const SizedBox(
+                    height: 4,
+                  ),
+
+                  // ==================================================
+                  // FUNÇÃO PROFISSIONAL
+                  // ==================================================
+                  if (_profileController.isLoading)
+                    const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 1.5,
+                        color: Colors.white38,
+                      ),
+                    )
+                  else
+                    Text(
+                      _profileController.primaryRoleLabel,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.white54,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+
+                  const SizedBox(
+                    height: 20,
+                  ),
+
+                  // ==================================================
+                  // AÇÕES
+                  // ==================================================
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _buildCircularActionIcon(
+                        context,
+                        Icons.description_outlined,
+                        route: AppRoutes.contracts,
+                      ),
+                      const SizedBox(
+                        width: 16,
+                      ),
+                      _buildCircularActionIcon(
+                        context,
+                        Icons.calendar_today_outlined,
+                        route: AppRoutes.calendar,
+                      ),
+                      const SizedBox(
+                        width: 16,
+                      ),
+                      _buildCircularActionIcon(
+                        context,
+                        Icons.notifications_none_outlined,
+                        hasNotification: true,
+                        onTap: () => _showNotificationsModal(
+                          context,
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  // ==================================================
+                  // ATIVIDADES
+                  // ==================================================
+                  if (widget.controller.isProfileCardExpanded) ...[
+                    const SizedBox(
+                      height: 28,
+                    ),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Atividades Recentes',
+                            style: TextStyle(
+                              color: Colors.white.withValues(
+                                alpha: 0.8,
+                              ),
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(
+                            height: 4,
+                          ),
+                          Text(
+                            '${DateTime.now().day.toString().padLeft(2, '0')} '
+                            '${widget.controller.getShortMonthName(widget.controller.focusedDay.month)} '
+                            '${widget.controller.focusedDay.year}',
+                            style: const TextStyle(
+                              color: Colors.white38,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(
+                      height: 20,
+                    ),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 24,
+                        horizontal: 16,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(
+                          alpha: 0.2,
+                        ),
+                        borderRadius: BorderRadius.circular(
+                          16,
+                        ),
+                      ),
+                      child: const Column(
+                        children: [
+                          Icon(
+                            Icons.history_toggle_off,
+                            color: Colors.white24,
+                            size: 28,
+                          ),
+                          SizedBox(
+                            height: 8,
+                          ),
+                          Text(
+                            'Nenhuma atividade recente por aqui.',
+                            style: TextStyle(
+                              color: Colors.white38,
+                              fontSize: 11,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ],
               ),
-            ),
-          ],
-        ],
-      ),
+            );
+          },
     );
   }
+
+  // ============================================================
+  // BOTÃO
+  // ============================================================
 
   Widget _buildCircularActionIcon(
     BuildContext context,
@@ -327,7 +403,11 @@ class AccountActivitiesCardWidget
         if (onTap !=
             null) {
           onTap();
-        } else if (route !=
+
+          return;
+        }
+
+        if (route !=
             null) {
           Navigator.of(
             context,

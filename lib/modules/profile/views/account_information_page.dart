@@ -7,6 +7,29 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:versin/app/locator.dart';
 import 'package:versin/modules/dashboard/controllers/dashboard_controller.dart';
 
+// ============================================================
+// ACCOUNT INFORMATION PAGE
+// ============================================================
+//
+// Responsável por:
+//
+// - e-mail;
+// - username único;
+// - nome artístico;
+// - avatar.
+//
+// Diferença entre:
+//
+// username
+// → identificador único da conta.
+// → exemplo: astryvo
+//
+// artist_name
+// → nome artístico exibido para as pessoas.
+// → exemplo: Astryvo
+//
+// ============================================================
+
 class AccountInformationPage
     extends
         StatefulWidget {
@@ -21,11 +44,19 @@ class AccountInformationPage
   createState() => _AccountInformationPageState();
 }
 
+// ============================================================
+// STATE
+// ============================================================
+
 class _AccountInformationPageState
     extends
         State<
           AccountInformationPage
         > {
+  // ============================================================
+  // DEPENDÊNCIAS
+  // ============================================================
+
   final SupabaseClient _supabase = Supabase.instance.client;
 
   final DashboardController _dashboardController =
@@ -33,18 +64,39 @@ class _AccountInformationPageState
         DashboardController
       >();
 
+  // ============================================================
+  // CONTROLLERS
+  // ============================================================
+
   final TextEditingController _emailController = TextEditingController();
+
+  final TextEditingController _usernameController = TextEditingController();
 
   final TextEditingController _artistNameController = TextEditingController();
 
+  // ============================================================
+  // ESTADO
+  // ============================================================
+
   bool _isLoading = true;
+
   bool _isSaving = false;
 
   Uint8List? _selectedAvatarBytes;
+
   String? _selectedAvatarExtension;
+
   String? _avatarUrl;
+
+  String? _originalUsername;
+
   String? _errorMessage;
+
   String? _successMessage;
+
+  // ============================================================
+  // CORES
+  // ============================================================
 
   static const Color _backgroundColor = Color(
     0xFF0D0B1F,
@@ -62,6 +114,10 @@ class _AccountInformationPageState
     0xFFE040FB,
   );
 
+  // ============================================================
+  // INIT
+  // ============================================================
+
   @override
   void initState() {
     super.initState();
@@ -69,9 +125,16 @@ class _AccountInformationPageState
     _loadAccount();
   }
 
+  // ============================================================
+  // DISPOSE
+  // ============================================================
+
   @override
   void dispose() {
     _emailController.dispose();
+
+    _usernameController.dispose();
+
     _artistNameController.dispose();
 
     super.dispose();
@@ -96,6 +159,7 @@ class _AccountInformationPageState
       setState(
         () {
           _isLoading = false;
+
           _errorMessage = 'Nenhum usuário autenticado.';
         },
       );
@@ -104,12 +168,16 @@ class _AccountInformationPageState
     }
 
     try {
+      // ========================================================
+      // PERFIL
+      // ========================================================
+
       final profile = await _supabase
           .from(
             'profiles',
           )
           .select(
-            'artist_name, avatar_url',
+            'username, artist_name, avatar_url',
           )
           .eq(
             'id',
@@ -121,13 +189,37 @@ class _AccountInformationPageState
         return;
       }
 
+      // ========================================================
+      // EMAIL
+      // ========================================================
+
       _emailController.text =
           user.email ??
           '';
 
+      // ========================================================
+      // USERNAME
+      // ========================================================
+
+      final username =
+          profile?['username']?.toString().trim() ??
+          '';
+
+      _usernameController.text = username;
+
+      _originalUsername = username.toLowerCase();
+
+      // ========================================================
+      // NOME ARTÍSTICO
+      // ========================================================
+
       _artistNameController.text =
           profile?['artist_name']?.toString().trim() ??
           '';
+
+      // ========================================================
+      // STATE
+      // ========================================================
 
       setState(
         () {
@@ -146,6 +238,7 @@ class _AccountInformationPageState
       setState(
         () {
           _isLoading = false;
+
           _errorMessage =
               'Não foi possível carregar o perfil: '
               '${error.message}';
@@ -161,6 +254,7 @@ class _AccountInformationPageState
       setState(
         () {
           _isLoading = false;
+
           _errorMessage = 'Não foi possível carregar as informações da conta.';
         },
       );
@@ -239,6 +333,51 @@ class _AccountInformationPageState
   }
 
   // ============================================================
+  // VERIFICAR USERNAME
+  // ============================================================
+
+  Future<
+    bool
+  >
+  _isUsernameAvailable({
+    required String username,
+    required String userId,
+  }) async {
+    // ==========================================================
+    // NÃO ALTEROU
+    // ==========================================================
+
+    if (_originalUsername ==
+        username) {
+      return true;
+    }
+
+    // ==========================================================
+    // BUSCAR OUTRA CONTA
+    // ==========================================================
+
+    final existing = await _supabase
+        .from(
+          'profiles',
+        )
+        .select(
+          'id',
+        )
+        .ilike(
+          'username',
+          username,
+        )
+        .neq(
+          'id',
+          userId,
+        )
+        .maybeSingle();
+
+    return existing ==
+        null;
+  }
+
+  // ============================================================
   // SALVAR
   // ============================================================
 
@@ -265,7 +404,23 @@ class _AccountInformationPageState
       return;
     }
 
+    // ==========================================================
+    // NORMALIZAR EMAIL
+    // ==========================================================
+
     final email = _emailController.text.trim().toLowerCase();
+
+    // ==========================================================
+    // NORMALIZAR USERNAME
+    // ==========================================================
+
+    final username = _normalizeUsername(
+      _usernameController.text,
+    );
+
+    // ==========================================================
+    // NORMALIZAR NOME ARTÍSTICO
+    // ==========================================================
 
     final artistName = _artistNameController.text.trim().replaceAll(
       RegExp(
@@ -273,6 +428,10 @@ class _AccountInformationPageState
       ),
       ' ',
     );
+
+    // ==========================================================
+    // VALIDAR EMAIL
+    // ==========================================================
 
     if (!_isValidEmail(
       email,
@@ -283,6 +442,27 @@ class _AccountInformationPageState
 
       return;
     }
+
+    // ==========================================================
+    // VALIDAR USERNAME
+    // ==========================================================
+
+    final usernameError = _validateUsername(
+      username,
+    );
+
+    if (usernameError !=
+        null) {
+      _showError(
+        usernameError,
+      );
+
+      return;
+    }
+
+    // ==========================================================
+    // VALIDAR NOME ARTÍSTICO
+    // ==========================================================
 
     if (artistName.length <
         2) {
@@ -302,6 +482,10 @@ class _AccountInformationPageState
       return;
     }
 
+    // ==========================================================
+    // LOADING
+    // ==========================================================
+
     setState(
       () {
         _isSaving = true;
@@ -313,6 +497,31 @@ class _AccountInformationPageState
     );
 
     try {
+      // ========================================================
+      // VERIFICAR DISPONIBILIDADE DO USERNAME
+      // ========================================================
+
+      final usernameAvailable = await _isUsernameAvailable(
+        username: username,
+        userId: user.id,
+      );
+
+      if (!usernameAvailable) {
+        if (!mounted) {
+          return;
+        }
+
+        setState(
+          () {
+            _isSaving = false;
+
+            _errorMessage = 'Esse nome de usuário já está sendo usado.';
+          },
+        );
+
+        return;
+      }
+
       // ========================================================
       // EMAIL
       // ========================================================
@@ -360,10 +569,21 @@ class _AccountInformationPageState
           )
           .update(
             {
+              // ====================================================
+              // USERNAME
+              // ====================================================
+              'username': username,
+
+              // ====================================================
+              // NOME ARTÍSTICO
+              // ====================================================
               'artist_name': artistName,
 
               'artist_name_updated_at': DateTime.now().toUtc().toIso8601String(),
 
+              // ====================================================
+              // AVATAR
+              // ====================================================
               'avatar_url': nextAvatarUrl,
             },
           )
@@ -392,9 +612,17 @@ class _AccountInformationPageState
         return;
       }
 
+      // ========================================================
+      // SUCESSO
+      // ========================================================
+
       setState(
         () {
           _avatarUrl = nextAvatarUrl;
+
+          _originalUsername = username;
+
+          _usernameController.text = username;
 
           _selectedAvatarBytes = null;
 
@@ -443,6 +671,28 @@ class _AccountInformationPageState
       error
     ) {
       if (!mounted) {
+        return;
+      }
+
+      // ========================================================
+      // UNIQUE VIOLATION
+      // ========================================================
+      //
+      // Mesmo verificando antes, o banco continua sendo
+      // responsável pela garantia final de unicidade.
+      //
+      // ========================================================
+
+      if (error.code ==
+          '23505') {
+        setState(
+          () {
+            _isSaving = false;
+
+            _errorMessage = 'Esse nome de usuário já está sendo usado.';
+          },
+        );
+
         return;
       }
 
@@ -530,6 +780,7 @@ class _AccountInformationPageState
         backgroundColor: _backgroundColor,
         elevation: 0,
         leading: IconButton(
+          tooltip: 'Voltar',
           onPressed: () {
             Navigator.of(
               context,
@@ -571,14 +822,23 @@ class _AccountInformationPageState
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // ============================================
+                      // AVATAR
+                      // ============================================
                       _buildAvatarCard(),
 
                       const SizedBox(
                         height: 18,
                       ),
 
+                      // ============================================
+                      // FORM
+                      // ============================================
                       _buildFormCard(),
 
+                      // ============================================
+                      // ERROR
+                      // ============================================
                       if (_errorMessage !=
                           null) ...[
                         const SizedBox(
@@ -591,6 +851,9 @@ class _AccountInformationPageState
                         ),
                       ],
 
+                      // ============================================
+                      // SUCCESS
+                      // ============================================
                       if (_successMessage !=
                           null) ...[
                         const SizedBox(
@@ -607,6 +870,9 @@ class _AccountInformationPageState
                         height: 20,
                       ),
 
+                      // ============================================
+                      // SALVAR
+                      // ============================================
                       SizedBox(
                         width: double.infinity,
                         height: 52,
@@ -711,7 +977,9 @@ class _AccountInformationPageState
           ),
 
           OutlinedButton.icon(
-            onPressed: _pickAvatar,
+            onPressed: _isSaving
+                ? null
+                : _pickAvatar,
             style: OutlinedButton.styleFrom(
               foregroundColor: _accentNeon,
               side: BorderSide(
@@ -741,6 +1009,10 @@ class _AccountInformationPageState
       ),
     );
   }
+
+  // ============================================================
+  // AVATAR IMAGE
+  // ============================================================
 
   Widget _buildAvatar() {
     final selectedBytes = _selectedAvatarBytes;
@@ -812,6 +1084,9 @@ class _AccountInformationPageState
             height: 18,
           ),
 
+          // ====================================================
+          // EMAIL
+          // ====================================================
           _buildField(
             controller: _emailController,
             label: 'E-MAIL',
@@ -824,10 +1099,44 @@ class _AccountInformationPageState
             height: 14,
           ),
 
+          // ====================================================
+          // USERNAME
+          // ====================================================
+          _buildField(
+            controller: _usernameController,
+            label: 'NOME DE USUÁRIO',
+            hint: 'ex: astryvo',
+            icon: Icons.alternate_email_rounded,
+            prefixText: '@',
+          ),
+
+          const SizedBox(
+            height: 6,
+          ),
+
+          Text(
+            'Identificador único no Versin. '
+            'Use de 3 a 24 caracteres: letras, números, ponto ou underline.',
+            style: TextStyle(
+              color: Colors.white.withValues(
+                alpha: 0.30,
+              ),
+              fontSize: 10,
+              height: 1.4,
+            ),
+          ),
+
+          const SizedBox(
+            height: 14,
+          ),
+
+          // ====================================================
+          // ARTIST NAME
+          // ====================================================
           _buildField(
             controller: _artistNameController,
             label: 'NOME ARTÍSTICO',
-            hint: 'Seu nome no Versin',
+            hint: 'Seu nome público no Versin',
             icon: Icons.person_outline_rounded,
           ),
 
@@ -850,16 +1159,24 @@ class _AccountInformationPageState
     );
   }
 
+  // ============================================================
+  // FIELD
+  // ============================================================
+
   Widget _buildField({
     required TextEditingController controller,
     required String label,
     required String hint,
     required IconData icon,
     TextInputType? keyboardType,
+    String? prefixText,
   }) {
     return TextField(
       controller: controller,
       keyboardType: keyboardType,
+      enabled: !_isSaving,
+      autocorrect: false,
+      enableSuggestions: false,
       style: const TextStyle(
         color: Colors.white,
         fontSize: 14,
@@ -867,6 +1184,12 @@ class _AccountInformationPageState
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
+        prefixText: prefixText,
+        prefixStyle: TextStyle(
+          color: _accentNeon.withValues(
+            alpha: 0.75,
+          ),
+        ),
         labelStyle: const TextStyle(
           color: Colors.white38,
           fontSize: 10,
@@ -897,6 +1220,16 @@ class _AccountInformationPageState
             ),
           ),
         ),
+        disabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(
+            12,
+          ),
+          borderSide: BorderSide(
+            color: Colors.white.withValues(
+              alpha: 0.04,
+            ),
+          ),
+        ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(
             12,
@@ -912,7 +1245,7 @@ class _AccountInformationPageState
   }
 
   // ============================================================
-  // MENSAGEM
+  // MESSAGE
   // ============================================================
 
   Widget _buildMessage({
@@ -970,7 +1303,7 @@ class _AccountInformationPageState
   }
 
   // ============================================================
-  // HELPERS
+  // CARD
   // ============================================================
 
   BoxDecoration _cardDecoration() {
@@ -989,6 +1322,10 @@ class _AccountInformationPageState
     );
   }
 
+  // ============================================================
+  // ERROR
+  // ============================================================
+
   void _showError(
     String message,
   ) {
@@ -1005,6 +1342,77 @@ class _AccountInformationPageState
     );
   }
 
+  // ============================================================
+  // USERNAME
+  // ============================================================
+
+  String _normalizeUsername(
+    String value,
+  ) {
+    return value.trim().toLowerCase().replaceFirst(
+      RegExp(
+        r'^@+',
+      ),
+      '',
+    );
+  }
+
+  String? _validateUsername(
+    String username,
+  ) {
+    if (username.isEmpty) {
+      return 'Informe um nome de usuário.';
+    }
+
+    if (username.length <
+        3) {
+      return 'O nome de usuário deve ter pelo menos 3 caracteres.';
+    }
+
+    if (username.length >
+        24) {
+      return 'O nome de usuário deve ter no máximo 24 caracteres.';
+    }
+
+    if (!RegExp(
+      r'^[a-z0-9._]+$',
+    ).hasMatch(
+      username,
+    )) {
+      return 'Use apenas letras, números, ponto e underline no nome de usuário.';
+    }
+
+    if (username.startsWith(
+          '.',
+        ) ||
+        username.startsWith(
+          '_',
+        ) ||
+        username.endsWith(
+          '.',
+        ) ||
+        username.endsWith(
+          '_',
+        )) {
+      return 'O nome de usuário deve começar e terminar com letra ou número.';
+    }
+
+    if (username.contains(
+          '..',
+        ) ||
+        username.contains(
+          '__',
+        )) {
+      return 'Evite pontos ou underlines duplicados no nome de usuário.';
+    }
+
+    return null;
+  }
+
+  // ============================================================
+  // EMAIL
+  // ============================================================
+
   bool _isValidEmail(
     String email,
   ) {
@@ -1014,6 +1422,10 @@ class _AccountInformationPageState
       email,
     );
   }
+
+  // ============================================================
+  // IMAGE EXTENSION
+  // ============================================================
 
   String _normalizeExtension(
     String? extension,
@@ -1032,6 +1444,10 @@ class _AccountInformationPageState
     }
   }
 
+  // ============================================================
+  // CONTENT TYPE
+  // ============================================================
+
   String _contentTypeForExtension(
     String extension,
   ) {
@@ -1048,6 +1464,10 @@ class _AccountInformationPageState
     }
   }
 
+  // ============================================================
+  // AUTH ERROR
+  // ============================================================
+
   String _translateAuthError(
     AuthException error,
   ) {
@@ -1056,7 +1476,8 @@ class _AccountInformationPageState
     if (message.contains(
       'email rate limit exceeded',
     )) {
-      return 'Muitos e-mails foram enviados em pouco tempo. Aguarde e tente novamente.';
+      return 'Muitos e-mails foram enviados em pouco tempo. '
+          'Aguarde e tente novamente.';
     }
 
     if (message.contains(
@@ -1068,7 +1489,8 @@ class _AccountInformationPageState
     if (message.contains(
       'email',
     )) {
-      return 'Não foi possível alterar o e-mail: ${error.message}';
+      return 'Não foi possível alterar o e-mail: '
+          '${error.message}';
     }
 
     return error.message;

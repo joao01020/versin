@@ -1,67 +1,300 @@
-import 'package:sqflite/sqflite.dart';
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart';
+import 'package:sqflite/sqflite.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
+
   static Database? _database;
+
   DatabaseHelper._init();
 
-  Future<Database> get database async {
-    if (_database != null) return _database!;
-    _database = await _initDB('versin_storage.db');
+  // ============================================================
+  // DATABASE
+  // ============================================================
+
+  Future<
+    Database
+  >
+  get database async {
+    if (_database !=
+        null) {
+      return _database!;
+    }
+
+    _database = await _initDB(
+      'versin_storage.db',
+    );
+
     return _database!;
   }
 
-  Future<Database> _initDB(String filePath) async {
+  // ============================================================
+  // INIT
+  // ============================================================
+
+  Future<
+    Database
+  >
+  _initDB(
+    String filePath,
+  ) async {
     final dbPath = await getDatabasesPath();
-    final path = join(dbPath, filePath);
-    
-    // Versão incrementada para 2 para suportar a nova coluna de nome
-    return await openDatabase(
-      path, 
-      version: 2, 
+
+    final path = join(
+      dbPath,
+      filePath,
+    );
+
+    debugPrint(
+      '[DATABASE] Abrindo: $path',
+    );
+
+    return openDatabase(
+      path,
+      version: 4,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
+      onOpen: _onOpen,
     );
   }
 
-  Future _createDB(Database db, int version) async {
-    await db.execute('''
-      CREATE TABLE offline_rhymes (id TEXT PRIMARY KEY, word TEXT, synced INTEGER)
-    ''');
-    
-    // Tabela projects agora inclui o campo 'name' para o título do projeto
-    await db.execute('''
-      CREATE TABLE projects (
-        id TEXT PRIMARY KEY, 
-        name TEXT, 
-        lyrics TEXT, 
-        bpm INTEGER, 
-        vibe TEXT, 
-        technique TEXT, 
+  // ============================================================
+  // CREATE
+  // ============================================================
+
+  Future<
+    void
+  >
+  _createDB(
+    Database db,
+    int version,
+  ) async {
+    // ==========================================================
+    // RIMAS
+    // ==========================================================
+
+    await db.execute(
+      '''
+      CREATE TABLE offline_rhymes (
+        id TEXT PRIMARY KEY,
+        word TEXT,
         synced INTEGER
       )
-    ''');
-    
-    await db.execute('''
-      CREATE TABLE user_profile (id TEXT PRIMARY KEY, name TEXT, wallet TEXT, synced INTEGER)
-    ''');
+      ''',
+    );
+
+    // ==========================================================
+    // PROJETOS
+    // ==========================================================
+
+    await db.execute(
+      '''
+      CREATE TABLE projects (
+        id TEXT PRIMARY KEY,
+        name TEXT,
+        lyrics TEXT,
+        bpm INTEGER,
+        vibe TEXT,
+        technique TEXT,
+        synced INTEGER
+      )
+      ''',
+    );
+
+    // ==========================================================
+    // PERFIL
+    // ==========================================================
+
+    await db.execute(
+      '''
+      CREATE TABLE user_profile (
+        id TEXT PRIMARY KEY,
+        name TEXT,
+        artist_name TEXT,
+        wallet TEXT,
+        synced INTEGER
+      )
+      ''',
+    );
+
+    debugPrint(
+      '[DATABASE] Banco criado na versão $version.',
+    );
   }
 
-  // Função para atualizar bancos de dados existentes sem perder dados
-  Future _upgradeDB(Database db, int oldVersion, int newVersion) async {
-    if (oldVersion < 2) {
-      // Adiciona a coluna name se ela não existir (para quem já tem a V1 instalada)
-      await db.execute('ALTER TABLE projects ADD COLUMN name TEXT DEFAULT "SEM TÍTULO"');
+  // ============================================================
+  // UPGRADE
+  // ============================================================
+
+  Future<
+    void
+  >
+  _upgradeDB(
+    Database db,
+    int oldVersion,
+    int newVersion,
+  ) async {
+    debugPrint(
+      '[DATABASE] Migration $oldVersion -> $newVersion',
+    );
+
+    // ==========================================================
+    // PROJECTS.NAME
+    // ==========================================================
+
+    await _addColumnIfMissing(
+      db,
+      table: 'projects',
+      column: 'name',
+      definition: 'TEXT DEFAULT "SEM TÍTULO"',
+    );
+
+    // ==========================================================
+    // USER_PROFILE.ARTIST_NAME
+    // ==========================================================
+
+    await _addColumnIfMissing(
+      db,
+      table: 'user_profile',
+      column: 'artist_name',
+      definition: 'TEXT',
+    );
+  }
+
+  // ============================================================
+  // ON OPEN
+  // ============================================================
+  //
+  // Proteção adicional.
+  //
+  // Mesmo que algum banco antigo tenha uma versão inconsistente,
+  // verificamos as colunas novamente quando o banco abre.
+  //
+  // ============================================================
+
+  Future<
+    void
+  >
+  _onOpen(
+    Database db,
+  ) async {
+    await _addColumnIfMissing(
+      db,
+      table: 'user_profile',
+      column: 'artist_name',
+      definition: 'TEXT',
+    );
+
+    debugPrint(
+      '[DATABASE] Estrutura verificada.',
+    );
+  }
+
+  // ============================================================
+  // ADICIONAR COLUNA SE NÃO EXISTIR
+  // ============================================================
+
+  Future<
+    void
+  >
+  _addColumnIfMissing(
+    Database db, {
+    required String table,
+    required String column,
+    required String definition,
+  }) async {
+    final tableExists = await _tableExists(
+      db,
+      table,
+    );
+
+    if (!tableExists) {
+      debugPrint(
+        '[DATABASE] Tabela $table não existe.',
+      );
+
+      return;
     }
+
+    final columns = await db.rawQuery(
+      'PRAGMA table_info($table)',
+    );
+
+    final exists = columns.any(
+      (
+        item,
+      ) =>
+          item['name'] ==
+          column,
+    );
+
+    if (exists) {
+      debugPrint(
+        '[DATABASE] $table.$column já existe.',
+      );
+
+      return;
+    }
+
+    await db.execute(
+      'ALTER TABLE $table '
+      'ADD COLUMN $column $definition',
+    );
+
+    debugPrint(
+      '[DATABASE] Coluna criada: $table.$column',
+    );
+  }
+
+  // ============================================================
+  // VERIFICAR TABELA
+  // ============================================================
+
+  Future<
+    bool
+  >
+  _tableExists(
+    Database db,
+    String table,
+  ) async {
+    final result = await db.rawQuery(
+      '''
+      SELECT name
+      FROM sqlite_master
+      WHERE type = 'table'
+      AND name = ?
+      LIMIT 1
+      ''',
+      [
+        table,
+      ],
+    );
+
+    return result.isNotEmpty;
+  }
+
+  // ============================================================
+  // FECHAR
+  // ============================================================
+
+  Future<
+    void
+  >
+  close() async {
+    final db = _database;
+
+    if (db ==
+        null) {
+      return;
+    }
+
+    await db.close();
+
+    _database = null;
+
+    debugPrint(
+      '[DATABASE] Banco fechado.',
+    );
   }
 }
-
-// Linha 30: Estrutura atualizada para incluir 'name' na tabela projects
-// Linha 31: Versão do banco subida para 2 para gatilho de atualização automática
-// Linha 32: Tabela 'projects' sincronizada com o header editável da ChatPage
-// Linha 33: Campo 'name' com valor padrão para evitar erros de nulo
-// Linha 34: Responsabilidade técnica: Persistência do título do projeto offline
-// Linha 35: Mantido o campo 'synced' para o fluxo do SyncManager
-// Linha 36: OnUpgrade implementado para garantir integridade dos dados antigos
-// Linha 37: Fim do arquivo DatabaseHelper sincronizado.

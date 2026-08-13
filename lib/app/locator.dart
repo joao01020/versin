@@ -6,6 +6,7 @@ import 'package:get_it/get_it.dart';
 
 import '../modules/dashboard/controllers/dashboard_controller.dart';
 import '../modules/match/controllers/match_controllers.dart';
+import '../modules/profile/controllers/professional_profile_controller.dart';
 import '../modules/wallet/controllers/wallet_controller.dart';
 import '../modules/wallet/controllers/royalties_controller.dart';
 
@@ -57,6 +58,39 @@ setupLocator() {
     DashboardController
   >(
     () => DashboardController(),
+  );
+
+  // ==========================================================
+  // PROFESSIONAL PROFILE MODULE
+  // ==========================================================
+  //
+  // IMPORTANTE:
+  //
+  // ProfessionalProfileController é LazySingleton porque
+  // precisamos compartilhar a MESMA instância entre:
+  //
+  // - ProfessionalProfileSettingsPage
+  // - AccountActivitiesCardWidget
+  // - Dashboard
+  //
+  // Dessa forma:
+  //
+  // usuário altera função
+  //        ↓
+  // controller salva
+  //        ↓
+  // notifyListeners()
+  //        ↓
+  // Dashboard recebe alteração
+  //
+  // Também evita criar um controller separado em cada tela.
+  //
+  // ==========================================================
+
+  sl.registerLazySingleton<
+    ProfessionalProfileController
+  >(
+    () => ProfessionalProfileController(),
   );
 
   // ==========================================================
@@ -127,8 +161,6 @@ setupLocator() {
   // ==========================================================
   // STUDIO MODULE — ESTADO DA SESSÃO
   // ==========================================================
-  //
-  // IMPORTANTE:
   //
   // StudioController é LazySingleton.
   //

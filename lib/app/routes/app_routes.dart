@@ -1,41 +1,75 @@
 import 'package:flutter/material.dart';
 
 // ============================================================
-// MÓDULOS PRINCIPAIS
+// LOGIN
 // ============================================================
 
 import 'package:versin/modules/login/views/login_page.dart';
+
+// ============================================================
+// DASHBOARD
+// ============================================================
 
 import 'package:versin/modules/dashboard/views/dashboard_page.dart';
 import 'package:versin/modules/dashboard/views/contracts/contracts_page.dart';
 import 'package:versin/modules/dashboard/views/calendar/calendar_page.dart';
 
 // ============================================================
-// MÓDULOS DO ECOSSISTEMA
+// CHAT / IA
 // ============================================================
 
 import 'package:versin/modules/chat/views/chat_page.dart';
 
+// ============================================================
+// HUB
+// ============================================================
+
 import 'package:versin/modules/hub/views/hub_page.dart';
 
+// ============================================================
+// MATCH / CONECTAR
+// ============================================================
+
 import 'package:versin/modules/match/views/match_page.dart';
+
+// ============================================================
+// WALLET
+// ============================================================
 
 import 'package:versin/modules/wallet/views/wallet_page.dart';
 import 'package:versin/modules/wallet/views/royalties_page.dart';
 
+// ============================================================
+// MARKET
+// ============================================================
+
 import 'package:versin/modules/market/market_page.dart';
+
+// ============================================================
+// STORAGE
+// ============================================================
 
 import 'package:versin/modules/storage/views/storage_page.dart';
 
+// ============================================================
+// VNODE
+// ============================================================
+
 import 'package:versin/modules/vnode/vnode_page.dart';
 
-import 'package:versin/modules/settings/settings_page.dart';
+// ============================================================
+// SETTINGS
+// ============================================================
+
+import 'package:versin/modules/settings/views/settings_page.dart';
 
 // ============================================================
 // APP ROUTES
 // ============================================================
 
 class AppRoutes {
+  AppRoutes._();
+
   // ==========================================================
   // ROTAS PRINCIPAIS
   // ==========================================================
@@ -128,7 +162,7 @@ class AppRoutes {
         ) => const HubPage(),
 
     // ====================================================
-    // MATCH
+    // MATCH / CONECTAR
     // ====================================================
     match:
         (
@@ -181,6 +215,6 @@ class AppRoutes {
     settings:
         (
           context,
-        ) => SettingsPage(),
+        ) => const SettingsPage(),
   };
 }

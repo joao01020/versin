@@ -21,10 +21,13 @@ import '../models/match_user_entity.dart';
 // Responsabilidades:
 //
 // - controlar sessão de descoberta;
+// - controlar usuário principal do Discovery;
 // - controlar recomendações;
+// - limpar resultados;
 // - registrar likes;
 // - detectar match mútuo;
 // - iniciar projeto/networking;
+// - controlar timer da conexão;
 // - utilizar o perfil profissional real do usuário.
 //
 // Perfil profissional:
@@ -122,6 +125,17 @@ class MatchController
 
   String get primaryRoleLabel => _professionalProfileController.primaryRoleLabel;
 
+  bool get hasDiscoveryUser =>
+      discoveryUser !=
+      null;
+
+  bool get hasRecommendations => recommendedUsers.isNotEmpty;
+
+  bool get hasMatchResults =>
+      discoveryUser !=
+          null ||
+      recommendedUsers.isNotEmpty;
+
   // ============================================================
   // USER ID
   // ============================================================
@@ -141,7 +155,7 @@ class MatchController
   }
 
   // ============================================================
-  // NOTIFY
+  // SAFE NOTIFY
   // ============================================================
 
   void safeNotify() {
@@ -154,11 +168,7 @@ class MatchController
   // INIT MATCH SESSION
   // ============================================================
   //
-  // Agora NÃO recebe mais:
-  //
-  // UserRole.artist
-  //
-  // A sessão usa:
+  // A sessão usa diretamente:
   //
   // professionalProfileController.primaryRole
   //
@@ -172,11 +182,17 @@ class MatchController
     void
   >
   initMatchSession() async {
+    // ==========================================================
+    // RESET DA SESSÃO
+    // ==========================================================
+
     isLoading = true;
 
     discoveryUser = null;
 
     recommendedUsers = [];
+
+    remainingSeconds = 1200;
 
     _cancelTimers();
 
@@ -212,7 +228,7 @@ class MatchController
     _startRealtimeMatchListener();
 
     // ==========================================================
-    // TIMEOUT DE BUSCA
+    // TIMEOUT DA BUSCA
     // ==========================================================
 
     _searchTimeoutTimer = Timer(
@@ -268,6 +284,45 @@ class MatchController
   }
 
   // ============================================================
+  // LIMPAR RESULTADOS DO MATCH
+  // ============================================================
+  //
+  // Usado pelo MatchRepository quando:
+  //
+  // - não existem usuários online;
+  // - não existem candidatos compatíveis;
+  // - ocorre erro no stream;
+  // - a busca precisa ser reiniciada.
+  //
+  // Isso evita manter um discoveryUser antigo na tela.
+  //
+  // ============================================================
+
+  void clearMatchResults({
+    bool stopLoading = true,
+  }) {
+    discoveryUser = null;
+
+    recommendedUsers = [];
+
+    _countdownTimer?.cancel();
+
+    _countdownTimer = null;
+
+    remainingSeconds = 1200;
+
+    if (stopLoading) {
+      isLoading = false;
+    }
+
+    safeNotify();
+
+    debugPrint(
+      '[MATCH] Resultados limpos.',
+    );
+  }
+
+  // ============================================================
   // REALTIME MATCH LISTENER
   // ============================================================
 
@@ -309,7 +364,7 @@ class MatchController
 
             final lastMatch = snapshot.last;
 
-            final senderId = lastMatch['sender_id']?.toString();
+            final senderId = lastMatch['sender_id']?.toString().trim();
 
             if (senderId ==
                     null ||
@@ -345,6 +400,13 @@ class MatchController
     String otherId,
   ) async {
     final supabase = Supabase.instance.client;
+
+    if (myId.trim().isEmpty ||
+        otherId.trim().isEmpty ||
+        myId ==
+            otherId) {
+      return false;
+    }
 
     try {
       // ========================================================
@@ -390,7 +452,7 @@ class MatchController
 
       if (existingProject !=
           null) {
-        final projectId = existingProject['id']?.toString();
+        final projectId = existingProject['id']?.toString().trim();
 
         if (projectId !=
                 null &&
@@ -399,12 +461,17 @@ class MatchController
             projectId,
           );
 
+          debugPrint(
+            '[MATCH] Projeto existente encontrado: '
+            '$projectId',
+          );
+
           return true;
         }
       }
 
       // ========================================================
-      // CRIAR NOVO PROJETO
+      // CRIAR PROJETO
       // ========================================================
 
       final newProject = await supabase
@@ -428,7 +495,7 @@ class MatchController
           )
           .single();
 
-      final newProjectId = newProject['id']?.toString();
+      final newProjectId = newProject['id']?.toString().trim();
 
       if (newProjectId ==
               null ||
@@ -436,8 +503,17 @@ class MatchController
         return false;
       }
 
+      // ========================================================
+      // EMITIR EVENTO
+      // ========================================================
+
       _matchEventController.add(
         newProjectId,
+      );
+
+      debugPrint(
+        '[MATCH] Novo projeto criado: '
+        '$newProjectId',
       );
 
       return true;
@@ -445,7 +521,8 @@ class MatchController
       error
     ) {
       debugPrint(
-        '[MATCH] Erro ao iniciar networking: $error',
+        '[MATCH] '
+        'Erro ao iniciar networking: $error',
       );
 
       return false;
@@ -467,14 +544,17 @@ class MatchController
     if (userId ==
         null) {
       debugPrint(
-        '[MATCH] Like ignorado: usuário não identificado.',
+        '[MATCH] Like ignorado: '
+        'usuário não identificado.',
       );
 
       return;
     }
 
-    if (targetId.trim().isEmpty ||
-        targetId ==
+    final normalizedTargetId = targetId.trim();
+
+    if (normalizedTargetId.isEmpty ||
+        normalizedTargetId ==
             userId) {
       return;
     }
@@ -488,24 +568,19 @@ class MatchController
             {
               'sender_id': userId,
 
-              'target_user_id': targetId,
+              'target_user_id': normalizedTargetId,
             },
           );
 
       debugPrint(
         '[MATCH] Like registrado: '
-        '$userId -> $targetId',
+        '$userId -> $normalizedTargetId',
       );
     } on PostgrestException catch (
       error
     ) {
       // ========================================================
       // UNIQUE VIOLATION
-      // ========================================================
-      //
-      // Caso o usuário clique novamente em alguém já curtido,
-      // evitamos quebrar a tela.
-      //
       // ========================================================
 
       if (error.code ==
@@ -518,14 +593,16 @@ class MatchController
       }
 
       debugPrint(
-        '[MATCH] Erro Supabase ao registrar like: '
+        '[MATCH] '
+        'Erro Supabase ao registrar like: '
         '${error.message}',
       );
     } catch (
       error
     ) {
       debugPrint(
-        '[MATCH] Erro ao registrar like: $error',
+        '[MATCH] '
+        'Erro ao registrar like: $error',
       );
     }
   }
@@ -538,6 +615,8 @@ class MatchController
     MatchUserEntity user,
   ) {
     _searchTimeoutTimer?.cancel();
+
+    _searchTimeoutTimer = null;
 
     discoveryUser = user;
 
@@ -560,16 +639,24 @@ class MatchController
   ) {
     _searchTimeoutTimer?.cancel();
 
-    recommendedUsers = users;
+    _searchTimeoutTimer = null;
 
-    // Se existem recomendações, a busca terminou
-    // mesmo que discoveryUser ainda seja null.
+    recommendedUsers =
+        List<
+          MatchUserEntity
+        >.unmodifiable(
+          users,
+        );
 
-    if (recommendedUsers.isNotEmpty ||
-        discoveryUser !=
-            null) {
-      isLoading = false;
-    }
+    // ==========================================================
+    // BUSCA FINALIZADA
+    // ==========================================================
+    //
+    // Mesmo com lista vazia, o Repository terminou o trabalho.
+    //
+    // ==========================================================
+
+    isLoading = false;
 
     safeNotify();
   }
@@ -600,6 +687,8 @@ class MatchController
         }
 
         timer.cancel();
+
+        _countdownTimer = null;
       },
     );
   }
@@ -648,7 +737,11 @@ class MatchController
   // DEMO
   // ============================================================
 
-  void listenDemo() {}
+  void listenDemo() {
+    debugPrint(
+      '[MATCH] Reproduzir demo.',
+    );
+  }
 
   // ============================================================
   // DISPOSE
@@ -662,13 +755,21 @@ class MatchController
 
     _matchSubscription = null;
 
-    _matchEventController.close();
+    if (!_matchEventController.isClosed) {
+      _matchEventController.close();
+    }
 
-    // NÃO damos dispose no:
+    // ==========================================================
+    // NÃO DISPOR PROFESSIONAL PROFILE CONTROLLER
+    // ==========================================================
     //
-    // _professionalProfileController
+    // Ele é LazySingleton compartilhado por:
     //
-    // porque ele é LazySingleton do GetIt.
+    // - Dashboard;
+    // - Match;
+    // - Perfil profissional.
+    //
+    // ==========================================================
 
     super.dispose();
   }

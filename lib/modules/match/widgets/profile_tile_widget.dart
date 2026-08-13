@@ -12,7 +12,8 @@ import '../models/match_user_entity.dart';
 // Exibe:
 //
 // - avatar;
-// - nome;
+// - nome artístico;
+// - username;
 // - função principal;
 // - bio;
 // - tags;
@@ -84,19 +85,61 @@ class ProfileTileWidget
                 // ==================================================
                 // NOME
                 // ==================================================
-                Text(
-                  user.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
-                  ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        user.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+
+                    if (user.isOnline) ...[
+                      const SizedBox(
+                        width: 6,
+                      ),
+
+                      const Text(
+                        'ONLINE',
+                        style: TextStyle(
+                          color: Colors.white24,
+                          fontSize: 7,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.6,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
 
+                // ==================================================
+                // USERNAME
+                // ==================================================
+                if (user.hasUsername) ...[
+                  const SizedBox(
+                    height: 2,
+                  ),
+
+                  Text(
+                    user.usernameLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white38,
+                      fontSize: 9,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+
                 const SizedBox(
-                  height: 3,
+                  height: 4,
                 ),
 
                 // ==================================================
@@ -181,6 +224,8 @@ class ProfileTileWidget
   Widget _buildAvatar() {
     final initial = user.name.trim().isNotEmpty
         ? user.name.trim()[0].toUpperCase()
+        : user.username.trim().isNotEmpty
+        ? user.username.trim()[0].toUpperCase()
         : '?';
 
     return Stack(

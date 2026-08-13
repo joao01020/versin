@@ -20,22 +20,26 @@ enum ConnectionType {
 //
 // MusicRole
 //
-// em vez do antigo:
+// e também separa:
 //
-// UserRole
+// name
+// → nome artístico / nome exibido.
 //
-// Isso permite suportar:
+// username
+// → identificador único do usuário.
 //
-// - Artista
-// - Beatmaker
-// - Produtor
-// - Compositor
-// - Eng. de Mixagem
-// - Eng. de Masterização
-// - Eng. de Gravação
-// - Instrumentista
-// - Sound Designer
-// - DJ
+// Exemplo:
+//
+// name:
+// Astryvo
+//
+// username:
+// astryvo
+//
+// Exibição:
+//
+// Astryvo
+// @astryvo
 //
 // ============================================================
 
@@ -46,6 +50,22 @@ class MatchUserEntity {
 
   final String id;
 
+  /// Username único.
+  ///
+  /// Exemplo:
+  ///
+  /// astryvo
+  ///
+  /// Na interface pode ser exibido como:
+  ///
+  /// @astryvo
+  final String username;
+
+  /// Nome artístico / nome de exibição.
+  ///
+  /// Exemplo:
+  ///
+  /// Astryvo
   final String name;
 
   // ============================================================
@@ -128,6 +148,7 @@ class MatchUserEntity {
 
   const MatchUserEntity({
     required this.id,
+    required this.username,
     required this.name,
     required this.primaryRole,
     required this.roles,
@@ -142,6 +163,34 @@ class MatchUserEntity {
     this.sessionStartedAt,
     this.provisionalHash,
   });
+
+  // ============================================================
+  // USERNAME FORMATADO
+  // ============================================================
+
+  String get usernameLabel {
+    final value = username.trim();
+
+    if (value.isEmpty) {
+      return '@nao_informado';
+    }
+
+    if (value.startsWith(
+      '@',
+    )) {
+      return value;
+    }
+
+    return '@$value';
+  }
+
+  // ============================================================
+  // POSSUI USERNAME
+  // ============================================================
+
+  bool get hasUsername {
+    return username.trim().isNotEmpty;
+  }
 
   // ============================================================
   // LABEL DA FUNÇÃO PRINCIPAL
@@ -256,11 +305,24 @@ class MatchUserEntity {
   }
 
   // ============================================================
+  // QUANTIDADE DE FUNÇÕES COMPATÍVEIS
+  // ============================================================
+
+  int matchingRolesCountWith(
+    MatchUserEntity other,
+  ) {
+    return matchingRolesWith(
+      other,
+    ).length;
+  }
+
+  // ============================================================
   // COPY WITH
   // ============================================================
 
   MatchUserEntity copyWith({
     String? id,
+    String? username,
     String? name,
     MusicRole? primaryRole,
     List<
@@ -288,6 +350,10 @@ class MatchUserEntity {
       id:
           id ??
           this.id,
+
+      username:
+          username ??
+          this.username,
 
       name:
           name ??
@@ -351,6 +417,7 @@ class MatchUserEntity {
   String toString() {
     return 'MatchUserEntity('
         'id: $id, '
+        'username: $username, '
         'name: $name, '
         'primaryRole: ${primaryRole?.key}, '
         'roles: ${MusicRole.toKeys(roles)}, '

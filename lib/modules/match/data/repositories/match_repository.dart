@@ -16,18 +16,23 @@ import 'package:versin/modules/profile/models/music_role.dart';
 //
 // - observar usuários online;
 // - descobrir candidatos compatíveis;
+// - pesquisar usuários;
 // - usar looking_for_roles do usuário atual;
 // - comparar com roles dos candidatos;
 // - priorizar interesse mútuo;
 // - converter profiles em MatchUserEntity;
+// - carregar username separadamente;
 // - alimentar Discovery e Recomendados.
 //
-// Agora NÃO usamos mais:
+// Fluxo:
 //
-// UserRole.artist
-// UserRole.beatmaker
-//
-// Tudo usa MusicRole.
+// Supabase
+//    ↓
+// MatchRepository
+//    ↓
+// MatchUserEntity
+//    ↓
+// MatchController / MatchPage
 //
 // ============================================================
 
@@ -37,6 +42,12 @@ class MatchRepository {
   // ============================================================
 
   final SupabaseClient _supabase = Supabase.instance.client;
+
+  // ============================================================
+  // CONFIGURAÇÃO
+  // ============================================================
+
+  static const int _searchLimit = 20;
 
   // ============================================================
   // STREAM
@@ -51,6 +62,404 @@ class MatchRepository {
     >
   >?
   _profilesSubscription;
+
+  // ============================================================
+  // PESQUISAR USUÁRIOS
+  // ============================================================
+  //
+  // Pesquisa por:
+  //
+  // - username
+  // - artist_name
+  // - name
+  //
+  // Exemplos:
+  //
+  // astryvo
+  // @astryvo
+  // Astryvo
+  //
+  // O próprio usuário é removido dos resultados.
+  //
+  // ============================================================
+
+  Future<
+    List<
+      MatchUserEntity
+    >
+  >
+  searchUsers({
+    required String query,
+    String? currentUserId,
+  }) async {
+    // ==========================================================
+    // NORMALIZAR QUERY
+    // ==========================================================
+
+    final normalizedQuery = _normalizeSearchQuery(
+      query,
+    );
+
+    if (normalizedQuery.isEmpty) {
+      return const [];
+    }
+
+    // ==========================================================
+    // NORMALIZAR ID ATUAL
+    // ==========================================================
+
+    final normalizedCurrentUserId = currentUserId?.trim();
+
+    // ==========================================================
+    // LOG
+    // ==========================================================
+
+    debugPrint(
+      '[MATCH REPOSITORY] ========================================',
+    );
+
+    debugPrint(
+      '[MATCH REPOSITORY] Pesquisando usuários.',
+    );
+
+    debugPrint(
+      '[MATCH REPOSITORY] Query: $normalizedQuery',
+    );
+
+    // ==========================================================
+    // BUSCAR
+    // ==========================================================
+
+    try {
+      // ========================================================
+      // QUERY BASE
+      // ========================================================
+      //
+      // IMPORTANTE:
+      //
+      // filtros precisam vir antes de:
+      //
+      // - limit
+      // - order
+      // - range
+      //
+      // ========================================================
+
+      final queryBuilder = _supabase
+          .from(
+            'profiles',
+          )
+          .select(
+            '''
+                id,
+                username,
+                artist_name,
+                name,
+                primary_role,
+                roles,
+                looking_for_roles,
+                tags,
+                bio,
+                showcase_url,
+                showcase_desc,
+                is_online
+                ''',
+          )
+          .or(
+            'username.ilike.%$normalizedQuery%,'
+            'artist_name.ilike.%$normalizedQuery%,'
+            'name.ilike.%$normalizedQuery%',
+          );
+
+      // ========================================================
+      // EXECUTAR QUERY
+      // ========================================================
+      //
+      // Criamos dois fluxos para evitar problema de tipagem:
+      //
+      // com usuário atual:
+      //
+      // or
+      // ↓
+      // neq
+      // ↓
+      // limit
+      //
+      // sem usuário atual:
+      //
+      // or
+      // ↓
+      // limit
+      //
+      // ========================================================
+
+      final dynamic response;
+
+      if (normalizedCurrentUserId !=
+              null &&
+          normalizedCurrentUserId.isNotEmpty) {
+        response = await queryBuilder
+            .neq(
+              'id',
+              normalizedCurrentUserId,
+            )
+            .limit(
+              _searchLimit,
+            );
+      } else {
+        response = await queryBuilder.limit(
+          _searchLimit,
+        );
+      }
+
+      // ========================================================
+      // CONVERTER RESPONSE
+      // ========================================================
+
+      final rows =
+          List<
+            Map<
+              String,
+              dynamic
+            >
+          >.from(
+            response
+                as List,
+          );
+
+      // ========================================================
+      // CONVERTER PARA ENTITY
+      // ========================================================
+
+      final users = rows
+          .map(
+            _mapMapToEntity,
+          )
+          .where(
+            (
+              user,
+            ) => user.id.isNotEmpty,
+          )
+          .toList();
+
+      // ========================================================
+      // ORDENAR RESULTADOS
+      // ========================================================
+
+      users.sort(
+        (
+          a,
+          b,
+        ) {
+          final scoreA = _calculateSearchScore(
+            user: a,
+            query: normalizedQuery,
+          );
+
+          final scoreB = _calculateSearchScore(
+            user: b,
+            query: normalizedQuery,
+          );
+
+          final scoreComparison = scoreB.compareTo(
+            scoreA,
+          );
+
+          if (scoreComparison !=
+              0) {
+            return scoreComparison;
+          }
+
+          return a.name.toLowerCase().compareTo(
+            b.name.toLowerCase(),
+          );
+        },
+      );
+
+      // ========================================================
+      // LOG
+      // ========================================================
+
+      debugPrint(
+        '[MATCH REPOSITORY] '
+        '${users.length} usuário(s) encontrado(s).',
+      );
+
+      for (final user in users) {
+        debugPrint(
+          '[MATCH REPOSITORY] '
+          '${user.name} | ${user.usernameLabel}',
+        );
+      }
+
+      debugPrint(
+        '[MATCH REPOSITORY] ========================================',
+      );
+
+      return users;
+    } on PostgrestException catch (
+      error
+    ) {
+      // ========================================================
+      // ERRO SUPABASE
+      // ========================================================
+
+      debugPrint(
+        '[MATCH REPOSITORY] ========================================',
+      );
+
+      debugPrint(
+        '[MATCH REPOSITORY] '
+        'Erro Supabase na pesquisa.',
+      );
+
+      debugPrint(
+        '[MATCH REPOSITORY] '
+        'Mensagem: ${error.message}',
+      );
+
+      debugPrint(
+        '[MATCH REPOSITORY] '
+        'Código: ${error.code}',
+      );
+
+      debugPrint(
+        '[MATCH REPOSITORY] '
+        'Detalhes: ${error.details}',
+      );
+
+      debugPrint(
+        '[MATCH REPOSITORY] ========================================',
+      );
+
+      rethrow;
+    } catch (
+      error
+    ) {
+      // ========================================================
+      // ERRO INESPERADO
+      // ========================================================
+
+      debugPrint(
+        '[MATCH REPOSITORY] '
+        'Erro inesperado na pesquisa: $error',
+      );
+
+      rethrow;
+    }
+  }
+
+  // ============================================================
+  // SCORE DA PESQUISA
+  // ============================================================
+  //
+  // Prioridade:
+  //
+  // username exato
+  //        ↓
+  // nome exato
+  //        ↓
+  // username começa com
+  //        ↓
+  // nome começa com
+  //        ↓
+  // contém
+  //
+  // ============================================================
+
+  int _calculateSearchScore({
+    required MatchUserEntity user,
+    required String query,
+  }) {
+    final normalizedUsername = user.username.trim().toLowerCase();
+
+    final normalizedName = user.name.trim().toLowerCase();
+
+    var score = 0;
+
+    // ==========================================================
+    // USERNAME EXATO
+    // ==========================================================
+
+    if (normalizedUsername ==
+        query) {
+      score += 100;
+    }
+
+    // ==========================================================
+    // NOME EXATO
+    // ==========================================================
+
+    if (normalizedName ==
+        query) {
+      score += 90;
+    }
+
+    // ==========================================================
+    // USERNAME COMEÇA COM
+    // ==========================================================
+
+    if (normalizedUsername.startsWith(
+      query,
+    )) {
+      score += 50;
+    }
+
+    // ==========================================================
+    // NOME COMEÇA COM
+    // ==========================================================
+
+    if (normalizedName.startsWith(
+      query,
+    )) {
+      score += 40;
+    }
+
+    // ==========================================================
+    // USERNAME CONTÉM
+    // ==========================================================
+
+    if (normalizedUsername.contains(
+      query,
+    )) {
+      score += 20;
+    }
+
+    // ==========================================================
+    // NOME CONTÉM
+    // ==========================================================
+
+    if (normalizedName.contains(
+      query,
+    )) {
+      score += 10;
+    }
+
+    // ==========================================================
+    // ONLINE
+    // ==========================================================
+
+    if (user.isOnline) {
+      score += 1;
+    }
+
+    return score;
+  }
+
+  // ============================================================
+  // NORMALIZAR PESQUISA
+  // ============================================================
+
+  String _normalizeSearchQuery(
+    String value,
+  ) {
+    return value.trim().toLowerCase().replaceFirst(
+      RegExp(
+        r'^@+',
+      ),
+      '',
+    );
+  }
 
   // ============================================================
   // INICIAR STREAM DE MATCH
@@ -111,9 +520,7 @@ class MatchRepository {
         'Nenhuma profissão procurada configurada.',
       );
 
-      controller.updateRecommendedUsers(
-        const [],
-      );
+      controller.clearMatchResults();
 
       debugPrint(
         '[MATCH REPOSITORY] ========================================',
@@ -124,14 +531,6 @@ class MatchRepository {
 
     // ==========================================================
     // STREAM DE USUÁRIOS ONLINE
-    // ==========================================================
-    //
-    // Por enquanto mantemos somente:
-    //
-    // is_online = true
-    //
-    // e processamos a compatibilidade localmente.
-    //
     // ==========================================================
 
     _profilesSubscription = _supabase
@@ -165,9 +564,7 @@ class MatchRepository {
                   'Erro no pipeline do Match: $error',
                 );
 
-                controller.updateRecommendedUsers(
-                  const [],
-                );
+                controller.clearMatchResults();
               },
         );
   }
@@ -201,9 +598,7 @@ class MatchRepository {
     // ==========================================================
 
     if (data.isEmpty) {
-      controller.updateRecommendedUsers(
-        const [],
-      );
+      controller.clearMatchResults();
 
       return;
     }
@@ -260,11 +655,6 @@ class MatchRepository {
         // ======================================================
         // COMPATIBILIDADE
         // ======================================================
-        //
-        // O candidato precisa exercer pelo menos uma profissão
-        // que o usuário atual esteja procurando.
-        //
-        // ======================================================
 
         return _hasIntersection(
           first: lookingForRoles,
@@ -283,9 +673,7 @@ class MatchRepository {
         'Nenhum candidato compatível.',
       );
 
-      controller.updateRecommendedUsers(
-        const [],
-      );
+      controller.clearMatchResults();
 
       return;
     }
@@ -318,7 +706,7 @@ class MatchRepository {
     );
 
     // ==========================================================
-    // CONVERTER PARA ENTIDADES
+    // CONVERTER
     // ==========================================================
 
     final users = candidates
@@ -328,9 +716,7 @@ class MatchRepository {
         .toList();
 
     if (users.isEmpty) {
-      controller.updateRecommendedUsers(
-        const [],
-      );
+      controller.clearMatchResults();
 
       return;
     }
@@ -368,31 +754,20 @@ class MatchRepository {
       debugPrint(
         '[MATCH REPOSITORY] '
         '${user.name} | '
+        '${user.usernameLabel} | '
         '${user.primaryRole?.key ?? "sem função"} | '
         'roles: ${MusicRole.toKeys(user.roles)} | '
         'procura: ${MusicRole.toKeys(user.lookingForRoles)}',
       );
     }
+
+    debugPrint(
+      '[MATCH REPOSITORY] ========================================',
+    );
   }
 
   // ============================================================
-  // SCORE
-  // ============================================================
-  //
-  // Regras:
-  //
-  // +10
-  // para cada função do candidato que o usuário procura.
-  //
-  // +20
-  // se o candidato também procura alguma função do usuário.
-  //
-  // +5
-  // se a função principal do candidato é diretamente procurada.
-  //
-  // +1
-  // se está online.
-  //
+  // SCORE DE COMPATIBILIDADE
   // ============================================================
 
   int _calculateCompatibilityScore({
@@ -410,17 +785,29 @@ class MatchRepository {
     >
     lookingForRoles,
   }) {
+    // ==========================================================
+    // FUNÇÕES DO CANDIDATO
+    // ==========================================================
+
     final candidateRoles = MusicRole.fromKeys(
       _readList(
         profile['roles'],
       ),
     );
 
+    // ==========================================================
+    // QUEM ELE PROCURA
+    // ==========================================================
+
     final candidateLookingForRoles = MusicRole.fromKeys(
       _readList(
         profile['looking_for_roles'],
       ),
     );
+
+    // ==========================================================
+    // PRINCIPAL
+    // ==========================================================
 
     final candidatePrimaryRole = MusicRole.fromKey(
       profile['primary_role']?.toString(),
@@ -429,7 +816,7 @@ class MatchRepository {
     var score = 0;
 
     // ==========================================================
-    // FUNÇÕES QUE EU PROCuro
+    // TEM O QUE EU PROCURO
     // ==========================================================
 
     for (final role in candidateRoles) {
@@ -441,7 +828,7 @@ class MatchRepository {
     }
 
     // ==========================================================
-    // PRINCIPAL DO CANDIDATO
+    // PRINCIPAL É O QUE EU PROCURO
     // ==========================================================
 
     if (candidatePrimaryRole !=
@@ -478,7 +865,7 @@ class MatchRepository {
   }
 
   // ============================================================
-  // VERIFICAR INTERSEÇÃO
+  // INTERSEÇÃO
   // ============================================================
 
   bool _hasIntersection({
@@ -505,7 +892,7 @@ class MatchRepository {
   }
 
   // ============================================================
-  // MAPEAR SUPABASE → MATCH USER ENTITY
+  // MAPEAR SUPABASE → ENTITY
   // ============================================================
 
   MatchUserEntity _mapMapToEntity(
@@ -516,6 +903,22 @@ class MatchRepository {
     map,
   ) {
     // ==========================================================
+    // USERNAME
+    // ==========================================================
+
+    final username = _readUsername(
+      map,
+    );
+
+    // ==========================================================
+    // NOME
+    // ==========================================================
+
+    final displayName = _readDisplayName(
+      map,
+    );
+
+    // ==========================================================
     // FUNÇÃO PRINCIPAL
     // ==========================================================
 
@@ -524,7 +927,7 @@ class MatchRepository {
     );
 
     // ==========================================================
-    // TODAS AS FUNÇÕES
+    // ROLES
     // ==========================================================
 
     final roles = MusicRole.fromKeys(
@@ -534,7 +937,7 @@ class MatchRepository {
     );
 
     // ==========================================================
-    // QUEM O CANDIDATO PROCURA
+    // LOOKING FOR
     // ==========================================================
 
     final lookingForRoles = MusicRole.fromKeys(
@@ -554,12 +957,12 @@ class MatchRepository {
             .map(
               (
                 item,
-              ) => item.toString(),
+              ) => item.toString().trim(),
             )
             .where(
               (
                 item,
-              ) => item.trim().isNotEmpty,
+              ) => item.isNotEmpty,
             )
             .toList();
 
@@ -572,9 +975,9 @@ class MatchRepository {
           map['id']?.toString().trim() ??
           '',
 
-      name: _readDisplayName(
-        map,
-      ),
+      username: username,
+
+      name: displayName,
 
       primaryRole: primaryRole,
 
@@ -585,15 +988,15 @@ class MatchRepository {
       tags: tags,
 
       bio:
-          map['bio']?.toString() ??
+          map['bio']?.toString().trim() ??
           '',
 
       showcaseMediaUrl:
-          map['showcase_url']?.toString() ??
+          map['showcase_url']?.toString().trim() ??
           '',
 
       showcaseDescription:
-          map['showcase_desc']?.toString() ??
+          map['showcase_desc']?.toString().trim() ??
           '',
 
       distanceKm: _readDouble(
@@ -607,7 +1010,34 @@ class MatchRepository {
   }
 
   // ============================================================
-  // NOME
+  // USERNAME
+  // ============================================================
+
+  String _readUsername(
+    Map<
+      String,
+      dynamic
+    >
+    map,
+  ) {
+    final username = map['username']?.toString().trim();
+
+    if (username ==
+            null ||
+        username.isEmpty) {
+      return '';
+    }
+
+    return username.replaceFirst(
+      RegExp(
+        r'^@+',
+      ),
+      '',
+    );
+  }
+
+  // ============================================================
+  // NOME PARA EXIBIÇÃO
   // ============================================================
 
   String _readDisplayName(
@@ -618,7 +1048,7 @@ class MatchRepository {
     map,
   ) {
     // ==========================================================
-    // NOME ARTÍSTICO
+    // ARTIST NAME
     // ==========================================================
 
     final artistName = map['artist_name']?.toString().trim();
@@ -645,11 +1075,11 @@ class MatchRepository {
     // USERNAME
     // ==========================================================
 
-    final username = map['username']?.toString().trim();
+    final username = _readUsername(
+      map,
+    );
 
-    if (username !=
-            null &&
-        username.isNotEmpty) {
+    if (username.isNotEmpty) {
       return username;
     }
 

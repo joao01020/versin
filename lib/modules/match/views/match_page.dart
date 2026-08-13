@@ -6,6 +6,7 @@ import 'package:versin/app/locator.dart';
 
 import 'package:versin/modules/match/controllers/match_controllers.dart';
 import 'package:versin/modules/match/data/repositories/match_repository.dart';
+import 'package:versin/modules/match/models/match_user_entity.dart';
 import 'package:versin/modules/match/widgets/discovery_card_widget.dart';
 import 'package:versin/modules/match/widgets/profile_tile_widget.dart';
 
@@ -18,31 +19,15 @@ import 'package:versin/modules/profile/views/professional_profile_settings_page.
 // MATCH PAGE
 // ============================================================
 //
-// Fluxo:
+// Responsabilidades:
 //
-// MatchPage
-//    ↓
-// ProfessionalProfileController
-//    ↓
-// carrega:
-//
-// - roles
-// - primaryRole
-// - lookingForRoles
-//
-//    ↓
-//
-// MatchController
-//
-//    ↓
-//
-// MatchRepository
-//
-//    ↓
-//
-// busca candidatos cujas roles combinam com:
-//
-// lookingForRoles
+// - exibir cabeçalho do Conectar;
+// - pesquisar usuários;
+// - exibir configuração profissional;
+// - exibir discovery;
+// - exibir recomendações;
+// - abrir networking;
+// - reiniciar busca após alteração profissional.
 //
 // ============================================================
 
@@ -79,6 +64,8 @@ class _MatchPageState
 
   late final ProfessionalProfileController _professionalProfileController;
 
+  final TextEditingController _searchController = TextEditingController();
+
   // ============================================================
   // REPOSITORY
   // ============================================================
@@ -95,12 +82,39 @@ class _MatchPageState
   _matchSubscription;
 
   // ============================================================
+  // SEARCH
+  // ============================================================
+
+  Timer? _searchDebounce;
+
+  final FocusNode _searchFocusNode = FocusNode();
+
+  // ============================================================
   // ESTADO VISUAL
   // ============================================================
 
   bool _isConnectionProfileExpanded = true;
 
   bool _isInitializingMatch = true;
+
+  bool _isSearchPanelOpen = false;
+
+  // ============================================================
+  // SEARCH STATE
+  // ============================================================
+
+  bool _isSearching = false;
+
+  bool _isSearchActive = false;
+
+  String _searchQuery = '';
+
+  String? _searchError;
+
+  List<
+    MatchUserEntity
+  >
+  _searchResults = [];
 
   // ============================================================
   // INIT
@@ -109,10 +123,6 @@ class _MatchPageState
   @override
   void initState() {
     super.initState();
-
-    // ==========================================================
-    // DEPENDÊNCIAS
-    // ==========================================================
 
     _matchController =
         sl<
@@ -129,10 +139,6 @@ class _MatchPageState
           MatchRepository
         >();
 
-    // ==========================================================
-    // LISTENERS
-    // ==========================================================
-
     _matchController.addListener(
       _onControllerUpdate,
     );
@@ -140,10 +146,6 @@ class _MatchPageState
     _professionalProfileController.addListener(
       _onControllerUpdate,
     );
-
-    // ==========================================================
-    // STREAM DE MATCH MÚTUO
-    // ==========================================================
 
     _matchSubscription = _matchController.matchEventStream.listen(
       (
@@ -173,28 +175,11 @@ class _MatchPageState
           },
     );
 
-    // ==========================================================
-    // INICIALIZAÇÃO ASSÍNCRONA
-    // ==========================================================
-
     _initializeMatch();
   }
 
   // ============================================================
   // INICIALIZAR MATCH
-  // ============================================================
-  //
-  // Ordem importante:
-  //
-  // 1. carregar perfil profissional;
-  // 2. obter primaryRole;
-  // 3. obter lookingForRoles;
-  // 4. iniciar MatchController;
-  // 5. iniciar MatchRepository.
-  //
-  // Dessa forma o repository nunca inicia antes de saber
-  // quem o usuário procura.
-  //
   // ============================================================
 
   Future<
@@ -210,19 +195,11 @@ class _MatchPageState
     }
 
     try {
-      // ========================================================
-      // PERFIL PROFISSIONAL
-      // ========================================================
-
       await _professionalProfileController.load();
 
       if (!mounted) {
         return;
       }
-
-      // ========================================================
-      // LOG
-      // ========================================================
 
       debugPrint(
         '[MATCH PAGE] ========================================',
@@ -247,19 +224,11 @@ class _MatchPageState
         '${_professionalProfileController.lookingForRoles.map((role) => role.key).toList()}',
       );
 
-      // ========================================================
-      // MATCH CONTROLLER
-      // ========================================================
-
       await _matchController.initMatchSession();
 
       if (!mounted) {
         return;
       }
-
-      // ========================================================
-      // REPOSITORY
-      // ========================================================
 
       _matchRepository.streamCrossRoleMatches(
         _matchController,
@@ -301,6 +270,190 @@ class _MatchPageState
 
     setState(
       () {},
+    );
+  }
+
+  // ============================================================
+  // ABRIR / FECHAR PESQUISA
+  // ============================================================
+
+  void _toggleSearchPanel() {
+    setState(
+      () {
+        _isSearchPanelOpen = !_isSearchPanelOpen;
+      },
+    );
+
+    if (_isSearchPanelOpen) {
+      Future.delayed(
+        const Duration(
+          milliseconds: 120,
+        ),
+        () {
+          if (!mounted) {
+            return;
+          }
+
+          _searchFocusNode.requestFocus();
+        },
+      );
+
+      return;
+    }
+
+    _clearSearch();
+  }
+
+  // ============================================================
+  // PESQUISA
+  // ============================================================
+
+  void _handleSearchChanged(
+    String value,
+  ) {
+    _searchDebounce?.cancel();
+
+    final normalized = value.trim();
+
+    if (normalized.isEmpty) {
+      setState(
+        () {
+          _searchQuery = '';
+
+          _isSearchActive = false;
+
+          _isSearching = false;
+
+          _searchError = null;
+
+          _searchResults = [];
+        },
+      );
+
+      return;
+    }
+
+    setState(
+      () {
+        _searchQuery = normalized;
+
+        _isSearchActive = true;
+
+        _searchError = null;
+      },
+    );
+
+    _searchDebounce = Timer(
+      const Duration(
+        milliseconds: 350,
+      ),
+      () {
+        _searchUsers(
+          normalized,
+        );
+      },
+    );
+  }
+
+  // ============================================================
+  // PESQUISAR USUÁRIOS
+  // ============================================================
+
+  Future<
+    void
+  >
+  _searchUsers(
+    String query,
+  ) async {
+    if (query.trim().isEmpty) {
+      return;
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(
+      () {
+        _isSearching = true;
+
+        _searchError = null;
+      },
+    );
+
+    try {
+      final users = await _matchRepository.searchUsers(
+        query: query,
+        currentUserId: _matchController.currentUserId,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      if (_searchQuery !=
+          query.trim()) {
+        return;
+      }
+
+      setState(
+        () {
+          _searchResults = users;
+
+          _isSearching = false;
+        },
+      );
+    } catch (
+      error
+    ) {
+      debugPrint(
+        '[MATCH PAGE] '
+        'Erro ao pesquisar usuários: $error',
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(
+        () {
+          _isSearching = false;
+
+          _searchResults = [];
+
+          _searchError = 'Não foi possível pesquisar usuários.';
+        },
+      );
+    }
+  }
+
+  // ============================================================
+  // LIMPAR PESQUISA
+  // ============================================================
+
+  void _clearSearch() {
+    _searchDebounce?.cancel();
+
+    _searchController.clear();
+
+    _searchFocusNode.unfocus();
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(
+      () {
+        _searchQuery = '';
+
+        _isSearchActive = false;
+
+        _isSearching = false;
+
+        _searchError = null;
+
+        _searchResults = [];
+      },
     );
   }
 
@@ -353,43 +506,17 @@ class _MatchPageState
       return;
     }
 
-    // ==========================================================
-    // RECARREGAR PERFIL
-    // ==========================================================
-
     await _professionalProfileController.refresh();
 
     if (!mounted) {
       return;
     }
 
-    // ==========================================================
-    // REINICIAR MATCH
-    // ==========================================================
-    //
-    // Se o usuário mudou:
-    //
-    // Beatmaker
-    //
-    // procura:
-    // Artista
-    //
-    // para:
-    //
-    // Beatmaker
-    //
-    // procura:
-    // Artista + Compositor
-    //
-    // precisamos recalcular os candidatos.
-    //
-    // ==========================================================
-
     await _restartMatchSearch();
   }
 
   // ============================================================
-  // REINICIAR BUSCA
+  // REINICIAR MATCH
   // ============================================================
 
   Future<
@@ -414,7 +541,7 @@ class _MatchPageState
   }
 
   // ============================================================
-  // EXPANDIR / RECOLHER
+  // EXPANDIR CARD
   // ============================================================
 
   void _toggleConnectionProfileCard() {
@@ -431,6 +558,12 @@ class _MatchPageState
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
+
+    _searchController.dispose();
+
+    _searchFocusNode.dispose();
+
     _matchSubscription?.cancel();
 
     _matchSubscription = null;
@@ -443,35 +576,9 @@ class _MatchPageState
       _onControllerUpdate,
     );
 
-    // ==========================================================
-    // PARAR STREAM DE PERFIS
-    // ==========================================================
-
     _matchRepository.stopStreaming();
 
-    // ==========================================================
-    // MATCH CONTROLLER
-    // ==========================================================
-    //
-    // MatchController está registrado como Factory.
-    //
-    // Portanto essa instância pertence a esta página.
-    //
-    // ==========================================================
-
     _matchController.dispose();
-
-    // ==========================================================
-    // PROFESSIONAL PROFILE CONTROLLER
-    // ==========================================================
-    //
-    // NÃO fazer:
-    //
-    // _professionalProfileController.dispose();
-    //
-    // Ele é LazySingleton compartilhado.
-    //
-    // ==========================================================
 
     super.dispose();
   }
@@ -507,6 +614,45 @@ class _MatchPageState
             ),
 
             // ==================================================
+            // HEADER SUPERIOR
+            // ==================================================
+            _buildTopHeader(),
+
+            // ==================================================
+            // PESQUISA EXPANDIDA
+            // ==================================================
+            AnimatedSize(
+              duration: const Duration(
+                milliseconds: 180,
+              ),
+              curve: Curves.easeOut,
+              child: _isSearchPanelOpen
+                  ? Padding(
+                      padding: const EdgeInsets.only(
+                        top: 16,
+                      ),
+                      child: _buildSearchField(),
+                    )
+                  : const SizedBox.shrink(),
+            ),
+
+            // ==================================================
+            // RESULTADOS
+            // ==================================================
+            if (_isSearchPanelOpen &&
+                _isSearchActive) ...[
+              const SizedBox(
+                height: 16,
+              ),
+
+              _buildSearchResults(),
+            ],
+
+            const SizedBox(
+              height: 22,
+            ),
+
+            // ==================================================
             // PERFIL DE CONEXÃO
             // ==================================================
             _buildConnectionProfileCard(),
@@ -524,9 +670,6 @@ class _MatchPageState
               height: 24,
             ),
 
-            // ==================================================
-            // DISCOVERY
-            // ==================================================
             _buildDiscoverySection(
               hasNoDiscovery: hasNoDiscovery,
             ),
@@ -565,6 +708,372 @@ class _MatchPageState
   }
 
   // ============================================================
+  // HEADER SUPERIOR
+  // ============================================================
+
+  Widget _buildTopHeader() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        // ======================================================
+        // TÍTULO
+        // ======================================================
+        const Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Conectar',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+
+              SizedBox(
+                height: 3,
+              ),
+
+              Text(
+                'Encontre pessoas para criar com você',
+                style: TextStyle(
+                  color: Colors.white38,
+                  fontSize: 11,
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(
+          width: 12,
+        ),
+
+        // ======================================================
+        // BOTÃO PESQUISAR
+        // ======================================================
+        Tooltip(
+          message: _isSearchPanelOpen
+              ? 'Fechar pesquisa'
+              : 'Pesquisar usuário',
+          child: InkWell(
+            onTap: _toggleSearchPanel,
+            borderRadius: BorderRadius.circular(
+              14,
+            ),
+            child: AnimatedContainer(
+              duration: const Duration(
+                milliseconds: 160,
+              ),
+              height: 42,
+              padding: const EdgeInsets.symmetric(
+                horizontal: 13,
+              ),
+              decoration: BoxDecoration(
+                color: _isSearchPanelOpen
+                    ? _matchController.accentNeon.withValues(
+                        alpha: 0.10,
+                      )
+                    : Colors.white.withValues(
+                        alpha: 0.035,
+                      ),
+                borderRadius: BorderRadius.circular(
+                  14,
+                ),
+                border: Border.all(
+                  color: _isSearchPanelOpen
+                      ? _matchController.accentNeon.withValues(
+                          alpha: 0.30,
+                        )
+                      : Colors.white.withValues(
+                          alpha: 0.07,
+                        ),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    _isSearchPanelOpen
+                        ? Icons.close_rounded
+                        : Icons.search_rounded,
+                    color: _isSearchPanelOpen
+                        ? _matchController.accentNeon
+                        : Colors.white60,
+                    size: 18,
+                  ),
+
+                  const SizedBox(
+                    width: 7,
+                  ),
+
+                  Text(
+                    _isSearchPanelOpen
+                        ? 'FECHAR'
+                        : 'PESQUISAR',
+                    style: TextStyle(
+                      color: _isSearchPanelOpen
+                          ? _matchController.accentNeon
+                          : Colors.white60,
+                      fontSize: 9,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.7,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ============================================================
+  // CAMPO DE PESQUISA
+  // ============================================================
+
+  Widget _buildSearchField() {
+    return Container(
+      height: 50,
+      decoration: BoxDecoration(
+        color: const Color(
+          0xFF17132D,
+        ),
+        borderRadius: BorderRadius.circular(
+          15,
+        ),
+        border: Border.all(
+          color: _isSearchActive
+              ? _matchController.accentNeon.withValues(
+                  alpha: 0.28,
+                )
+              : Colors.white.withValues(
+                  alpha: 0.07,
+                ),
+        ),
+      ),
+      child: TextField(
+        controller: _searchController,
+        focusNode: _searchFocusNode,
+        onChanged: _handleSearchChanged,
+        textInputAction: TextInputAction.search,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 12,
+        ),
+        decoration: InputDecoration(
+          border: InputBorder.none,
+
+          hintText: 'Pesquisar por nome ou @usuario',
+
+          hintStyle: const TextStyle(
+            color: Colors.white24,
+            fontSize: 11,
+          ),
+
+          prefixIcon: Icon(
+            Icons.search_rounded,
+            color: _isSearchActive
+                ? _matchController.accentNeon
+                : Colors.white38,
+            size: 20,
+          ),
+
+          suffixIcon: _searchController.text.isNotEmpty
+              ? IconButton(
+                  tooltip: 'Limpar',
+                  onPressed: _clearSearch,
+                  icon: const Icon(
+                    Icons.close_rounded,
+                    color: Colors.white38,
+                    size: 18,
+                  ),
+                )
+              : null,
+        ),
+      ),
+    );
+  }
+
+  // ============================================================
+  // RESULTADOS DA PESQUISA
+  // ============================================================
+
+  Widget _buildSearchResults() {
+    if (_isSearching) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(
+          vertical: 28,
+        ),
+        decoration: _searchResultDecoration(),
+        child: const Center(
+          child: SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: Colors.purpleAccent,
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (_searchError !=
+        null) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(
+          16,
+        ),
+        decoration: _searchResultDecoration(),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.error_outline_rounded,
+              color: Colors.redAccent,
+              size: 18,
+            ),
+
+            const SizedBox(
+              width: 9,
+            ),
+
+            Expanded(
+              child: Text(
+                _searchError!,
+                style: const TextStyle(
+                  color: Colors.white54,
+                  fontSize: 11,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_searchResults.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(
+          vertical: 24,
+          horizontal: 16,
+        ),
+        decoration: _searchResultDecoration(),
+        child: Column(
+          children: [
+            const Icon(
+              Icons.person_search_outlined,
+              color: Colors.white24,
+              size: 26,
+            ),
+
+            const SizedBox(
+              height: 8,
+            ),
+
+            Text(
+              'Nenhum usuário encontrado para "$_searchQuery".',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Colors.white38,
+                fontSize: 11,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Text(
+              'Resultados',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+
+            const SizedBox(
+              width: 8,
+            ),
+
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 7,
+                vertical: 3,
+              ),
+              decoration: BoxDecoration(
+                color: _matchController.accentNeon.withValues(
+                  alpha: 0.08,
+                ),
+                borderRadius: BorderRadius.circular(
+                  20,
+                ),
+              ),
+              child: Text(
+                '${_searchResults.length}',
+                style: TextStyle(
+                  color: _matchController.accentNeon,
+                  fontSize: 9,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+
+        const SizedBox(
+          height: 12,
+        ),
+
+        ..._searchResults.map(
+          (
+            user,
+          ) {
+            return ProfileTileWidget(
+              user: user,
+              controller: _matchController,
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  // ============================================================
+  // DECORAÇÃO SEARCH
+  // ============================================================
+
+  BoxDecoration _searchResultDecoration() {
+    return BoxDecoration(
+      color:
+          const Color(
+            0xFF17132D,
+          ).withValues(
+            alpha: 0.65,
+          ),
+      borderRadius: BorderRadius.circular(
+        16,
+      ),
+      border: Border.all(
+        color: Colors.white.withValues(
+          alpha: 0.05,
+        ),
+      ),
+    );
+  }
+
+  // ============================================================
   // CARD — PERFIL DE CONEXÃO
   // ============================================================
 
@@ -593,9 +1102,6 @@ class _MatchPageState
       ),
       child: Column(
         children: [
-          // ====================================================
-          // HEADER
-          // ====================================================
           InkWell(
             onTap: _toggleConnectionProfileCard,
             borderRadius: BorderRadius.circular(
@@ -607,9 +1113,6 @@ class _MatchPageState
               ),
               child: Row(
                 children: [
-                  // ============================================
-                  // PERFIL
-                  // ============================================
                   Tooltip(
                     message: 'Editar perfil profissional',
                     child: InkWell(
@@ -644,9 +1147,6 @@ class _MatchPageState
                     width: 13,
                   ),
 
-                  // ============================================
-                  // TEXTO
-                  // ============================================
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -683,9 +1183,6 @@ class _MatchPageState
                     ),
                   ),
 
-                  // ============================================
-                  // EDITAR
-                  // ============================================
                   IconButton(
                     tooltip: 'Editar perfil profissional',
                     onPressed: _openProfessionalProfileSettings,
@@ -696,9 +1193,6 @@ class _MatchPageState
                     ),
                   ),
 
-                  // ============================================
-                  // EXPANDIR
-                  // ============================================
                   Icon(
                     _isConnectionProfileExpanded
                         ? Icons.keyboard_arrow_up_rounded
@@ -711,9 +1205,6 @@ class _MatchPageState
             ),
           ),
 
-          // ====================================================
-          // EXPANDIDO
-          // ====================================================
           AnimatedCrossFade(
             duration: const Duration(
               milliseconds: 180,
@@ -733,7 +1224,7 @@ class _MatchPageState
   }
 
   // ============================================================
-  // CONTEÚDO EXPANDIDO
+  // CARD EXPANDIDO
   // ============================================================
 
   Widget _buildConnectionProfileExpandedContent() {
@@ -783,9 +1274,6 @@ class _MatchPageState
             height: 16,
           ),
 
-          // ====================================================
-          // FUNÇÃO PRINCIPAL
-          // ====================================================
           Row(
             children: [
               const Text(
@@ -818,9 +1306,6 @@ class _MatchPageState
             height: 14,
           ),
 
-          // ====================================================
-          // QUEM PROCURA
-          // ====================================================
           const Text(
             'PROFISSIONAIS PROCURADOS',
             style: TextStyle(
@@ -895,9 +1380,6 @@ class _MatchPageState
             height: 16,
           ),
 
-          // ====================================================
-          // EDITAR
-          // ====================================================
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(

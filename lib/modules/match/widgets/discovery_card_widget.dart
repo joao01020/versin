@@ -13,7 +13,8 @@ import 'action_button_widget.dart';
 // Exibe:
 //
 // - showcase;
-// - nome;
+// - nome artístico;
+// - username;
 // - função principal;
 // - bio;
 // - tipo de conexão;
@@ -27,7 +28,6 @@ class DiscoveryCardWidget
     extends
         StatefulWidget {
   final MatchController controller;
-
   final MatchUserEntity user;
 
   const DiscoveryCardWidget({
@@ -42,6 +42,10 @@ class DiscoveryCardWidget
   >
   createState() => _DiscoveryCardWidgetState();
 }
+
+// ============================================================
+// STATE
+// ============================================================
 
 class _DiscoveryCardWidgetState
     extends
@@ -102,7 +106,7 @@ class _DiscoveryCardWidgetState
       );
 
       // ========================================================
-      // SE AINDA NÃO É MATCH MÚTUO
+      // AINDA NÃO É MATCH MÚTUO
       // ========================================================
 
       if (!started &&
@@ -117,7 +121,8 @@ class _DiscoveryCardWidgetState
       error
     ) {
       debugPrint(
-        '[DISCOVERY] Erro ao processar conexão: $error',
+        '[DISCOVERY] '
+        'Erro ao processar conexão: $error',
       );
 
       if (mounted) {
@@ -195,7 +200,7 @@ class _DiscoveryCardWidgetState
             );
 
     return Container(
-      height: 250,
+      height: 270,
       width: double.infinity,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(
@@ -385,8 +390,28 @@ class _DiscoveryCardWidgetState
                     ],
                   ),
 
+                  // ==================================================
+                  // USERNAME
+                  // ==================================================
+                  if (widget.user.hasUsername) ...[
+                    const SizedBox(
+                      height: 2,
+                    ),
+
+                    Text(
+                      widget.user.usernameLabel,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white54,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+
                   const SizedBox(
-                    height: 3,
+                    height: 4,
                   ),
 
                   // ==================================================
@@ -394,6 +419,8 @@ class _DiscoveryCardWidgetState
                   // ==================================================
                   Text(
                     widget.user.primaryRoleLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: widget.controller.accentNeon,
                       fontSize: 11,
@@ -473,7 +500,8 @@ class _DiscoveryCardWidgetState
                               color: Colors.white24,
                               onTap: () {
                                 debugPrint(
-                                  '[DISCOVERY] Perfil ignorado: '
+                                  '[DISCOVERY] '
+                                  'Perfil ignorado: '
                                   '${widget.user.id}',
                                 );
                               },

@@ -38,6 +38,7 @@ dependencies:
   fl_chart: ^1.2.0
   desktop_multi_window: ^0.3.0
   desktop_drop: ^0.3.0
+  just_audio:   
   
   window_manager:
     git:

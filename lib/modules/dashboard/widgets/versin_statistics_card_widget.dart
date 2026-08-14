@@ -2,12 +2,16 @@ import 'package:flutter/material.dart';
 
 import '../controllers/dashboard_controller.dart';
 
-class MainChartCardWidget
+// ============================================================
+// VERSIN STATISTICS CARD WIDGET
+// ============================================================
+
+class VersinStatisticsCardWidget
     extends
         StatelessWidget {
   final DashboardController controller;
 
-  const MainChartCardWidget({
+  const VersinStatisticsCardWidget({
     super.key,
     required this.controller,
   });
@@ -37,6 +41,9 @@ class MainChartCardWidget
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // ====================================================
+          // TÍTULO
+          // ====================================================
           const Text(
             'Estatísticas Versin',
             style: TextStyle(
@@ -45,9 +52,14 @@ class MainChartCardWidget
               fontWeight: FontWeight.bold,
             ),
           ),
+
           const SizedBox(
             height: 30,
           ),
+
+          // ====================================================
+          // GRÁFICO
+          // ====================================================
           SizedBox(
             height: 150,
             child: Row(

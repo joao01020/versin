@@ -2,16 +2,49 @@ import 'package:flutter/material.dart';
 
 import 'package:versin/app/locator.dart';
 import 'package:versin/app/routes/app_routes.dart';
+
+import 'package:versin/modules/activities/controllers/recent_activity_controller.dart';
+import 'package:versin/modules/activities/views/recent_activities_page.dart';
+import 'package:versin/modules/activities/widgets/recent_activities_card_widget.dart';
+import 'package:versin/modules/notifications/widgets/notification_button_widget.dart';
 import 'package:versin/modules/profile/controllers/professional_profile_controller.dart';
 
 import '../controllers/dashboard_controller.dart';
 
+// ============================================================
+// ACCOUNT ACTIVITIES CARD WIDGET
+// ============================================================
+//
+// Card principal do perfil exibido no Dashboard.
+//
+// Responsabilidades:
+//
+// - exibir avatar;
+// - exibir nome artístico;
+// - exibir função profissional principal;
+// - acessar contratos;
+// - acessar calendário;
+// - acessar notificações;
+// - exibir as 3 atividades mais recentes;
+// - permitir acessar o histórico mensal;
+// - permitir expandir/recolher o card.
+//
+// ============================================================
+
 class AccountActivitiesCardWidget
     extends
         StatefulWidget {
+  // ============================================================
+  // DEPENDÊNCIAS
+  // ============================================================
+
   final DashboardController controller;
 
   final VoidCallback onStateChanged;
+
+  // ============================================================
+  // CONSTRUTOR
+  // ============================================================
 
   const AccountActivitiesCardWidget({
     super.key,
@@ -26,12 +59,30 @@ class AccountActivitiesCardWidget
   createState() => _AccountActivitiesCardWidgetState();
 }
 
+// ============================================================
+// STATE
+// ============================================================
+
 class _AccountActivitiesCardWidgetState
     extends
         State<
           AccountActivitiesCardWidget
         > {
+  // ============================================================
+  // PROFILE CONTROLLER
+  // ============================================================
+
   late final ProfessionalProfileController _profileController;
+
+  // ============================================================
+  // ACTIVITY CONTROLLER
+  // ============================================================
+
+  late final RecentActivityController _activityController;
+
+  // ============================================================
+  // INIT
+  // ============================================================
 
   @override
   void initState() {
@@ -42,79 +93,12 @@ class _AccountActivitiesCardWidgetState
           ProfessionalProfileController
         >();
 
+    _activityController =
+        sl<
+          RecentActivityController
+        >();
+
     _profileController.load();
-  }
-
-  // ============================================================
-  // NOTIFICAÇÕES
-  // ============================================================
-
-  void _showNotificationsModal(
-    BuildContext context,
-  ) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder:
-          (
-            context,
-          ) => Container(
-            height:
-                MediaQuery.of(
-                  context,
-                ).size.height *
-                0.6,
-            decoration: const BoxDecoration(
-              color: Color(
-                0xFF1F1A3A,
-              ),
-              borderRadius: BorderRadius.vertical(
-                top: Radius.circular(
-                  24,
-                ),
-              ),
-            ),
-            padding: const EdgeInsets.all(
-              20,
-            ),
-            child: Column(
-              children: [
-                Container(
-                  width: 40,
-                  height: 4,
-                  color: Colors.white.withValues(
-                    alpha: 0.24,
-                  ),
-                ),
-                const SizedBox(
-                  height: 20,
-                ),
-                const Text(
-                  'NOTIFICAÇÕES',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(
-                  height: 20,
-                ),
-                const Expanded(
-                  child: Center(
-                    child: Text(
-                      'Nenhuma notificação nova.',
-                      style: TextStyle(
-                        color: Colors.white54,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-    );
   }
 
   // ============================================================
@@ -130,6 +114,7 @@ class _AccountActivitiesCardWidgetState
         [
           widget.controller,
           _profileController,
+          _activityController,
         ],
       ),
       builder:
@@ -167,7 +152,7 @@ class _AccountActivitiesCardWidgetState
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   // ==================================================
-                  // EXPANDIR
+                  // EXPANDIR / RECOLHER
                   // ==================================================
                   Row(
                     mainAxisAlignment: MainAxisAlignment.end,
@@ -245,7 +230,7 @@ class _AccountActivitiesCardWidgetState
                   ),
 
                   // ==================================================
-                  // FUNÇÃO PROFISSIONAL
+                  // FUNÇÃO PROFISSIONAL PRINCIPAL
                   // ==================================================
                   if (_profileController.isLoading)
                     const SizedBox(
@@ -277,108 +262,66 @@ class _AccountActivitiesCardWidgetState
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
+                      // ==================================================
+                      // CONTRATOS
+                      // ==================================================
                       _buildCircularActionIcon(
                         context,
                         Icons.description_outlined,
                         route: AppRoutes.contracts,
                       ),
+
                       const SizedBox(
                         width: 16,
                       ),
+
+                      // ==================================================
+                      // CALENDÁRIO
+                      // ==================================================
                       _buildCircularActionIcon(
                         context,
                         Icons.calendar_today_outlined,
                         route: AppRoutes.calendar,
                       ),
+
                       const SizedBox(
                         width: 16,
                       ),
-                      _buildCircularActionIcon(
-                        context,
-                        Icons.notifications_none_outlined,
-                        hasNotification: true,
-                        onTap: () => _showNotificationsModal(
-                          context,
-                        ),
+
+                      // ==================================================
+                      // NOTIFICAÇÕES
+                      // ==================================================
+                      const NotificationButtonWidget(
+                        size: 44,
                       ),
                     ],
                   ),
 
                   // ==================================================
-                  // ATIVIDADES
+                  // ATIVIDADES RECENTES
                   // ==================================================
                   if (widget.controller.isProfileCardExpanded) ...[
                     const SizedBox(
                       height: 28,
                     ),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Atividades Recentes',
-                            style: TextStyle(
-                              color: Colors.white.withValues(
-                                alpha: 0.8,
-                              ),
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(
-                            height: 4,
-                          ),
-                          Text(
-                            '${DateTime.now().day.toString().padLeft(2, '0')} '
-                            '${widget.controller.getShortMonthName(widget.controller.focusedDay.month)} '
-                            '${widget.controller.focusedDay.year}',
-                            style: const TextStyle(
-                              color: Colors.white38,
-                              fontSize: 11,
-                            ),
-                          ),
-                        ],
-                      ),
+
+                    RecentActivitiesCardWidget(
+                      controller: _activityController,
+                      accentColor: widget.controller.accentNeon,
                     ),
-                    const SizedBox(
-                      height: 20,
-                    ),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 24,
-                        horizontal: 16,
+
+                    // ==================================================
+                    // VER MAIS
+                    // ==================================================
+                    if (_activityController.hasActivities) ...[
+                      const SizedBox(
+                        height: 12,
                       ),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(
-                          alpha: 0.2,
-                        ),
-                        borderRadius: BorderRadius.circular(
-                          16,
-                        ),
+
+                      _buildViewMoreButton(
+                        context,
                       ),
-                      child: const Column(
-                        children: [
-                          Icon(
-                            Icons.history_toggle_off,
-                            color: Colors.white24,
-                            size: 28,
-                          ),
-                          SizedBox(
-                            height: 8,
-                          ),
-                          Text(
-                            'Nenhuma atividade recente por aqui.',
-                            style: TextStyle(
-                              color: Colors.white38,
-                              fontSize: 11,
-                              fontStyle: FontStyle.italic,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                    ],
                   ],
                 ],
               ),
@@ -388,24 +331,112 @@ class _AccountActivitiesCardWidgetState
   }
 
   // ============================================================
-  // BOTÃO
+  // VER MAIS
+  // ============================================================
+
+  Widget _buildViewMoreButton(
+    BuildContext context,
+  ) {
+    return Align(
+      alignment: Alignment.centerRight,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(
+            12,
+          ),
+          onTap: () {
+            _openActivitiesPage(
+              context,
+            );
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 10,
+              vertical: 7,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'VER MAIS',
+                  style: TextStyle(
+                    color: widget.controller.accentNeon,
+                    fontSize: 9,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.6,
+                  ),
+                ),
+
+                const SizedBox(
+                  width: 5,
+                ),
+
+                Icon(
+                  Icons.arrow_forward_rounded,
+                  color: widget.controller.accentNeon,
+                  size: 13,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ============================================================
+  // ABRIR HISTÓRICO DE ATIVIDADES
+  // ============================================================
+
+  Future<
+    void
+  >
+  _openActivitiesPage(
+    BuildContext context,
+  ) async {
+    await Navigator.of(
+      context,
+    ).push(
+      MaterialPageRoute<
+        void
+      >(
+        builder:
+            (
+              context,
+            ) {
+              return const RecentActivitiesPage();
+            },
+      ),
+    );
+  }
+
+  // ============================================================
+  // BOTÃO CIRCULAR
   // ============================================================
 
   Widget _buildCircularActionIcon(
     BuildContext context,
     IconData icon, {
-    bool hasNotification = false,
     String? route,
     VoidCallback? onTap,
   }) {
     return GestureDetector(
       onTap: () {
+        // ======================================================
+        // CALLBACK PERSONALIZADO
+        // ======================================================
+
         if (onTap !=
             null) {
           onTap();
 
           return;
         }
+
+        // ======================================================
+        // ROTA
+        // ======================================================
 
         if (route !=
             null) {
@@ -416,43 +447,25 @@ class _AccountActivitiesCardWidgetState
           );
         }
       },
-      child: Stack(
-        alignment: Alignment.topRight,
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(
-                alpha: 0.05,
-              ),
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: Colors.white.withValues(
-                  alpha: 0.08,
-                ),
-              ),
-            ),
-            child: Icon(
-              icon,
-              color: Colors.white70,
-              size: 20,
+      child: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(
+            alpha: 0.05,
+          ),
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: Colors.white.withValues(
+              alpha: 0.08,
             ),
           ),
-          if (hasNotification)
-            Positioned(
-              right: 2,
-              top: 2,
-              child: Container(
-                width: 8,
-                height: 8,
-                decoration: const BoxDecoration(
-                  color: Colors.orangeAccent,
-                  shape: BoxShape.circle,
-                ),
-              ),
-            ),
-        ],
+        ),
+        child: Icon(
+          icon,
+          color: Colors.white70,
+          size: 20,
+        ),
       ),
     );
   }

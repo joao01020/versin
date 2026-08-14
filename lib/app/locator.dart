@@ -7,8 +7,25 @@ import 'package:get_it/get_it.dart';
 import '../modules/dashboard/controllers/dashboard_controller.dart';
 import '../modules/match/controllers/match_controllers.dart';
 import '../modules/profile/controllers/professional_profile_controller.dart';
-import '../modules/wallet/controllers/wallet_controller.dart';
 import '../modules/wallet/controllers/royalties_controller.dart';
+import '../modules/wallet/controllers/wallet_controller.dart';
+
+// ============================================================
+// ACTIVITIES
+// ============================================================
+
+import 'package:versin/modules/activities/controllers/recent_activity_controller.dart';
+import 'package:versin/modules/activities/data/repositories/recent_activity_repository_impl.dart';
+import 'package:versin/modules/activities/repositories/recent_activity_repository.dart';
+import 'package:versin/modules/activities/services/recent_activity_service.dart';
+
+// ============================================================
+// NOTIFICATIONS
+// ============================================================
+
+import 'package:versin/modules/notifications/controllers/notification_controller.dart';
+import 'package:versin/modules/notifications/data/repositories/notification_repository_impl.dart';
+import 'package:versin/modules/notifications/repositories/notification_repository.dart';
 
 // ============================================================
 // BRAIN & RHYMES
@@ -63,34 +80,99 @@ setupLocator() {
   // ==========================================================
   // PROFESSIONAL PROFILE MODULE
   // ==========================================================
-  //
-  // IMPORTANTE:
-  //
-  // ProfessionalProfileController é LazySingleton porque
-  // precisamos compartilhar a MESMA instância entre:
-  //
-  // - ProfessionalProfileSettingsPage
-  // - AccountActivitiesCardWidget
-  // - Dashboard
-  //
-  // Dessa forma:
-  //
-  // usuário altera função
-  //        ↓
-  // controller salva
-  //        ↓
-  // notifyListeners()
-  //        ↓
-  // Dashboard recebe alteração
-  //
-  // Também evita criar um controller separado em cada tela.
-  //
-  // ==========================================================
 
   sl.registerLazySingleton<
     ProfessionalProfileController
   >(
     () => ProfessionalProfileController(),
+  );
+
+  // ==========================================================
+  // ACTIVITIES MODULE
+  // ==========================================================
+  //
+  // Fluxo:
+  //
+  // Dashboard / Outros módulos
+  //              ↓
+  // RecentActivityService
+  //              ↓
+  // RecentActivityController
+  //              ↓
+  // RecentActivityRepository
+  //              ↓
+  // RecentActivityRepositoryImpl
+  //              ↓
+  // RecentActivityRemoteDatasource
+  //              ↓
+  // Supabase
+  //
+  // IMPORTANTE:
+  //
+  // RecentActivityRepository precisa ser registrado antes do
+  // RecentActivityController.
+  //
+  // RecentActivityController é LazySingleton porque:
+  //
+  // - Dashboard;
+  // - Realtime;
+  // - Service;
+  // - outros módulos;
+  //
+  // precisam compartilhar a mesma instância e o mesmo estado.
+  //
+  // RecentActivityService também é LazySingleton porque deve
+  // sempre utilizar esse mesmo Controller.
+  //
+  // ==========================================================
+
+  sl.registerLazySingleton<
+    RecentActivityRepository
+  >(
+    () => RecentActivityRepositoryImpl(),
+  );
+
+  sl.registerLazySingleton<
+    RecentActivityController
+  >(
+    () => RecentActivityController(
+      repository:
+          sl<
+            RecentActivityRepository
+          >(),
+    ),
+  );
+
+  sl.registerLazySingleton<
+    RecentActivityService
+  >(
+    () => RecentActivityService(
+      controller:
+          sl<
+            RecentActivityController
+          >(),
+    ),
+  );
+
+  // ==========================================================
+  // NOTIFICATIONS MODULE
+  // ==========================================================
+
+  sl.registerLazySingleton<
+    NotificationRepository
+  >(
+    () => NotificationRepositoryImpl(),
+  );
+
+  sl.registerLazySingleton<
+    NotificationController
+  >(
+    () => NotificationController(
+      repository:
+          sl<
+            NotificationRepository
+          >(),
+    ),
   );
 
   // ==========================================================
@@ -128,20 +210,6 @@ setupLocator() {
   // ==========================================================
   // BRAIN & RHYMES MODULE
   // ==========================================================
-  //
-  // BrainController é a instância principal.
-  //
-  // RhymesController aponta para exatamente a mesma instância.
-  //
-  // Isso significa:
-  //
-  // BrainController
-  //        │
-  //        └── RhymesController
-  //
-  // Não existem dois bancos de rimas separados.
-  //
-  // ==========================================================
 
   sl.registerLazySingleton<
     BrainController
@@ -159,29 +227,7 @@ setupLocator() {
   );
 
   // ==========================================================
-  // STUDIO MODULE — ESTADO DA SESSÃO
-  // ==========================================================
-  //
-  // StudioController é LazySingleton.
-  //
-  // Portanto ele é criado somente uma vez enquanto o app
-  // estiver aberto.
-  //
-  // Isso mantém:
-  //
-  // - título da música
-  // - letra
-  // - BPM
-  // - vibe
-  // - técnica
-  // - Timeline
-  // - mapa mental
-  // - nós
-  // - posição dos nós
-  // - conexões do mapa
-  //
-  // mesmo se o usuário sair do Studio e voltar.
-  //
+  // STUDIO MODULE
   // ==========================================================
 
   sl.registerLazySingleton<
@@ -198,31 +244,6 @@ setupLocator() {
   // ==========================================================
   // STORAGE MODULE
   // ==========================================================
-  //
-  // Estrutura:
-  //
-  // StoragePage
-  //      ↓
-  // StorageController
-  //      ↓
-  // StorageRepository
-  //      ↓
-  // InMemoryStorageRepository
-  //
-  // Enquanto ainda não conectamos banco real, o repository
-  // em memória começa vazio.
-  //
-  // Depois podemos substituir:
-  //
-  // InMemoryStorageRepository
-  //
-  // por:
-  //
-  // SupabaseStorageRepository
-  //
-  // sem alterar o StorageController.
-  //
-  // ==========================================================
 
   sl.registerLazySingleton<
     StorageRepository
@@ -232,14 +253,6 @@ setupLocator() {
 
   // ==========================================================
   // STORAGE HASH SERVICE
-  // ==========================================================
-  //
-  // Responsável por:
-  //
-  // - SHA-256 de letras
-  // - SHA-256 de arquivos
-  // - verificação de integridade
-  //
   // ==========================================================
 
   sl.registerLazySingleton<
@@ -251,16 +264,6 @@ setupLocator() {
   // ==========================================================
   // STORAGE FILE SERVICE
   // ==========================================================
-  //
-  // Responsável por:
-  //
-  // - selecionar beat
-  // - validar arquivo
-  // - ler metadados
-  // - tamanho
-  // - MIME
-  //
-  // ==========================================================
 
   sl.registerLazySingleton<
     StorageFileService
@@ -270,12 +273,6 @@ setupLocator() {
 
   // ==========================================================
   // STORAGE CONTROLLER
-  // ==========================================================
-  //
-  // IMPORTANTE:
-  //
-  // O repository precisa estar registrado ANTES do controller.
-  //
   // ==========================================================
 
   sl.registerLazySingleton<

@@ -8,6 +8,7 @@ import 'package:versin/modules/dashboard/controllers/dashboard_controller.dart';
 import 'package:versin/modules/profile/views/account_information_page.dart';
 import 'package:versin/modules/profile/views/professional_profile_settings_page.dart';
 import 'package:versin/modules/settings/widgets/settings_tile.dart';
+import 'package:versin/modules/settings/views/private_api_settings_page.dart';
 
 class SettingsPage
     extends
@@ -55,16 +56,6 @@ class _SettingsPageState
 
   bool _syncCloud = true;
   bool _autoSave = true;
-
-  bool _isApiExpanded = false;
-  bool _obscureApiKey = true;
-  final TextEditingController _apiKeyController = TextEditingController();
-
-  @override
-  void dispose() {
-    _apiKeyController.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(
@@ -206,152 +197,22 @@ class _SettingsPageState
                   ),
                   _buildDivider(),
 
-                  Theme(
-                    data:
-                        Theme.of(
-                          context,
-                        ).copyWith(
-                          dividerColor: Colors.transparent,
+                  SettingsTile(
+                    icon: Icons.vpn_key_outlined,
+                    title: "Configurar API Privada",
+                    subtitle: "Gerenciar credenciais e chaves externas de IA/Serviços",
+                    onTap: () {
+                      Navigator.of(
+                        context,
+                      ).push(
+                        MaterialPageRoute(
+                          builder:
+                              (
+                                _,
+                              ) => const PrivateApiSettingsPage(),
                         ),
-                    child: ExpansionTile(
-                      onExpansionChanged:
-                          (
-                            expanded,
-                          ) {
-                            setState(
-                              () => _isApiExpanded = expanded,
-                            );
-                          },
-                      leading: Icon(
-                        Icons.vpn_key_outlined,
-                        color: accentNeon,
-                        size: 22,
-                      ),
-                      title: const Text(
-                        "Configurar API Privada",
-                        style: TextStyle(
-                          color: Colors.white,
-                        ),
-                      ),
-                      subtitle: const Text(
-                        "Gerenciar credenciais e chaves externas de IA/Serviços",
-                        style: TextStyle(
-                          color: Colors.white54,
-                          fontSize: 12,
-                        ),
-                      ),
-                      trailing: Icon(
-                        _isApiExpanded
-                            ? Icons.keyboard_arrow_up
-                            : Icons.keyboard_arrow_down,
-                        color: Colors.white24,
-                      ),
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.only(
-                            left: 16,
-                            right: 16,
-                            bottom: 20,
-                            top: 4,
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.all(
-                                  12,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.black.withValues(
-                                    alpha: 0.3,
-                                  ),
-                                  borderRadius: BorderRadius.circular(
-                                    10,
-                                  ),
-                                  border: Border.all(
-                                    color: Colors.white.withValues(
-                                      alpha: 0.02,
-                                    ),
-                                  ),
-                                ),
-                                child: Text(
-                                  "Esta opção opcional concede autonomia para vincular sua própria chave de API ao ecossistema Versin. "
-                                  "Recomendado para contornar limitações padrão de cota de requisições ou para aplicar modelos neurais customizados dedicados.",
-                                  style: TextStyle(
-                                    color: Colors.white.withValues(
-                                      alpha: 0.5,
-                                    ),
-                                    fontSize: 12,
-                                    height: 1.4,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(
-                                height: 14,
-                              ),
-                              TextField(
-                                controller: _apiKeyController,
-                                obscureText: _obscureApiKey,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 13,
-                                ),
-                                decoration: InputDecoration(
-                                  hintText: "Insira sua API Key privada",
-                                  hintStyle: const TextStyle(
-                                    color: Colors.white24,
-                                    fontSize: 13,
-                                  ),
-                                  filled: true,
-                                  fillColor: Colors.white.withValues(
-                                    alpha: 0.02,
-                                  ),
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 14,
-                                    vertical: 12,
-                                  ),
-                                  enabledBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(
-                                      12,
-                                    ),
-                                    borderSide: BorderSide(
-                                      color: Colors.white.withValues(
-                                        alpha: 0.05,
-                                      ),
-                                    ),
-                                  ),
-                                  focusedBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(
-                                      12,
-                                    ),
-                                    borderSide: BorderSide(
-                                      color: accentNeon.withValues(
-                                        alpha: 0.3,
-                                      ),
-                                    ),
-                                  ),
-                                  suffixIcon: IconButton(
-                                    icon: Icon(
-                                      _obscureApiKey
-                                          ? Icons.visibility_off
-                                          : Icons.visibility,
-                                      color: Colors.white30,
-                                      size: 18,
-                                    ),
-                                    onPressed: () {
-                                      setState(
-                                        () => _obscureApiKey = !_obscureApiKey,
-                                      );
-                                    },
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
+                      );
+                    },
                   ),
                 ],
               ),
@@ -1261,7 +1122,7 @@ class _SettingsPageState
     onChanged,
   }) {
     return SwitchListTile(
-      activeColor: accentNeon,
+      activeThumbColor: accentNeon,
       activeTrackColor: primaryPurple.withValues(
         alpha: 0.4,
       ),

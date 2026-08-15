@@ -1,10 +1,29 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
 import 'package:versin/features/rhymes/presentation/controller/rhymes_controller.dart';
+import 'package:versin/modules/studio/controllers/studio_mind_map_controller.dart';
+import 'package:versin/modules/studio/controllers/studio_timeline_controller.dart';
 import 'package:versin/modules/studio/models/mind_map_node.dart';
 import 'package:versin/modules/studio/models/song_project.dart';
+
+// ============================================================
+// STUDIO CONTROLLER
+// ============================================================
+//
+// Controller principal/orquestrador do Studio.
+//
+// Responsabilidades mantidas aqui:
+//
+// - projeto atual;
+// - editor de letra;
+// - texto selecionado;
+// - título/BPM/vibe/técnica;
+// - estado dos painéis;
+// - criação/carregamento/exportação.
+//
+// Timeline e Mind Map são delegados para controllers próprios.
+//
+// ============================================================
 
 class StudioController
     extends
@@ -16,12 +35,20 @@ class StudioController
   final RhymesController rhymesController;
 
   // ============================================================
-  // PROJETO ATUAL
+  // PROJETO
   // ============================================================
 
   SongProject _project;
 
   SongProject get project => _project;
+
+  // ============================================================
+  // SUBCONTROLLERS
+  // ============================================================
+
+  late final StudioTimelineController timelineController;
+
+  late final StudioMindMapController mindMapController;
 
   // ============================================================
   // EDITOR DA LETRA
@@ -30,7 +57,7 @@ class StudioController
   late final TextEditingController lyricController;
 
   // ============================================================
-  // SELEÇÃO ATUAL
+  // SELEÇÃO DE TEXTO
   // ============================================================
 
   String _selectedText = '';
@@ -38,31 +65,6 @@ class StudioController
   String get selectedText => _selectedText;
 
   bool get hasSelectedText => _selectedText.trim().isNotEmpty;
-
-  // ============================================================
-  // MAPA
-  // ============================================================
-
-  String? _selectedNodeId;
-
-  String? get selectedNodeId => _selectedNodeId;
-
-  MindMapNode? get selectedNode {
-    final id = _selectedNodeId;
-
-    if (id ==
-        null) {
-      return null;
-    }
-
-    return _project.findMindMapNode(
-      id,
-    );
-  }
-
-  bool _isMapVisible = true;
-
-  bool get isMapVisible => _isMapVisible;
 
   // ============================================================
   // PAINÉIS DESTACÁVEIS
@@ -104,31 +106,40 @@ class StudioController
       _onLyricsChanged,
     );
 
-    rhymesController.addListener(
-      _onRhymesChanged,
+    timelineController = StudioTimelineController(
+      rhymesController: rhymesController,
+      projectProvider: () => _project,
+      markChanged: _markChanged,
     );
 
-    // ==========================================================
-    // SINCRONIZAÇÃO INICIAL
-    // ==========================================================
-    //
-    // Se a biblioteca já estiver carregada quando o Studio abrir,
-    // as palavras entram imediatamente na Timeline do projeto.
-    //
-    // Se ainda não estiver carregada, _onRhymesChanged() fará
-    // essa sincronização assim que o BrainController terminar
-    // de buscar os dados.
-    //
-    // ==========================================================
+    mindMapController = StudioMindMapController(
+      projectProvider: () => _project,
+      markChanged: _markChanged,
+    );
 
-    _syncGlobalRhymesToTimeline(
-      notify: false,
-      markChanged: false,
+    timelineController.addListener(
+      _onChildChanged,
+    );
+
+    mindMapController.addListener(
+      _onChildChanged,
     );
   }
 
   // ============================================================
-  // GETTERS RÁPIDOS
+  // ALTERAÇÃO DOS SUBCONTROLLERS
+  // ============================================================
+
+  void _onChildChanged() {
+    if (_isDisposed) {
+      return;
+    }
+
+    notifyListeners();
+  }
+
+  // ============================================================
+  // GETTERS DO PROJETO
   // ============================================================
 
   String get title => _project.title;
@@ -141,141 +152,55 @@ class StudioController
 
   String? get technique => _project.technique;
 
+  bool get hasLyrics => _project.hasLyrics;
+
+  // ============================================================
+  // TIMELINE - GETTERS COMPATÍVEIS
+  // ============================================================
+
   List<
     String
   >
-  get timelineWords => List.unmodifiable(
-    _project.timelineWords,
-  );
+  get timelineWords => timelineController.timelineWords;
+
+  bool get hasTimelineWords => timelineController.hasTimelineWords;
+
+  List<
+    String
+  >
+  get rhymeLibrary => timelineController.rhymeLibrary;
+
+  // ============================================================
+  // MIND MAP - GETTERS COMPATÍVEIS
+  // ============================================================
+
+  String? get selectedNodeId => mindMapController.selectedNodeId;
+
+  MindMapNode? get selectedNode => mindMapController.selectedNode;
+
+  bool get isMapVisible => mindMapController.isMapVisible;
 
   List<
     MindMapNode
   >
-  get mindMapNodes => List.unmodifiable(
-    _project.mindMapNodes,
-  );
+  get mindMapNodes => mindMapController.mindMapNodes;
 
-  bool get hasLyrics => _project.hasLyrics;
-
-  bool get hasTimelineWords => _project.timelineWords.isNotEmpty;
-
-  bool get hasMindMap => _project.mindMapNodes.isNotEmpty;
+  bool get hasMindMap => mindMapController.hasMindMap;
 
   // ============================================================
-  // BANCO GLOBAL DE RIMAS
+  // BIBLIOTECA GLOBAL
   // ============================================================
-
-  List<
-    String
-  >
-  get rhymeLibrary {
-    return List<
-      String
-    >.unmodifiable(
-      rhymesController.vocabulary
-          .map(
-            (
-              rhyme,
-            ) => rhyme.word.trim(),
-          )
-          .where(
-            (
-              word,
-            ) => word.isNotEmpty,
-          ),
-    );
-  }
 
   bool hasLibraryWord(
     String word,
   ) {
-    final normalized = _normalizeWord(
+    return timelineController.hasLibraryWord(
       word,
     );
-
-    if (normalized.isEmpty) {
-      return false;
-    }
-
-    return rhymesController.vocabulary.any(
-      (
-        rhyme,
-      ) =>
-          _normalizeWord(
-            rhyme.word,
-          ) ==
-          normalized,
-    );
   }
-
-  void _onRhymesChanged() {
-    final changed = _syncGlobalRhymesToTimeline(
-      notify: false,
-      markChanged: false,
-    );
-
-    // Mesmo quando nenhuma palavra nova entrou na Timeline,
-    // a Biblioteca pode ter mudado e a UI precisa refletir isso.
-    if (changed ||
-        !_isDisposed) {
-      notifyListeners();
-    }
-  }
-
-  // ============================================================
-  // SINCRONIZAR BANCO GLOBAL → TIMELINE DO STUDIO
-  // ============================================================
-
-  bool _syncGlobalRhymesToTimeline({
-    bool notify = true,
-    bool markChanged = true,
-  }) {
-    bool changed = false;
-
-    for (final rhyme in rhymesController.vocabulary) {
-      final word = rhyme.word.trim();
-
-      if (word.isEmpty) {
-        continue;
-      }
-
-      if (_project.hasTimelineWord(
-        word,
-      )) {
-        continue;
-      }
-
-      final added = _project.addTimelineWord(
-        word,
-      );
-
-      if (added) {
-        changed = true;
-      }
-    }
-
-    if (!changed) {
-      return false;
-    }
-
-    if (markChanged) {
-      _markChanged();
-    }
-
-    if (notify &&
-        !_isDisposed) {
-      notifyListeners();
-    }
-
-    return true;
-  }
-
-  // ============================================================
-  // SINCRONIZAR MANUALMENTE
-  // ============================================================
 
   void syncGlobalRhymesToTimeline() {
-    _syncGlobalRhymesToTimeline();
+    timelineController.syncGlobalRhymesToTimeline();
   }
 
   // ============================================================
@@ -482,74 +407,21 @@ class StudioController
   }
 
   // ============================================================
-  // TIMELINE
+  // TIMELINE - FACHADA
   // ============================================================
 
   bool addTimelineWord(
     String word,
   ) {
-    final normalized = word.trim();
-
-    if (normalized.isEmpty) {
-      return false;
-    }
-
-    final added = _project.addTimelineWord(
-      normalized,
+    return timelineController.addTimelineWord(
+      word,
     );
-
-    // Toda palavra usada no Studio também passa a fazer parte
-    // do banco global compartilhado com Chat/Biblioteca.
-    unawaited(
-      _ensureWordInGlobalLibrary(
-        normalized,
-      ),
-    );
-
-    if (!added) {
-      return false;
-    }
-
-    _markChanged();
-
-    notifyListeners();
-
-    return true;
-  }
-
-  Future<
-    void
-  >
-  _ensureWordInGlobalLibrary(
-    String word,
-  ) async {
-    final normalized = word.trim();
-
-    if (normalized.isEmpty ||
-        hasLibraryWord(
-          normalized,
-        )) {
-      return;
-    }
-
-    try {
-      await rhymesController.addWord(
-        normalized,
-        false,
-      );
-    } catch (
-      e
-    ) {
-      debugPrint(
-        'Erro ao sincronizar palavra do Studio com a biblioteca: $e',
-      );
-    }
   }
 
   bool addLibraryWordToTimeline(
     String word,
   ) {
-    return addTimelineWord(
+    return timelineController.addLibraryWordToTimeline(
       word,
     );
   }
@@ -557,25 +429,15 @@ class StudioController
   bool removeTimelineWord(
     String word,
   ) {
-    final removed = _project.removeTimelineWord(
+    return timelineController.removeTimelineWord(
       word,
     );
-
-    if (!removed) {
-      return false;
-    }
-
-    _markChanged();
-
-    notifyListeners();
-
-    return true;
   }
 
   bool hasTimelineWord(
     String word,
   ) {
-    return _project.hasTimelineWord(
+    return timelineController.hasTimelineWord(
       word,
     );
   }
@@ -583,21 +445,13 @@ class StudioController
   bool isTimelineWordUsed(
     String word,
   ) {
-    return _project.isTimelineWordUsed(
+    return timelineController.isTimelineWordUsed(
       word,
     );
   }
 
   void clearTimeline() {
-    if (_project.timelineWords.isEmpty) {
-      return;
-    }
-
-    _project.clearTimeline();
-
-    _markChanged();
-
-    notifyListeners();
+    timelineController.clearTimeline();
   }
 
   void addSelectedTextToTimeline() {
@@ -607,13 +461,13 @@ class StudioController
       return;
     }
 
-    addTimelineWord(
+    timelineController.addTimelineWord(
       text,
     );
   }
 
   // ============================================================
-  // MAPA — ADICIONAR
+  // MIND MAP - ADICIONAR
   // ============================================================
 
   MindMapNode addMindMapNode({
@@ -621,31 +475,11 @@ class StudioController
     MindMapNodeType type = MindMapNodeType.idea,
     Offset position = Offset.zero,
   }) {
-    final normalized = text.trim();
-
-    final node = MindMapNode(
-      id: _generateNodeId(),
-      text: normalized,
+    return mindMapController.addMindMapNode(
+      text: text,
       type: type,
-      x: position.dx,
-      y: position.dy,
+      position: position,
     );
-
-    if (normalized.isEmpty) {
-      return node;
-    }
-
-    _project.addMindMapNode(
-      node,
-    );
-
-    _selectedNodeId = node.id;
-
-    _markChanged();
-
-    notifyListeners();
-
-    return node;
   }
 
   MindMapNode? addSelectedTextToMap({
@@ -658,7 +492,7 @@ class StudioController
       return null;
     }
 
-    return addMindMapNode(
+    return mindMapController.addMindMapNode(
       text: text,
       type: type,
       position: position,
@@ -666,267 +500,103 @@ class StudioController
   }
 
   // ============================================================
-  // MAPA — REMOVER
+  // MIND MAP - FACHADA
   // ============================================================
 
   bool removeMindMapNode(
     String nodeId,
   ) {
-    final removed = _project.removeMindMapNode(
+    return mindMapController.removeMindMapNode(
       nodeId,
     );
-
-    if (!removed) {
-      return false;
-    }
-
-    if (_selectedNodeId ==
-        nodeId) {
-      _selectedNodeId = null;
-    }
-
-    _markChanged();
-
-    notifyListeners();
-
-    return true;
   }
-
-  // ============================================================
-  // MAPA — SELEÇÃO
-  // ============================================================
 
   void selectMindMapNode(
     String? nodeId,
   ) {
-    if (nodeId ==
-        null) {
-      _selectedNodeId = null;
-
-      notifyListeners();
-
-      return;
-    }
-
-    final node = _project.findMindMapNode(
+    mindMapController.selectMindMapNode(
       nodeId,
     );
-
-    if (node ==
-        null) {
-      return;
-    }
-
-    _selectedNodeId = nodeId;
-
-    notifyListeners();
   }
 
   void clearMindMapSelection() {
-    if (_selectedNodeId ==
-        null) {
-      return;
-    }
-
-    _selectedNodeId = null;
-
-    notifyListeners();
+    mindMapController.clearMindMapSelection();
   }
-
-  // ============================================================
-  // MAPA — MOVER
-  // ============================================================
 
   void moveMindMapNode(
     String nodeId,
     Offset delta,
   ) {
-    final node = _project.findMindMapNode(
+    mindMapController.moveMindMapNode(
       nodeId,
-    );
-
-    if (node ==
-        null) {
-      return;
-    }
-
-    node.move(
       delta,
     );
-
-    _project.touch();
-
-    _markChanged();
-
-    notifyListeners();
   }
 
   void setMindMapNodePosition(
     String nodeId,
     Offset position,
   ) {
-    final node = _project.findMindMapNode(
+    mindMapController.setMindMapNodePosition(
       nodeId,
-    );
-
-    if (node ==
-        null) {
-      return;
-    }
-
-    node.setPosition(
       position,
     );
-
-    _project.touch();
-
-    _markChanged();
-
-    notifyListeners();
   }
-
-  // ============================================================
-  // MAPA — TEXTO
-  // ============================================================
 
   void updateMindMapNodeText(
     String nodeId,
     String text,
   ) {
-    final node = _project.findMindMapNode(
+    mindMapController.updateMindMapNodeText(
       nodeId,
+      text,
     );
-
-    if (node ==
-        null) {
-      return;
-    }
-
-    final normalized = text.trim();
-
-    if (normalized.isEmpty ||
-        normalized ==
-            node.text) {
-      return;
-    }
-
-    node.text = normalized;
-
-    _project.touch();
-
-    _markChanged();
-
-    notifyListeners();
   }
-
-  // ============================================================
-  // MAPA — TIPO
-  // ============================================================
 
   void updateMindMapNodeType(
     String nodeId,
     MindMapNodeType type,
   ) {
-    final node = _project.findMindMapNode(
+    mindMapController.updateMindMapNodeType(
       nodeId,
+      type,
     );
-
-    if (node ==
-            null ||
-        node.type ==
-            type) {
-      return;
-    }
-
-    node.type = type;
-
-    _project.touch();
-
-    _markChanged();
-
-    notifyListeners();
   }
-
-  // ============================================================
-  // MAPA — CONEXÕES
-  // ============================================================
 
   bool connectMindMapNodes(
     String firstNodeId,
     String secondNodeId,
   ) {
-    final connected = _project.connectMindMapNodes(
+    return mindMapController.connectMindMapNodes(
       firstNodeId,
       secondNodeId,
     );
-
-    if (!connected) {
-      return false;
-    }
-
-    _markChanged();
-
-    notifyListeners();
-
-    return true;
   }
 
   bool disconnectMindMapNodes(
     String firstNodeId,
     String secondNodeId,
   ) {
-    final disconnected = _project.disconnectMindMapNodes(
+    return mindMapController.disconnectMindMapNodes(
       firstNodeId,
       secondNodeId,
     );
-
-    if (!disconnected) {
-      return false;
-    }
-
-    _markChanged();
-
-    notifyListeners();
-
-    return true;
   }
 
   bool connectSelectedNodeTo(
     String secondNodeId,
   ) {
-    final firstNodeId = _selectedNodeId;
-
-    if (firstNodeId ==
-        null) {
-      return false;
-    }
-
-    return connectMindMapNodes(
-      firstNodeId,
+    return mindMapController.connectSelectedNodeTo(
       secondNodeId,
     );
   }
 
-  // ============================================================
-  // MAPA — LIMPAR
-  // ============================================================
-
   void clearMindMap() {
-    if (_project.mindMapNodes.isEmpty) {
-      return;
-    }
-
-    _project.clearMindMap();
-
-    _selectedNodeId = null;
-
-    _markChanged();
-
-    notifyListeners();
+    mindMapController.clearMindMap();
   }
 
   // ============================================================
-  // PAINEL LETRA — DESTACAR / ENCAIXAR
+  // PAINEL LETRA
   // ============================================================
 
   void detachLyrics() {
@@ -956,7 +626,7 @@ class StudioController
   }
 
   // ============================================================
-  // PAINEL MAPA — DESTACAR / ENCAIXAR
+  // PAINEL MAPA
   // ============================================================
 
   void detachMindMap() {
@@ -985,10 +655,6 @@ class StudioController
     notifyListeners();
   }
 
-  // ============================================================
-  // ENCAIXAR TODOS OS PAINÉIS
-  // ============================================================
-
   void dockAllPanels() {
     if (!_isLyricsDetached &&
         !_isMindMapDetached) {
@@ -996,6 +662,7 @@ class StudioController
     }
 
     _isLyricsDetached = false;
+
     _isMindMapDetached = false;
 
     notifyListeners();
@@ -1006,26 +673,19 @@ class StudioController
   // ============================================================
 
   void toggleMapVisibility() {
-    _isMapVisible = !_isMapVisible;
-
-    notifyListeners();
+    mindMapController.toggleMapVisibility();
   }
 
   void setMapVisible(
     bool value,
   ) {
-    if (_isMapVisible ==
-        value) {
-      return;
-    }
-
-    _isMapVisible = value;
-
-    notifyListeners();
+    mindMapController.setMapVisible(
+      value,
+    );
   }
 
   // ============================================================
-  // MAPA → TIMELINE
+  // MAPA -> TIMELINE
   // ============================================================
 
   bool addNodeToTimeline(
@@ -1040,7 +700,7 @@ class StudioController
       return false;
     }
 
-    return addTimelineWord(
+    return timelineController.addTimelineWord(
       node.text,
     );
   }
@@ -1053,13 +713,13 @@ class StudioController
       return false;
     }
 
-    return addTimelineWord(
+    return timelineController.addTimelineWord(
       node.text,
     );
   }
 
   // ============================================================
-  // TIMELINE → MAPA
+  // TIMELINE -> MAPA
   // ============================================================
 
   MindMapNode? addTimelineWordToMap(
@@ -1073,7 +733,7 @@ class StudioController
       return null;
     }
 
-    return addMindMapNode(
+    return mindMapController.addMindMapNode(
       text: normalized,
       type: type,
       position: position,
@@ -1098,9 +758,13 @@ class StudioController
     );
 
     _selectedText = '';
-    _selectedNodeId = null;
+
+    mindMapController.resetLocalState(
+      notify: false,
+    );
 
     _isLyricsDetached = false;
+
     _isMindMapDetached = false;
 
     _hasUnsavedChanges = false;
@@ -1125,7 +789,10 @@ class StudioController
     );
 
     _selectedText = '';
-    _selectedNodeId = null;
+
+    mindMapController.resetLocalState(
+      notify: false,
+    );
 
     _hasUnsavedChanges = false;
 
@@ -1167,20 +834,6 @@ class StudioController
   }
 
   // ============================================================
-  // GERADOR DE ID
-  // ============================================================
-
-  String _generateNodeId() {
-    return 'node-${DateTime.now().microsecondsSinceEpoch}';
-  }
-
-  String _normalizeWord(
-    String value,
-  ) {
-    return value.trim().toLowerCase();
-  }
-
-  // ============================================================
   // DISPOSE
   // ============================================================
 
@@ -1188,13 +841,21 @@ class StudioController
   void dispose() {
     _isDisposed = true;
 
-    rhymesController.removeListener(
-      _onRhymesChanged,
+    timelineController.removeListener(
+      _onChildChanged,
+    );
+
+    mindMapController.removeListener(
+      _onChildChanged,
     );
 
     lyricController.removeListener(
       _onLyricsChanged,
     );
+
+    timelineController.dispose();
+
+    mindMapController.dispose();
 
     lyricController.dispose();
 

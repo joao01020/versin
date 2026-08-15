@@ -6,11 +6,14 @@ import 'package:versin/core/widgets/timeline/versin_timeline.dart';
 import 'package:versin/features/rhymes/presentation/controller/rhymes_controller.dart';
 import 'package:versin/modules/brain/controller/brain_controller.dart';
 import 'package:versin/modules/chat/controllers/chat_controller.dart';
-import 'package:versin/modules/chat/domain/repositories/chat_repository.dart';
+import 'package:versin/modules/chat/data/datasources/chat_remote_datasource.dart';
+import 'package:versin/modules/chat/services/ai_provider_service.dart';
+import 'package:versin/modules/chat/services/private_api_service.dart';
+import 'package:versin/modules/chat/services/private_ai_client.dart';
 import 'package:versin/modules/chat/views/components/chat/list/chat_list_view.dart';
 import 'package:versin/modules/chat/views/components/suggestion_balloon/suggestion_balloon.dart';
 import 'package:versin/modules/rhymelibrary/views/rhyme_library_page.dart';
-
+import 'package:versin/modules/chat/domain/repositories/chat_repository_impl.dart';
 // ============================================================
 // STUDIO
 // ============================================================
@@ -70,9 +73,66 @@ class _ChatPageState
           BrainController
         >();
 
+    // ==========================================================
+    // CAMADA DE IA
+    // ==========================================================
+    //
+    // Fluxo:
+    //
+    // ChatController
+    //      ↓
+    // ChatRepositoryImpl
+    //      ↓
+    // AiProviderService
+    //      ↓
+    // ┌──────────────────────┐
+    // │ API privada ativa?   │
+    // └──────────┬───────────┘
+    //            │
+    //       ┌────┴────┐
+    //       │         │
+    //      NÃO       SIM
+    //       │         │
+    //       ↓         ↓
+    //   IA Versin   API privada
+    //
+    // ==========================================================
+
+    final privateApiService = PrivateApiService();
+
+    final aiProviderService = AiProviderService(
+      privateApiService: privateApiService,
+    );
+
+    final privateAiClient = PrivateAiClient();
+
+    final remoteDatasource = ChatRemoteDatasource();
+
+    final chatRepository = ChatRepositoryImpl(
+      remoteDatasource: remoteDatasource,
+
+      aiProviderService: aiProviderService,
+
+      privateAiClient: privateAiClient,
+    );
+
     _controller = ChatController(
-      repository: ChatRepositoryImpl(),
+      repository: chatRepository,
+
       rhymesController: _rhymesController,
+    );
+
+    // ==========================================================
+    // SINCRONIZAR FONTE VISUAL DA IA
+    // ==========================================================
+    //
+    // Isso permite que a barra da IA mostre imediatamente
+    // "API privada ativa" quando a credencial já estiver salva.
+    //
+    // ==========================================================
+
+    _syncAiSource(
+      aiProviderService,
     );
 
     _rhymesController.carregarDadosUsuario();
@@ -93,6 +153,64 @@ class _ChatPageState
       );
 
       _isSessionInitialized = true;
+    }
+  }
+
+  // ============================================================
+  // SINCRONIZAR FONTE DA IA
+  // ============================================================
+
+  Future<
+    void
+  >
+  _syncAiSource(
+    AiProviderService aiProviderService,
+  ) async {
+    try {
+      final config = await aiProviderService.getPrivateConfig();
+
+      if (!mounted) {
+        return;
+      }
+
+      if (config.canUsePrivateApi) {
+        _rhymesController.activatePrivateAi(
+          provider: config.provider,
+
+          model: config.model,
+        );
+
+        debugPrint(
+          '[CHAT PAGE] '
+          'API privada ativa: ${config.provider}',
+        );
+
+        return;
+      }
+
+      _rhymesController.activateVersinAi();
+
+      debugPrint(
+        '[CHAT PAGE] '
+        'IA Versin ativa.',
+      );
+    } catch (
+      error,
+      stackTrace
+    ) {
+      debugPrint(
+        '[CHAT PAGE] '
+        'Erro ao sincronizar fonte da IA: $error',
+      );
+
+      debugPrint(
+        '[CHAT PAGE] '
+        'Stack trace: $stackTrace',
+      );
+
+      if (mounted) {
+        _rhymesController.activateVersinAi();
+      }
     }
   }
 

@@ -592,6 +592,33 @@ class ChatController
   // ============================================================
   // ENVIO PARA IA
   // ============================================================
+  //
+  // O ChatController não chama mais o RhymesController para
+  // fazer a requisição.
+  //
+  // Fluxo atual:
+  //
+  // ChatController
+  //      ↓
+  // ChatRepository
+  //      ↓
+  // AiProviderService
+  //      ↓
+  // ┌──────────────────────┐
+  // │ API privada ativa?   │
+  // └──────────┬───────────┘
+  //            │
+  //       ┌────┴────┐
+  //       │         │
+  //      NÃO       SIM
+  //       │         │
+  //       ↓         ↓
+  //   IA Versin   API privada
+  //
+  // Depois da resposta, os metadados são enviados ao
+  // RhymesController para manter a barra mensal sincronizada.
+  //
+  // ============================================================
 
   Future<
     void
@@ -599,6 +626,12 @@ class ChatController
   _sendToAi(
     String text,
   ) async {
+    final normalizedText = text.trim();
+
+    if (normalizedText.isEmpty) {
+      return;
+    }
+
     isAiTyping = true;
 
     notifyListeners();
@@ -606,18 +639,46 @@ class ChatController
     _scrollToBottom();
 
     try {
-      final response = await rhymesController.fetchAiResponse(
-        text,
+      // ========================================================
+      // REPOSITORY
+      // ========================================================
+
+      final response = await repository.fetchAiResponse(
+        normalizedText,
       );
 
-      final content = response['content'];
+      // ========================================================
+      // SINCRONIZAR FONTE / QUOTA
+      // ========================================================
+      //
+      // Se a resposta veio da IA Versin:
+      //
+      // - os dados de quota podem atualizar a barra.
+      //
+      // Se veio da API privada:
+      //
+      // - a barra Versin permanece com o último consumo;
+      // - o estado passa a indicar API privada ativa.
+      //
+      // ========================================================
+
+      rhymesController.applyAiResponseMetadata(
+        response,
+      );
+
+      // ========================================================
+      // CONTEÚDO
+      // ========================================================
+
+      final content = response['content']?.toString().trim();
 
       if (content !=
               null &&
-          content.trim().isNotEmpty) {
+          content.isNotEmpty) {
         messages.add(
           ChatMessage(
             role: ChatRole.assistant,
+
             content: content,
           ),
         );
@@ -625,21 +686,81 @@ class ChatController
         messages.add(
           ChatMessage(
             role: ChatRole.assistant,
+
             content: 'Resposta em branco.',
           ),
         );
       }
+
+      // ========================================================
+      // LOG DA FONTE
+      // ========================================================
+
+      final usedVersinApi =
+          response['used_versin_api'] ==
+          true;
+
+      final usedPrivateApi =
+          response['used_private_api'] ==
+          true;
+
+      final provider = response['provider']?.toString().trim();
+
+      final model = response['model']?.toString().trim();
+
+      debugPrint(
+        '[CHAT CONTROLLER] '
+        'Resposta recebida.',
+      );
+
+      debugPrint(
+        '[CHAT CONTROLLER] '
+        'IA Versin: $usedVersinApi',
+      );
+
+      debugPrint(
+        '[CHAT CONTROLLER] '
+        'API privada: $usedPrivateApi',
+      );
+
+      if (provider !=
+              null &&
+          provider.isNotEmpty) {
+        debugPrint(
+          '[CHAT CONTROLLER] '
+          'Provider: $provider',
+        );
+      }
+
+      if (model !=
+              null &&
+          model.isNotEmpty) {
+        debugPrint(
+          '[CHAT CONTROLLER] '
+          'Modelo: $model',
+        );
+      }
     } catch (
-      e
+      error,
+      stackTrace
     ) {
       debugPrint(
-        'Erro no ChatController: $e',
+        '[CHAT CONTROLLER] '
+        'Erro ao enviar mensagem: $error',
+      );
+
+      debugPrint(
+        '[CHAT CONTROLLER] '
+        'Stack trace: $stackTrace',
       );
 
       messages.add(
         ChatMessage(
           role: ChatRole.assistant,
-          content: 'Erro de conexão.',
+
+          content: _buildAiErrorMessage(
+            error,
+          ),
         ),
       );
     } finally {
@@ -649,6 +770,57 @@ class ChatController
 
       _scrollToBottom();
     }
+  }
+
+  // ============================================================
+  // MENSAGEM DE ERRO DA IA
+  // ============================================================
+
+  String _buildAiErrorMessage(
+    Object error,
+  ) {
+    final normalized = error.toString().toLowerCase();
+
+    if (normalized.contains(
+      'unimplemented',
+    )) {
+      return 'A API privada está configurada, mas o cliente desse provedor ainda não foi conectado.';
+    }
+
+    if (normalized.contains(
+          'timeout',
+        ) ||
+        normalized.contains(
+          'timed out',
+        )) {
+      return 'A IA demorou demais para responder. Tente novamente.';
+    }
+
+    if (normalized.contains(
+          '401',
+        ) ||
+        normalized.contains(
+          'unauthorized',
+        ) ||
+        normalized.contains(
+          'não autorizado',
+        )) {
+      return 'Não foi possível autenticar a API. Verifique a credencial configurada.';
+    }
+
+    if (normalized.contains(
+          '429',
+        ) ||
+        normalized.contains(
+          'quota',
+        ) ||
+        normalized.contains(
+          'limite',
+        )) {
+      return 'O limite de uso da IA foi atingido ou o provedor recusou novas requisições.';
+    }
+
+    return 'Erro de conexão com a IA. Tente novamente.';
   }
 
   // ============================================================

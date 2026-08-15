@@ -1,16 +1,36 @@
-/// 1. A Interface (O contrato)
+// ============================================================
+// CHAT REPOSITORY
+// ============================================================
+//
+// Contrato do módulo de chat.
+//
+// A UI e o ChatController não precisam saber:
+//
+// - se a resposta veio da Edge Function;
+// - se veio de API privada;
+// - qual provider foi utilizado.
+//
+// ============================================================
+
 abstract class ChatRepository {
+  // ============================================================
+  // IA
+  // ============================================================
+
   Future<
-    List<
-      Map<
-        String,
-        dynamic
-      >
+    Map<
+      String,
+      dynamic
     >
   >
   fetchAiResponse(
     String message,
   );
+
+  // ============================================================
+  // PROJETO
+  // ============================================================
+
   Future<
     void
   >
@@ -21,39 +41,4 @@ abstract class ChatRepository {
     >
     projectData,
   );
-}
-
-/// 2. Implementação Concreta
-class ChatRepositoryImpl
-    implements
-        ChatRepository {
-  @override
-  Future<
-    List<
-      Map<
-        String,
-        dynamic
-      >
-    >
-  >
-  fetchAiResponse(
-    String message,
-  ) async {
-    // Aqui você conectará sua API no futuro
-    return [];
-  }
-
-  @override
-  Future<
-    void
-  >
-  saveProject(
-    Map<
-      String,
-      dynamic
-    >
-    projectData,
-  ) async {
-    // Lógica para salvar projeto
-  }
 }

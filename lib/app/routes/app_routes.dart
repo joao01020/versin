@@ -12,7 +12,12 @@ import 'package:versin/modules/login/views/login_page.dart';
 
 import 'package:versin/modules/dashboard/views/dashboard_page.dart';
 import 'package:versin/modules/dashboard/views/contracts/contracts_page.dart';
-import 'package:versin/modules/dashboard/views/calendar/calendar_page.dart';
+
+// ============================================================
+// CALENDAR
+// ============================================================
+
+import 'package:versin/modules/calendar/views/calendar_page.dart';
 
 // ============================================================
 // CHAT / IA
@@ -139,6 +144,20 @@ class AppRoutes {
 
     // ====================================================
     // CALENDÁRIO
+    // ====================================================
+    //
+    // Novo módulo:
+    //
+    // lib/modules/calendar/views/calendar_page.dart
+    //
+    // Inclui:
+    //
+    // - eventos reais;
+    // - compromissos colaborativos;
+    // - convites;
+    // - anotações por dia;
+    // - Supabase.
+    //
     // ====================================================
     calendar:
         (

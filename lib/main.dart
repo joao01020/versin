@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:desktop_multi_window/desktop_multi_window.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:get_it/get_it.dart';
+import 'package:just_audio_media_kit/just_audio_media_kit.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -34,12 +37,14 @@ import 'package:versin/modules/studio/windows/mind_map_window.dart';
 //
 // ============================================================
 
-const WindowMethodChannel _lyricsChannel = WindowMethodChannel(
+const WindowMethodChannel
+_lyricsChannel = WindowMethodChannel(
   'versin_studio_lyrics',
   mode: ChannelMode.bidirectional,
 );
 
-const WindowMethodChannel _mindMapChannel = WindowMethodChannel(
+const WindowMethodChannel
+_mindMapChannel = WindowMethodChannel(
   'versin_studio_mind_map',
   mode: ChannelMode.bidirectional,
 );
@@ -48,37 +53,50 @@ const WindowMethodChannel _mindMapChannel = WindowMethodChannel(
 // MAIN
 // ============================================================
 
-Future<void> main(List<String> args) async {
+Future<
+  void
+>
+main(
+  List<
+    String
+  >
+  args,
+) async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // ============================================================
-  // DESCOBRIR QUAL JANELA ESTE ENGINE REPRESENTA
+  // AUDIO BACKEND
   // ============================================================
   //
-  // No Desktop:
+  // Precisa ser inicializado antes da criação de qualquer
+  // AudioPlayer.
   //
-  // janela principal
-  //      -> arguments vazio / tipo desconhecido
-  //
-  // janela da letra
-  //      -> studio_lyrics
-  //
-  // janela do mapa
-  //      -> studio_mind_map
-  //
+  // ============================================================
+
+  _initializeAudioBackend();
+
+  // ============================================================
+  // DESCOBRIR QUAL JANELA ESTE ENGINE REPRESENTA
   // ============================================================
 
   if (_isDesktopPlatform) {
     final currentWindow = await WindowController.fromCurrentEngine();
 
-    final windowType = StudioWindowArguments.getType(currentWindow.arguments);
+    final windowType = StudioWindowArguments.getType(
+      currentWindow.arguments,
+    );
 
     // ==========================================================
     // JANELA EXTERNA DA LETRA
     // ==========================================================
 
-    if (windowType == StudioWindowType.lyrics) {
-      runApp(LyricsWindow(arguments: currentWindow.arguments));
+    if (windowType ==
+        StudioWindowType.lyrics) {
+      runApp(
+        LyricsWindow(
+          arguments: currentWindow.arguments,
+        ),
+      );
 
       return;
     }
@@ -87,43 +105,97 @@ Future<void> main(List<String> args) async {
     // JANELA EXTERNA DO MAPA
     // ==========================================================
 
-    if (windowType == StudioWindowType.mindMap) {
-      runApp(MindMapWindow(arguments: currentWindow.arguments));
+    if (windowType ==
+        StudioWindowType.mindMap) {
+      runApp(
+        MindMapWindow(
+          arguments: currentWindow.arguments,
+        ),
+      );
 
       return;
     }
   }
 
   // ============================================================
-  // JANELA PRINCIPAL DO VERSIN
+  // JANELA PRINCIPAL
   // ============================================================
 
   await _initializeMainApplication();
 
-  runApp(const MyApp());
+  runApp(
+    const MyApp(),
+  );
+}
+
+// ============================================================
+// INICIALIZAR AUDIO BACKEND
+// ============================================================
+
+void
+_initializeAudioBackend() {
+  if (kIsWeb) {
+    return;
+  }
+
+  if (defaultTargetPlatform !=
+      TargetPlatform.linux) {
+    return;
+  }
+
+  JustAudioMediaKit.ensureInitialized(
+    linux: true,
+    windows: false,
+    android: false,
+    iOS: false,
+    macOS: false,
+  );
+
+  JustAudioMediaKit.protocolWhitelist =
+      const <
+        String
+      >[
+        'file',
+        'http',
+        'https',
+      ];
+
+  JustAudioMediaKit.title = 'Versin';
+
+  debugPrint(
+    '[AUDIO] '
+    'just_audio_media_kit inicializado para Linux.',
+  );
 }
 
 // ============================================================
 // DETECTAR DESKTOP
 // ============================================================
 
-bool get _isDesktopPlatform {
+bool
+get _isDesktopPlatform {
   if (kIsWeb) {
     return false;
   }
 
-  return defaultTargetPlatform == TargetPlatform.linux ||
-      defaultTargetPlatform == TargetPlatform.windows ||
-      defaultTargetPlatform == TargetPlatform.macOS;
+  return defaultTargetPlatform ==
+          TargetPlatform.linux ||
+      defaultTargetPlatform ==
+          TargetPlatform.windows ||
+      defaultTargetPlatform ==
+          TargetPlatform.macOS;
 }
 
 // ============================================================
 // INICIALIZAÇÃO DA APLICAÇÃO PRINCIPAL
 // ============================================================
 
-Future<void> _initializeMainApplication() async {
+Future<
+  void
+>
+_initializeMainApplication() async {
   // ============================================================
-  // 0. URL WEB SEM #
+  // URL WEB SEM #
   // ============================================================
 
   if (kIsWeb) {
@@ -131,15 +203,18 @@ Future<void> _initializeMainApplication() async {
   }
 
   // ============================================================
-  // 1. GETIT
+  // GETIT
   // ============================================================
 
-  if (!GetIt.instance.isRegistered<DashboardController>()) {
+  if (!GetIt.instance
+      .isRegistered<
+        DashboardController
+      >()) {
     setupLocator();
   }
 
   // ============================================================
-  // 2. SQFLITE FFI
+  // SQFLITE FFI
   // ============================================================
 
   if (_isDesktopPlatform) {
@@ -149,31 +224,39 @@ Future<void> _initializeMainApplication() async {
   }
 
   // ============================================================
-  // 3. VARIÁVEIS DE AMBIENTE
+  // VARIÁVEIS DE AMBIENTE
   // ============================================================
 
-  await dotenv.load(fileName: '.env');
+  await dotenv.load(
+    fileName: '.env',
+  );
 
   // ============================================================
-  // 4. SUPABASE
+  // SUPABASE
   // ============================================================
 
   await Supabase.initialize(
-    url: dotenv.env['SUPABASE_URL'] ?? '',
-    anonKey: dotenv.env['SUPABASE_ANON_KEY'] ?? '',
+    url:
+        dotenv.env['SUPABASE_URL'] ??
+        '',
+
+    anonKey:
+        dotenv.env['SUPABASE_ANON_KEY'] ??
+        '',
+
     authOptions: const FlutterAuthClientOptions(
       authFlowType: AuthFlowType.implicit,
     ),
   );
 
   // ============================================================
-  // 5. SINCRONIZAÇÃO OFFLINE
+  // SINCRONIZAÇÃO OFFLINE
   // ============================================================
 
   SyncManager().watchConnection();
 
   // ============================================================
-  // 6. COMUNICAÇÃO COM AS JANELAS EXTERNAS
+  // COMUNICAÇÃO COM AS JANELAS EXTERNAS
   // ============================================================
 
   if (_isDesktopPlatform) {
@@ -185,232 +268,330 @@ Future<void> _initializeMainApplication() async {
 // CONFIGURAR IPC DO STUDIO
 // ============================================================
 
-Future<void> _configureStudioWindowChannels() async {
-  final studio = GetIt.I<StudioController>();
+Future<
+  void
+>
+_configureStudioWindowChannels() async {
+  final studio =
+      GetIt.I<
+        StudioController
+      >();
 
   // ============================================================
   // LETRA
   // ============================================================
 
-  await _lyricsChannel.setMethodCallHandler((call) async {
-    switch (call.method) {
-      // ======================================================
-      // LETRA ALTERADA NA JANELA EXTERNA
-      // ======================================================
+  await _lyricsChannel.setMethodCallHandler(
+    (
+      call,
+    ) async {
+      switch (call.method) {
+        // ======================================================
+        // LETRA ALTERADA NA JANELA EXTERNA
+        // ======================================================
 
-      case 'lyricsChanged':
-        final data = _asMap(call.arguments);
+        case 'lyricsChanged':
+          final data = _asMap(
+            call.arguments,
+          );
 
-        final lyrics = data['lyrics']?.toString() ?? '';
+          final lyrics =
+              data['lyrics']?.toString() ??
+              '';
 
-        studio.setLyrics(lyrics);
+          studio.setLyrics(
+            lyrics,
+          );
 
-        return true;
+          return true;
 
-      // ======================================================
-      // ENCAIXAR LETRA NOVAMENTE
-      // ======================================================
+        // ======================================================
+        // ENCAIXAR LETRA NOVAMENTE
+        // ======================================================
 
-      case 'dockLyrics':
-        final data = _asMap(call.arguments);
+        case 'dockLyrics':
+          final data = _asMap(
+            call.arguments,
+          );
 
-        final lyrics = data['lyrics']?.toString();
+          final lyrics = data['lyrics']?.toString();
 
-        if (lyrics != null) {
-          studio.setLyrics(lyrics);
-        }
+          if (lyrics !=
+              null) {
+            studio.setLyrics(
+              lyrics,
+            );
+          }
 
-        studio.dockLyrics();
+          studio.dockLyrics();
 
-        await StudioWindowService.instance.dockLyricsWindow();
+          await StudioWindowService.instance.dockLyricsWindow();
 
-        return true;
+          return true;
 
-      default:
-        return null;
-    }
-  });
+        default:
+          return null;
+      }
+    },
+  );
 
   // ============================================================
   // MAPA
   // ============================================================
 
-  await _mindMapChannel.setMethodCallHandler((call) async {
-    switch (call.method) {
-      // ======================================================
-      // JANELA DO MAPA PEDIU O ESTADO MAIS RECENTE
-      // ======================================================
+  await _mindMapChannel.setMethodCallHandler(
+    (
+      call,
+    ) async {
+      switch (call.method) {
+        // ======================================================
+        // JANELA DO MAPA PEDIU O ESTADO MAIS RECENTE
+        // ======================================================
 
-      case 'requestMindMap':
-        await _pushMindMapToExternalWindow(studio);
+        case 'requestMindMap':
+          await _pushMindMapToExternalWindow(
+            studio,
+          );
 
-        return true;
+          return true;
 
-      // ======================================================
-      // SELECIONAR NÓ
-      // ======================================================
+        // ======================================================
+        // SELECIONAR NÓ
+        // ======================================================
 
-      case 'selectMindMapNode':
-        final data = _asMap(call.arguments);
+        case 'selectMindMapNode':
+          final data = _asMap(
+            call.arguments,
+          );
 
-        final rawNodeId = data['node_id'];
+          studio.selectMindMapNode(
+            data['node_id']?.toString(),
+          );
 
-        studio.selectMindMapNode(
-          rawNodeId == null ? null : rawNodeId.toString(),
-        );
+          return true;
 
-        return true;
+        // ======================================================
+        // MOVER NÓ
+        // ======================================================
 
-      // ======================================================
-      // MOVER NÓ
-      // ======================================================
+        case 'setMindMapNodePosition':
+          final data = _asMap(
+            call.arguments,
+          );
 
-      case 'setMindMapNodePosition':
-        final data = _asMap(call.arguments);
+          final nodeId =
+              data['node_id']?.toString() ??
+              '';
 
-        final nodeId = data['node_id']?.toString() ?? '';
+          final x = _asDouble(
+            data['x'],
+          );
 
-        final x = _asDouble(data['x']);
+          final y = _asDouble(
+            data['y'],
+          );
 
-        final y = _asDouble(data['y']);
+          if (nodeId.isNotEmpty) {
+            studio.setMindMapNodePosition(
+              nodeId,
+              Offset(
+                x,
+                y,
+              ),
+            );
+          }
 
-        if (nodeId.isNotEmpty) {
-          studio.setMindMapNodePosition(nodeId, Offset(x, y));
-        }
+          return true;
 
-        return true;
+        // ======================================================
+        // REMOVER NÓ
+        // ======================================================
 
-      // ======================================================
-      // REMOVER NÓ
-      // ======================================================
+        case 'removeMindMapNode':
+          final data = _asMap(
+            call.arguments,
+          );
 
-      case 'removeMindMapNode':
-        final data = _asMap(call.arguments);
+          final nodeId =
+              data['node_id']?.toString() ??
+              '';
 
-        final nodeId = data['node_id']?.toString() ?? '';
+          if (nodeId.isNotEmpty) {
+            studio.removeMindMapNode(
+              nodeId,
+            );
+          }
 
-        if (nodeId.isNotEmpty) {
-          studio.removeMindMapNode(nodeId);
-        }
+          return true;
 
-        return true;
+        // ======================================================
+        // NÓ PARA TIMELINE
+        // ======================================================
 
-      // ======================================================
-      // NÓ → TIMELINE
-      // ======================================================
+        case 'addMindMapNodeToTimeline':
+          final data = _asMap(
+            call.arguments,
+          );
 
-      case 'addMindMapNodeToTimeline':
-        final data = _asMap(call.arguments);
+          final nodeId =
+              data['node_id']?.toString() ??
+              '';
 
-        final nodeId = data['node_id']?.toString() ?? '';
+          final text =
+              data['text']?.toString() ??
+              '';
 
-        final text = data['text']?.toString() ?? '';
+          var added = false;
 
-        bool added = false;
+          if (nodeId.isNotEmpty) {
+            added = studio.addNodeToTimeline(
+              nodeId,
+            );
+          }
 
-        if (nodeId.isNotEmpty) {
-          added = studio.addNodeToTimeline(nodeId);
-        }
+          if (!added &&
+              text.trim().isNotEmpty) {
+            studio.addTimelineWord(
+              text,
+            );
+          }
 
-        // Se por algum motivo o nó já não existir no
-        // StudioController, ainda aproveitamos o texto recebido.
-        if (!added && text.trim().isNotEmpty) {
-          studio.addTimelineWord(text);
-        }
+          return true;
 
-        return true;
+        // ======================================================
+        // CONECTAR NÓS
+        // ======================================================
 
-      // ======================================================
-      // CONECTAR NÓS
-      // ======================================================
+        case 'connectMindMapNodes':
+          final data = _asMap(
+            call.arguments,
+          );
 
-      case 'connectMindMapNodes':
-        final data = _asMap(call.arguments);
+          final firstNodeId =
+              data['first_node_id']?.toString() ??
+              '';
 
-        final firstNodeId = data['first_node_id']?.toString() ?? '';
+          final secondNodeId =
+              data['second_node_id']?.toString() ??
+              '';
 
-        final secondNodeId = data['second_node_id']?.toString() ?? '';
+          if (firstNodeId.isNotEmpty &&
+              secondNodeId.isNotEmpty) {
+            studio.connectMindMapNodes(
+              firstNodeId,
+              secondNodeId,
+            );
+          }
 
-        if (firstNodeId.isNotEmpty && secondNodeId.isNotEmpty) {
-          studio.connectMindMapNodes(firstNodeId, secondNodeId);
-        }
+          return true;
 
-        return true;
+        // ======================================================
+        // ENCAIXAR MAPA NOVAMENTE
+        // ======================================================
 
-      // ======================================================
-      // ENCAIXAR MAPA NOVAMENTE
-      // ======================================================
+        case 'dockMindMap':
+          studio.dockMindMap();
 
-      case 'dockMindMap':
-        studio.dockMindMap();
+          await StudioWindowService.instance.dockMindMapWindow();
 
-        await StudioWindowService.instance.dockMindMapWindow();
+          return true;
 
-        return true;
-
-      default:
-        return null;
-    }
-  });
+        default:
+          return null;
+      }
+    },
+  );
 
   // ============================================================
-  // MANTER AS JANELAS EXTERNAS ATUALIZADAS
-  // ============================================================
-  //
-  // Quando o StudioController muda pela janela principal,
-  // propagamos o estado para a janela externa.
-  //
-  // As janelas externas já evitam reenviar a mesma alteração
-  // quando recebem uma sincronização.
-  //
+  // ATUALIZAR JANELAS EXTERNAS
   // ============================================================
 
-  studio.addListener(() {
-    _pushStudioStateToExternalWindows(studio);
-  });
+  studio.addListener(
+    () {
+      unawaited(
+        _pushStudioStateToExternalWindows(
+          studio,
+        ),
+      );
+    },
+  );
 
   // ============================================================
-  // QUANDO UMA NOVA JANELA É CRIADA
-  // ============================================================
-  //
-  // Isso é especialmente importante porque o serviço pode criar
-  // a janela somente com o tipo/projectId.
-  //
-  // Assim que ela aparece, enviamos LETRA e MAPA atuais.
-  //
+  // NOVA JANELA CRIADA
   // ============================================================
 
-  onWindowsChanged.listen((_) {
-    _pushStudioStateToExternalWindows(studio);
-  });
+  onWindowsChanged.listen(
+    (
+      _,
+    ) {
+      unawaited(
+        _pushStudioStateToExternalWindows(
+          studio,
+        ),
+      );
+    },
+  );
 
-  // Primeira tentativa de sincronização.
-  await _pushStudioStateToExternalWindows(studio);
+  // ============================================================
+  // PRIMEIRA SINCRONIZAÇÃO
+  // ============================================================
+
+  await _pushStudioStateToExternalWindows(
+    studio,
+  );
 }
 
 // ============================================================
-// ENVIAR TODO O ESTADO EXTERNO
+// ENVIAR ESTADO PARA AS JANELAS EXTERNAS
 // ============================================================
 
-Future<void> _pushStudioStateToExternalWindows(StudioController studio) async {
-  await Future.wait([
-    _pushLyricsToExternalWindow(studio),
-    _pushMindMapToExternalWindow(studio),
-  ]);
+Future<
+  void
+>
+_pushStudioStateToExternalWindows(
+  StudioController studio,
+) async {
+  await Future.wait(
+    <
+      Future<
+        void
+      >
+    >[
+      _pushLyricsToExternalWindow(
+        studio,
+      ),
+      _pushMindMapToExternalWindow(
+        studio,
+      ),
+    ],
+  );
 }
 
 // ============================================================
 // ENVIAR LETRA
 // ============================================================
 
-Future<void> _pushLyricsToExternalWindow(StudioController studio) async {
+Future<
+  void
+>
+_pushLyricsToExternalWindow(
+  StudioController studio,
+) async {
   try {
-    await _lyricsChannel.invokeMethod('setProject', {
-      'project_id': _studioProjectId(studio),
-      'lyrics': studio.lyrics,
-    });
-  } catch (_) {
-    // É normal falhar quando a janela da letra ainda não existe.
+    await _lyricsChannel.invokeMethod(
+      'setProject',
+      {
+        'project_id': _studioProjectId(
+          studio,
+        ),
+
+        'lyrics': studio.lyrics,
+      },
+    );
+  } catch (
+    _
+  ) {
+    // A janela externa pode ainda não existir.
   }
 }
 
@@ -418,25 +599,50 @@ Future<void> _pushLyricsToExternalWindow(StudioController studio) async {
 // ENVIAR MAPA
 // ============================================================
 
-Future<void> _pushMindMapToExternalWindow(StudioController studio) async {
+Future<
+  void
+>
+_pushMindMapToExternalWindow(
+  StudioController studio,
+) async {
   try {
-    await _mindMapChannel.invokeMethod('setMindMap', {
-      'project_id': _studioProjectId(studio),
-      'nodes': studio.mindMapNodes
-          .map(
-            (node) => {
+    await _mindMapChannel.invokeMethod(
+      'setMindMap',
+      {
+        'project_id': _studioProjectId(
+          studio,
+        ),
+
+        'nodes': studio.mindMapNodes.map(
+          (
+            node,
+          ) {
+            return {
               'id': node.id,
+
               'text': node.text,
+
               'type': node.type.name,
+
               'x': node.x,
+
               'y': node.y,
-              'connections': List<String>.from(node.connections),
-            },
-          )
-          .toList(),
-    });
-  } catch (_) {
-    // É normal falhar quando a janela do mapa ainda não existe.
+
+              'connections':
+                  List<
+                    String
+                  >.from(
+                    node.connections,
+                  ),
+            };
+          },
+        ).toList(),
+      },
+    );
+  } catch (
+    _
+  ) {
+    // A janela externa pode ainda não existir.
   }
 }
 
@@ -444,46 +650,80 @@ Future<void> _pushMindMapToExternalWindow(StudioController studio) async {
 // ID DO PROJETO
 // ============================================================
 
-String _studioProjectId(StudioController studio) {
+String
+_studioProjectId(
+  StudioController studio,
+) {
   try {
     final data = studio.exportProject();
 
     final id = data['id']?.toString().trim();
 
-    if (id != null && id.isNotEmpty) {
+    if (id !=
+            null &&
+        id.isNotEmpty) {
       return id;
     }
-  } catch (_) {
-    // fallback abaixo
+  } catch (
+    _
+  ) {
+    // Usa o título como fallback.
   }
 
   return studio.title;
 }
 
 // ============================================================
-// CONVERTER DYNAMIC → MAP
+// CONVERTER DYNAMIC PARA MAP
 // ============================================================
 
-Map<String, dynamic> _asMap(dynamic value) {
-  if (value is Map<String, dynamic>) {
+Map<
+  String,
+  dynamic
+>
+_asMap(
+  dynamic value,
+) {
+  if (value
+      is Map<
+        String,
+        dynamic
+      >) {
     return value;
   }
 
-  if (value is Map) {
-    return Map<String, dynamic>.from(value);
+  if (value
+      is Map) {
+    return Map<
+      String,
+      dynamic
+    >.from(
+      value,
+    );
   }
 
-  return {};
+  return <
+    String,
+    dynamic
+  >{};
 }
 
 // ============================================================
 // CONVERTER PARA DOUBLE
 // ============================================================
 
-double _asDouble(dynamic value) {
-  if (value is num) {
+double
+_asDouble(
+  dynamic value,
+) {
+  if (value
+      is num) {
     return value.toDouble();
   }
 
-  return double.tryParse(value?.toString() ?? '') ?? 0;
+  return double.tryParse(
+        value?.toString() ??
+            '',
+      ) ??
+      0;
 }

@@ -1,67 +1,69 @@
-import 'dart:async';
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 
 import 'package:versin/core/models/rhyme_model.dart';
-import 'package:versin/features/rhymes/data/repositories/rhymes_repository.dart';
 import 'package:versin/features/rhymes/domain/services/audio_service.dart';
+import 'package:versin/modules/chat/controllers/ai_quota_controller.dart';
+import 'package:versin/modules/chat/controllers/ai_source_controller.dart';
+import 'package:versin/modules/chat/controllers/vocabulary_controller.dart';
+import 'package:versin/modules/chat/services/rhyme_suggestion_service.dart';
+import 'package:versin/modules/chat/services/rhymes_ai_service.dart';
+import 'package:versin/modules/chat/services/vocabulary_service.dart';
 import 'package:versin/modules/chat/views/components/suggestion_balloon/controllers/suggestion_controller.dart';
 
 // ============================================================
 // RHYMES CONTROLLER
+// ============================================================
+//
+// Responsável por orquestrar o estado utilizado pela interface
+// de composição.
+//
+// As responsabilidades maiores foram extraídas para:
+//
+// VocabularyController
+// AiQuotaController
+// AiSourceController
+// RhymeSuggestionService
+// RhymesAiService
+//
+// O RhymesController mantém uma camada de compatibilidade para
+// os widgets que já utilizavam sua API pública.
+//
 // ============================================================
 
 class RhymesController
     extends
         ChangeNotifier {
   // ============================================================
-  // DEPENDÊNCIAS
+  // ÁUDIO
   // ============================================================
-
-  final RhymesRepository _repository = RhymesRepository();
 
   final AudioService _audioService = AudioService();
 
+  // ============================================================
+  // SUGESTÕES
+  // ============================================================
+
   final SuggestionController suggestionController = SuggestionController();
 
-  // ============================================================
-  // TIMERS
-  // ============================================================
-
-  Timer? _debounce;
-
-  Timer? _connectionTimer;
+  late final RhymeSuggestionService _rhymeSuggestionService;
 
   // ============================================================
-  // CARREGAMENTO
+  // VOCABULARY
   // ============================================================
 
-  bool _isLoading = false;
-
-  bool _isVocabularyLoading = false;
+  final VocabularyController vocabularyController = VocabularyController(
+    service: VocabularyService(),
+  );
 
   // ============================================================
-  // QUOTA MENSAL DA IA
+  // IA
   // ============================================================
 
-  double _aiUsagePercentage = 0.0;
+  final AiQuotaController aiQuotaController = AiQuotaController();
 
-  double _aiUsageProgress = 0.0;
+  final AiSourceController aiSourceController = AiSourceController();
 
-  String _aiUsageLevel = 'normal';
-
-  String _aiUsageMessage = 'Uso normal da IA.';
-
-  bool _aiQuotaBlocked = false;
-
-  bool _aiCanUse = true;
-
-  int _aiUsedTokens = 0;
-
-  int _aiRemainingTokens = 100000;
-
-  int _aiLimitTokens = 100000;
+  final RhymesAiService _rhymesAiService = RhymesAiService();
 
   // ============================================================
   // PROGRESSO
@@ -72,22 +74,10 @@ class RhymesController
   double _stepProgress = 0.0;
 
   // ============================================================
-  // FONTE DA IA
+  // API KEY LEGADA
   // ============================================================
 
   String? _userApiKey;
-
-  bool _usingPrivateApi = false;
-
-  String? _activeAiProvider;
-
-  String? _activeAiModel;
-
-  // ============================================================
-  // CONEXÃO
-  // ============================================================
-
-  int connectionSeconds = 0;
 
   // ============================================================
   // ESTÚDIO
@@ -102,13 +92,8 @@ class RhymesController
   bool isBpmPlaying = false;
 
   // ============================================================
-  // VOCABULÁRIO
+  // TRENDING
   // ============================================================
-
-  List<
-    Rhyme
-  >
-  vocabulary = [];
 
   List<
     Map<
@@ -119,7 +104,41 @@ class RhymesController
   trendingWords = [];
 
   // ============================================================
-  // GETTERS
+  // CONSTRUTOR
+  // ============================================================
+
+  RhymesController() {
+    _rhymeSuggestionService = RhymeSuggestionService(
+      suggestionController: suggestionController,
+    );
+
+    vocabularyController.addListener(
+      _onChildControllerChanged,
+    );
+
+    aiQuotaController.addListener(
+      _onChildControllerChanged,
+    );
+
+    aiSourceController.addListener(
+      _onChildControllerChanged,
+    );
+
+    _rhymesAiService.addListener(
+      _onChildControllerChanged,
+    );
+  }
+
+  // ============================================================
+  // PROPAGAR ALTERAÇÕES
+  // ============================================================
+
+  void _onChildControllerChanged() {
+    notifyListeners();
+  }
+
+  // ============================================================
+  // GETTERS GERAIS
   // ============================================================
 
   List<
@@ -127,29 +146,57 @@ class RhymesController
   >
   get suggestions => suggestionController.suggestions;
 
-  bool get isLoading => _isLoading;
+  bool get isLoading => _rhymesAiService.isLoading;
 
-  bool get isVocabularyLoading => _isVocabularyLoading;
+  bool get isVocabularyLoading => vocabularyController.isLoading;
 
-  double get aiUsagePercentage => _aiUsagePercentage;
+  int get currentStep => _currentStep;
 
-  double get aiUsageProgress => _aiUsageProgress;
+  double get stepProgress => _stepProgress;
+
+  int get connectionSeconds => _rhymesAiService.connectionSeconds;
+
+  // ============================================================
+  // VOCABULARY GETTERS
+  // ============================================================
+
+  List<
+    Rhyme
+  >
+  get vocabulary => vocabularyController.vocabulary;
+
+  List<
+    String
+  >
+  get vocabularyWords => vocabularyController.vocabularyWords;
+
+  int get vocabularyCount => vocabularyController.vocabularyCount;
+
+  // ============================================================
+  // IA - QUOTA
+  // ============================================================
+
+  double get aiUsagePercentage => aiQuotaController.usagePercentage;
+
+  double get aiUsageProgress => aiQuotaController.usageProgress;
 
   String get aiUsageLevel {
-    if (_usingPrivateApi) {
+    if (usingPrivateApi) {
       return 'private';
     }
 
-    return _aiUsageLevel;
+    return aiQuotaController.usageLevel;
   }
 
   String get aiUsageMessage {
-    if (_usingPrivateApi) {
-      final provider = _activeAiProvider?.trim();
+    if (usingPrivateApi) {
+      final provider = activeAiProvider?.trim();
 
       if (provider !=
               null &&
-          provider.isNotEmpty) {
+          provider.isNotEmpty &&
+          provider.toLowerCase() !=
+              'private') {
         return 'API privada $provider ativa. '
             'A cota mensal do Versin não está sendo consumida.';
       }
@@ -158,96 +205,67 @@ class RhymesController
           'A cota mensal do Versin não está sendo consumida.';
     }
 
-    return _aiUsageMessage;
+    return aiQuotaController.usageMessage;
   }
 
   bool get aiQuotaBlocked {
-    if (_usingPrivateApi) {
+    if (usingPrivateApi) {
       return false;
     }
 
-    return _aiQuotaBlocked;
+    return aiQuotaController.quotaBlocked;
   }
 
   bool get aiCanUse {
-    if (_usingPrivateApi) {
+    if (usingPrivateApi) {
       return true;
     }
 
-    return _aiCanUse;
+    return aiQuotaController.canUse;
   }
 
-  int get aiUsedTokens => _aiUsedTokens;
+  int get aiUsedTokens => aiQuotaController.usedTokens;
 
-  int get aiRemainingTokens => _aiRemainingTokens;
+  int get aiRemainingTokens => aiQuotaController.remainingTokens;
 
-  int get aiLimitTokens => _aiLimitTokens;
+  int get aiLimitTokens => aiQuotaController.limitTokens;
 
-  bool get usingPrivateApi => _usingPrivateApi;
+  // ============================================================
+  // IA - SOURCE
+  // ============================================================
 
-  bool get usingVersinApi => !_usingPrivateApi;
+  bool get usingPrivateApi => aiSourceController.usingPrivateApi;
 
-  String? get activeAiProvider => _activeAiProvider;
+  bool get usingVersinApi => aiSourceController.usingVersinApi;
 
-  String? get activeAiModel => _activeAiModel;
+  String? get activeAiProvider {
+    final provider = aiSourceController.provider.trim();
 
-  int get currentStep => _currentStep;
+    if (provider.isEmpty) {
+      return null;
+    }
 
-  double get stepProgress => _stepProgress;
+    return provider;
+  }
+
+  String? get activeAiModel => aiSourceController.model;
 
   String? get userApiKey => _userApiKey;
 
-  List<
-    String
-  >
-  get vocabularyWords => vocabulary
-      .map(
-        (
-          rhyme,
-        ) => rhyme.word,
-      )
-      .toList();
-
-  int get vocabularyCount => vocabulary.length;
-
   // ============================================================
-  // NORMALIZAÇÃO
-  // ============================================================
-
-  String _normalizeWord(
-    String word,
-  ) {
-    return word.trim().toLowerCase();
-  }
-
-  // ============================================================
-  // VERIFICAR PALAVRA
+  // VOCABULARY - CONTÉM
   // ============================================================
 
   bool containsWord(
     String word,
   ) {
-    final normalized = _normalizeWord(
+    return vocabularyController.containsWord(
       word,
-    );
-
-    if (normalized.isEmpty) {
-      return false;
-    }
-
-    return vocabulary.any(
-      (
-        rhyme,
-      ) =>
-          _normalizeWord(
-            rhyme.word,
-          ) ==
-          normalized,
     );
   }
 
   // ============================================================
-  // ADICIONAR UMA PALAVRA
+  // VOCABULARY - ADICIONAR
   // ============================================================
 
   Future<
@@ -257,47 +275,14 @@ class RhymesController
     String word,
     bool priority,
   ) async {
-    final normalized = _normalizeWord(
+    await vocabularyController.addWord(
       word,
+      priority,
     );
-
-    if (normalized.isEmpty) {
-      return;
-    }
-
-    if (containsWord(
-      normalized,
-    )) {
-      return;
-    }
-
-    final rhyme = Rhyme(
-      word: normalized,
-      isPriority: priority,
-    );
-
-    vocabulary.insert(
-      0,
-      rhyme,
-    );
-
-    notifyListeners();
-
-    try {
-      await _repository.saveWord(
-        normalized,
-      );
-    } catch (
-      e
-    ) {
-      debugPrint(
-        'Erro ao salvar palavra: $e',
-      );
-    }
   }
 
   // ============================================================
-  // ADICIONAR VÁRIAS PALAVRAS
+  // VOCABULARY - ADICIONAR VÁRIAS
   // ============================================================
 
   Future<
@@ -309,48 +294,15 @@ class RhymesController
     >
     words, {
     bool priority = false,
-  }) async {
-    int addedCount = 0;
-
-    final uniqueWords =
-        <
-          String
-        >{};
-
-    for (final rawWord in words) {
-      final normalized = _normalizeWord(
-        rawWord,
-      );
-
-      if (normalized.isEmpty) {
-        continue;
-      }
-
-      uniqueWords.add(
-        normalized,
-      );
-    }
-
-    for (final word in uniqueWords) {
-      if (containsWord(
-        word,
-      )) {
-        continue;
-      }
-
-      await addWord(
-        word,
-        priority,
-      );
-
-      addedCount++;
-    }
-
-    return addedCount;
+  }) {
+    return vocabularyController.addWords(
+      words,
+      priority: priority,
+    );
   }
 
   // ============================================================
-  // REMOVER POR ÍNDICE
+  // VOCABULARY - REMOVER ÍNDICE
   // ============================================================
 
   Future<
@@ -359,36 +311,13 @@ class RhymesController
   removeWord(
     int index,
   ) async {
-    if (index <
-            0 ||
-        index >=
-            vocabulary.length) {
-      return;
-    }
-
-    final word = vocabulary[index].word;
-
-    vocabulary.removeAt(
+    await vocabularyController.removeWord(
       index,
     );
-
-    notifyListeners();
-
-    try {
-      await _repository.deleteWord(
-        word,
-      );
-    } catch (
-      e
-    ) {
-      debugPrint(
-        'Erro ao remover palavra: $e',
-      );
-    }
   }
 
   // ============================================================
-  // REMOVER PELO TEXTO
+  // VOCABULARY - REMOVER VALOR
   // ============================================================
 
   Future<
@@ -397,28 +326,41 @@ class RhymesController
   removeWordByValue(
     String word,
   ) async {
-    final normalized = _normalizeWord(
+    await vocabularyController.removeWordByValue(
       word,
     );
+  }
 
-    final index = vocabulary.indexWhere(
-      (
-        rhyme,
-      ) =>
-          _normalizeWord(
-            rhyme.word,
-          ) ==
-          normalized,
+  // ============================================================
+  // VOCABULARY - REORDENAR
+  // ============================================================
+  //
+  // A lista pública do VocabularyController é somente leitura.
+  //
+  // Por isso, toda a mutação deve acontecer dentro do próprio
+  // VocabularyController através de reorder(...).
+  //
+  // ============================================================
+
+  void reorderVocabulary(
+    int oldIndex,
+    int newIndex,
+  ) {
+    vocabularyController.reorder(
+      oldIndex,
+      newIndex,
     );
+  }
 
-    if (index ==
-        -1) {
-      return;
-    }
+  // ============================================================
+  // VOCABULARY - CARREGAR
+  // ============================================================
 
-    await removeWord(
-      index,
-    );
+  Future<
+    void
+  >
+  carregarDadosUsuario() {
+    return vocabularyController.load();
   }
 
   // ============================================================
@@ -469,29 +411,39 @@ class RhymesController
     String? model,
     bool notify = true,
   }) {
-    final normalizedProvider = provider?.trim();
+    if (usingPrivateApi) {
+      aiSourceController.activatePrivate(
+        provider: _normalizeProvider(
+          provider,
+        ),
+        model: model,
+        notify: notify,
+      );
 
-    final normalizedModel = model?.trim();
-
-    _usingPrivateApi = usingPrivateApi;
-
-    _activeAiProvider =
-        normalizedProvider ==
-                null ||
-            normalizedProvider.isEmpty
-        ? null
-        : normalizedProvider;
-
-    _activeAiModel =
-        normalizedModel ==
-                null ||
-            normalizedModel.isEmpty
-        ? null
-        : normalizedModel;
-
-    if (notify) {
-      notifyListeners();
+      return;
     }
+
+    aiSourceController.activateVersin(
+      notify: notify,
+    );
+  }
+
+  // ============================================================
+  // NORMALIZAR PROVIDER
+  // ============================================================
+
+  String _normalizeProvider(
+    String? provider,
+  ) {
+    final normalized = provider?.trim();
+
+    if (normalized ==
+            null ||
+        normalized.isEmpty) {
+      return 'private';
+    }
+
+    return normalized;
   }
 
   // ============================================================
@@ -506,59 +458,12 @@ class RhymesController
     data, {
     bool notify = true,
   }) {
-    final usedPrivateApi =
-        data['used_private_api'] ==
-        true;
-
-    final usedVersinApi =
-        data['used_versin_api'] ==
-        true;
-
-    if (usedPrivateApi) {
-      setAiSource(
-        usingPrivateApi: true,
-        provider: data['provider']?.toString(),
-        model: data['model']?.toString(),
-        notify: false,
-      );
-
-      if (notify) {
-        notifyListeners();
-      }
-
-      return;
-    }
-
-    if (usedVersinApi) {
-      setAiSource(
-        usingPrivateApi: false,
-        provider: data['provider']?.toString(),
-        model: data['model']?.toString(),
-        notify: false,
-      );
-
-      _tryUpdateAiQuota(
-        data,
-      );
-
-      if (notify) {
-        notifyListeners();
-      }
-
-      return;
-    }
-
-    if (_containsAiQuotaData(
+    aiSourceController.applyMetadata(
       data,
-    )) {
-      setAiSource(
-        usingPrivateApi: false,
-        provider: data['provider']?.toString(),
-        model: data['model']?.toString(),
-        notify: false,
-      );
+    );
 
-      _tryUpdateAiQuota(
+    if (aiSourceController.usingVersinApi) {
+      aiQuotaController.updateFromMap(
         data,
       );
     }
@@ -576,9 +481,10 @@ class RhymesController
     String? provider,
     String? model,
   }) {
-    setAiSource(
-      usingPrivateApi: true,
-      provider: provider,
+    aiSourceController.activatePrivate(
+      provider: _normalizeProvider(
+        provider,
+      ),
       model: model,
     );
   }
@@ -588,11 +494,7 @@ class RhymesController
   // ============================================================
 
   void activateVersinAi() {
-    setAiSource(
-      usingPrivateApi: false,
-      provider: 'versin',
-      model: null,
-    );
+    aiSourceController.activateVersin();
   }
 
   // ============================================================
@@ -620,98 +522,25 @@ class RhymesController
   void onTextChanged(
     String text,
   ) {
-    _debounce?.cancel();
-
-    suggestionController.updateFromText(
-      text,
-    );
-
-    _debounce = Timer(
-      const Duration(
-        milliseconds: 300,
-      ),
-      () {
-        final normalized = text.trim().toLowerCase();
-
-        if (normalized.isEmpty) {
-          suggestionController.clearSuggestions();
-
-          notifyListeners();
-
-          return;
-        }
-
-        final words = normalized.split(
-          RegExp(
-            r'\s+',
-          ),
-        );
-
-        if (words.isEmpty) {
-          return;
-        }
-
-        final lastWord = words.last;
-
-        if (lastWord.length <
-            2) {
-          if (suggestionController.suggestions.isEmpty) {
-            suggestionController.clearSuggestions();
-          }
-
-          notifyListeners();
-
-          return;
-        }
-
-        final suffix = lastWord.substring(
-          lastWord.length -
-              2,
-        );
-
-        final localSuggestions = vocabulary
-            .map(
-              (
-                item,
-              ) => item.word.trim().toLowerCase(),
-            )
-            .where(
-              (
-                word,
-              ) =>
-                  word !=
-                      lastWord &&
-                  (word.endsWith(
-                        suffix,
-                      ) ||
-                      word.startsWith(
-                        lastWord,
-                      )),
-            )
-            .toList();
-
-        if (localSuggestions.isNotEmpty) {
-          final combined =
-              <
-                    String
-                  >{
-                    ...suggestionController.suggestions,
-                    ...localSuggestions,
-                  }
-                  .toList();
-
-          suggestionController.setSuggestions(
-            combined,
-          );
-        }
-
-        notifyListeners();
-      },
+    _rhymeSuggestionService.onTextChanged(
+      text: text,
+      vocabulary: vocabularyController.vocabulary,
+      onChanged: notifyListeners,
     );
   }
 
   // ============================================================
-  // QUOTA DA IA
+  // LIMPAR SUGESTÕES
+  // ============================================================
+
+  void clearSuggestions() {
+    _rhymeSuggestionService.clear(
+      onChanged: notifyListeners,
+    );
+  }
+
+  // ============================================================
+  // ATUALIZAR QUOTA
   // ============================================================
 
   void updateAiQuotaFromMap(
@@ -722,82 +551,9 @@ class RhymesController
     quota, {
     bool notify = true,
   }) {
-    final percentageRaw = quota['usage_percentage'];
-
-    final progressRaw = quota['progress'];
-
-    final usedRaw = quota['used_tokens'];
-
-    final remainingRaw = quota['remaining_tokens'];
-
-    final limitRaw = quota['limit_tokens'];
-
-    final blockedRaw = quota['blocked'];
-
-    final canUseRaw = quota['can_use_ai'];
-
-    if (percentageRaw
-        is num) {
-      _aiUsagePercentage = percentageRaw.toDouble().clamp(
-        0.0,
-        100.0,
-      );
-    }
-
-    if (progressRaw
-        is num) {
-      _aiUsageProgress = progressRaw.toDouble().clamp(
-        0.0,
-        1.0,
-      );
-    } else {
-      _aiUsageProgress =
-          (_aiUsagePercentage /
-                  100)
-              .clamp(
-                0.0,
-                1.0,
-              );
-    }
-
-    _aiUsageLevel =
-        quota['level']?.toString().trim().toLowerCase() ??
-        _aiUsageLevel;
-
-    _aiUsageMessage =
-        quota['message']?.toString().trim() ??
-        _aiUsageMessage;
-
-    if (usedRaw
-        is num) {
-      _aiUsedTokens = usedRaw.toInt();
-    }
-
-    if (remainingRaw
-        is num) {
-      _aiRemainingTokens = remainingRaw.toInt();
-    }
-
-    if (limitRaw
-        is num) {
-      _aiLimitTokens = limitRaw.toInt();
-    }
-
-    if (blockedRaw
-        is bool) {
-      _aiQuotaBlocked = blockedRaw;
-    } else {
-      _aiQuotaBlocked =
-          _aiUsagePercentage >=
-          100.0;
-    }
-
-    if (canUseRaw
-        is bool) {
-      _aiCanUse = canUseRaw;
-    } else {
-      _aiCanUse = !_aiQuotaBlocked;
-    }
+    aiQuotaController.updateFromMap(
+      quota,
+    );
 
     if (notify) {
       notifyListeners();
@@ -811,23 +567,7 @@ class RhymesController
   void resetAiQuota({
     bool notify = true,
   }) {
-    _aiUsagePercentage = 0.0;
-
-    _aiUsageProgress = 0.0;
-
-    _aiUsageLevel = 'normal';
-
-    _aiUsageMessage = 'Uso normal da IA.';
-
-    _aiQuotaBlocked = false;
-
-    _aiCanUse = true;
-
-    _aiUsedTokens = 0;
-
-    _aiRemainingTokens = 100000;
-
-    _aiLimitTokens = 100000;
+    aiQuotaController.reset();
 
     if (notify) {
       notifyListeners();
@@ -835,98 +575,7 @@ class RhymesController
   }
 
   // ============================================================
-  // ATUALIZAR QUOTA
-  // ============================================================
-
-  void _tryUpdateAiQuota(
-    Map<
-      String,
-      dynamic
-    >
-    data,
-  ) {
-    dynamic rawQuota = data['quota'];
-
-    rawQuota ??= data['ai_quota'];
-
-    rawQuota ??= data['usage'];
-
-    if (rawQuota
-        is Map) {
-      updateAiQuotaFromMap(
-        Map<
-          String,
-          dynamic
-        >.from(
-          rawQuota,
-        ),
-        notify: false,
-      );
-
-      return;
-    }
-
-    if (data.containsKey(
-          'usage_percentage',
-        ) ||
-        data.containsKey(
-          'blocked',
-        ) ||
-        data.containsKey(
-          'can_use_ai',
-        )) {
-      updateAiQuotaFromMap(
-        data,
-        notify: false,
-      );
-    }
-  }
-
-  // ============================================================
-  // POSSUI DADOS DE QUOTA?
-  // ============================================================
-
-  bool _containsAiQuotaData(
-    Map<
-      String,
-      dynamic
-    >
-    data,
-  ) {
-    if (data.containsKey(
-          'quota',
-        ) ||
-        data.containsKey(
-          'ai_quota',
-        ) ||
-        data.containsKey(
-          'usage',
-        )) {
-      return true;
-    }
-
-    return data.containsKey(
-          'usage_percentage',
-        ) ||
-        data.containsKey(
-          'used_tokens',
-        ) ||
-        data.containsKey(
-          'remaining_tokens',
-        ) ||
-        data.containsKey(
-          'limit_tokens',
-        ) ||
-        data.containsKey(
-          'blocked',
-        ) ||
-        data.containsKey(
-          'can_use_ai',
-        );
-  }
-
-  // ============================================================
-  // IA
+  // IA LEGADA
   // ============================================================
 
   Future<
@@ -947,413 +596,59 @@ class RhymesController
       };
     }
 
-    if (_aiQuotaBlocked ||
-        !_aiCanUse) {
+    if (aiQuotaBlocked ||
+        !aiCanUse) {
       return {
         'role': 'assistant',
-        'content': _aiUsageMessage.isNotEmpty
-            ? _aiUsageMessage
+        'content': aiUsageMessage.isNotEmpty
+            ? aiUsageMessage
             : 'Limite mensal de IA atingido.',
       };
     }
 
-    _isLoading = true;
-
-    connectionSeconds = 0;
-
-    notifyListeners();
-
-    _connectionTimer?.cancel();
-
-    _connectionTimer = Timer.periodic(
-      const Duration(
-        seconds: 1,
-      ),
-      (
-        _,
-      ) {
-        connectionSeconds++;
-
-        notifyListeners();
-      },
+    aiSourceController.activateVersin(
+      notify: false,
     );
 
-    try {
-      debugPrint(
-        '',
+    final result = await _rhymesAiService.fetchAiResponse(
+      message: normalizedMessage,
+      vocabulary: vocabularyWords,
+      bpm: currentBpm,
+      vibe: selectedVibe,
+      technique: selectedTechnique,
+      apiKey: _userApiKey,
+    );
+
+    final quota = result.quota;
+
+    if (quota !=
+        null) {
+      aiQuotaController.updateFromMap(
+        quota,
       );
+    }
 
-      debugPrint(
-        '================ IA REQUEST ================',
-      );
+    final rawData = result.rawData;
 
-      debugPrint(
-        'Mensagem: $normalizedMessage',
-      );
-
-      debugPrint(
-        'BPM: $currentBpm',
-      );
-
-      debugPrint(
-        'Vibe: $selectedVibe',
-      );
-
-      debugPrint(
-        'Técnica: $selectedTechnique',
-      );
-
-      debugPrint(
-        'Vocabulário: ${vocabulary.length} palavras',
-      );
-
-      // ======================================================
-      // FLUXO LEGADO / IA VERSIN
-      // ======================================================
-
-      setAiSource(
-        usingPrivateApi: false,
-        provider: 'versin',
-        notify: false,
-      );
-
-      final response = await _repository.postChat(
-        message: normalizedMessage,
-        currentList: vocabularyWords,
-        apiKey: _userApiKey,
-        context: {
-          'bpm': currentBpm,
-          'vibe': selectedVibe,
-          'technique': selectedTechnique,
-        },
-      );
-
-      debugPrint(
-        '---------------- IA RESPONSE ----------------',
-      );
-
-      debugPrint(
-        'Status: ${response.statusCode}',
-      );
-
-      debugPrint(
-        'Body: ${response.body}',
-      );
-
-      debugPrint(
-        'Headers: ${response.headers}',
-      );
-
-      debugPrint(
-        '=============================================',
-      );
-
-      if (response.statusCode <
-              200 ||
-          response.statusCode >=
-              300) {
-        return {
-          'role': 'assistant',
-          'content': _buildServerErrorMessage(
-            response.statusCode,
-            response.body,
-          ),
-        };
-      }
-
-      final decoded = jsonDecode(
-        response.body,
-      );
-
-      if (decoded
-          is! Map) {
-        debugPrint(
-          'Resposta da IA não é um objeto JSON.',
-        );
-
-        return {
-          'role': 'assistant',
-          'content': 'O servidor respondeu em um formato inválido.',
-        };
-      }
-
-      final data =
-          Map<
-            String,
-            dynamic
-          >.from(
-            decoded,
+    if (rawData !=
+        null) {
+      final hasSourceMetadata =
+          rawData['used_private_api'] ==
+              true ||
+          rawData['used_versin_api'] ==
+              true ||
+          rawData.containsKey(
+            'source',
           );
 
-      _tryUpdateAiQuota(
-        data,
-      );
-
-      final content = data['content']?.toString().trim();
-
-      if (content ==
-              null ||
-          content.isEmpty) {
-        return {
-          'role': 'assistant',
-          'content': 'O servidor respondeu sem conteúdo.',
-        };
-      }
-
-      return {
-        'role': 'assistant',
-        'content': content,
-      };
-    } on FormatException catch (
-      e
-    ) {
-      debugPrint(
-        'Erro ao decodificar JSON da IA: $e',
-      );
-
-      return {
-        'role': 'assistant',
-        'content': 'O servidor respondeu em um formato inválido.',
-      };
-    } on TimeoutException catch (
-      e
-    ) {
-      debugPrint(
-        'Timeout na conexão com IA: $e',
-      );
-
-      return {
-        'role': 'assistant',
-        'content': 'O servidor demorou demais para responder. Tente novamente.',
-      };
-    } catch (
-      e,
-      stackTrace
-    ) {
-      debugPrint(
-        '',
-      );
-
-      debugPrint(
-        '================ ERRO IA ====================',
-      );
-
-      debugPrint(
-        'Erro: $e',
-      );
-
-      debugPrint(
-        'Stack: $stackTrace',
-      );
-
-      debugPrint(
-        '=============================================',
-      );
-
-      return {
-        'role': 'assistant',
-        'content': 'Conexão instável. Tente novamente!',
-      };
-    } finally {
-      _connectionTimer?.cancel();
-
-      _connectionTimer = null;
-
-      _isLoading = false;
-
-      notifyListeners();
-    }
-  }
-
-  // ============================================================
-  // ERRO DO SERVIDOR
-  // ============================================================
-
-  String _buildServerErrorMessage(
-    int statusCode,
-    String responseBody,
-  ) {
-    String? serverMessage;
-
-    try {
-      final decoded = jsonDecode(
-        responseBody,
-      );
-
-      if (decoded
-          is Map) {
-        final data =
-            Map<
-              String,
-              dynamic
-            >.from(
-              decoded,
-            );
-
-        serverMessage =
-            data['error']?.toString() ??
-            data['message']?.toString() ??
-            data['detail']?.toString();
-      }
-    } catch (
-      _
-    ) {
-      if (responseBody.trim().isNotEmpty) {
-        serverMessage = responseBody.trim();
-      }
-    }
-
-    final normalizedServerMessage = serverMessage?.toLowerCase();
-
-    final quotaReached =
-        statusCode ==
-            429 &&
-        normalizedServerMessage !=
-            null &&
-        (normalizedServerMessage.contains(
-              'limite mensal',
-            ) ||
-            normalizedServerMessage.contains(
-              'monthly',
-            ) ||
-            normalizedServerMessage.contains(
-              'quota',
-            ));
-
-    if (quotaReached) {
-      _aiQuotaBlocked = true;
-
-      _aiCanUse = false;
-
-      _aiUsagePercentage = 100.0;
-
-      _aiUsageProgress = 1.0;
-
-      _aiUsageLevel = 'blocked';
-
-      _aiUsageMessage =
-          serverMessage !=
-                  null &&
-              serverMessage.isNotEmpty
-          ? serverMessage
-          : 'Limite mensal de IA atingido.';
-    }
-
-    switch (statusCode) {
-      case 401:
-        return serverMessage !=
-                null
-            ? 'Não autorizado: $serverMessage'
-            : 'Não autorizado. Verifique sua API Key.';
-
-      case 403:
-        return serverMessage !=
-                null
-            ? 'Acesso negado: $serverMessage'
-            : 'Acesso negado pelo servidor.';
-
-      case 404:
-        return serverMessage !=
-                null
-            ? 'Serviço não encontrado: $serverMessage'
-            : 'O serviço da IA não foi encontrado.';
-
-      case 429:
-        if (quotaReached) {
-          return _aiUsageMessage;
-        }
-
-        return serverMessage !=
-                null
-            ? 'Limite de requisições atingido: $serverMessage'
-            : 'Muitas requisições. Aguarde um pouco e tente novamente.';
-
-      case 500:
-        return serverMessage !=
-                null
-            ? 'Erro interno do servidor: $serverMessage'
-            : 'Erro interno do servidor.';
-
-      case 502:
-        return serverMessage !=
-                null
-            ? 'Gateway inválido: $serverMessage'
-            : 'O servidor intermediário falhou.';
-
-      case 503:
-        return serverMessage !=
-                null
-            ? 'Servidor temporariamente indisponível: $serverMessage'
-            : 'Servidor temporariamente indisponível. Tente novamente em instantes.';
-
-      case 504:
-        return serverMessage !=
-                null
-            ? 'Tempo limite do servidor: $serverMessage'
-            : 'O servidor demorou demais para responder.';
-
-      default:
-        return serverMessage !=
-                null
-            ? 'Erro no servidor ($statusCode): $serverMessage'
-            : 'Erro no servidor (Status: $statusCode)';
-    }
-  }
-
-  // ============================================================
-  // CARREGAMENTO
-  // ============================================================
-
-  Future<
-    void
-  >
-  carregarDadosUsuario() async {
-    if (_isVocabularyLoading) {
-      return;
-    }
-
-    _isVocabularyLoading = true;
-
-    notifyListeners();
-
-    try {
-      final loadedVocabulary = await _repository.fetchVocabulary();
-
-      final unique =
-          <
-            String,
-            Rhyme
-          >{};
-
-      for (final rhyme in loadedVocabulary) {
-        final normalized = _normalizeWord(
-          rhyme.word,
-        );
-
-        if (normalized.isEmpty) {
-          continue;
-        }
-
-        unique[normalized] = Rhyme(
-          word: normalized,
-          isPriority: rhyme.isPriority,
+      if (hasSourceMetadata) {
+        aiSourceController.applyMetadata(
+          rawData,
         );
       }
-
-      vocabulary = unique.values.toList();
-
-      notifyListeners();
-    } catch (
-      e
-    ) {
-      debugPrint(
-        'Erro ao carregar vocabulário: $e',
-      );
-    } finally {
-      _isVocabularyLoading = false;
-
-      notifyListeners();
     }
+
+    return result.toMessageMap();
   }
 
   // ============================================================
@@ -1415,28 +710,40 @@ class RhymesController
   }
 
   // ============================================================
-  // LIMPAR SUGESTÕES
-  // ============================================================
-
-  void clearSuggestions() {
-    suggestionController.clearSuggestions();
-
-    notifyListeners();
-  }
-
-  // ============================================================
   // DISPOSE
   // ============================================================
 
   @override
   void dispose() {
-    _debounce?.cancel();
+    vocabularyController.removeListener(
+      _onChildControllerChanged,
+    );
 
-    _connectionTimer?.cancel();
+    aiQuotaController.removeListener(
+      _onChildControllerChanged,
+    );
+
+    aiSourceController.removeListener(
+      _onChildControllerChanged,
+    );
+
+    _rhymesAiService.removeListener(
+      _onChildControllerChanged,
+    );
 
     _audioService.dispose();
 
+    _rhymeSuggestionService.dispose();
+
     suggestionController.dispose();
+
+    vocabularyController.dispose();
+
+    aiQuotaController.dispose();
+
+    aiSourceController.dispose();
+
+    _rhymesAiService.dispose();
 
     super.dispose();
   }

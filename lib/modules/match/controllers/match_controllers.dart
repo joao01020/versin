@@ -18,33 +18,59 @@ import '../models/match_user_entity.dart';
 // MATCH CONTROLLER
 // ============================================================
 //
+// Controller principal do módulo Match.
+//
 // Responsabilidades:
 //
-// - controlar sessão de descoberta;
-// - controlar usuário principal do Discovery;
+// - controlar o estado da descoberta;
+// - controlar Discovery;
 // - controlar recomendações;
-// - limpar resultados;
 // - registrar likes;
 // - detectar match mútuo;
-// - iniciar projeto/networking;
-// - controlar timer da conexão;
-// - utilizar o perfil profissional real do usuário.
+// - iniciar networking;
+// - emitir evento de projeto;
+// - controlar countdown da conexão;
+// - expor dados do perfil profissional.
 //
-// Perfil profissional:
+// IMPORTANTE:
 //
-// ProfessionalProfileController
+// O Controller NÃO:
 //
-// fornece:
+// - desenha widgets;
+// - controla BuildContext;
+// - navega entre páginas;
+// - pesquisa usuários manualmente;
+// - calcula ranking de candidatos.
 //
-// - primaryRole
-// - selectedRoles
-// - lookingForRoles
+// Essas responsabilidades pertencem respectivamente a:
+//
+// UI
+// MatchPage / Widgets
+//
+// Busca
+// MatchSearchController
+//
+// Ranking / candidatos
+// MatchRepository
+//
+// Sessão
+// MatchSessionService
 //
 // ============================================================
 
 class MatchController
     with
         ChangeNotifier {
+  // ============================================================
+  // CONSTANTES
+  // ============================================================
+
+  static const int _connectionDurationSeconds = 1200;
+
+  static const Duration _searchTimeout = Duration(
+    milliseconds: 1500,
+  );
+
   // ============================================================
   // DEPENDÊNCIAS
   // ============================================================
@@ -60,7 +86,26 @@ class MatchController
       >();
 
   // ============================================================
-  // STREAM DE MATCH
+  // SUPABASE
+  // ============================================================
+  //
+  // Por enquanto permanece aqui porque:
+  //
+  // - favoritos;
+  // - match mútuo;
+  // - criação de projeto;
+  //
+  // ainda fazem parte do Controller atual.
+  //
+  // Em uma próxima refatoração isso poderá ser movido para
+  // MatchRemoteDatasource sem alterar a UI.
+  //
+  // ============================================================
+
+  SupabaseClient get _supabase => Supabase.instance.client;
+
+  // ============================================================
+  // STREAM DE EVENTO DE MATCH
   // ============================================================
 
   final StreamController<
@@ -72,32 +117,59 @@ class MatchController
       >.broadcast();
 
   // ============================================================
-  // TIMERS / SUBSCRIPTIONS
+  // TIMERS
   // ============================================================
 
   Timer? _countdownTimer;
 
   Timer? _searchTimeoutTimer;
 
-  StreamSubscription? _matchSubscription;
-
   // ============================================================
-  // ESTADO
+  // REALTIME
   // ============================================================
 
-  bool isLoading = true;
+  StreamSubscription<
+    dynamic
+  >?
+  _matchSubscription;
 
-  MatchUserEntity? discoveryUser;
+  // ============================================================
+  // ESTADO INTERNO
+  // ============================================================
+
+  bool _isLoading = true;
+
+  MatchUserEntity? _discoveryUser;
 
   List<
     MatchUserEntity
   >
-  recommendedUsers = [];
+  _recommendedUsers =
+      const <
+        MatchUserEntity
+      >[];
 
-  int remainingSeconds = 1200;
+  int _remainingSeconds = _connectionDurationSeconds;
+
+  bool _disposed = false;
 
   // ============================================================
-  // GETTERS
+  // GETTERS — ESTADO
+  // ============================================================
+
+  bool get isLoading => _isLoading;
+
+  MatchUserEntity? get discoveryUser => _discoveryUser;
+
+  List<
+    MatchUserEntity
+  >
+  get recommendedUsers => _recommendedUsers;
+
+  int get remainingSeconds => _remainingSeconds;
+
+  // ============================================================
+  // GETTERS — EVENTOS
   // ============================================================
 
   Stream<
@@ -105,9 +177,17 @@ class MatchController
   >
   get matchEventStream => _matchEventController.stream;
 
+  // ============================================================
+  // GETTERS — TEMA
+  // ============================================================
+
   Color get accentNeon => _dashboardController.accentNeon;
 
   Color get primaryPurple => _dashboardController.primaryPurple;
+
+  // ============================================================
+  // GETTERS — PERFIL PROFISSIONAL
+  // ============================================================
 
   ProfessionalProfileController get professionalProfileController => _professionalProfileController;
 
@@ -125,22 +205,30 @@ class MatchController
 
   String get primaryRoleLabel => _professionalProfileController.primaryRoleLabel;
 
+  // ============================================================
+  // GETTERS — RESULTADOS
+  // ============================================================
+
   bool get hasDiscoveryUser =>
-      discoveryUser !=
+      _discoveryUser !=
       null;
 
-  bool get hasRecommendations => recommendedUsers.isNotEmpty;
+  bool get hasRecommendations => _recommendedUsers.isNotEmpty;
 
   bool get hasMatchResults =>
-      discoveryUser !=
+      _discoveryUser !=
           null ||
-      recommendedUsers.isNotEmpty;
+      _recommendedUsers.isNotEmpty;
 
   // ============================================================
   // USER ID
   // ============================================================
 
   String? get currentUserId {
+    // ==========================================================
+    // DEBUG USER
+    // ==========================================================
+
     if (kDebugMode) {
       final debugUserId = dotenv.env['DEBUG_USER_ID']?.trim();
 
@@ -151,78 +239,73 @@ class MatchController
       }
     }
 
-    return Supabase.instance.client.auth.currentUser?.id;
-  }
+    // ==========================================================
+    // USUÁRIO AUTENTICADO
+    // ==========================================================
 
-  // ============================================================
-  // SAFE NOTIFY
-  // ============================================================
-
-  void safeNotify() {
-    if (hasListeners) {
-      notifyListeners();
-    }
+    return _supabase.auth.currentUser?.id;
   }
 
   // ============================================================
   // INIT MATCH SESSION
-  // ============================================================
-  //
-  // A sessão usa diretamente:
-  //
-  // professionalProfileController.primaryRole
-  //
-  // e:
-  //
-  // professionalProfileController.lookingForRoles
-  //
   // ============================================================
 
   Future<
     void
   >
   initMatchSession() async {
+    if (_disposed) {
+      return;
+    }
+
     // ==========================================================
-    // RESET DA SESSÃO
+    // RESET
     // ==========================================================
 
-    isLoading = true;
+    _setLoading(
+      true,
+      notify: false,
+    );
 
-    discoveryUser = null;
+    _discoveryUser = null;
 
-    recommendedUsers = [];
+    _recommendedUsers =
+        const <
+          MatchUserEntity
+        >[];
 
-    remainingSeconds = 1200;
+    _remainingSeconds = _connectionDurationSeconds;
 
     _cancelTimers();
 
     safeNotify();
 
     // ==========================================================
-    // CARREGAR PERFIL PROFISSIONAL
+    // PERFIL PROFISSIONAL
+    // ==========================================================
+    //
+    // Mantemos load() aqui por compatibilidade com chamadas
+    // diretas a MatchController.
+    //
+    // O ProfessionalProfileController é LazySingleton e pode
+    // compartilhar os dados com Dashboard e Match.
+    //
     // ==========================================================
 
     await _professionalProfileController.load();
 
-    // ==========================================================
-    // PERFIL NÃO CONFIGURADO
-    // ==========================================================
-
-    if (_professionalProfileController.primaryRole ==
-        null) {
-      debugPrint(
-        '[MATCH] Função principal não configurada.',
-      );
-    }
-
-    if (_professionalProfileController.lookingForRoles.isEmpty) {
-      debugPrint(
-        '[MATCH] Nenhum profissional procurado configurado.',
-      );
+    if (_disposed) {
+      return;
     }
 
     // ==========================================================
-    // REALTIME
+    // VALIDAR CONFIGURAÇÃO
+    // ==========================================================
+
+    _validateProfessionalProfile();
+
+    // ==========================================================
+    // REALTIME DE MATCH MÚTUO
     // ==========================================================
 
     _startRealtimeMatchListener();
@@ -231,26 +314,75 @@ class MatchController
     // TIMEOUT DA BUSCA
     // ==========================================================
 
-    _searchTimeoutTimer = Timer(
-      const Duration(
-        milliseconds: 1500,
-      ),
-      () {
-        if (isLoading &&
-            discoveryUser ==
-                null &&
-            recommendedUsers.isEmpty) {
-          isLoading = false;
-
-          safeNotify();
-        }
-      },
-    );
+    _startSearchTimeout();
 
     // ==========================================================
     // LOG
     // ==========================================================
 
+    _logSessionStarted();
+  }
+
+  // ============================================================
+  // VALIDAR PERFIL
+  // ============================================================
+
+  void _validateProfessionalProfile() {
+    if (currentPrimaryRole ==
+        null) {
+      debugPrint(
+        '[MATCH] '
+        'Função principal não configurada.',
+      );
+    }
+
+    if (lookingForRoles.isEmpty) {
+      debugPrint(
+        '[MATCH] '
+        'Nenhum profissional procurado configurado.',
+      );
+    }
+  }
+
+  // ============================================================
+  // TIMEOUT DA BUSCA
+  // ============================================================
+
+  void _startSearchTimeout() {
+    _searchTimeoutTimer?.cancel();
+
+    _searchTimeoutTimer = Timer(
+      _searchTimeout,
+      () {
+        if (_disposed) {
+          return;
+        }
+
+        if (!_isLoading) {
+          return;
+        }
+
+        if (_discoveryUser !=
+            null) {
+          return;
+        }
+
+        if (_recommendedUsers.isNotEmpty) {
+          return;
+        }
+
+        _setLoading(
+          false,
+        );
+      },
+    );
+  }
+
+  // ============================================================
+  // LOG DA SESSÃO
+  // ============================================================
+
+  void _logSessionStarted() {
     debugPrint(
       '[MATCH] ========================================',
     );
@@ -264,18 +396,25 @@ class MatchController
     );
 
     debugPrint(
-      '[MATCH] Função principal: '
+      '[MATCH] '
+      'Função principal: '
       '${currentPrimaryRole?.key ?? "não informado"}',
     );
 
     debugPrint(
-      '[MATCH] Funções: '
-      '${currentRoles.map((role) => role.key).toList()}',
+      '[MATCH] '
+      'Funções: '
+      '${currentRoles.map((role) {
+        return role.key;
+      }).toList()}',
     );
 
     debugPrint(
-      '[MATCH] Procura: '
-      '${lookingForRoles.map((role) => role.key).toList()}',
+      '[MATCH] '
+      'Procura: '
+      '${lookingForRoles.map((role) {
+        return role.key;
+      }).toList()}',
     );
 
     debugPrint(
@@ -284,35 +423,31 @@ class MatchController
   }
 
   // ============================================================
-  // LIMPAR RESULTADOS DO MATCH
-  // ============================================================
-  //
-  // Usado pelo MatchRepository quando:
-  //
-  // - não existem usuários online;
-  // - não existem candidatos compatíveis;
-  // - ocorre erro no stream;
-  // - a busca precisa ser reiniciada.
-  //
-  // Isso evita manter um discoveryUser antigo na tela.
-  //
+  // LIMPAR RESULTADOS
   // ============================================================
 
   void clearMatchResults({
     bool stopLoading = true,
   }) {
-    discoveryUser = null;
+    if (_disposed) {
+      return;
+    }
 
-    recommendedUsers = [];
+    _discoveryUser = null;
+
+    _recommendedUsers =
+        const <
+          MatchUserEntity
+        >[];
 
     _countdownTimer?.cancel();
 
     _countdownTimer = null;
 
-    remainingSeconds = 1200;
+    _remainingSeconds = _connectionDurationSeconds;
 
     if (stopLoading) {
-      isLoading = false;
+      _isLoading = false;
     }
 
     safeNotify();
@@ -323,25 +458,39 @@ class MatchController
   }
 
   // ============================================================
-  // REALTIME MATCH LISTENER
+  // REALTIME MATCH
   // ============================================================
 
   void _startRealtimeMatchListener() {
     final userId = currentUserId;
 
     if (userId ==
-        null) {
+            null ||
+        userId.trim().isEmpty) {
       debugPrint(
-        '[MATCH] Não foi possível iniciar realtime: '
+        '[MATCH] '
+        'Não foi possível iniciar realtime: '
         'usuário não identificado.',
       );
 
       return;
     }
 
-    _matchSubscription?.cancel();
+    // ==========================================================
+    // CANCELAR LISTENER ANTERIOR
+    // ==========================================================
 
-    _matchSubscription = Supabase.instance.client
+    unawaited(
+      _matchSubscription?.cancel(),
+    );
+
+    _matchSubscription = null;
+
+    // ==========================================================
+    // NOVO LISTENER
+    // ==========================================================
+
+    _matchSubscription = _supabase
         .from(
           'favorites',
         )
@@ -358,7 +507,8 @@ class MatchController
           (
             snapshot,
           ) {
-            if (snapshot.isEmpty) {
+            if (_disposed ||
+                snapshot.isEmpty) {
               return;
             }
 
@@ -372,9 +522,11 @@ class MatchController
               return;
             }
 
-            checkAndStartNetworking(
-              userId,
-              senderId,
+            unawaited(
+              checkAndStartNetworking(
+                userId,
+                senderId,
+              ),
             );
           },
           onError:
@@ -382,14 +534,15 @@ class MatchController
                 error,
               ) {
                 debugPrint(
-                  '[MATCH] Erro realtime: $error',
+                  '[MATCH] '
+                  'Erro realtime: $error',
                 );
               },
         );
   }
 
   // ============================================================
-  // MATCH MÚTUO
+  // VERIFICAR MATCH MÚTUO
   // ============================================================
 
   Future<
@@ -399,21 +552,27 @@ class MatchController
     String myId,
     String otherId,
   ) async {
-    final supabase = Supabase.instance.client;
+    final normalizedMyId = myId.trim();
 
-    if (myId.trim().isEmpty ||
-        otherId.trim().isEmpty ||
-        myId ==
-            otherId) {
+    final normalizedOtherId = otherId.trim();
+
+    // ==========================================================
+    // VALIDAR
+    // ==========================================================
+
+    if (normalizedMyId.isEmpty ||
+        normalizedOtherId.isEmpty ||
+        normalizedMyId ==
+            normalizedOtherId) {
       return false;
     }
 
     try {
       // ========================================================
-      // VERIFICAR FAVORITOS MÚTUOS
+      // FAVORITOS MÚTUOS
       // ========================================================
 
-      final matches = await supabase
+      final matches = await _supabase
           .from(
             'favorites',
           )
@@ -421,8 +580,14 @@ class MatchController
             '*',
           )
           .or(
-            'and(sender_id.eq.$myId,target_user_id.eq.$otherId),'
-            'and(sender_id.eq.$otherId,target_user_id.eq.$myId)',
+            'and('
+            'sender_id.eq.$normalizedMyId,'
+            'target_user_id.eq.$normalizedOtherId'
+            '),'
+            'and('
+            'sender_id.eq.$normalizedOtherId,'
+            'target_user_id.eq.$normalizedMyId'
+            ')',
           );
 
       if (matches.length <
@@ -434,7 +599,7 @@ class MatchController
       // PROJETO EXISTENTE
       // ========================================================
 
-      final existingProject = await supabase
+      final existingProject = await _supabase
           .from(
             'projects',
           )
@@ -444,37 +609,35 @@ class MatchController
           .contains(
             'members',
             [
-              myId,
-              otherId,
+              normalizedMyId,
+              normalizedOtherId,
             ],
           )
           .maybeSingle();
 
-      if (existingProject !=
-          null) {
-        final projectId = existingProject['id']?.toString().trim();
+      final existingProjectId = existingProject?['id']?.toString().trim();
 
-        if (projectId !=
-                null &&
-            projectId.isNotEmpty) {
-          _matchEventController.add(
-            projectId,
-          );
+      if (existingProjectId !=
+              null &&
+          existingProjectId.isNotEmpty) {
+        _emitMatchEvent(
+          existingProjectId,
+        );
 
-          debugPrint(
-            '[MATCH] Projeto existente encontrado: '
-            '$projectId',
-          );
+        debugPrint(
+          '[MATCH] '
+          'Projeto existente encontrado: '
+          '$existingProjectId',
+        );
 
-          return true;
-        }
+        return true;
       }
 
       // ========================================================
-      // CRIAR PROJETO
+      // CRIAR NOVO PROJETO
       // ========================================================
 
-      final newProject = await supabase
+      final newProject = await _supabase
           .from(
             'projects',
           )
@@ -483,8 +646,8 @@ class MatchController
               'title': 'Studio Session',
 
               'members': [
-                myId,
-                otherId,
+                normalizedMyId,
+                normalizedOtherId,
               ],
 
               'status': 'active',
@@ -507,26 +670,57 @@ class MatchController
       // EMITIR EVENTO
       // ========================================================
 
-      _matchEventController.add(
+      _emitMatchEvent(
         newProjectId,
       );
 
       debugPrint(
-        '[MATCH] Novo projeto criado: '
+        '[MATCH] '
+        'Novo projeto criado: '
         '$newProjectId',
       );
 
       return true;
     } catch (
-      error
+      error,
+      stackTrace
     ) {
       debugPrint(
         '[MATCH] '
-        'Erro ao iniciar networking: $error',
+        'Erro ao iniciar networking: '
+        '$error',
+      );
+
+      debugPrint(
+        '[MATCH] '
+        'StackTrace: $stackTrace',
       );
 
       return false;
     }
+  }
+
+  // ============================================================
+  // EMITIR MATCH
+  // ============================================================
+
+  void _emitMatchEvent(
+    String projectId,
+  ) {
+    if (_disposed ||
+        _matchEventController.isClosed) {
+      return;
+    }
+
+    final normalizedProjectId = projectId.trim();
+
+    if (normalizedProjectId.isEmpty) {
+      return;
+    }
+
+    _matchEventController.add(
+      normalizedProjectId,
+    );
   }
 
   // ============================================================
@@ -542,51 +736,57 @@ class MatchController
     final userId = currentUserId;
 
     if (userId ==
-        null) {
+            null ||
+        userId.trim().isEmpty) {
       debugPrint(
-        '[MATCH] Like ignorado: '
-        'usuário não identificado.',
+        '[MATCH] '
+        'Like ignorado: usuário não identificado.',
       );
 
       return;
     }
 
+    final normalizedUserId = userId.trim();
+
     final normalizedTargetId = targetId.trim();
 
     if (normalizedTargetId.isEmpty ||
         normalizedTargetId ==
-            userId) {
+            normalizedUserId) {
       return;
     }
 
     try {
-      await Supabase.instance.client
+      await _supabase
           .from(
             'favorites',
           )
           .insert(
             {
-              'sender_id': userId,
+              'sender_id': normalizedUserId,
 
               'target_user_id': normalizedTargetId,
             },
           );
 
       debugPrint(
-        '[MATCH] Like registrado: '
-        '$userId -> $normalizedTargetId',
+        '[MATCH] '
+        'Like registrado: '
+        '$normalizedUserId -> '
+        '$normalizedTargetId',
       );
     } on PostgrestException catch (
       error
     ) {
       // ========================================================
-      // UNIQUE VIOLATION
+      // LIKE JÁ EXISTENTE
       // ========================================================
 
       if (error.code ==
           '23505') {
         debugPrint(
-          '[MATCH] Like já registrado.',
+          '[MATCH] '
+          'Like já registrado.',
         );
 
         return;
@@ -598,11 +798,18 @@ class MatchController
         '${error.message}',
       );
     } catch (
-      error
+      error,
+      stackTrace
     ) {
       debugPrint(
         '[MATCH] '
-        'Erro ao registrar like: $error',
+        'Erro ao registrar like: '
+        '$error',
+      );
+
+      debugPrint(
+        '[MATCH] '
+        'StackTrace: $stackTrace',
       );
     }
   }
@@ -614,13 +821,33 @@ class MatchController
   void setDiscoveryUser(
     MatchUserEntity user,
   ) {
+    if (_disposed) {
+      return;
+    }
+
+    // ==========================================================
+    // ENCERRAR TIMEOUT
+    // ==========================================================
+
     _searchTimeoutTimer?.cancel();
 
     _searchTimeoutTimer = null;
 
-    discoveryUser = user;
+    // ==========================================================
+    // USER
+    // ==========================================================
 
-    isLoading = false;
+    _discoveryUser = user;
+
+    // ==========================================================
+    // LOADING
+    // ==========================================================
+
+    _isLoading = false;
+
+    // ==========================================================
+    // TIMER
+    // ==========================================================
 
     startConnectionTimer();
 
@@ -637,11 +864,23 @@ class MatchController
     >
     users,
   ) {
+    if (_disposed) {
+      return;
+    }
+
+    // ==========================================================
+    // ENCERRAR TIMEOUT
+    // ==========================================================
+
     _searchTimeoutTimer?.cancel();
 
     _searchTimeoutTimer = null;
 
-    recommendedUsers =
+    // ==========================================================
+    // RESULTADOS
+    // ==========================================================
+
+    _recommendedUsers =
         List<
           MatchUserEntity
         >.unmodifiable(
@@ -651,24 +890,24 @@ class MatchController
     // ==========================================================
     // BUSCA FINALIZADA
     // ==========================================================
-    //
-    // Mesmo com lista vazia, o Repository terminou o trabalho.
-    //
-    // ==========================================================
 
-    isLoading = false;
+    _isLoading = false;
 
     safeNotify();
   }
 
   // ============================================================
-  // TIMER DE CONEXÃO
+  // TIMER DA CONEXÃO
   // ============================================================
 
   void startConnectionTimer() {
+    if (_disposed) {
+      return;
+    }
+
     _countdownTimer?.cancel();
 
-    remainingSeconds = 1200;
+    _remainingSeconds = _connectionDurationSeconds;
 
     _countdownTimer = Timer.periodic(
       const Duration(
@@ -677,9 +916,15 @@ class MatchController
       (
         timer,
       ) {
-        if (remainingSeconds >
+        if (_disposed) {
+          timer.cancel();
+
+          return;
+        }
+
+        if (_remainingSeconds >
             0) {
-          remainingSeconds--;
+          _remainingSeconds--;
 
           safeNotify();
 
@@ -708,6 +953,46 @@ class MatchController
   }
 
   // ============================================================
+  // LOADING
+  // ============================================================
+
+  void _setLoading(
+    bool value, {
+    bool notify = true,
+  }) {
+    if (_disposed) {
+      return;
+    }
+
+    if (_isLoading ==
+        value) {
+      return;
+    }
+
+    _isLoading = value;
+
+    if (notify) {
+      safeNotify();
+    }
+  }
+
+  // ============================================================
+  // SAFE NOTIFY
+  // ============================================================
+
+  void safeNotify() {
+    if (_disposed) {
+      return;
+    }
+
+    if (!hasListeners) {
+      return;
+    }
+
+    notifyListeners();
+  }
+
+  // ============================================================
   // CONTRATO PROVISÓRIO
   // ============================================================
 
@@ -715,11 +1000,16 @@ class MatchController
     String userA,
     String userB,
   ) {
-    final hash =
-        userA.hashCode ^
-        userB.hashCode;
+    final normalizedUserA = userA.trim();
 
-    return 'VRSN-$hash-'
+    final normalizedUserB = userB.trim();
+
+    final hash =
+        normalizedUserA.hashCode ^
+        normalizedUserB.hashCode;
+
+    return 'VRSN-'
+        '$hash-'
         '${DateTime.now().millisecondsSinceEpoch}';
   }
 
@@ -727,11 +1017,13 @@ class MatchController
   // FILTROS
   // ============================================================
 
-  VoidCallback get openFilters => () {
-    debugPrint(
-      '[MATCH] Abrir filtros.',
-    );
-  };
+  VoidCallback get openFilters {
+    return () {
+      debugPrint(
+        '[MATCH] Abrir filtros.',
+      );
+    };
+  }
 
   // ============================================================
   // DEMO
@@ -749,25 +1041,48 @@ class MatchController
 
   @override
   void dispose() {
+    if (_disposed) {
+      return;
+    }
+
+    // ==========================================================
+    // MARCAR COMO ENCERRADO
+    // ==========================================================
+
+    _disposed = true;
+
+    // ==========================================================
+    // TIMERS
+    // ==========================================================
+
     _cancelTimers();
 
-    _matchSubscription?.cancel();
+    // ==========================================================
+    // REALTIME
+    // ==========================================================
+
+    unawaited(
+      _matchSubscription?.cancel(),
+    );
 
     _matchSubscription = null;
 
+    // ==========================================================
+    // EVENT STREAM
+    // ==========================================================
+
     if (!_matchEventController.isClosed) {
-      _matchEventController.close();
+      unawaited(
+        _matchEventController.close(),
+      );
     }
 
     // ==========================================================
     // NÃO DISPOR PROFESSIONAL PROFILE CONTROLLER
     // ==========================================================
     //
-    // Ele é LazySingleton compartilhado por:
-    //
-    // - Dashboard;
-    // - Match;
-    // - Perfil profissional.
+    // ProfessionalProfileController é LazySingleton e é
+    // compartilhado por outras partes do aplicativo.
     //
     // ==========================================================
 

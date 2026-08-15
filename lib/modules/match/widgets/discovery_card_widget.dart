@@ -20,20 +20,66 @@ import 'action_button_widget.dart';
 // - tipo de conexão;
 // - timer;
 // - profissionais procurados;
-// - ações.
+// - ações;
+// - botão para ouvir demo.
+//
+// NÃO:
+//
+// - consulta Supabase;
+// - carrega música;
+// - gera signed URL;
+// - reproduz áudio.
+//
+// O fluxo da demo é delegado para onListenDemo.
 //
 // ============================================================
 
 class DiscoveryCardWidget
     extends
         StatefulWidget {
+  // ============================================================
+  // MATCH
+  // ============================================================
+
   final MatchController controller;
+
+  // ============================================================
+  // USUÁRIO
+  // ============================================================
+
   final MatchUserEntity user;
+
+  // ============================================================
+  // DEMO
+  // ============================================================
+  //
+  // O widget superior decide:
+  //
+  // - buscar demo;
+  // - solicitar URL de reprodução;
+  // - abrir modal;
+  // - reproduzir;
+  // - mostrar estado vazio.
+  //
+  // O DiscoveryCardWidget apenas dispara a ação.
+  //
+  // ============================================================
+
+  final Future<
+    void
+  >
+  Function()?
+  onListenDemo;
+
+  // ============================================================
+  // CONSTRUTOR
+  // ============================================================
 
   const DiscoveryCardWidget({
     super.key,
     required this.controller,
     required this.user,
+    this.onListenDemo,
   });
 
   @override
@@ -57,6 +103,8 @@ class _DiscoveryCardWidgetState
   // ============================================================
 
   bool _isWaitingForNetworking = false;
+
+  bool _isOpeningDemo = false;
 
   // ============================================================
   // MATCH INTENT
@@ -122,13 +170,116 @@ class _DiscoveryCardWidgetState
     ) {
       debugPrint(
         '[DISCOVERY] '
-        'Erro ao processar conexão: $error',
+        'Erro ao processar conexão: '
+        '$error',
       );
 
       if (mounted) {
         setState(
           () {
             _isWaitingForNetworking = false;
+          },
+        );
+      }
+    }
+  }
+
+  // ============================================================
+  // OUVIR DEMO
+  // ============================================================
+
+  Future<
+    void
+  >
+  _handleListenDemo() async {
+    final callback = widget.onListenDemo;
+
+    if (callback ==
+        null) {
+      debugPrint(
+        '[DISCOVERY] '
+        'Callback de demo não configurado para: '
+        '${widget.user.id}',
+      );
+
+      return;
+    }
+
+    // ========================================================
+    // EVITAR CLIQUES DUPLOS
+    // ========================================================
+
+    if (_isOpeningDemo) {
+      debugPrint(
+        '[DISCOVERY] '
+        'Abertura da demo já está em andamento.',
+      );
+
+      return;
+    }
+
+    // ========================================================
+    // BLOQUEAR BOTÃO
+    // ========================================================
+
+    if (mounted) {
+      setState(
+        () {
+          _isOpeningDemo = true;
+        },
+      );
+    }
+
+    try {
+      debugPrint(
+        '[DISCOVERY] '
+        'Abrindo demo de: '
+        '${widget.user.id}',
+      );
+
+      // ======================================================
+      // DELEGAR TODO O FLUXO
+      // ======================================================
+      //
+      // IMPORTANTE:
+      //
+      // O callback superior é responsável por:
+      //
+      // 1. buscar a track;
+      // 2. gerar UMA playback URL;
+      // 3. abrir o player;
+      // 4. usar a mesma URL no player.
+      //
+      // Este widget NÃO solicita outra URL.
+      //
+      // ======================================================
+
+      await callback();
+
+      debugPrint(
+        '[DISCOVERY] '
+        'Fluxo da demo finalizado.',
+      );
+    } catch (
+      error,
+      stackTrace
+    ) {
+      debugPrint(
+        '[DISCOVERY] '
+        'Erro ao abrir demo: '
+        '$error',
+      );
+
+      debugPrint(
+        '[DISCOVERY] '
+        'Stack trace: '
+        '$stackTrace',
+      );
+    } finally {
+      if (mounted) {
+        setState(
+          () {
+            _isOpeningDemo = false;
           },
         );
       }
@@ -467,96 +618,129 @@ class _DiscoveryCardWidgetState
                   // AÇÕES
                   // ==================================================
                   _isWaitingForNetworking
-                      ? Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(
-                            12,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(
-                              alpha: 0.10,
-                            ),
-                            borderRadius: BorderRadius.circular(
-                              12,
-                            ),
-                          ),
-                          child: const Center(
-                            child: Text(
-                              'ESPERANDO NETWORKING...',
-                              style: TextStyle(
-                                color: Colors.white70,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ),
-                        )
-                      : Row(
-                          children: [
-                            // ======================================
-                            // PASSAR
-                            // ======================================
-                            ActionButtonWidget(
-                              icon: Icons.close,
-                              color: Colors.white24,
-                              onTap: () {
-                                debugPrint(
-                                  '[DISCOVERY] '
-                                  'Perfil ignorado: '
-                                  '${widget.user.id}',
-                                );
-                              },
-                            ),
-
-                            const SizedBox(
-                              width: 12,
-                            ),
-
-                            // ======================================
-                            // LIKE
-                            // ======================================
-                            ActionButtonWidget(
-                              icon: Icons.favorite,
-                              color: widget.controller.accentNeon,
-                              onTap: _handleMatchIntent,
-                            ),
-
-                            const Spacer(),
-
-                            // ======================================
-                            // DEMO
-                            // ======================================
-                            ElevatedButton.icon(
-                              onPressed: widget.controller.listenDemo,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: widget.controller.accentNeon,
-                                foregroundColor: Colors.black,
-                                elevation: 0,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(
-                                    12,
-                                  ),
-                                ),
-                              ),
-                              icon: const Icon(
-                                Icons.play_arrow_rounded,
-                                size: 17,
-                              ),
-                              label: const Text(
-                                'OUVIR DEMO',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
+                      ? _buildWaiting()
+                      : _buildActions(),
                 ],
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  // ============================================================
+  // WAITING
+  // ============================================================
+
+  Widget _buildWaiting() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(
+        12,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(
+          alpha: 0.10,
+        ),
+        borderRadius: BorderRadius.circular(
+          12,
+        ),
+      ),
+      child: const Center(
+        child: Text(
+          'ESPERANDO NETWORKING...',
+          style: TextStyle(
+            color: Colors.white70,
+            fontSize: 12,
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ============================================================
+  // AÇÕES
+  // ============================================================
+
+  Widget _buildActions() {
+    return Row(
+      children: [
+        // ======================================================
+        // PASSAR
+        // ======================================================
+        ActionButtonWidget(
+          icon: Icons.close,
+          color: Colors.white24,
+          onTap: () {
+            debugPrint(
+              '[DISCOVERY] '
+              'Perfil ignorado: '
+              '${widget.user.id}',
+            );
+          },
+        ),
+
+        const SizedBox(
+          width: 12,
+        ),
+
+        // ======================================================
+        // LIKE
+        // ======================================================
+        ActionButtonWidget(
+          icon: Icons.favorite,
+          color: widget.controller.accentNeon,
+          onTap: _handleMatchIntent,
+        ),
+
+        const Spacer(),
+
+        // ======================================================
+        // OUVIR DEMO
+        // ======================================================
+        ElevatedButton.icon(
+          onPressed:
+              widget.onListenDemo ==
+                      null ||
+                  _isOpeningDemo
+              ? null
+              : _handleListenDemo,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: widget.controller.accentNeon,
+            disabledBackgroundColor: Colors.white12,
+            foregroundColor: Colors.black,
+            disabledForegroundColor: Colors.white38,
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(
+                12,
+              ),
+            ),
+          ),
+          icon: _isOpeningDemo
+              ? const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                  ),
+                )
+              : const Icon(
+                  Icons.play_arrow_rounded,
+                  size: 17,
+                ),
+          label: Text(
+            _isOpeningDemo
+                ? 'CARREGANDO...'
+                : 'OUVIR DEMO',
+            style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      ],
     );
   }
 

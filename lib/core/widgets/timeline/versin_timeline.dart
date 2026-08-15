@@ -1,9 +1,28 @@
 import 'package:flutter/material.dart';
 
+// ============================================================
+// VERSIN TIMELINE
+// ============================================================
+//
+// Timeline visual das palavras/rimas salvas.
+//
+// Características:
+//
+// - limite de 12 palavras ativas;
+// - todas as palavras ficam visíveis;
+// - quebra automática em várias linhas;
+// - campo de nova rima integrado;
+// - remoção individual;
+// - contador;
+// - animações suaves.
+//
+// ============================================================
+
 class VersinTimeline
     extends
         StatefulWidget {
   final int currentStep;
+
   final Color activeColor;
 
   final List<
@@ -15,10 +34,12 @@ class VersinTimeline
     String
   >
   onAddRhyme;
+
   final ValueChanged<
     String
   >
   onRemoveRhyme;
+
   final ValueChanged<
     String
   >?
@@ -41,123 +62,185 @@ class VersinTimeline
   createState() => _VersinTimelineState();
 }
 
+// ============================================================
+// STATE
+// ============================================================
+
 class _VersinTimelineState
     extends
         State<
           VersinTimeline
         > {
-  final List<
-    _RimaItem
-  >
-  _rimas = [];
+  final TextEditingController _inputController = TextEditingController();
 
-  int _idCounter = 0;
+  final FocusNode _inputFocusNode = FocusNode();
 
-  static const int _maxRimas = 17;
+  bool _isSubmitting = false;
+
+  static const int _maxActiveRhymes = 12;
+
+  // ============================================================
+  // INIT
+  // ============================================================
 
   @override
   void initState() {
     super.initState();
-
-    _syncFromSavedRhymes();
   }
+
+  // ============================================================
+  // DISPOSE
+  // ============================================================
 
   @override
-  void didUpdateWidget(
-    covariant VersinTimeline oldWidget,
-  ) {
-    super.didUpdateWidget(
-      oldWidget,
-    );
+  void dispose() {
+    _inputController.dispose();
 
-    if (!_sameList(
-      oldWidget.savedRhymes,
-      widget.savedRhymes,
-    )) {
-      _syncFromSavedRhymes();
-    }
+    _inputFocusNode.dispose();
+
+    super.dispose();
   }
 
-  bool _sameList(
-    List<
-      String
-    >
-    a,
-    List<
-      String
-    >
-    b,
-  ) {
-    if (a.length !=
-        b.length) {
-      return false;
-    }
+  // ============================================================
+  // NORMALIZAÇÃO
+  // ============================================================
 
-    for (
-      int i = 0;
-      i <
-          a.length;
-      i++
-    ) {
-      if (a[i] !=
-          b[i]) {
-        return false;
+  String _normalize(
+    String value,
+  ) {
+    return value.trim().toLowerCase();
+  }
+
+  // ============================================================
+  // LISTA LIMPA
+  // ============================================================
+
+  List<
+    String
+  >
+  get _rhymes {
+    final unique =
+        <
+          String
+        >{};
+
+    final result =
+        <
+          String
+        >[];
+
+    for (final raw in widget.savedRhymes) {
+      final word = raw.trim();
+
+      if (word.isEmpty) {
+        continue;
+      }
+
+      final normalized = _normalize(
+        word,
+      );
+
+      if (unique.add(
+        normalized,
+      )) {
+        result.add(
+          word,
+        );
       }
     }
 
-    return true;
+    return result;
   }
 
-  void _syncFromSavedRhymes() {
-    final saved = widget.savedRhymes
-        .map(
-          (
-            rima,
-          ) => rima.trim(),
-        )
-        .where(
-          (
-            rima,
-          ) => rima.isNotEmpty,
-        )
-        .take(
-          _maxRimas,
-        )
-        .toList();
+  bool get _isFull =>
+      _rhymes.length >=
+      _maxActiveRhymes;
 
-    for (final item in _rimas) {
-      item.controller.dispose();
-      item.focusNode.dispose();
+  // ============================================================
+  // ADICIONAR
+  // ============================================================
+
+  Future<
+    void
+  >
+  _submitRhyme() async {
+    if (_isSubmitting ||
+        _isFull) {
+      return;
     }
 
-    _rimas.clear();
+    final text = _inputController.text.trim();
 
-    for (final rhyme in saved) {
-      _rimas.add(
-        _RimaItem(
-          id: _idCounter++,
-          controller: TextEditingController(
-            text: rhyme,
+    if (text.isEmpty) {
+      return;
+    }
+
+    final alreadyExists = _rhymes.any(
+      (
+        rhyme,
+      ) =>
+          _normalize(
+            rhyme,
+          ) ==
+          _normalize(
+            text,
           ),
-          focusNode: FocusNode(),
-          isAdded: true,
-        ),
-      );
+    );
+
+    if (alreadyExists) {
+      _inputController.clear();
+
+      _requestInputFocus();
+
+      return;
     }
 
-    if (_rimas.length <
-        _maxRimas) {
-      _rimas.add(
-        _createPendingRhyme(),
-      );
-    }
+    setState(
+      () {
+        _isSubmitting = true;
+      },
+    );
 
-    if (mounted) {
-      setState(
-        () {},
+    try {
+      widget.onAddRhyme(
+        text,
       );
-    }
 
+      _inputController.clear();
+
+      widget.onTextChanged?.call(
+        '',
+      );
+    } finally {
+      if (mounted) {
+        setState(
+          () {
+            _isSubmitting = false;
+          },
+        );
+
+        _requestInputFocus();
+      }
+    }
+  }
+
+  // ============================================================
+  // REMOVER
+  // ============================================================
+
+  void _removeRhyme(
+    String rhyme,
+  ) {
+    widget.onRemoveRhyme(
+      rhyme,
+    );
+  }
+
+  // ============================================================
+  // FOCO
+  // ============================================================
+
+  void _requestInputFocus() {
     WidgetsBinding.instance.addPostFrameCallback(
       (
         _,
@@ -166,461 +249,637 @@ class _VersinTimelineState
           return;
         }
 
-        final pending = _rimas
-            .where(
-              (
-                item,
-              ) => !item.isAdded,
-            )
-            .firstOrNull;
-
-        pending?.focusNode.requestFocus();
+        _inputFocusNode.requestFocus();
       },
     );
   }
 
-  _RimaItem _createPendingRhyme() {
-    return _RimaItem(
-      id: _idCounter++,
-      controller: TextEditingController(),
-      focusNode: FocusNode(),
-      isNew: true,
-    );
-  }
-
-  void _confirmarRima(
-    int id,
-  ) {
-    final index = _rimas.indexWhere(
-      (
-        rima,
-      ) =>
-          rima.id ==
-          id,
-    );
-
-    if (index ==
-        -1) {
-      return;
-    }
-
-    final item = _rimas[index];
-
-    final text = item.controller.text.trim();
-
-    if (text.isEmpty) {
-      return;
-    }
-
-    final alreadyExists = widget.savedRhymes.any(
-      (
-        saved,
-      ) =>
-          saved.trim().toLowerCase() ==
-          text.toLowerCase(),
-    );
-
-    if (alreadyExists) {
-      item.controller.clear();
-      return;
-    }
-
-    widget.onAddRhyme(
-      text,
-    );
-  }
-
-  void _removerRima(
-    _RimaItem item,
-  ) {
-    if (!item.isAdded) {
-      item.controller.clear();
-      return;
-    }
-
-    final text = item.controller.text.trim();
-
-    if (text.isEmpty) {
-      return;
-    }
-
-    widget.onRemoveRhyme(
-      text,
-    );
-  }
-
-  int get _completedCount {
-    return _rimas
-        .where(
-          (
-            rima,
-          ) => rima.isAdded,
-        )
-        .length;
-  }
-
-  @override
-  void dispose() {
-    for (final rima in _rimas) {
-      rima.controller.dispose();
-      rima.focusNode.dispose();
-    }
-
-    super.dispose();
-  }
+  // ============================================================
+  // BUILD
+  // ============================================================
 
   @override
   Widget build(
     BuildContext context,
   ) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
+    final rhymes = _rhymes;
+
+    return AnimatedSize(
+      duration: const Duration(
+        milliseconds: 220,
+      ),
+      curve: Curves.easeOutCubic,
+      alignment: Alignment.topCenter,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(
+          14,
+          12,
+          14,
+          14,
+        ),
+        decoration: BoxDecoration(
+          color: const Color(
+            0xFF121212,
+          ),
+          border: Border(
+            bottom: BorderSide(
+              color: Colors.white.withValues(
+                alpha: 0.05,
+              ),
+            ),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildHeader(
+              rhymes.length,
+            ),
+
+            const SizedBox(
+              height: 10,
+            ),
+
+            _buildProgress(
+              rhymes.length,
+            ),
+
+            const SizedBox(
+              height: 12,
+            ),
+
+            _buildWordsArea(
+              rhymes,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ============================================================
+  // HEADER
+  // ============================================================
+
+  Widget _buildHeader(
+    int count,
+  ) {
+    return Row(
       children: [
         Container(
-          width: double.infinity,
-          height: 40,
-          padding: const EdgeInsets.symmetric(
-            horizontal: 40,
-          ),
-          child: CustomPaint(
-            painter: TimelinePainter(
-              itemCount: _completedCount,
-              activeColor: widget.activeColor,
-              maxItems: _maxRimas,
+          width: 34,
+          height: 34,
+          decoration: BoxDecoration(
+            color: widget.activeColor.withValues(
+              alpha: 0.10,
             ),
+            borderRadius: BorderRadius.circular(
+              10,
+            ),
+            border: Border.all(
+              color: widget.activeColor.withValues(
+                alpha: 0.14,
+              ),
+            ),
+          ),
+          child: Icon(
+            Icons.route_rounded,
+            color: widget.activeColor,
+            size: 18,
+          ),
+        ),
+
+        const SizedBox(
+          width: 10,
+        ),
+
+        const Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Linha criativa',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.1,
+                ),
+              ),
+
+              SizedBox(
+                height: 2,
+              ),
+
+              Text(
+                'Palavras da sua composição',
+                style: TextStyle(
+                  color: Colors.white30,
+                  fontSize: 9,
+                ),
+              ),
+            ],
           ),
         ),
 
         Container(
-          height: 50,
           padding: const EdgeInsets.symmetric(
-            horizontal: 32,
+            horizontal: 10,
+            vertical: 6,
           ),
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            itemCount: _rimas.length,
-            itemBuilder:
-                (
-                  context,
-                  index,
-                ) {
-                  final rima = _rimas[index];
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(
+              alpha: 0.035,
+            ),
+            borderRadius: BorderRadius.circular(
+              20,
+            ),
+            border: Border.all(
+              color: Colors.white.withValues(
+                alpha: 0.05,
+              ),
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.auto_awesome_rounded,
+                size: 12,
+                color: widget.activeColor.withValues(
+                  alpha: 0.85,
+                ),
+              ),
 
-                  final bgColor = rima.isAdded
-                      ? Colors.white.withValues(
-                          alpha: 0.03,
-                        )
-                      : widget.activeColor.withValues(
-                          alpha: rima.isNew
-                              ? 0.15
-                              : 0.05,
-                        );
+              const SizedBox(
+                width: 5,
+              ),
 
-                  final borderColor = rima.isAdded
-                      ? Colors.white.withValues(
-                          alpha: 0.1,
-                        )
-                      : widget.activeColor.withValues(
-                          alpha: rima.isNew
-                              ? 0.5
-                              : 0.15,
-                        );
-
-                  return AnimatedContainer(
-                    duration: const Duration(
-                      milliseconds: 400,
-                    ),
-                    margin: const EdgeInsets.only(
-                      right: 8,
-                    ),
-                    constraints: const BoxConstraints(
-                      minWidth: 70,
-                    ),
-                    padding: const EdgeInsets.only(
-                      left: 16,
-                      right: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: bgColor,
-                      borderRadius: BorderRadius.circular(
-                        12,
-                      ),
-                      border: Border.all(
-                        color: borderColor,
-                        width: 1.2,
-                      ),
-                      boxShadow:
-                          rima.isNew &&
-                              !rima.isAdded
-                          ? [
-                              BoxShadow(
-                                color: widget.activeColor.withValues(
-                                  alpha: 0.2,
-                                ),
-                                blurRadius: 6,
-                              ),
-                            ]
-                          : const [],
-                    ),
-                    child: Center(
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IntrinsicWidth(
-                            child: TextField(
-                              controller: rima.controller,
-                              focusNode: rima.focusNode,
-                              enabled: !rima.isAdded,
-                              onChanged: widget.onTextChanged,
-                              onSubmitted:
-                                  (
-                                    _,
-                                  ) {
-                                    _confirmarRima(
-                                      rima.id,
-                                    );
-                                  },
-                              style: TextStyle(
-                                color: rima.isAdded
-                                    ? Colors.white54
-                                    : Colors.white,
-                                fontSize: 13,
-                              ),
-                              decoration: InputDecoration(
-                                border: InputBorder.none,
-                                hintText: 'Rima...',
-                                hintStyle: TextStyle(
-                                  color: rima.isAdded
-                                      ? Colors.transparent
-                                      : Colors.white24,
-                                ),
-                                isDense: true,
-                                contentPadding: EdgeInsets.zero,
-                              ),
-                            ),
-                          ),
-
-                          if (rima.isAdded ||
-                              _rimas.length >
-                                  1) ...[
-                            const SizedBox(
-                              width: 8,
-                            ),
-
-                            GestureDetector(
-                              onTap: () {
-                                _removerRima(
-                                  rima,
-                                );
-                              },
-                              child: Icon(
-                                Icons.close_rounded,
-                                size: 16,
-                                color: rima.isAdded
-                                    ? Colors.white30
-                                    : widget.activeColor.withValues(
-                                        alpha: 0.5,
-                                      ),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  );
-                },
+              Text(
+                '$count',
+                style: TextStyle(
+                  color: widget.activeColor,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'monospace',
+                ),
+              ),
+            ],
           ),
         ),
       ],
     );
   }
-}
 
-class _RimaItem {
-  final int id;
-  final TextEditingController controller;
-  final FocusNode focusNode;
+  // ============================================================
+  // PROGRESSO
+  // ============================================================
 
-  bool isNew;
-  bool isAdded;
-
-  _RimaItem({
-    required this.id,
-    required this.controller,
-    required this.focusNode,
-    this.isNew = false,
-    this.isAdded = false,
-  });
-}
-
-class TimelinePainter
-    extends
-        CustomPainter {
-  final int itemCount;
-  final Color activeColor;
-  final int maxItems;
-
-  const TimelinePainter({
-    required this.itemCount,
-    required this.activeColor,
-    required this.maxItems,
-  });
-
-  @override
-  void paint(
-    Canvas canvas,
-    Size size,
+  Widget _buildProgress(
+    int count,
   ) {
-    if (maxItems <=
-        1) {
-      return;
-    }
-
-    final spacing =
-        size.width /
-        (maxItems -
-            1);
-
-    final y =
-        size.height /
-        2;
-
-    final paintLine = Paint()
-      ..color = Colors.white10
-      ..strokeWidth = 2
-      ..strokeCap = StrokeCap.round;
-
-    final paintActive = Paint()
-      ..color = activeColor
-      ..strokeWidth = 2
-      ..strokeCap = StrokeCap.round;
-
-    canvas.drawLine(
-      Offset(
-        0,
-        y,
-      ),
-      Offset(
-        size.width,
-        y,
-      ),
-      paintLine,
-    );
-
-    final reachedItems =
-        itemCount >
+    final progress =
+        count ==
             0
-        ? itemCount -
-              1
-        : 0;
+        ? 0.0
+        : (count /
+                  _maxActiveRhymes)
+              .clamp(
+                0.0,
+                1.0,
+              );
 
-    final progressWidth =
-        (reachedItems *
-                spacing)
-            .clamp(
-              0.0,
-              size.width,
-            );
-
-    canvas.drawLine(
-      Offset(
-        0,
-        y,
-      ),
-      Offset(
-        progressWidth,
-        y,
-      ),
-      paintActive,
-    );
-
-    for (
-      int i = 0;
-      i <
-          maxItems;
-      i++
-    ) {
-      final x =
-          i *
-          spacing;
-
-      final isReached =
-          i <
-          itemCount;
-
-      final position = Offset(
-        x,
-        y,
-      );
-
-      if (isReached) {
-        canvas.drawCircle(
-          position,
-          8,
-          Paint()
-            ..color = activeColor.withValues(
-              alpha: 0.1,
-            )
-            ..maskFilter = const MaskFilter.blur(
-              BlurStyle.normal,
-              3,
+    return Row(
+      children: [
+        Expanded(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(
+              20,
             ),
-        );
-      }
+            child: SizedBox(
+              height: 3,
+              child: LinearProgressIndicator(
+                value: progress,
+                backgroundColor: Colors.white.withValues(
+                  alpha: 0.05,
+                ),
+                valueColor:
+                    AlwaysStoppedAnimation<
+                      Color
+                    >(
+                      widget.activeColor.withValues(
+                        alpha: 0.75,
+                      ),
+                    ),
+              ),
+            ),
+          ),
+        ),
 
-      canvas.drawCircle(
-        position,
-        5,
-        Paint()
-          ..color = isReached
-              ? activeColor
-              : const Color(
-                  0xFF1A1A1A,
-                )
-          ..style = PaintingStyle.fill,
-      );
+        const SizedBox(
+          width: 9,
+        ),
 
-      canvas.drawCircle(
-        position,
-        5,
-        Paint()
-          ..color = isReached
-              ? activeColor
-              : Colors.white24
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.2,
-      );
-    }
+        Text(
+          count ==
+                  0
+              ? '0/$_maxActiveRhymes'
+              : '$count/$_maxActiveRhymes',
+          style: const TextStyle(
+            color: Colors.white24,
+            fontSize: 8,
+          ),
+        ),
+      ],
+    );
   }
 
-  @override
-  bool shouldRepaint(
-    covariant TimelinePainter oldDelegate,
+  // ============================================================
+  // ÁREA DAS PALAVRAS
+  // ============================================================
+
+  Widget _buildWordsArea(
+    List<
+      String
+    >
+    rhymes,
   ) {
-    return oldDelegate.itemCount !=
-            itemCount ||
-        oldDelegate.maxItems !=
-            maxItems ||
-        oldDelegate.activeColor !=
-            activeColor;
+    return LayoutBuilder(
+      builder:
+          (
+            context,
+            constraints,
+          ) {
+            return Wrap(
+              spacing: 7,
+              runSpacing: 7,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                for (
+                  int index = 0;
+                  index <
+                      rhymes.length;
+                  index++
+                )
+                  _buildRhymeChip(
+                    rhyme: rhymes[index],
+                    index: index,
+                  ),
+
+                if (!_isFull)
+                  _buildInputChip(
+                    constraints.maxWidth,
+                  )
+                else
+                  _buildLimitReachedChip(),
+              ],
+            );
+          },
+    );
   }
-}
 
-extension _IterableFirstOrNull<
-  T
->
-    on
-        Iterable<
-          T
-        > {
-  T? get firstOrNull {
-    final iterator = this.iterator;
+  // ============================================================
+  // CHIP DA RIMA
+  // ============================================================
 
-    if (!iterator.moveNext()) {
-      return null;
-    }
+  Widget _buildRhymeChip({
+    required String rhyme,
+    required int index,
+  }) {
+    return TweenAnimationBuilder<
+      double
+    >(
+      key: ValueKey(
+        rhyme,
+      ),
+      tween: Tween(
+        begin: 0,
+        end: 1,
+      ),
+      duration: Duration(
+        milliseconds:
+            180 +
+            (index.clamp(
+                  0,
+                  8,
+                ) *
+                30),
+      ),
+      curve: Curves.easeOutCubic,
+      builder:
+          (
+            context,
+            value,
+            child,
+          ) {
+            return Opacity(
+              opacity: value,
+              child: Transform.translate(
+                offset: Offset(
+                  0,
+                  5 *
+                      (1 -
+                          value),
+                ),
+                child: child,
+              ),
+            );
+          },
+      child: Container(
+        constraints: const BoxConstraints(
+          minHeight: 36,
+          maxWidth: 220,
+        ),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(
+            alpha: 0.035,
+          ),
+          borderRadius: BorderRadius.circular(
+            12,
+          ),
+          border: Border.all(
+            color: Colors.white.withValues(
+              alpha: 0.065,
+            ),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 4,
+              height: 20,
+              margin: const EdgeInsets.only(
+                left: 8,
+              ),
+              decoration: BoxDecoration(
+                color: widget.activeColor.withValues(
+                  alpha: 0.70,
+                ),
+                borderRadius: BorderRadius.circular(
+                  10,
+                ),
+              ),
+            ),
 
-    return iterator.current;
+            const SizedBox(
+              width: 8,
+            ),
+
+            Flexible(
+              child: Text(
+                rhyme,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+
+            const SizedBox(
+              width: 4,
+            ),
+
+            Tooltip(
+              message: 'Remover',
+              child: InkWell(
+                onTap: () => _removeRhyme(
+                  rhyme,
+                ),
+                borderRadius: BorderRadius.circular(
+                  20,
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(
+                    7,
+                  ),
+                  child: Icon(
+                    Icons.close_rounded,
+                    color: Colors.white.withValues(
+                      alpha: 0.24,
+                    ),
+                    size: 14,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ============================================================
+  // LIMITE ATINGIDO
+  // ============================================================
+
+  Widget _buildLimitReachedChip() {
+    return Container(
+      constraints: const BoxConstraints(
+        minHeight: 36,
+        maxWidth: 280,
+      ),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 12,
+        vertical: 8,
+      ),
+      decoration: BoxDecoration(
+        color: widget.activeColor.withValues(
+          alpha: 0.055,
+        ),
+        borderRadius: BorderRadius.circular(
+          12,
+        ),
+        border: Border.all(
+          color: widget.activeColor.withValues(
+            alpha: 0.14,
+          ),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.lock_outline_rounded,
+            size: 14,
+            color: widget.activeColor.withValues(
+              alpha: 0.75,
+            ),
+          ),
+
+          const SizedBox(
+            width: 7,
+          ),
+
+          const Flexible(
+            child: Text(
+              '12 palavras ativas. Use ou remova uma para liberar espaço.',
+              style: TextStyle(
+                color: Colors.white38,
+                fontSize: 9,
+                height: 1.3,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ============================================================
+  // CHIP DE ENTRADA
+  // ============================================================
+
+  Widget _buildInputChip(
+    double availableWidth,
+  ) {
+    final inputWidth =
+        availableWidth <
+            300
+        ? availableWidth
+        : 170.0;
+
+    return AnimatedContainer(
+      duration: const Duration(
+        milliseconds: 180,
+      ),
+      curve: Curves.easeOutCubic,
+      width: inputWidth,
+      height: 36,
+      padding: const EdgeInsets.only(
+        left: 11,
+        right: 4,
+      ),
+      decoration: BoxDecoration(
+        color: widget.activeColor.withValues(
+          alpha: 0.07,
+        ),
+        borderRadius: BorderRadius.circular(
+          12,
+        ),
+        border: Border.all(
+          color: widget.activeColor.withValues(
+            alpha: _inputFocusNode.hasFocus
+                ? 0.35
+                : 0.16,
+          ),
+        ),
+        boxShadow: _inputFocusNode.hasFocus
+            ? [
+                BoxShadow(
+                  color: widget.activeColor.withValues(
+                    alpha: 0.08,
+                  ),
+                  blurRadius: 12,
+                ),
+              ]
+            : const [],
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.add_rounded,
+            size: 15,
+            color: widget.activeColor.withValues(
+              alpha: 0.75,
+            ),
+          ),
+
+          const SizedBox(
+            width: 5,
+          ),
+
+          Expanded(
+            child: TextField(
+              controller: _inputController,
+              focusNode: _inputFocusNode,
+              textInputAction: TextInputAction.done,
+              onChanged:
+                  (
+                    value,
+                  ) {
+                    widget.onTextChanged?.call(
+                      value,
+                    );
+
+                    setState(
+                      () {},
+                    );
+                  },
+              onSubmitted:
+                  (
+                    _,
+                  ) {
+                    _submitRhyme();
+                  },
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 11,
+              ),
+              decoration: const InputDecoration(
+                border: InputBorder.none,
+                isDense: true,
+                hintText: 'Nova palavra...',
+                hintStyle: TextStyle(
+                  color: Colors.white24,
+                  fontSize: 10,
+                ),
+                contentPadding: EdgeInsets.zero,
+              ),
+            ),
+          ),
+
+          AnimatedSwitcher(
+            duration: const Duration(
+              milliseconds: 150,
+            ),
+            child: _inputController.text.trim().isEmpty
+                ? const SizedBox(
+                    key: ValueKey(
+                      'empty-action',
+                    ),
+                    width: 4,
+                  )
+                : Tooltip(
+                    key: const ValueKey(
+                      'send-action',
+                    ),
+                    message: 'Adicionar',
+                    child: InkWell(
+                      onTap: _isSubmitting
+                          ? null
+                          : _submitRhyme,
+                      borderRadius: BorderRadius.circular(
+                        20,
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(
+                          6,
+                        ),
+                        child: _isSubmitting
+                            ? SizedBox(
+                                width: 13,
+                                height: 13,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 1.6,
+                                  color: widget.activeColor,
+                                ),
+                              )
+                            : Icon(
+                                Icons.arrow_upward_rounded,
+                                size: 15,
+                                color: widget.activeColor,
+                              ),
+                      ),
+                    ),
+                  ),
+          ),
+        ],
+      ),
+    );
   }
 }

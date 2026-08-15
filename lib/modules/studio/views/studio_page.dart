@@ -1320,6 +1320,49 @@ class _StudioPageState
       ),
       child: Row(
         children: [
+          // ====================================================
+          // VOLTAR
+          // ====================================================
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () {
+                Navigator.of(
+                  context,
+                ).maybePop();
+              },
+              borderRadius: BorderRadius.circular(
+                10,
+              ),
+              child: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(
+                    alpha: 0.04,
+                  ),
+                  borderRadius: BorderRadius.circular(
+                    10,
+                  ),
+                  border: Border.all(
+                    color: Colors.white.withValues(
+                      alpha: 0.06,
+                    ),
+                  ),
+                ),
+                child: const Icon(
+                  Icons.arrow_back_rounded,
+                  color: Colors.white70,
+                  size: 19,
+                ),
+              ),
+            ),
+          ),
+
+          const SizedBox(
+            width: 12,
+          ),
+
           Expanded(
             child: InkWell(
               borderRadius: BorderRadius.circular(

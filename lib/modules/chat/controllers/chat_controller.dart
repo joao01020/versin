@@ -6,27 +6,15 @@ import 'package:versin/modules/chat/domain/repositories/chat_repository.dart';
 import 'package:versin/features/rhymes/presentation/controller/rhymes_controller.dart';
 import 'package:versin/modules/brain/controller/brain_controller.dart';
 
-// ============================================================
-// PAPEL DA MENSAGEM
-// ============================================================
-
 enum ChatRole {
   user,
   assistant,
 }
 
-// ============================================================
-// ETAPA DA CRIAÇÃO
-// ============================================================
-
 enum ChatCreationStage {
   imagination,
   writing,
 }
-
-// ============================================================
-// MENSAGEM
-// ============================================================
 
 class ChatMessage {
   final ChatRole role;
@@ -86,10 +74,6 @@ class ChatMessage {
       ChatRole.user;
 }
 
-// ============================================================
-// CHAT CONTROLLER
-// ============================================================
-
 class ChatController
     extends
         ChangeNotifier {
@@ -132,10 +116,6 @@ class ChatController
     required this.repository,
     required this.rhymesController,
   });
-
-  // ============================================================
-  // PALAVRAS IGNORADAS NA EXTRAÇÃO INICIAL
-  // ============================================================
 
   static const Set<
     String
@@ -212,20 +192,12 @@ class ChatController
     'você',
   };
 
-  // ============================================================
-  // NOTIFY
-  // ============================================================
-
   @override
   void notifyListeners() {
     if (!_isDisposed) {
       super.notifyListeners();
     }
   }
-
-  // ============================================================
-  // SUGESTÕES
-  // ============================================================
 
   void nextSuggestion() {
     updateSuggestionIndex(
@@ -274,10 +246,6 @@ class ChatController
         suggestions.length];
   }
 
-  // ============================================================
-  // PROCESSAR MENSAGEM EXTERNA
-  // ============================================================
-
   Future<
     void
   >
@@ -288,10 +256,6 @@ class ChatController
 
     await sendMessage();
   }
-
-  // ============================================================
-  // ENVIO
-  // ============================================================
 
   Future<
     void
@@ -318,11 +282,6 @@ class ChatController
 
     _scrollToBottom();
 
-    // ========================================================
-    // PRIMEIRA ETAPA — IMAGINAÇÃO
-    // NÃO CHAMA IA
-    // ========================================================
-
     if (creationStage ==
         ChatCreationStage.imagination) {
       await _processInitialImagination(
@@ -332,18 +291,10 @@ class ChatController
       return;
     }
 
-    // ========================================================
-    // ETAPA NORMAL — IA
-    // ========================================================
-
     await _sendToAi(
       text,
     );
   }
-
-  // ============================================================
-  // PROCESSAR IMAGINAÇÃO INICIAL
-  // ============================================================
 
   Future<
     void
@@ -352,10 +303,6 @@ class ChatController
     String text,
   ) async {
     final brainController = brain;
-
-    // ========================================================
-    // CAMINHO PRINCIPAL — BRAIN CONTROLLER + CREATIVE VISION
-    // ========================================================
 
     if (brainController !=
         null) {
@@ -469,10 +416,6 @@ class ChatController
       return;
     }
 
-    // ========================================================
-    // FALLBACK — CASO NÃO EXISTA BRAIN CONTROLLER
-    // ========================================================
-
     final extractedWords = _extractCreativeWords(
       text,
     );
@@ -526,10 +469,6 @@ class ChatController
     notifyListeners();
     _scrollToBottom();
   }
-
-  // ============================================================
-  // EXTRAÇÃO LOCAL
-  // ============================================================
 
   List<
     String
@@ -589,37 +528,6 @@ class ChatController
     return extracted;
   }
 
-  // ============================================================
-  // ENVIO PARA IA
-  // ============================================================
-  //
-  // O ChatController não chama mais o RhymesController para
-  // fazer a requisição.
-  //
-  // Fluxo atual:
-  //
-  // ChatController
-  //      ↓
-  // ChatRepository
-  //      ↓
-  // AiProviderService
-  //      ↓
-  // ┌──────────────────────┐
-  // │ API privada ativa?   │
-  // └──────────┬───────────┘
-  //            │
-  //       ┌────┴────┐
-  //       │         │
-  //      NÃO       SIM
-  //       │         │
-  //       ↓         ↓
-  //   IA Versin   API privada
-  //
-  // Depois da resposta, os metadados são enviados ao
-  // RhymesController para manter a barra mensal sincronizada.
-  //
-  // ============================================================
-
   Future<
     void
   >
@@ -639,36 +547,13 @@ class ChatController
     _scrollToBottom();
 
     try {
-      // ========================================================
-      // REPOSITORY
-      // ========================================================
-
       final response = await repository.fetchAiResponse(
         normalizedText,
       );
 
-      // ========================================================
-      // SINCRONIZAR FONTE / QUOTA
-      // ========================================================
-      //
-      // Se a resposta veio da IA Versin:
-      //
-      // - os dados de quota podem atualizar a barra.
-      //
-      // Se veio da API privada:
-      //
-      // - a barra Versin permanece com o último consumo;
-      // - o estado passa a indicar API privada ativa.
-      //
-      // ========================================================
-
       rhymesController.applyAiResponseMetadata(
         response,
       );
-
-      // ========================================================
-      // CONTEÚDO
-      // ========================================================
 
       final content = response['content']?.toString().trim();
 
@@ -691,10 +576,6 @@ class ChatController
           ),
         );
       }
-
-      // ========================================================
-      // LOG DA FONTE
-      // ========================================================
 
       final usedVersinApi =
           response['used_versin_api'] ==
@@ -772,10 +653,6 @@ class ChatController
     }
   }
 
-  // ============================================================
-  // MENSAGEM DE ERRO DA IA
-  // ============================================================
-
   String _buildAiErrorMessage(
     Object error,
   ) {
@@ -823,10 +700,6 @@ class ChatController
     return 'Erro de conexão com a IA. Tente novamente.';
   }
 
-  // ============================================================
-  // ESTRUTURA
-  // ============================================================
-
   void sendStructureToChat(
     List<
       String
@@ -857,10 +730,6 @@ class ChatController
     notifyListeners();
   }
 
-  // ============================================================
-  // TEXTO
-  // ============================================================
-
   void addWordToText(
     String word,
   ) {
@@ -877,19 +746,11 @@ class ChatController
     notifyListeners();
   }
 
-  // ============================================================
-  // BPM
-  // ============================================================
-
   void toggleBpm() {
     rhymesController.isBpmPlaying = !rhymesController.isBpmPlaying;
 
     notifyListeners();
   }
-
-  // ============================================================
-  // PROJETO
-  // ============================================================
 
   void editProjectName(
     BuildContext context,
@@ -945,10 +806,6 @@ class ChatController
           },
     );
   }
-
-  // ============================================================
-  // MENU RÁPIDO
-  // ============================================================
 
   void showStudioQuickMenu(
     BuildContext context,
@@ -1009,10 +866,6 @@ class ChatController
     );
   }
 
-  // ============================================================
-  // INICIALIZAÇÃO
-  // ============================================================
-
   Future<
     void
   >
@@ -1022,6 +875,70 @@ class ChatController
     if (messages.isNotEmpty) {
       return;
     }
+
+    // ==========================================================
+    // CARREGAR MEMÓRIA CRIATIVA
+    // ==========================================================
+    //
+    // O vocabulário funciona como memória persistente da
+    // composição. Se já existem palavras salvas, não faz sentido
+    // voltar para a etapa inicial de imaginação.
+    //
+    // ==========================================================
+
+    await rhymesController.carregarDadosUsuario();
+
+    if (_isDisposed) {
+      return;
+    }
+
+    final savedWords = rhymesController.vocabularyWords;
+
+    // ==========================================================
+    // RETOMAR TRABALHO EXISTENTE
+    // ==========================================================
+
+    if (savedWords.isNotEmpty) {
+      creationStage = ChatCreationStage.writing;
+
+      final preview = savedWords
+          .take(
+            5,
+          )
+          .join(
+            ' • ',
+          );
+
+      final wordCount = savedWords.length;
+
+      final wordLabel =
+          wordCount ==
+              1
+          ? 'palavra salva'
+          : 'palavras salvas';
+
+      messages.add(
+        ChatMessage(
+          role: ChatRole.assistant,
+          content:
+              'Vamos voltar ao trabalho?\n\n'
+              'Já temos $wordCount $wordLabel '
+              'da sua composição.\n\n'
+              '$preview\n\n'
+              'O que posso te ajudar agora?',
+        ),
+      );
+
+      notifyListeners();
+
+      _scrollToBottom();
+
+      return;
+    }
+
+    // ==========================================================
+    // PRIMEIRO CONTATO
+    // ==========================================================
 
     creationStage = ChatCreationStage.imagination;
 
@@ -1041,10 +958,6 @@ class ChatController
 
     _startCreativeHelpTimer();
   }
-
-  // ============================================================
-  // AJUDA APÓS 30 SEGUNDOS
-  // ============================================================
 
   void _startCreativeHelpTimer() {
     _creativeHelpTimer?.cancel();
@@ -1093,10 +1006,6 @@ class ChatController
     _creativeHelpTimer = null;
   }
 
-  // ============================================================
-  // SCROLL
-  // ============================================================
-
   void _scrollToBottom() {
     if (_isDisposed) {
       return;
@@ -1121,10 +1030,6 @@ class ChatController
       },
     );
   }
-
-  // ============================================================
-  // DISPOSE
-  // ============================================================
 
   @override
   void dispose() {

@@ -53,6 +53,10 @@ class _ChatPageState
 
   bool _isSessionInitialized = false;
 
+  bool _isReady = false;
+
+  bool _controllerCreated = false;
+
   // ============================================================
   // KEEP ALIVE
   // ============================================================
@@ -73,31 +77,17 @@ class _ChatPageState
           BrainController
         >();
 
-    // ==========================================================
-    // CAMADA DE IA
-    // ==========================================================
-    //
-    // Fluxo:
-    //
-    // ChatController
-    //      ↓
-    // ChatRepositoryImpl
-    //      ↓
-    // AiProviderService
-    //      ↓
-    // ┌──────────────────────┐
-    // │ API privada ativa?   │
-    // └──────────┬───────────┘
-    //            │
-    //       ┌────┴────┐
-    //       │         │
-    //      NÃO       SIM
-    //       │         │
-    //       ↓         ↓
-    //   IA Versin   API privada
-    //
-    // ==========================================================
+    _initializeChat();
+  }
 
+  // ============================================================
+  // INICIALIZAÇÃO DO CHAT
+  // ============================================================
+
+  Future<
+    void
+  >
+  _initializeChat() async {
     final privateApiService = PrivateApiService();
 
     final aiProviderService = AiProviderService(
@@ -110,50 +100,56 @@ class _ChatPageState
 
     final chatRepository = ChatRepositoryImpl(
       remoteDatasource: remoteDatasource,
-
       aiProviderService: aiProviderService,
-
       privateAiClient: privateAiClient,
     );
 
     _controller = ChatController(
       repository: chatRepository,
-
       rhymesController: _rhymesController,
     );
 
-    // ==========================================================
-    // SINCRONIZAR FONTE VISUAL DA IA
-    // ==========================================================
-    //
-    // Isso permite que a barra da IA mostre imediatamente
-    // "API privada ativa" quando a credencial já estiver salva.
-    //
-    // ==========================================================
+    _controllerCreated = true;
 
-    _syncAiSource(
+    await _rhymesController.carregarDadosUsuario();
+
+    if (!mounted) {
+      return;
+    }
+
+    debugPrint(
+      '[CHAT PAGE] '
+      'Vocabulário antes da sessão: '
+      '${_rhymesController.vocabularyWords}',
+    );
+
+    await _syncAiSource(
       aiProviderService,
     );
 
-    _rhymesController.carregarDadosUsuario();
-
-    if (!_isSessionInitialized) {
-      WidgetsBinding.instance.addPostFrameCallback(
-        (
-          _,
-        ) {
-          if (!mounted) {
-            return;
-          }
-
-          _controller.initChatSession(
-            context,
-          );
-        },
-      );
-
-      _isSessionInitialized = true;
+    if (!mounted) {
+      return;
     }
+
+    if (_isSessionInitialized) {
+      return;
+    }
+
+    _isSessionInitialized = true;
+
+    await _controller.initChatSession(
+      context,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(
+      () {
+        _isReady = true;
+      },
+    );
   }
 
   // ============================================================
@@ -220,7 +216,9 @@ class _ChatPageState
 
   @override
   void dispose() {
-    _controller.dispose();
+    if (_controllerCreated) {
+      _controller.dispose();
+    }
 
     super.dispose();
   }
@@ -315,24 +313,8 @@ class _ChatPageState
   _removerRimaTimeline(
     String rima,
   ) async {
-    final normalizedRhyme = rima.trim().toLowerCase();
-
-    final index = _rhymesController.vocabulary.indexWhere(
-      (
-        item,
-      ) {
-        return item.word.trim().toLowerCase() ==
-            normalizedRhyme;
-      },
-    );
-
-    if (index ==
-        -1) {
-      return;
-    }
-
-    await _rhymesController.removeWord(
-      index,
+    await _rhymesController.removeWordByValue(
+      rima,
     );
   }
 
@@ -347,6 +329,17 @@ class _ChatPageState
     super.build(
       context,
     );
+
+    if (!_isReady) {
+      return const Scaffold(
+        backgroundColor: Color(
+          0xFF0F0F0F,
+        ),
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
 
     return AnimatedBuilder(
       animation: Listenable.merge(
@@ -365,47 +358,7 @@ class _ChatPageState
 
             final activeColor = rhymesCtrl.getActiveColor();
 
-            final savedRhymes = rhymesCtrl.vocabulary
-                .map(
-                  (
-                    rhyme,
-                  ) => rhyme.word,
-                )
-                .toList();
-
-            // ======================================================
-            // POSIÇÃO DO BALÃO DE SUGESTÃO
-            // ======================================================
-
-            final textPainter =
-                TextPainter(
-                  text: TextSpan(
-                    text: _controller.messageController.text,
-                    style: const TextStyle(
-                      fontSize: 15,
-                    ),
-                  ),
-                  maxLines: 1,
-                  textDirection: TextDirection.ltr,
-                )..layout(
-                  minWidth: 0,
-                  maxWidth: double.infinity,
-                );
-
-            final screenWidth = MediaQuery.sizeOf(
-              context,
-            ).width;
-
-            const baseLeftOffset = 33.0;
-
-            final cursorPositionLeft =
-                (baseLeftOffset +
-                        textPainter.size.width)
-                    .clamp(
-                      baseLeftOffset,
-                      screenWidth -
-                          160.0,
-                    );
+            final savedRhymes = rhymesCtrl.vocabularyWords;
 
             return Scaffold(
               backgroundColor: const Color(
@@ -611,124 +564,136 @@ class _ChatPageState
                         // ==================================================
                         // INPUT
                         // ==================================================
-                        Stack(
-                          alignment: Alignment.centerRight,
-                          children: [
-                            ChatBottomBar(
-                              messageController: _controller.messageController,
-                              rhymesController: rhymesCtrl,
-                              activeColor: activeColor,
-                              creationStage: _controller.creationStage,
+                        Builder(
+                          builder:
+                              (
+                                context,
+                              ) {
+                                final hasSuggestion =
+                                    _controller.creationStage ==
+                                        ChatCreationStage.writing &&
+                                    rhymesCtrl.suggestions.isNotEmpty;
 
-                              // ============================================
-                              // ENVIAR
-                              // ============================================
-                              onSend:
-                                  (
-                                    _,
-                                  ) {
-                                    _controller.sendMessage();
-                                  },
+                                return Stack(
+                                  alignment: Alignment.centerRight,
+                                  children: [
+                                    ChatBottomBar(
+                                      messageController: _controller.messageController,
+                                      rhymesController: rhymesCtrl,
+                                      activeColor: activeColor,
+                                      creationStage: _controller.creationStage,
 
-                              currentSuggestionIndex: _controller.currentSuggestionIndex,
-                              onUpdateSuggestionIndex: _controller.updateSuggestionIndex,
-                              onAddRhyme: _controller.addWordToText,
+                                      // =========================================
+                                      // SUGESTÃO DENTRO DO CAMPO
+                                      // =========================================
+                                      showSuggestion: hasSuggestion,
 
-                              // ============================================
-                              // MICROFONE
-                              // ============================================
-                              onMicPressed: () {
-                                _abrirPainelDeVoz(
-                                  context,
-                                  activeColor,
+                                      suggestionWidget: hasSuggestion
+                                          ? SuggestionBalloon(
+                                              controller: rhymesCtrl.suggestionController,
+                                              suggestion: _controller.getCurrentSuggestion(),
+
+                                              // =============================
+                                              // USAR SUGESTÃO
+                                              // =============================
+                                              onTap: () {
+                                                final suggestion = _controller.getCurrentSuggestion();
+
+                                                final text = _controller.messageController.text;
+
+                                                final words = text.trimRight().split(
+                                                  RegExp(
+                                                    r'\s+',
+                                                  ),
+                                                );
+
+                                                if (words.isNotEmpty) {
+                                                  words.removeLast();
+
+                                                  words.add(
+                                                    suggestion,
+                                                  );
+
+                                                  final newText = '${words.join(' ')} ';
+
+                                                  _controller.messageController.value = TextEditingValue(
+                                                    text: newText,
+                                                    selection: TextSelection.collapsed(
+                                                      offset: newText.length,
+                                                    ),
+                                                  );
+                                                }
+
+                                                rhymesCtrl.clearSuggestions();
+                                              },
+
+                                              // =============================
+                                              // FECHAR
+                                              // =============================
+                                              onDismiss: () {
+                                                rhymesCtrl.clearSuggestions();
+                                              },
+
+                                              // =============================
+                                              // PEDIR EXEMPLO AO VERSIN
+                                              // =============================
+                                              onAddCommand: () {
+                                                final word = _controller.getCurrentSuggestion();
+
+                                                rhymesCtrl.clearSuggestions();
+
+                                                _controller.processMessage(
+                                                  'Me dê um exemplo de rima com: $word',
+                                                );
+                                              },
+                                            )
+                                          : null,
+
+                                      // =========================================
+                                      // ENVIAR
+                                      // =========================================
+                                      onSend:
+                                          (
+                                            _,
+                                          ) {
+                                            _controller.sendMessage();
+                                          },
+
+                                      currentSuggestionIndex: _controller.currentSuggestionIndex,
+
+                                      onUpdateSuggestionIndex: _controller.updateSuggestionIndex,
+
+                                      onAddRhyme: _controller.addWordToText,
+
+                                      // =========================================
+                                      // MICROFONE
+                                      // =========================================
+                                      onMicPressed: () {
+                                        _abrirPainelDeVoz(
+                                          context,
+                                          activeColor,
+                                        );
+                                      },
+                                    ),
+
+                                    // ===========================================
+                                    // METRÔNOMO
+                                    // ===========================================
+                                    Positioned(
+                                      right: 55,
+                                      bottom: 10,
+                                      child: MetronomePlayer(
+                                        isPlaying: rhymesCtrl.isBpmPlaying,
+                                        onTap: _controller.toggleBpm,
+                                        activeColor: activeColor,
+                                      ),
+                                    ),
+                                  ],
                                 );
                               },
-                            ),
-
-                            // ===============================================
-                            // METRÔNOMO
-                            // ===============================================
-                            Positioned(
-                              right: 55,
-                              child: MetronomePlayer(
-                                isPlaying: rhymesCtrl.isBpmPlaying,
-                                onTap: _controller.toggleBpm,
-                                activeColor: activeColor,
-                              ),
-                            ),
-                          ],
                         ),
                       ],
                     ),
-
-                    // ====================================================
-                    // SUGESTÃO
-                    // ====================================================
-                    if (_controller.creationStage ==
-                            ChatCreationStage.writing &&
-                        rhymesCtrl.suggestions.isNotEmpty)
-                      Positioned(
-                        left: cursorPositionLeft,
-                        bottom: 75,
-                        child: SuggestionBalloon(
-                          controller: rhymesCtrl.suggestionController,
-                          suggestion: _controller.getCurrentSuggestion(),
-
-                          // =============================================
-                          // USAR SUGESTÃO
-                          // =============================================
-                          onTap: () {
-                            final suggestion = _controller.getCurrentSuggestion();
-
-                            final text = _controller.messageController.text;
-
-                            final words = text.trimRight().split(
-                              RegExp(
-                                r'\s+',
-                              ),
-                            );
-
-                            if (words.isNotEmpty) {
-                              words.removeLast();
-
-                              words.add(
-                                suggestion,
-                              );
-
-                              final newText = '${words.join(' ')} ';
-
-                              _controller.messageController.value = TextEditingValue(
-                                text: newText,
-                                selection: TextSelection.collapsed(
-                                  offset: newText.length,
-                                ),
-                              );
-                            }
-
-                            rhymesCtrl.clearSuggestions();
-                          },
-
-                          // =============================================
-                          // FECHAR
-                          // =============================================
-                          onDismiss: () {
-                            rhymesCtrl.clearSuggestions();
-                          },
-
-                          // =============================================
-                          // PEDIR EXEMPLO AO VERSIN
-                          // =============================================
-                          onAddCommand: () {
-                            final word = _controller.getCurrentSuggestion();
-
-                            rhymesCtrl.clearSuggestions();
-
-                            _controller.processMessage(
-                              'Me dê um exemplo de rima com: $word',
-                            );
-                          },
-                        ),
-                      ),
                   ],
                 ),
               ),

@@ -11,7 +11,8 @@ import '../datasources/public_profile_remote_datasource.dart';
 //
 // - converter Map -> Model;
 // - converter Model -> Map;
-// - delegar operações de banco ao Datasource.
+// - delegar operações de banco ao Datasource;
+// - atualizar visibilidade ONLINE / OFFLINE.
 //
 // Arquitetura:
 //
@@ -108,7 +109,52 @@ class PublicProfileRepositoryImpl
 
     final data = await _remoteDatasource.updateProfile(
       userId: userId,
+
       data: profile.toUpdateMap(),
+    );
+
+    return PublicProfileModel.fromMap(
+      data,
+    );
+  }
+
+  // ============================================================
+  // ONLINE / OFFLINE
+  // ============================================================
+  //
+  // Atualiza somente:
+  //
+  // public.profiles.is_online
+  //
+  // Isso evita reenviar:
+  //
+  // - nome;
+  // - username;
+  // - bio;
+  // - avatar.
+  //
+  // ============================================================
+
+  @override
+  Future<
+    PublicProfileModel
+  >
+  updateOnlineStatus({
+    required String userId,
+    required bool isOnline,
+  }) async {
+    final normalizedUserId = userId.trim();
+
+    if (normalizedUserId.isEmpty) {
+      throw ArgumentError(
+        'userId não pode ser vazio.',
+      );
+    }
+
+    final data = await _remoteDatasource.updateOnlineStatus(
+      userId: normalizedUserId,
+
+      isOnline: isOnline,
     );
 
     return PublicProfileModel.fromMap(
@@ -140,6 +186,7 @@ class PublicProfileRepositoryImpl
 
     final rows = await _remoteDatasource.getTracks(
       userId: normalizedUserId,
+
       onlyActive: onlyActive,
     );
 
@@ -203,6 +250,7 @@ class PublicProfileRepositoryImpl
 
     final data = await _remoteDatasource.getFirstTrack(
       userId: normalizedUserId,
+
       onlyActive: true,
     );
 
@@ -220,13 +268,9 @@ class PublicProfileRepositoryImpl
   // CRIAR TRACK
   // ============================================================
   //
-  // IMPORTANTE:
+  // O arquivo já deve ter sido enviado para o R2.
   //
-  // O arquivo já deve ter sido enviado para o R2 antes daqui.
-  //
-  // storagePath contém o objectKey do R2.
-  //
-  // Exemplo:
+  // storagePath contém:
   //
   // profiles/<user-id>/tracks/<uuid>.mp3
   //
@@ -273,6 +317,7 @@ class PublicProfileRepositoryImpl
 
     final data = await _remoteDatasource.updateTrack(
       trackId: trackId,
+
       data: track.toUpdateMap(),
     );
 
@@ -285,23 +330,13 @@ class PublicProfileRepositoryImpl
   // EXCLUIR TRACK - LEGADO
   // ============================================================
   //
-  // IMPORTANTE:
-  //
   // O fluxo normal NÃO deve usar este método.
   //
-  // Para excluir uma demo use:
-  //
-  // ProfileTrackService.deleteTrack(
-  //   trackId: track.id,
-  // )
-  //
-  // A Edge Function delete-profile-track remove:
+  // Para excluir uma demo use o ProfileTrackService, que chama
+  // delete-profile-track e remove:
   //
   // - arquivo do R2;
-  // - registro no Postgres.
-  //
-  // Este método permanece apenas porque a interface
-  // PublicProfileRepository ainda o expõe.
+  // - linha do Postgres.
   //
   // ============================================================
 
@@ -326,7 +361,7 @@ class PublicProfileRepositoryImpl
   }
 
   // ============================================================
-  // STREAM
+  // REALTIME
   // ============================================================
 
   @override

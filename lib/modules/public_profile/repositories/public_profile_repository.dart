@@ -18,6 +18,17 @@ import '../models/public_profile_model.dart';
 //
 // sem alterar o Controller.
 //
+// Responsabilidades:
+//
+// - carregar perfil;
+// - atualizar perfil;
+// - alterar visibilidade ONLINE / OFFLINE;
+// - carregar demos;
+// - criar demos;
+// - atualizar demos;
+// - remover demos;
+// - acompanhar demos em realtime.
+//
 // ============================================================
 
 abstract class PublicProfileRepository {
@@ -25,21 +36,75 @@ abstract class PublicProfileRepository {
   // PERFIL
   // ============================================================
 
-  Future<PublicProfileModel?> getProfile({required String userId});
+  Future<
+    PublicProfileModel?
+  >
+  getProfile({
+    required String userId,
+  });
 
   // ============================================================
   // ATUALIZAR PERFIL
   // ============================================================
+  //
+  // Usado para:
+  //
+  // - nome;
+  // - username;
+  // - avatar;
+  // - bio;
+  // - demais campos editáveis do perfil.
+  //
+  // ============================================================
 
-  Future<PublicProfileModel> updateProfile({
+  Future<
+    PublicProfileModel
+  >
+  updateProfile({
     required PublicProfileModel profile,
+  });
+
+  // ============================================================
+  // ATUALIZAR VISIBILIDADE
+  // ============================================================
+  //
+  // Atualiza somente:
+  //
+  // public.profiles.is_online
+  //
+  // true:
+  //
+  // - perfil ONLINE;
+  // - pode aparecer no Match;
+  // - pode aparecer em Discovery;
+  // - pode aparecer em buscas públicas.
+  //
+  // false:
+  //
+  // - perfil OFFLINE;
+  // - deve ser ocultado para outros usuários;
+  // - o próprio dono continua podendo acessar o perfil.
+  //
+  // ============================================================
+
+  Future<
+    PublicProfileModel
+  >
+  updateOnlineStatus({
+    required String userId,
+    required bool isOnline,
   });
 
   // ============================================================
   // TRACKS
   // ============================================================
 
-  Future<List<ProfileTrackModel>> getTracks({
+  Future<
+    List<
+      ProfileTrackModel
+    >
+  >
+  getTracks({
     required String userId,
     bool onlyActive = true,
   });
@@ -48,7 +113,7 @@ abstract class PublicProfileRepository {
   // PRIMEIRA DEMO
   // ============================================================
   //
-  // Usado pelo Match para o botão:
+  // Usado principalmente pelo Match:
   //
   // OUVIR DEMO
   //
@@ -56,29 +121,56 @@ abstract class PublicProfileRepository {
   //
   // ============================================================
 
-  Future<ProfileTrackModel?> getFirstTrack({required String userId});
+  Future<
+    ProfileTrackModel?
+  >
+  getFirstTrack({
+    required String userId,
+  });
 
   // ============================================================
   // CRIAR TRACK
   // ============================================================
 
-  Future<ProfileTrackModel> createTrack({required ProfileTrackModel track});
+  Future<
+    ProfileTrackModel
+  >
+  createTrack({
+    required ProfileTrackModel track,
+  });
 
   // ============================================================
   // ATUALIZAR TRACK
   // ============================================================
 
-  Future<ProfileTrackModel> updateTrack({required ProfileTrackModel track});
+  Future<
+    ProfileTrackModel
+  >
+  updateTrack({
+    required ProfileTrackModel track,
+  });
 
   // ============================================================
   // EXCLUIR TRACK
   // ============================================================
 
-  Future<void> deleteTrack({required String trackId});
+  Future<
+    void
+  >
+  deleteTrack({
+    required String trackId,
+  });
 
   // ============================================================
   // REALTIME
   // ============================================================
 
-  Stream<List<ProfileTrackModel>> watchTracks({required String userId});
+  Stream<
+    List<
+      ProfileTrackModel
+    >
+  >
+  watchTracks({
+    required String userId,
+  });
 }

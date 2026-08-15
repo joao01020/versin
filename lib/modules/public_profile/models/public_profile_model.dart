@@ -13,6 +13,7 @@
 // - armazenar dados do perfil público;
 // - converter Map -> Model;
 // - converter Model -> Map;
+// - controlar is_online;
 // - fornecer helpers de apresentação;
 // - permitir cópias imutáveis.
 //
@@ -52,7 +53,24 @@ class PublicProfileModel {
   final String bio;
 
   // ============================================================
-  // STATUS
+  // STATUS / VISIBILIDADE
+  // ============================================================
+  //
+  // true:
+  //
+  // - perfil visível;
+  // - pode aparecer no Match;
+  // - pode aparecer em buscas públicas.
+  //
+  // false:
+  //
+  // - perfil fica offline;
+  // - deve ser ignorado pelo Discovery;
+  // - continua acessível pelo próprio dono.
+  //
+  // A filtragem real de outros usuários é responsabilidade
+  // do repository/datasource do Match.
+  //
   // ============================================================
 
   final bool isOnline;
@@ -84,7 +102,9 @@ class PublicProfileModel {
   // EMPTY
   // ============================================================
 
-  factory PublicProfileModel.empty({required String userId}) {
+  factory PublicProfileModel.empty({
+    required String userId,
+  }) {
     return PublicProfileModel(
       userId: userId.trim(),
       username: '',
@@ -100,7 +120,9 @@ class PublicProfileModel {
 
   bool get hasUserId => userId.trim().isNotEmpty;
 
-  bool get hasAvatar => avatarUrl?.trim().isNotEmpty == true;
+  bool get hasAvatar =>
+      avatarUrl?.trim().isNotEmpty ==
+      true;
 
   bool get hasBio => bio.trim().isNotEmpty;
 
@@ -108,9 +130,26 @@ class PublicProfileModel {
 
   bool get hasDisplayName => displayName.trim().isNotEmpty;
 
-  bool get isEmpty => !hasUsername && !hasDisplayName && !hasBio && !hasAvatar;
+  bool get isEmpty =>
+      !hasUsername &&
+      !hasDisplayName &&
+      !hasBio &&
+      !hasAvatar;
 
-  bool get isComplete => hasUserId && hasUsername && hasDisplayName;
+  bool get isComplete =>
+      hasUserId &&
+      hasUsername &&
+      hasDisplayName;
+
+  // ============================================================
+  // VISIBILIDADE
+  // ============================================================
+
+  bool get isOffline => !isOnline;
+
+  String get onlineStatusLabel => isOnline
+      ? 'ONLINE'
+      : 'OFFLINE';
 
   // ============================================================
   // USERNAME
@@ -123,7 +162,9 @@ class PublicProfileModel {
       return '';
     }
 
-    if (normalizedUsername.startsWith('@')) {
+    if (normalizedUsername.startsWith(
+      '@',
+    )) {
       return normalizedUsername;
     }
 
@@ -161,21 +202,44 @@ class PublicProfileModel {
       return '?';
     }
 
-    final parts = normalizedName.split(RegExp(r'\s+')).where((part) {
-      return part.isNotEmpty;
-    }).toList();
+    final parts = normalizedName
+        .split(
+          RegExp(
+            r'\s+',
+          ),
+        )
+        .where(
+          (
+            part,
+          ) {
+            return part.isNotEmpty;
+          },
+        )
+        .toList();
 
     if (parts.isEmpty) {
       return '?';
     }
 
-    if (parts.length == 1) {
-      return parts.first.substring(0, 1).toUpperCase();
+    if (parts.length ==
+        1) {
+      return parts.first
+          .substring(
+            0,
+            1,
+          )
+          .toUpperCase();
     }
 
-    final first = parts.first.substring(0, 1);
+    final first = parts.first.substring(
+      0,
+      1,
+    );
 
-    final last = parts.last.substring(0, 1);
+    final last = parts.last.substring(
+      0,
+      1,
+    );
 
     return '$first$last'.toUpperCase();
   }
@@ -187,7 +251,8 @@ class PublicProfileModel {
   String get shortBio {
     final normalizedBio = bio.trim();
 
-    if (normalizedBio.length <= 160) {
+    if (normalizedBio.length <=
+        160) {
       return normalizedBio;
     }
 
@@ -210,12 +275,24 @@ class PublicProfileModel {
   //
   // ============================================================
 
-  factory PublicProfileModel.fromMap(Map<String, dynamic> map) {
-    final artistName = _readString(map['artist_name']);
+  factory PublicProfileModel.fromMap(
+    Map<
+      String,
+      dynamic
+    >
+    map,
+  ) {
+    final artistName = _readString(
+      map['artist_name'],
+    );
 
-    final name = _readString(map['name']);
+    final name = _readString(
+      map['name'],
+    );
 
-    final username = _readString(map['username']);
+    final username = _readString(
+      map['username'],
+    );
 
     final resolvedName = artistName.isNotEmpty
         ? artistName
@@ -224,21 +301,33 @@ class PublicProfileModel {
         : username;
 
     return PublicProfileModel(
-      userId: _readString(map['id']),
+      userId: _readString(
+        map['id'],
+      ),
 
       username: username,
 
       displayName: resolvedName,
 
-      avatarUrl: _readNullableString(map['avatar_url']),
+      avatarUrl: _readNullableString(
+        map['avatar_url'],
+      ),
 
-      bio: _readString(map['bio']),
+      bio: _readString(
+        map['bio'],
+      ),
 
-      isOnline: _readBool(map['is_online']),
+      isOnline: _readBool(
+        map['is_online'],
+      ),
 
-      createdAt: _readDateTime(map['created_at']),
+      createdAt: _readDateTime(
+        map['created_at'],
+      ),
 
-      updatedAt: _readDateTime(map['updated_at']),
+      updatedAt: _readDateTime(
+        map['updated_at'],
+      ),
     );
   }
 
@@ -250,7 +339,11 @@ class PublicProfileModel {
   //
   // ============================================================
 
-  Map<String, dynamic> toMap() {
+  Map<
+    String,
+    dynamic
+  >
+  toMap() {
     return {
       'id': userId.trim(),
 
@@ -258,15 +351,21 @@ class PublicProfileModel {
 
       'artist_name': displayName.trim(),
 
-      'avatar_url': _normalizeNullableString(avatarUrl),
+      'avatar_url': _normalizeNullableString(
+        avatarUrl,
+      ),
 
       'bio': bio.trim(),
 
       'is_online': isOnline,
 
-      if (createdAt != null) 'created_at': createdAt!.toUtc().toIso8601String(),
+      if (createdAt !=
+          null)
+        'created_at': createdAt!.toUtc().toIso8601String(),
 
-      if (updatedAt != null) 'updated_at': updatedAt!.toUtc().toIso8601String(),
+      if (updatedAt !=
+          null)
+        'updated_at': updatedAt!.toUtc().toIso8601String(),
     };
   }
 
@@ -274,25 +373,67 @@ class PublicProfileModel {
   // TO UPDATE MAP
   // ============================================================
   //
-  // Utilizado na edição do perfil.
+  // Utilizado tanto para:
   //
-  // Não envia:
+  // - editar perfil;
+  // - mudar ONLINE / OFFLINE.
+  //
+  // Agora is_online também é persistido.
+  //
+  // NÃO envia:
   //
   // - id;
-  // - created_at;
-  // - is_online.
+  // - created_at.
   //
   // ============================================================
 
-  Map<String, dynamic> toUpdateMap() {
+  Map<
+    String,
+    dynamic
+  >
+  toUpdateMap() {
     return {
       'username': username.trim(),
 
       'artist_name': displayName.trim(),
 
-      'avatar_url': _normalizeNullableString(avatarUrl),
+      'avatar_url': _normalizeNullableString(
+        avatarUrl,
+      ),
 
       'bio': bio.trim(),
+
+      // ========================================================
+      // VISIBILIDADE
+      // ========================================================
+      'is_online': isOnline,
+
+      // ========================================================
+      // UPDATED AT
+      // ========================================================
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    };
+  }
+
+  // ============================================================
+  // MAP SOMENTE DO STATUS
+  // ============================================================
+  //
+  // Útil se posteriormente quisermos atualizar apenas:
+  //
+  // is_online
+  //
+  // sem enviar nome, bio ou avatar.
+  //
+  // ============================================================
+
+  Map<
+    String,
+    dynamic
+  >
+  toOnlineStatusMap() {
+    return {
+      'is_online': isOnline,
 
       'updated_at': DateTime.now().toUtc().toIso8601String(),
     };
@@ -314,21 +455,52 @@ class PublicProfileModel {
     DateTime? updatedAt,
   }) {
     return PublicProfileModel(
-      userId: userId ?? this.userId,
+      userId:
+          userId ??
+          this.userId,
 
-      username: username ?? this.username,
+      username:
+          username ??
+          this.username,
 
-      displayName: displayName ?? this.displayName,
+      displayName:
+          displayName ??
+          this.displayName,
 
-      avatarUrl: clearAvatar ? null : avatarUrl ?? this.avatarUrl,
+      avatarUrl: clearAvatar
+          ? null
+          : avatarUrl ??
+                this.avatarUrl,
 
-      bio: bio ?? this.bio,
+      bio:
+          bio ??
+          this.bio,
 
-      isOnline: isOnline ?? this.isOnline,
+      isOnline:
+          isOnline ??
+          this.isOnline,
 
-      createdAt: createdAt ?? this.createdAt,
+      createdAt:
+          createdAt ??
+          this.createdAt,
 
-      updatedAt: updatedAt ?? this.updatedAt,
+      updatedAt:
+          updatedAt ??
+          this.updatedAt,
+    );
+  }
+
+  // ============================================================
+  // COPY ONLINE
+  // ============================================================
+
+  PublicProfileModel copyWithOnline(
+    bool value,
+  ) {
+    return copyWith(
+      isOnline: value,
+
+      updatedAt: DateTime.now(),
     );
   }
 
@@ -336,8 +508,11 @@ class PublicProfileModel {
   // READ STRING
   // ============================================================
 
-  static String _readString(dynamic value) {
-    if (value == null) {
+  static String _readString(
+    dynamic value,
+  ) {
+    if (value ==
+        null) {
       return '';
     }
 
@@ -348,8 +523,12 @@ class PublicProfileModel {
   // READ NULLABLE STRING
   // ============================================================
 
-  static String? _readNullableString(dynamic value) {
-    final normalized = _readString(value);
+  static String? _readNullableString(
+    dynamic value,
+  ) {
+    final normalized = _readString(
+      value,
+    );
 
     if (normalized.isEmpty) {
       return null;
@@ -362,10 +541,14 @@ class PublicProfileModel {
   // NORMALIZE NULLABLE STRING
   // ============================================================
 
-  static String? _normalizeNullableString(String? value) {
+  static String? _normalizeNullableString(
+    String? value,
+  ) {
     final normalized = value?.trim();
 
-    if (normalized == null || normalized.isEmpty) {
+    if (normalized ==
+            null ||
+        normalized.isEmpty) {
       return null;
     }
 
@@ -376,34 +559,47 @@ class PublicProfileModel {
   // READ BOOL
   // ============================================================
 
-  static bool _readBool(dynamic value) {
-    if (value == null) {
+  static bool _readBool(
+    dynamic value,
+  ) {
+    if (value ==
+        null) {
       return false;
     }
 
-    if (value is bool) {
+    if (value
+        is bool) {
       return value;
     }
 
-    if (value is num) {
-      return value != 0;
+    if (value
+        is num) {
+      return value !=
+          0;
     }
 
     final normalized = value.toString().trim().toLowerCase();
 
-    return normalized == 'true' || normalized == '1';
+    return normalized ==
+            'true' ||
+        normalized ==
+            '1';
   }
 
   // ============================================================
   // READ DATETIME
   // ============================================================
 
-  static DateTime? _readDateTime(dynamic value) {
-    if (value == null) {
+  static DateTime? _readDateTime(
+    dynamic value,
+  ) {
+    if (value ==
+        null) {
       return null;
     }
 
-    if (value is DateTime) {
+    if (value
+        is DateTime) {
       return value;
     }
 
@@ -413,7 +609,9 @@ class PublicProfileModel {
       return null;
     }
 
-    return DateTime.tryParse(normalized);
+    return DateTime.tryParse(
+      normalized,
+    );
   }
 
   // ============================================================

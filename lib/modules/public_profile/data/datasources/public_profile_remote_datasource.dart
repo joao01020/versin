@@ -12,7 +12,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 // PERFIL
 //
 // - buscar perfil;
-// - atualizar perfil.
+// - atualizar perfil;
+// - atualizar status ONLINE / OFFLINE.
 //
 // TRACKS
 //
@@ -76,6 +77,27 @@ abstract class PublicProfileRemoteDatasource {
       dynamic
     >
     data,
+  });
+
+  // ============================================================
+  // ONLINE / OFFLINE
+  // ============================================================
+  //
+  // Atualiza somente:
+  //
+  // public.profiles.is_online
+  //
+  // ============================================================
+
+  Future<
+    Map<
+      String,
+      dynamic
+    >
+  >
+  updateOnlineStatus({
+    required String userId,
+    required bool isOnline,
   });
 
   // ============================================================
@@ -149,21 +171,6 @@ abstract class PublicProfileRemoteDatasource {
 
   // ============================================================
   // DELETE LEGADO
-  // ============================================================
-  //
-  // Mantido para compatibilidade com o Repository.
-  //
-  // O fluxo normal NÃO deve chamar isso para excluir uma demo.
-  //
-  // A remoção real deve passar por:
-  //
-  // delete-profile-track
-  //
-  // que remove:
-  //
-  // - objeto do R2;
-  // - linha do Postgres.
-  //
   // ============================================================
 
   Future<
@@ -343,13 +350,39 @@ class PublicProfileRemoteDatasourceImpl
       );
     }
 
+    final normalizedData =
+        Map<
+          String,
+          dynamic
+        >.from(
+          data,
+        );
+
+    // ==========================================================
+    // CAMPOS IMUTÁVEIS
+    // ==========================================================
+
+    normalizedData.remove(
+      'id',
+    );
+
+    normalizedData.remove(
+      'created_at',
+    );
+
+    // ==========================================================
+    // UPDATED AT
+    // ==========================================================
+
+    normalizedData['updated_at'] = DateTime.now().toUtc().toIso8601String();
+
     try {
       final response = await _supabase
           .from(
             _profilesTable,
           )
           .update(
-            data,
+            normalizedData,
           )
           .eq(
             'id',
@@ -371,6 +404,72 @@ class PublicProfileRemoteDatasourceImpl
     ) {
       _logPostgrestError(
         operation: 'atualizar perfil',
+        error: error,
+      );
+
+      rethrow;
+    }
+  }
+
+  // ============================================================
+  // ATUALIZAR ONLINE / OFFLINE
+  // ============================================================
+
+  @override
+  Future<
+    Map<
+      String,
+      dynamic
+    >
+  >
+  updateOnlineStatus({
+    required String userId,
+    required bool isOnline,
+  }) async {
+    final normalizedUserId = userId.trim();
+
+    if (normalizedUserId.isEmpty) {
+      throw ArgumentError(
+        'userId não pode ser vazio.',
+      );
+    }
+
+    try {
+      final response = await _supabase
+          .from(
+            _profilesTable,
+          )
+          .update(
+            {
+              'is_online': isOnline,
+              'updated_at': DateTime.now().toUtc().toIso8601String(),
+            },
+          )
+          .eq(
+            'id',
+            normalizedUserId,
+          )
+          .select(
+            _profileFields,
+          )
+          .single();
+
+      debugPrint(
+        '[PUBLIC PROFILE REMOTE] '
+        'Perfil ${isOnline ? 'ONLINE' : 'OFFLINE'}.',
+      );
+
+      return Map<
+        String,
+        dynamic
+      >.from(
+        response,
+      );
+    } on PostgrestException catch (
+      error
+    ) {
+      _logPostgrestError(
+        operation: 'alterar status online',
         error: error,
       );
 
@@ -474,18 +573,6 @@ class PublicProfileRemoteDatasourceImpl
 
   // ============================================================
   // PRIMEIRA DEMO
-  // ============================================================
-  //
-  // Usado principalmente no Match:
-  //
-  // OUVIR DEMO
-  //
-  // Aqui buscamos somente os METADADOS.
-  //
-  // A URL de áudio será solicitada depois para:
-  //
-  // create-track-playback-url
-  //
   // ============================================================
 
   @override
@@ -603,14 +690,6 @@ class PublicProfileRemoteDatasourceImpl
 
   // ============================================================
   // CRIAR TRACK
-  // ============================================================
-  //
-  // O arquivo já deve ter sido enviado para o R2.
-  //
-  // storage_path contém:
-  //
-  // profiles/<user-id>/tracks/<uuid>.mp3
-  //
   // ============================================================
 
   @override
@@ -737,12 +816,6 @@ class PublicProfileRemoteDatasourceImpl
     // ==========================================================
     // AUDIO URL
     // ==========================================================
-    //
-    // Cloudflare R2 usa URL temporária.
-    //
-    // Não persistimos signed URLs.
-    //
-    // ==========================================================
 
     normalizedData.remove(
       'audio_url',
@@ -791,18 +864,6 @@ class PublicProfileRemoteDatasourceImpl
 
   // ============================================================
   // DELETE LEGADO
-  // ============================================================
-  //
-  // NÃO usar no fluxo normal do aplicativo.
-  //
-  // PublicProfileController deve usar:
-  //
-  // ProfileTrackService.deleteTrack(trackId: ...)
-  //
-  // que chama:
-  //
-  // delete-profile-track
-  //
   // ============================================================
 
   @override
@@ -927,10 +988,6 @@ class PublicProfileRemoteDatasourceImpl
                 a,
                 b,
               ) {
-                // ==============================================
-                // POSITION
-                // ==============================================
-
                 final positionA = _readPosition(
                   a['position'],
                 );
@@ -947,10 +1004,6 @@ class PublicProfileRemoteDatasourceImpl
                     0) {
                   return positionResult;
                 }
-
-                // ==============================================
-                // CREATED AT
-                // ==============================================
 
                 final createdA = _readDateTime(
                   a['created_at'],
@@ -1001,10 +1054,6 @@ class PublicProfileRemoteDatasourceImpl
           data,
         );
 
-    // ==========================================================
-    // ID
-    // ==========================================================
-
     final id = normalized['id']?.toString().trim();
 
     if (id ==
@@ -1017,10 +1066,6 @@ class PublicProfileRemoteDatasourceImpl
 
     // ==========================================================
     // AUDIO URL
-    // ==========================================================
-    //
-    // Não armazenamos URL assinada do R2.
-    //
     // ==========================================================
 
     normalized.remove(
@@ -1144,7 +1189,9 @@ class PublicProfileRemoteDatasourceImpl
             role,
           ) {
             return role.toString().trim().toLowerCase().replaceAll(
-              ' ',
+              RegExp(
+                r'\s+',
+              ),
               '_',
             );
           },

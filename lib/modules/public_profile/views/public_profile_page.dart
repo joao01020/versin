@@ -26,6 +26,7 @@ import 'package:versin/modules/public_profile/widgets/public_profile_tracks_widg
 // - remover demo;
 // - editar perfil;
 // - reproduzir demo;
+// - alterar ONLINE / OFFLINE;
 // - atualizar interface.
 //
 // Reprodução:
@@ -333,6 +334,58 @@ class _PublicProfilePageState
   >
   _refresh() async {
     await controller.refresh();
+  }
+
+  Future<
+    void
+  >
+  _toggleOnlineStatus() async {
+    if (!controller.isOwner ||
+        controller.isUpdatingOnlineStatus) {
+      return;
+    }
+
+    final currentProfile = controller.profile;
+
+    if (currentProfile ==
+        null) {
+      return;
+    }
+
+    final wasOnline = currentProfile.isOnline;
+
+    final changed = await controller.toggleOnline();
+
+    if (!mounted) {
+      return;
+    }
+
+    if (!changed) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(
+        SnackBar(
+          content: Text(
+            controller.errorMessage ??
+                'Não foi possível alterar a visibilidade do perfil.',
+          ),
+        ),
+      );
+
+      return;
+    }
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(
+      SnackBar(
+        content: Text(
+          wasOnline
+              ? 'Seu perfil agora está offline.'
+              : 'Seu perfil agora está online.',
+        ),
+      ),
+    );
   }
 
   // ============================================================
@@ -745,8 +798,14 @@ class _PublicProfilePageState
 
                     isOwner: controller.isOwner,
 
+                    isUpdatingOnlineStatus: controller.isUpdatingOnlineStatus,
+
                     onEdit: controller.isOwner
                         ? _openEditProfile
+                        : null,
+
+                    onToggleOnline: controller.isOwner
+                        ? _toggleOnlineStatus
                         : null,
                   ),
 

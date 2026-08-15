@@ -17,6 +17,7 @@ import 'package:versin/modules/public_profile/services/profile_track_service.dar
 // - carregar perfil público;
 // - carregar demos;
 // - atualizar perfil;
+// - alterar visibilidade ONLINE / OFFLINE;
 // - publicar demo;
 // - excluir demo;
 // - buscar demo de outro usuário;
@@ -76,6 +77,8 @@ class PublicProfileController
   bool _isSaving = false;
 
   bool _isUploadingTrack = false;
+
+  bool _isUpdatingOnlineStatus = false;
 
   String? _errorMessage;
 
@@ -154,6 +157,8 @@ class PublicProfileController
   bool get isSaving => _isSaving;
 
   bool get isUploadingTrack => _isUploadingTrack;
+
+  bool get isUpdatingOnlineStatus => _isUpdatingOnlineStatus;
 
   String? get errorMessage => _errorMessage;
 
@@ -466,6 +471,141 @@ class PublicProfileController
         false,
       );
     }
+  }
+
+  // ============================================================
+  // ONLINE / OFFLINE
+  // ============================================================
+  //
+  // Altera a visibilidade pública do perfil.
+  //
+  // true:
+  //
+  // - perfil ONLINE;
+  // - elegível para aparecer no Match / Discovery.
+  //
+  // false:
+  //
+  // - perfil OFFLINE;
+  // - deve ser ocultado das consultas públicas;
+  // - o próprio dono continua conseguindo abrir o perfil.
+  //
+  // IMPORTANTE:
+  //
+  // O Controller apenas persiste is_online.
+  // O filtro que realmente remove usuários OFFLINE do Match
+  // deve existir também no datasource/repository do Match.
+  //
+  // ============================================================
+
+  Future<
+    bool
+  >
+  setOnlineStatus(
+    bool value,
+  ) async {
+    final currentProfile = _profile;
+
+    if (_disposed ||
+        currentProfile ==
+            null ||
+        !isOwner ||
+        _isUpdatingOnlineStatus) {
+      return false;
+    }
+
+    // ==========================================================
+    // NADA PARA ALTERAR
+    // ==========================================================
+
+    if (currentProfile.isOnline ==
+        value) {
+      return true;
+    }
+
+    // ==========================================================
+    // LOADING
+    // ==========================================================
+
+    _setUpdatingOnlineStatus(
+      true,
+    );
+
+    _clearError();
+
+    try {
+      // ========================================================
+      // SUPABASE
+      // ========================================================
+
+      final updatedProfile = await _repository.updateOnlineStatus(
+        userId: currentProfile.userId,
+
+        isOnline: value,
+      );
+
+      if (_disposed) {
+        return false;
+      }
+
+      // ========================================================
+      // ESTADO LOCAL
+      // ========================================================
+
+      _profile = updatedProfile;
+
+      _notify();
+
+      debugPrint(
+        '[PUBLIC PROFILE] '
+        'Perfil ${updatedProfile.isOnline ? 'ONLINE' : 'OFFLINE'}.',
+      );
+
+      return true;
+    } catch (
+      error
+    ) {
+      _setError(
+        value
+            ? 'Não foi possível deixar o perfil online.'
+            : 'Não foi possível deixar o perfil offline.',
+      );
+
+      debugPrint(
+        '[PUBLIC PROFILE] '
+        'Erro ao alterar visibilidade: '
+        '$error',
+      );
+
+      return false;
+    } finally {
+      _setUpdatingOnlineStatus(
+        false,
+      );
+    }
+  }
+
+  // ============================================================
+  // TOGGLE ONLINE / OFFLINE
+  // ============================================================
+
+  Future<
+    bool
+  >
+  toggleOnline() async {
+    final currentProfile = _profile;
+
+    if (_disposed ||
+        currentProfile ==
+            null ||
+        !isOwner ||
+        _isUpdatingOnlineStatus) {
+      return false;
+    }
+
+    return setOnlineStatus(
+      !currentProfile.isOnline,
+    );
   }
 
   // ============================================================
@@ -1134,6 +1274,24 @@ class PublicProfileController
     }
 
     _isSaving = value;
+
+    _notify();
+  }
+
+  // ============================================================
+  // ONLINE STATUS LOADING
+  // ============================================================
+
+  void _setUpdatingOnlineStatus(
+    bool value,
+  ) {
+    if (_disposed ||
+        _isUpdatingOnlineStatus ==
+            value) {
+      return;
+    }
+
+    _isUpdatingOnlineStatus = value;
 
     _notify();
   }

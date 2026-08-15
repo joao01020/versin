@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'package:versin/modules/match/widgets/profile_track_player_sheet.dart';
+
 import 'package:versin/modules/public_profile/controllers/public_profile_controller.dart';
 import 'package:versin/modules/public_profile/models/profile_track_model.dart';
 import 'package:versin/modules/public_profile/views/edit_public_profile_page.dart';
@@ -12,7 +14,7 @@ import 'package:versin/modules/public_profile/widgets/public_profile_tracks_widg
 // PUBLIC PROFILE PAGE
 // ============================================================
 //
-// Página pública do perfil usado pelo modo Conectar.
+// Página pública do perfil.
 //
 // Responsabilidades:
 //
@@ -22,16 +24,42 @@ import 'package:versin/modules/public_profile/widgets/public_profile_tracks_widg
 // - exibir músicas;
 // - adicionar demo;
 // - remover demo;
-// - permitir edição quando for o dono;
-// - permitir voltar em qualquer estado;
-// - atualizar interface pelo controller.
+// - editar perfil;
+// - reproduzir demo;
+// - atualizar interface.
+//
+// Reprodução:
+//
+// ícone PLAY
+//      ↓
+// getTrackPlaybackUrl()
+//      ↓
+// create-track-playback-url
+//      ↓
+// Cloudflare R2
+//      ↓
+// ProfileTrackPlayerSheet
 //
 // ============================================================
 
-class PublicProfilePage extends StatefulWidget {
+class PublicProfilePage
+    extends
+        StatefulWidget {
+  // ============================================================
+  // USER
+  // ============================================================
+
   final String userId;
 
+  // ============================================================
+  // CONTROLLER
+  // ============================================================
+
   final PublicProfileController controller;
+
+  // ============================================================
+  // CONSTRUTOR
+  // ============================================================
 
   const PublicProfilePage({
     super.key,
@@ -40,19 +68,46 @@ class PublicProfilePage extends StatefulWidget {
   });
 
   @override
-  State<PublicProfilePage> createState() => _PublicProfilePageState();
+  State<
+    PublicProfilePage
+  >
+  createState() => _PublicProfilePageState();
 }
 
 // ============================================================
 // STATE
 // ============================================================
 
-class _PublicProfilePageState extends State<PublicProfilePage> {
+class _PublicProfilePageState
+    extends
+        State<
+          PublicProfilePage
+        > {
+  // ============================================================
+  // CONSTANTES
+  // ============================================================
+
+  static const Color _accentColor = Color(
+    0xFFE100FF,
+  );
+
   // ============================================================
   // CONTROLLER
   // ============================================================
 
   PublicProfileController get controller => widget.controller;
+
+  // ============================================================
+  // PLAYBACK
+  // ============================================================
+
+  final Set<
+    String
+  >
+  _loadingTrackIds =
+      <
+        String
+      >{};
 
   // ============================================================
   // INIT
@@ -62,15 +117,23 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
   void initState() {
     super.initState();
 
-    controller.addListener(_onControllerChanged);
+    controller.addListener(
+      _onControllerChanged,
+    );
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) {
-        return;
-      }
+    WidgetsBinding.instance.addPostFrameCallback(
+      (
+        _,
+      ) {
+        if (!mounted) {
+          return;
+        }
 
-      controller.load(userId: widget.userId);
-    });
+        controller.load(
+          userId: widget.userId,
+        );
+      },
+    );
   }
 
   // ============================================================
@@ -78,17 +141,37 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
   // ============================================================
 
   @override
-  void didUpdateWidget(covariant PublicProfilePage oldWidget) {
-    super.didUpdateWidget(oldWidget);
+  void didUpdateWidget(
+    covariant PublicProfilePage oldWidget,
+  ) {
+    super.didUpdateWidget(
+      oldWidget,
+    );
 
-    if (oldWidget.controller != widget.controller) {
-      oldWidget.controller.removeListener(_onControllerChanged);
+    // ==========================================================
+    // CONTROLLER ALTERADO
+    // ==========================================================
 
-      widget.controller.addListener(_onControllerChanged);
+    if (oldWidget.controller !=
+        widget.controller) {
+      oldWidget.controller.removeListener(
+        _onControllerChanged,
+      );
+
+      widget.controller.addListener(
+        _onControllerChanged,
+      );
     }
 
-    if (oldWidget.userId != widget.userId) {
-      widget.controller.load(userId: widget.userId);
+    // ==========================================================
+    // USER ALTERADO
+    // ==========================================================
+
+    if (oldWidget.userId !=
+        widget.userId) {
+      widget.controller.load(
+        userId: widget.userId,
+      );
     }
   }
 
@@ -101,7 +184,9 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
       return;
     }
 
-    setState(() {});
+    setState(
+      () {},
+    );
   }
 
   // ============================================================
@@ -109,33 +194,54 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
   // ============================================================
 
   void _goBack() {
-    if (!Navigator.of(context).canPop()) {
+    if (!Navigator.of(
+      context,
+    ).canPop()) {
       return;
     }
 
-    Navigator.of(context).pop();
+    Navigator.of(
+      context,
+    ).pop();
   }
 
   // ============================================================
   // EDITAR PERFIL
   // ============================================================
 
-  Future<void> _openEditProfile() async {
+  Future<
+    void
+  >
+  _openEditProfile() async {
     final profile = controller.profile;
 
-    if (profile == null || !controller.isOwner) {
+    if (profile ==
+            null ||
+        !controller.isOwner) {
       return;
     }
 
-    final updated = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(
-        builder: (_) {
-          return EditPublicProfilePage(controller: controller);
-        },
-      ),
-    );
+    final updated =
+        await Navigator.of(
+          context,
+        ).push<
+          bool
+        >(
+          MaterialPageRoute(
+            builder:
+                (
+                  _,
+                ) {
+                  return EditPublicProfilePage(
+                    controller: controller,
+                  );
+                },
+          ),
+        );
 
-    if (!mounted || updated != true) {
+    if (!mounted ||
+        updated !=
+            true) {
       return;
     }
 
@@ -146,25 +252,36 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
   // ADICIONAR DEMO
   // ============================================================
 
-  Future<void> _openAddTrack() async {
-    if (!controller.isOwner || controller.isUploadingTrack) {
+  Future<
+    void
+  >
+  _openAddTrack() async {
+    if (!controller.isOwner ||
+        controller.isUploadingTrack) {
       return;
     }
 
     final result = await AddProfileTrackSheet.show(
       context: context,
-      accentColor: const Color(0xFFE100FF),
+
+      accentColor: _accentColor,
     );
 
-    if (!mounted || result == null) {
+    if (!mounted ||
+        result ==
+            null) {
       return;
     }
 
     final created = await controller.addTrack(
       title: result.title,
+
       fileName: result.file.fileName,
+
       bytes: result.file.bytes,
+
       mimeType: result.file.mimeType,
+
       audienceRoles: result.audience.roles,
     );
 
@@ -172,11 +289,19 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
       return;
     }
 
-    if (created == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
+    // ==========================================================
+    // ERRO
+    // ==========================================================
+
+    if (created ==
+        null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(
         SnackBar(
           content: Text(
-            controller.errorMessage ?? 'Não foi possível publicar a demo.',
+            controller.errorMessage ??
+                'Não foi possível publicar a demo.',
           ),
         ),
       );
@@ -184,8 +309,18 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${created.title} foi publicada no seu perfil.')),
+    // ==========================================================
+    // SUCESSO
+    // ==========================================================
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(
+      SnackBar(
+        content: Text(
+          '${created.title} foi publicada no seu perfil.',
+        ),
+      ),
     );
   }
 
@@ -193,69 +328,241 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
   // REFRESH
   // ============================================================
 
-  Future<void> _refresh() async {
+  Future<
+    void
+  >
+  _refresh() async {
     await controller.refresh();
   }
 
   // ============================================================
   // PLAY TRACK
   // ============================================================
+  //
+  // Este fluxo agora é o MESMO utilizado em:
+  //
+  // Match
+  // → OUVIR DEMO
+  //
+  // Aqui:
+  //
+  // botão roxo de play
+  //      ↓
+  // getTrackPlaybackUrl
+  //      ↓
+  // signed GET URL
+  //      ↓
+  // ProfileTrackPlayerSheet
+  //
+  // ============================================================
 
-  Future<void> _playTrack(ProfileTrackModel track) async {
-    final url = await controller.getTrackPlaybackUrl(track);
+  Future<
+    void
+  >
+  _playTrack(
+    ProfileTrackModel track,
+  ) async {
+    final trackId = track.id.trim();
 
-    if (!mounted) {
+    // ==========================================================
+    // VALIDAR
+    // ==========================================================
+
+    if (trackId.isEmpty ||
+        !mounted) {
       return;
     }
 
-    if (url.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Não foi possível carregar a música.')),
+    // ==========================================================
+    // EVITAR CLIQUE DUPLO
+    // ==========================================================
+
+    if (_loadingTrackIds.contains(
+      trackId,
+    )) {
+      debugPrint(
+        '[PUBLIC PROFILE PLAYER] '
+        'Track já está carregando.',
       );
 
       return;
     }
 
-    debugPrint(
-      '[PUBLIC PROFILE] '
-      'Playback URL: '
-      '$url',
+    // ==========================================================
+    // LOADING
+    // ==========================================================
+
+    setState(
+      () {
+        _loadingTrackIds.add(
+          trackId,
+        );
+      },
     );
 
-    // ==========================================================
-    // PLAYER
-    // ==========================================================
-    //
-    // Na próxima etapa conectaremos:
-    //
-    // ProfileTrackPlayerController
-    //
-    // ==========================================================
+    try {
+      debugPrint(
+        '[PUBLIC PROFILE PLAYER] '
+        'Abrindo demo: '
+        '${track.title}',
+      );
+
+      // ========================================================
+      // PLAYBACK URL
+      // ========================================================
+
+      final url = await controller.getTrackPlaybackUrl(
+        track,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      // ========================================================
+      // URL INVÁLIDA
+      // ========================================================
+
+      if (url.trim().isEmpty) {
+        debugPrint(
+          '[PUBLIC PROFILE PLAYER] '
+          'URL de reprodução indisponível.',
+        );
+
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Não foi possível carregar a música.',
+            ),
+          ),
+        );
+
+        return;
+      }
+
+      // ========================================================
+      // PERFIL
+      // ========================================================
+
+      final profile = controller.profile;
+
+      final displayName =
+          profile?.resolvedDisplayName ??
+          'Profissional';
+
+      // ========================================================
+      // PLAYER
+      // ========================================================
+
+      debugPrint(
+        '[PUBLIC PROFILE PLAYER] '
+        'Playback URL disponível.',
+      );
+
+      await ProfileTrackPlayerSheet.show(
+        context: context,
+
+        track: track,
+
+        playbackUrl: url,
+
+        displayName: displayName,
+
+        accentColor: _accentColor,
+      );
+    } catch (
+      error,
+      stackTrace
+    ) {
+      debugPrint(
+        '[PUBLIC PROFILE PLAYER] '
+        'Erro ao reproduzir demo: '
+        '$error',
+      );
+
+      debugPrint(
+        '[PUBLIC PROFILE PLAYER] '
+        'Stack trace: '
+        '$stackTrace',
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Não foi possível reproduzir a música.',
+          ),
+        ),
+      );
+    } finally {
+      if (!mounted) {
+        return;
+      }
+
+      setState(
+        () {
+          _loadingTrackIds.remove(
+            trackId,
+          );
+        },
+      );
+    }
   }
 
   // ============================================================
   // DELETE TRACK
   // ============================================================
 
-  Future<void> _deleteTrack(ProfileTrackModel track) async {
-    final deleted = await controller.deleteTrack(track);
+  Future<
+    void
+  >
+  _deleteTrack(
+    ProfileTrackModel track,
+  ) async {
+    final deleted = await controller.deleteTrack(
+      track,
+    );
 
     if (!mounted) {
       return;
     }
 
+    // ==========================================================
+    // SUCCESS
+    // ==========================================================
+
     if (deleted) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Demo removida.')));
+      ).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Demo removida.',
+          ),
+        ),
+      );
 
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
+    // ==========================================================
+    // ERROR
+    // ==========================================================
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(
       SnackBar(
         content: Text(
-          controller.errorMessage ?? 'Não foi possível remover a música.',
+          controller.errorMessage ??
+              'Não foi possível remover a música.',
         ),
       ),
     );
@@ -266,16 +573,24 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
   // ============================================================
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(
+    BuildContext context,
+  ) {
     return Scaffold(
-      backgroundColor: const Color(0xFF09090F),
+      backgroundColor: const Color(
+        0xFF09090F,
+      ),
 
       // ========================================================
       // APP BAR
       // ========================================================
       appBar: AppBar(
-        backgroundColor: const Color(0xFF09090F),
+        backgroundColor: const Color(
+          0xFF09090F,
+        ),
+
         surfaceTintColor: Colors.transparent,
+
         elevation: 0,
 
         // ======================================================
@@ -283,8 +598,13 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
         // ======================================================
         leading: IconButton(
           tooltip: 'Voltar',
+
           onPressed: _goBack,
-          icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+
+          icon: const Icon(
+            Icons.arrow_back_rounded,
+            color: Colors.white,
+          ),
         ),
 
         // ======================================================
@@ -306,11 +626,20 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
           // ====================================================
           // EDITAR
           // ====================================================
-          if (controller.isOwner && controller.profile != null)
+          if (controller.isOwner &&
+              controller.profile !=
+                  null)
             IconButton(
               tooltip: 'Editar perfil',
-              onPressed: controller.isSaving ? null : _openEditProfile,
-              icon: const Icon(Icons.edit_outlined, color: Colors.white),
+
+              onPressed: controller.isSaving
+                  ? null
+                  : _openEditProfile,
+
+              icon: const Icon(
+                Icons.edit_outlined,
+                color: Colors.white,
+              ),
             ),
 
           // ====================================================
@@ -318,18 +647,31 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
           // ====================================================
           IconButton(
             tooltip: 'Atualizar',
-            onPressed: controller.isLoading ? null : _refresh,
-            icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+
+            onPressed: controller.isLoading
+                ? null
+                : _refresh,
+
+            icon: const Icon(
+              Icons.refresh_rounded,
+              color: Colors.white,
+            ),
           ),
 
-          const SizedBox(width: 8),
+          const SizedBox(
+            width: 8,
+          ),
         ],
       ),
 
       // ========================================================
       // BODY
       // ========================================================
-      body: SafeArea(top: false, child: _buildBody()),
+      body: SafeArea(
+        top: false,
+
+        child: _buildBody(),
+      ),
     );
   }
 
@@ -342,15 +684,21 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
     // LOADING INICIAL
     // ==========================================================
 
-    if (controller.isLoading && controller.profile == null) {
-      return const Center(child: CircularProgressIndicator());
+    if (controller.isLoading &&
+        controller.profile ==
+            null) {
+      return const Center(
+        child: CircularProgressIndicator(),
+      );
     }
 
     // ==========================================================
     // ERRO
     // ==========================================================
 
-    if (controller.hasError && controller.profile == null) {
+    if (controller.hasError &&
+        controller.profile ==
+            null) {
       return _buildError();
     }
 
@@ -360,91 +708,131 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
 
     final profile = controller.profile;
 
-    if (profile == null) {
+    if (profile ==
+        null) {
       return _buildEmpty();
     }
 
     // ==========================================================
-    // PERFIL CARREGADO
+    // CONTEÚDO
     // ==========================================================
 
     return RefreshIndicator(
       onRefresh: _refresh,
+
       child: CustomScrollView(
         physics: const AlwaysScrollableScrollPhysics(
           parent: BouncingScrollPhysics(),
         ),
+
         slivers: [
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
+            padding: const EdgeInsets.fromLTRB(
+              20,
+              20,
+              20,
+              40,
+            ),
+
             sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                // ============================================
-                // HEADER
-                // ============================================
-                PublicProfileHeaderWidget(
-                  profile: profile,
-                  isOwner: controller.isOwner,
-                  onEdit: controller.isOwner ? _openEditProfile : null,
-                ),
+              delegate: SliverChildListDelegate(
+                [
+                  // ============================================
+                  // HEADER
+                  // ============================================
+                  PublicProfileHeaderWidget(
+                    profile: profile,
 
-                const SizedBox(height: 24),
+                    isOwner: controller.isOwner,
 
-                // ============================================
-                // BIO
-                // ============================================
-                PublicProfileBioWidget(
-                  bio: profile.bio,
-                  isOwner: controller.isOwner,
-                  onEdit: controller.isOwner ? _openEditProfile : null,
-                ),
+                    onEdit: controller.isOwner
+                        ? _openEditProfile
+                        : null,
+                  ),
 
-                const SizedBox(height: 28),
+                  const SizedBox(
+                    height: 24,
+                  ),
 
-                // ============================================
-                // MÚSICAS
-                // ============================================
-                PublicProfileTracksWidget(
-                  tracks: controller.tracks,
+                  // ============================================
+                  // BIO
+                  // ============================================
+                  PublicProfileBioWidget(
+                    bio: profile.bio,
 
-                  isOwner: controller.isOwner,
+                    isOwner: controller.isOwner,
 
-                  isUploading: controller.isUploadingTrack,
+                    onEdit: controller.isOwner
+                        ? _openEditProfile
+                        : null,
+                  ),
 
-                  // ==========================================
-                  // ADICIONAR
-                  // ==========================================
-                  onAddTrack: controller.isOwner ? _openAddTrack : null,
+                  const SizedBox(
+                    height: 28,
+                  ),
 
-                  // ==========================================
-                  // PLAY
-                  // ==========================================
-                  onPlayTrack: _playTrack,
+                  // ============================================
+                  // MÚSICAS
+                  // ============================================
+                  PublicProfileTracksWidget(
+                    tracks: controller.tracks,
 
-                  // ==========================================
-                  // DELETE
-                  // ==========================================
-                  onDeleteTrack: controller.isOwner ? _deleteTrack : null,
-                ),
+                    isOwner: controller.isOwner,
 
-                // ============================================
-                // UPLOAD
-                // ============================================
-                if (controller.isUploadingTrack) ...[
-                  const SizedBox(height: 18),
+                    isUploading: controller.isUploadingTrack,
 
-                  _buildUploadingCard(),
+                    // ==========================================
+                    // ADICIONAR
+                    // ==========================================
+                    onAddTrack: controller.isOwner
+                        ? _openAddTrack
+                        : null,
+
+                    // ==========================================
+                    // PLAY
+                    // ==========================================
+                    //
+                    // ESTE É O ÍCONE ROXO.
+                    //
+                    // Agora usa exatamente o mesmo modal
+                    // utilizado pelo OUVIR DEMO do Match.
+                    //
+                    // ==========================================
+                    onPlayTrack: _playTrack,
+
+                    // ==========================================
+                    // DELETE
+                    // ==========================================
+                    onDeleteTrack: controller.isOwner
+                        ? _deleteTrack
+                        : null,
+                  ),
+
+                  // ============================================
+                  // UPLOAD
+                  // ============================================
+                  if (controller.isUploadingTrack) ...[
+                    const SizedBox(
+                      height: 18,
+                    ),
+
+                    _buildUploadingCard(),
+                  ],
+
+                  // ============================================
+                  // LOADING SECUNDÁRIO
+                  // ============================================
+                  if (controller.isLoading) ...[
+                    const SizedBox(
+                      height: 24,
+                    ),
+
+                    const Center(
+                      child: CircularProgressIndicator(),
+                    ),
+                  ],
                 ],
-
-                // ============================================
-                // LOADING SECUNDÁRIO
-                // ============================================
-                if (controller.isLoading) ...[
-                  const SizedBox(height: 24),
-
-                  const Center(child: CircularProgressIndicator()),
-                ],
-              ]),
+              ),
             ),
           ),
         ],
@@ -453,20 +841,33 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
   }
 
   // ============================================================
-  // UPLOADING CARD
+  // UPLOADING
   // ============================================================
 
   Widget _buildUploadingCard() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(14),
+
+      padding: const EdgeInsets.all(
+        14,
+      ),
+
       decoration: BoxDecoration(
-        color: const Color(0xFFE100FF).withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(14),
+        color: _accentColor.withValues(
+          alpha: 0.06,
+        ),
+
+        borderRadius: BorderRadius.circular(
+          14,
+        ),
+
         border: Border.all(
-          color: const Color(0xFFE100FF).withValues(alpha: 0.16),
+          color: _accentColor.withValues(
+            alpha: 0.16,
+          ),
         ),
       ),
+
       child: const Row(
         children: [
           SizedBox(
@@ -474,16 +875,21 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
             height: 18,
             child: CircularProgressIndicator(
               strokeWidth: 2,
-              color: Color(0xFFE100FF),
+              color: _accentColor,
             ),
           ),
 
-          SizedBox(width: 12),
+          SizedBox(
+            width: 12,
+          ),
 
           Expanded(
             child: Text(
               'Enviando demo para o seu perfil...',
-              style: TextStyle(color: Colors.white60, fontSize: 11),
+              style: TextStyle(
+                color: Colors.white60,
+                fontSize: 11,
+              ),
             ),
           ),
         ],
@@ -492,17 +898,28 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
   }
 
   // ============================================================
-  // ERRO
+  // ERROR
   // ============================================================
 
   Widget _buildError() {
     return RefreshIndicator(
       onRefresh: _refresh,
+
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(24),
+
+        padding: const EdgeInsets.all(
+          24,
+        ),
+
         children: [
-          SizedBox(height: MediaQuery.of(context).size.height * 0.22),
+          SizedBox(
+            height:
+                MediaQuery.of(
+                  context,
+                ).size.height *
+                0.22,
+          ),
 
           const Icon(
             Icons.error_outline_rounded,
@@ -510,21 +927,37 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
             size: 46,
           ),
 
-          const SizedBox(height: 16),
-
-          Text(
-            controller.errorMessage ?? 'Não foi possível carregar o perfil.',
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: Colors.white70, fontSize: 15),
+          const SizedBox(
+            height: 16,
           ),
 
-          const SizedBox(height: 20),
+          Text(
+            controller.errorMessage ??
+                'Não foi possível carregar o perfil.',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 15,
+            ),
+          ),
+
+          const SizedBox(
+            height: 20,
+          ),
 
           Center(
             child: FilledButton.icon(
-              onPressed: controller.isLoading ? null : _refresh,
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Tentar novamente'),
+              onPressed: controller.isLoading
+                  ? null
+                  : _refresh,
+
+              icon: const Icon(
+                Icons.refresh_rounded,
+              ),
+
+              label: const Text(
+                'Tentar novamente',
+              ),
             ),
           ),
         ],
@@ -533,17 +966,28 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
   }
 
   // ============================================================
-  // PERFIL NÃO ENCONTRADO
+  // EMPTY
   // ============================================================
 
   Widget _buildEmpty() {
     return RefreshIndicator(
       onRefresh: _refresh,
+
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(24),
+
+        padding: const EdgeInsets.all(
+          24,
+        ),
+
         children: [
-          SizedBox(height: MediaQuery.of(context).size.height * 0.22),
+          SizedBox(
+            height:
+                MediaQuery.of(
+                  context,
+                ).size.height *
+                0.22,
+          ),
 
           const Icon(
             Icons.person_off_outlined,
@@ -551,7 +995,9 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
             size: 48,
           ),
 
-          const SizedBox(height: 16),
+          const SizedBox(
+            height: 16,
+          ),
 
           const Text(
             'Perfil não encontrado.',
@@ -563,21 +1009,36 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
             ),
           ),
 
-          const SizedBox(height: 8),
+          const SizedBox(
+            height: 8,
+          ),
 
           const Text(
             'Não encontramos um perfil público associado a esta conta.',
             textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.white38, fontSize: 12),
+            style: TextStyle(
+              color: Colors.white38,
+              fontSize: 12,
+            ),
           ),
 
-          const SizedBox(height: 20),
+          const SizedBox(
+            height: 20,
+          ),
 
           Center(
             child: OutlinedButton.icon(
-              onPressed: controller.isLoading ? null : _refresh,
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Atualizar'),
+              onPressed: controller.isLoading
+                  ? null
+                  : _refresh,
+
+              icon: const Icon(
+                Icons.refresh_rounded,
+              ),
+
+              label: const Text(
+                'Atualizar',
+              ),
             ),
           ),
         ],
@@ -591,7 +1052,11 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
 
   @override
   void dispose() {
-    controller.removeListener(_onControllerChanged);
+    controller.removeListener(
+      _onControllerChanged,
+    );
+
+    _loadingTrackIds.clear();
 
     super.dispose();
   }

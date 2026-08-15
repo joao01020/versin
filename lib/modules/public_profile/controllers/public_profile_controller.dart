@@ -12,27 +12,37 @@ import 'package:versin/modules/public_profile/services/profile_track_service.dar
 // PUBLIC PROFILE CONTROLLER
 // ============================================================
 //
-// Estado principal do perfil público.
+// Responsável por:
 //
-// Responsabilidades:
+// - carregar perfil público;
+// - carregar demos;
+// - atualizar perfil;
+// - publicar demo;
+// - excluir demo;
+// - buscar demo de outro usuário;
+// - obter URL temporária de reprodução;
+// - impedir requests duplicados de playback;
+// - manter estado da tela.
 //
-// - carregar perfil;
-// - carregar músicas;
-// - buscar primeira demo;
-// - editar perfil;
-// - adicionar música;
-// - remover música;
-// - controlar audiência das demos;
-// - acompanhar músicas em realtime;
-// - gerar URL para reprodução;
-// - controlar loading;
-// - controlar saving;
-// - controlar upload;
-// - controlar erros.
+// Arquitetura:
+//
+// Supabase
+// ├── Auth
+// └── Postgres
+//
+// Cloudflare R2
+// └── arquivos de áudio
+//
+// Edge Functions
+// ├── create-track-upload-url
+// ├── create-track-playback-url
+// └── delete-profile-track
 //
 // ============================================================
 
-class PublicProfileController extends ChangeNotifier {
+class PublicProfileController
+    extends
+        ChangeNotifier {
   // ============================================================
   // DEPENDÊNCIAS
   // ============================================================
@@ -42,12 +52,24 @@ class PublicProfileController extends ChangeNotifier {
   final ProfileTrackService _trackService;
 
   // ============================================================
-  // ESTADO
+  // PERFIL
   // ============================================================
 
   PublicProfileModel? _profile;
 
-  List<ProfileTrackModel> _tracks = const <ProfileTrackModel>[];
+  List<
+    ProfileTrackModel
+  >
+  _tracks =
+      const <
+        ProfileTrackModel
+      >[];
+
+  String? _loadedUserId;
+
+  // ============================================================
+  // ESTADOS
+  // ============================================================
 
   bool _isLoading = false;
 
@@ -57,13 +79,48 @@ class PublicProfileController extends ChangeNotifier {
 
   String? _errorMessage;
 
-  String? _loadedUserId;
-
   // ============================================================
-  // STREAM
+  // REALTIME
   // ============================================================
 
-  StreamSubscription<List<ProfileTrackModel>>? _tracksSubscription;
+  StreamSubscription<
+    List<
+      ProfileTrackModel
+    >
+  >?
+  _tracksSubscription;
+
+  // ============================================================
+  // PLAYBACK REQUESTS
+  // ============================================================
+  //
+  // Evita:
+  //
+  // chamada A
+  //     ↓
+  // create-track-playback-url
+  //
+  // chamada B da mesma track antes de A terminar
+  //     ↓
+  // cria outra chamada desnecessária
+  //
+  // Agora ambas compartilham o mesmo Future.
+  //
+  // ============================================================
+
+  final Map<
+    String,
+    Future<
+      String
+    >
+  >
+  _playbackRequests =
+      <
+        String,
+        Future<
+          String
+        >
+      >{};
 
   // ============================================================
   // DISPOSE
@@ -87,7 +144,10 @@ class PublicProfileController extends ChangeNotifier {
 
   PublicProfileModel? get profile => _profile;
 
-  List<ProfileTrackModel> get tracks => _tracks;
+  List<
+    ProfileTrackModel
+  >
+  get tracks => _tracks;
 
   bool get isLoading => _isLoading;
 
@@ -97,52 +157,77 @@ class PublicProfileController extends ChangeNotifier {
 
   String? get errorMessage => _errorMessage;
 
-  bool get hasError => _errorMessage?.trim().isNotEmpty == true;
+  bool get hasError =>
+      _errorMessage?.trim().isNotEmpty ==
+      true;
 
-  bool get hasProfile => _profile != null;
+  bool get hasProfile =>
+      _profile !=
+      null;
 
   bool get hasTracks => _tracks.isNotEmpty;
 
   String? get loadedUserId => _loadedUserId;
 
   // ============================================================
-  // CURRENT USER
+  // USUÁRIO AUTENTICADO
   // ============================================================
 
   String? get currentUserId {
-    return Supabase.instance.client.auth.currentUser?.id;
+    final id = Supabase.instance.client.auth.currentUser?.id.trim();
+
+    if (id ==
+            null ||
+        id.isEmpty) {
+      return null;
+    }
+
+    return id;
   }
 
   // ============================================================
-  // É O DONO DO PERFIL?
+  // OWNER
   // ============================================================
 
   bool get isOwner {
     final authenticatedUserId = currentUserId;
 
-    final profileUserId = _profile?.userId;
+    final profileUserId = _profile?.userId.trim();
 
-    if (authenticatedUserId == null || profileUserId == null) {
+    if (authenticatedUserId ==
+            null ||
+        profileUserId ==
+            null ||
+        profileUserId.isEmpty) {
       return false;
     }
 
-    return authenticatedUserId == profileUserId;
+    return authenticatedUserId ==
+        profileUserId;
   }
 
   // ============================================================
-  // CARREGAR PERFIL
+  // LOAD
   // ============================================================
 
-  Future<void> load({required String userId}) async {
+  Future<
+    void
+  >
+  load({
+    required String userId,
+  }) async {
     final normalizedUserId = userId.trim();
 
-    if (_disposed || normalizedUserId.isEmpty) {
+    if (_disposed ||
+        normalizedUserId.isEmpty) {
       return;
     }
 
     _loadedUserId = normalizedUserId;
 
-    _setLoading(true);
+    _setLoading(
+      true,
+    );
 
     _clearError();
 
@@ -151,17 +236,21 @@ class PublicProfileController extends ChangeNotifier {
       // PERFIL
       // ========================================================
 
-      _profile = await _repository.getProfile(userId: normalizedUserId);
+      _profile = await _repository.getProfile(
+        userId: normalizedUserId,
+      );
 
       if (_disposed) {
         return;
       }
 
       // ========================================================
-      // MÚSICAS
+      // TRACKS
       // ========================================================
 
-      _tracks = await _repository.getTracks(userId: normalizedUserId);
+      _tracks = await _repository.getTracks(
+        userId: normalizedUserId,
+      );
 
       if (_disposed) {
         return;
@@ -171,11 +260,17 @@ class PublicProfileController extends ChangeNotifier {
       // REALTIME
       // ========================================================
 
-      _startTracksStream(normalizedUserId);
+      _startTracksStream(
+        normalizedUserId,
+      );
 
       _notify();
-    } catch (error) {
-      _setError('Não foi possível carregar o perfil.');
+    } catch (
+      error
+    ) {
+      _setError(
+        'Não foi possível carregar o perfil.',
+      );
 
       debugPrint(
         '[PUBLIC PROFILE] '
@@ -183,7 +278,9 @@ class PublicProfileController extends ChangeNotifier {
         '$error',
       );
     } finally {
-      _setLoading(false);
+      _setLoading(
+        false,
+      );
     }
   }
 
@@ -191,46 +288,51 @@ class PublicProfileController extends ChangeNotifier {
   // REFRESH
   // ============================================================
 
-  Future<void> refresh() async {
+  Future<
+    void
+  >
+  refresh() async {
     final userId = _loadedUserId;
 
-    if (userId == null || userId.isEmpty) {
+    if (userId ==
+            null ||
+        userId.isEmpty) {
       return;
     }
 
-    await load(userId: userId);
+    await load(
+      userId: userId,
+    );
   }
 
   // ============================================================
-  // BUSCAR PRIMEIRA DEMO DE UM USUÁRIO
+  // PRIMEIRA DEMO
   // ============================================================
   //
-  // Importante:
-  //
-  // Este método NÃO altera:
-  //
-  // - _profile;
-  // - _tracks;
-  // - _loadedUserId;
-  //
-  // Portanto pode ser usado pelo Match para ouvir a demo
-  // de outro usuário sem trocar o perfil atualmente carregado.
+  // Não altera o perfil atualmente carregado.
   //
   // ============================================================
 
-  Future<ProfileTrackModel?> getFirstTrackForUser({
+  Future<
+    ProfileTrackModel?
+  >
+  getFirstTrackForUser({
     required String userId,
   }) async {
     final normalizedUserId = userId.trim();
 
-    if (_disposed || normalizedUserId.isEmpty) {
+    if (_disposed ||
+        normalizedUserId.isEmpty) {
       return null;
     }
 
     try {
-      final track = await _repository.getFirstTrack(userId: normalizedUserId);
+      final track = await _repository.getFirstTrack(
+        userId: normalizedUserId,
+      );
 
-      if (track == null) {
+      if (track ==
+          null) {
         debugPrint(
           '[PUBLIC PROFILE] '
           'Usuário sem demo: '
@@ -243,13 +345,13 @@ class PublicProfileController extends ChangeNotifier {
       debugPrint(
         '[PUBLIC PROFILE] '
         'Demo encontrada: '
-        '${track.title} | '
-        'userId: '
-        '$normalizedUserId',
+        '${track.title}',
       );
 
       return track;
-    } catch (error) {
+    } catch (
+      error
+    ) {
       debugPrint(
         '[PUBLIC PROFILE] '
         'Erro ao buscar primeira demo: '
@@ -261,43 +363,53 @@ class PublicProfileController extends ChangeNotifier {
   }
 
   // ============================================================
-  // BUSCAR TRACKS DE OUTRO USUÁRIO
-  // ============================================================
-  //
-  // Também não altera o estado atual.
-  //
-  // Útil caso futuramente o modal permita navegar entre várias
-  // demos.
-  //
+  // TRACKS DE OUTRO USUÁRIO
   // ============================================================
 
-  Future<List<ProfileTrackModel>> getTracksForUser({
+  Future<
+    List<
+      ProfileTrackModel
+    >
+  >
+  getTracksForUser({
     required String userId,
   }) async {
     final normalizedUserId = userId.trim();
 
-    if (_disposed || normalizedUserId.isEmpty) {
-      return const <ProfileTrackModel>[];
+    if (_disposed ||
+        normalizedUserId.isEmpty) {
+      return const <
+        ProfileTrackModel
+      >[];
     }
 
     try {
-      return await _repository.getTracks(userId: normalizedUserId);
-    } catch (error) {
+      return await _repository.getTracks(
+        userId: normalizedUserId,
+      );
+    } catch (
+      error
+    ) {
       debugPrint(
         '[PUBLIC PROFILE] '
         'Erro ao buscar demos do usuário: '
         '$error',
       );
 
-      return const <ProfileTrackModel>[];
+      return const <
+        ProfileTrackModel
+      >[];
     }
   }
 
   // ============================================================
-  // ATUALIZAR PERFIL
+  // UPDATE PROFILE
   // ============================================================
 
-  Future<bool> updateProfile({
+  Future<
+    bool
+  >
+  updateProfile({
     required String displayName,
     required String username,
     required String bio,
@@ -305,29 +417,42 @@ class PublicProfileController extends ChangeNotifier {
   }) async {
     final currentProfile = _profile;
 
-    if (_disposed || currentProfile == null) {
+    if (_disposed ||
+        currentProfile ==
+            null) {
       return false;
     }
 
-    _setSaving(true);
+    _setSaving(
+      true,
+    );
 
     _clearError();
 
     try {
       final updatedProfile = currentProfile.copyWith(
         displayName: displayName.trim(),
+
         username: username.trim(),
+
         bio: bio.trim(),
+
         avatarUrl: avatarUrl?.trim(),
       );
 
-      _profile = await _repository.updateProfile(profile: updatedProfile);
+      _profile = await _repository.updateProfile(
+        profile: updatedProfile,
+      );
 
       _notify();
 
       return true;
-    } catch (error) {
-      _setError('Não foi possível atualizar o perfil.');
+    } catch (
+      error
+    ) {
+      _setError(
+        'Não foi possível atualizar o perfil.',
+      );
 
       debugPrint(
         '[PUBLIC PROFILE] '
@@ -337,58 +462,89 @@ class PublicProfileController extends ChangeNotifier {
 
       return false;
     } finally {
-      _setSaving(false);
+      _setSaving(
+        false,
+      );
     }
   }
 
   // ============================================================
-  // ADICIONAR MÚSICA
+  // ADD TRACK
+  // ============================================================
+  //
+  // Flutter
+  //      ↓
+  // create-track-upload-url
+  //      ↓
+  // Cloudflare R2
+  //      ↓
+  // objectKey
+  //      ↓
+  // public.profile_tracks
+  //
   // ============================================================
 
-  Future<ProfileTrackModel?> addTrack({
+  Future<
+    ProfileTrackModel?
+  >
+  addTrack({
     required String title,
     required String fileName,
     required Uint8List bytes,
-    required List<String> audienceRoles,
+    required List<
+      String
+    >
+    audienceRoles,
     String? mimeType,
     int? durationSeconds,
   }) async {
     final profile = _profile;
 
-    if (_disposed || profile == null || !isOwner) {
+    if (_disposed ||
+        profile ==
+            null ||
+        !isOwner) {
       return null;
     }
 
     // ==========================================================
-    // TÍTULO
+    // TITLE
     // ==========================================================
 
     final normalizedTitle = title.trim();
 
     if (normalizedTitle.isEmpty) {
-      _setError('Informe o título da música.');
+      _setError(
+        'Informe o título da música.',
+      );
 
       return null;
     }
 
     // ==========================================================
-    // ARQUIVO
+    // FILE
     // ==========================================================
 
     if (bytes.isEmpty) {
-      _setError('O arquivo selecionado está vazio.');
+      _setError(
+        'O arquivo selecionado está vazio.',
+      );
 
       return null;
     }
 
     // ==========================================================
-    // AUDIÊNCIA
+    // AUDIENCE
     // ==========================================================
 
-    final normalizedAudienceRoles = _normalizeAudienceRoles(audienceRoles);
+    final normalizedAudienceRoles = _normalizeAudienceRoles(
+      audienceRoles,
+    );
 
     if (normalizedAudienceRoles.isEmpty) {
-      _setError('Escolha pelo menos um grupo que poderá ouvir a demo.');
+      _setError(
+        'Escolha pelo menos um grupo que poderá ouvir a demo.',
+      );
 
       return null;
     }
@@ -397,21 +553,26 @@ class PublicProfileController extends ChangeNotifier {
     // UPLOAD
     // ==========================================================
 
-    _setUploadingTrack(true);
+    _setUploadingTrack(
+      true,
+    );
 
     _clearError();
 
-    String? uploadedStoragePath;
+    String? uploadedObjectKey;
 
     try {
       // ========================================================
-      // STORAGE
+      // R2
       // ========================================================
 
-      uploadedStoragePath = await _trackService.uploadTrack(
+      uploadedObjectKey = await _trackService.uploadTrack(
         userId: profile.userId,
+
         fileName: fileName,
+
         bytes: bytes,
+
         contentType: mimeType,
       );
 
@@ -421,69 +582,102 @@ class PublicProfileController extends ChangeNotifier {
 
       final track = ProfileTrackModel(
         id: '',
+
         userId: profile.userId,
+
         title: normalizedTitle,
-        storagePath: uploadedStoragePath,
+
+        storagePath: uploadedObjectKey,
+
         audienceRoles: normalizedAudienceRoles,
+
         durationSeconds: durationSeconds,
+
         mimeType: mimeType?.trim(),
+
         fileSizeBytes: bytes.length,
+
         position: _nextTrackPosition,
+
         isActive: true,
       );
 
       // ========================================================
-      // BANCO
+      // POSTGRES
       // ========================================================
 
-      final created = await _repository.createTrack(track: track);
+      final created = await _repository.createTrack(
+        track: track,
+      );
 
       // ========================================================
-      // ESTADO LOCAL
+      // LOCAL
       // ========================================================
 
       if (!_disposed &&
-          !_tracks.any((current) {
-            return current.id == created.id;
-          })) {
-        final updatedTracks = <ProfileTrackModel>[..._tracks, created];
+          !_tracks.any(
+            (
+              current,
+            ) =>
+                current.id ==
+                created.id,
+          )) {
+        final updated =
+            <
+              ProfileTrackModel
+            >[
+              ..._tracks,
+              created,
+            ];
 
-        updatedTracks.sort((a, b) {
-          return a.position.compareTo(b.position);
-        });
+        updated.sort(
+          (
+            a,
+            b,
+          ) {
+            return a.position.compareTo(
+              b.position,
+            );
+          },
+        );
 
-        _tracks = List<ProfileTrackModel>.unmodifiable(updatedTracks);
+        _tracks =
+            List<
+              ProfileTrackModel
+            >.unmodifiable(
+              updated,
+            );
 
         _notify();
       }
 
       debugPrint(
         '[PUBLIC PROFILE] '
-        'Demo adicionada: '
-        '${created.title} | '
-        'audience: '
-        '${created.audienceRoles}',
+        'Demo publicada: '
+        '${created.title}',
       );
 
       return created;
-    } catch (error) {
+    } catch (
+      error
+    ) {
       // ========================================================
-      // ROLLBACK DO STORAGE
+      // POSSÍVEL OBJETO ÓRFÃO
       // ========================================================
 
-      if (uploadedStoragePath != null && uploadedStoragePath.isNotEmpty) {
-        try {
-          await _trackService.deleteTrackFile(storagePath: uploadedStoragePath);
-        } catch (rollbackError) {
-          debugPrint(
-            '[PUBLIC PROFILE] '
-            'Erro no rollback do arquivo: '
-            '$rollbackError',
-          );
-        }
+      if (uploadedObjectKey !=
+              null &&
+          uploadedObjectKey.isNotEmpty) {
+        debugPrint(
+          '[PUBLIC PROFILE] '
+          'Upload R2 concluído, '
+          'mas criação no banco falhou.',
+        );
       }
 
-      _setError('Não foi possível adicionar a música.');
+      _setError(
+        'Não foi possível publicar a música.',
+      );
 
       debugPrint(
         '[PUBLIC PROFILE] '
@@ -493,12 +687,14 @@ class PublicProfileController extends ChangeNotifier {
 
       return null;
     } finally {
-      _setUploadingTrack(false);
+      _setUploadingTrack(
+        false,
+      );
     }
   }
 
   // ============================================================
-  // PRÓXIMA POSIÇÃO
+  // NEXT POSITION
   // ============================================================
 
   int get _nextTrackPosition {
@@ -506,60 +702,103 @@ class PublicProfileController extends ChangeNotifier {
       return 0;
     }
 
-    var highestPosition = 0;
+    var highestPosition = -1;
 
     for (final track in _tracks) {
-      if (track.position > highestPosition) {
+      if (track.position >
+          highestPosition) {
         highestPosition = track.position;
       }
     }
 
-    return highestPosition + 1;
+    return highestPosition +
+        1;
   }
 
   // ============================================================
-  // REMOVER MÚSICA
+  // DELETE TRACK
+  // ============================================================
+  //
+  // delete-profile-track remove:
+  //
+  // - R2;
+  // - Postgres.
+  //
   // ============================================================
 
-  Future<bool> deleteTrack(ProfileTrackModel track) async {
-    if (_disposed || !isOwner) {
+  Future<
+    bool
+  >
+  deleteTrack(
+    ProfileTrackModel track,
+  ) async {
+    if (_disposed ||
+        !isOwner) {
+      return false;
+    }
+
+    final trackId = track.id.trim();
+
+    if (trackId.isEmpty) {
+      _setError(
+        'A música não possui um identificador válido.',
+      );
+
       return false;
     }
 
     _clearError();
 
     try {
-      // ========================================================
-      // BANCO
-      // ========================================================
+      await _trackService.deleteTrackFile(
+        storagePath: track.storagePath,
 
-      await _repository.deleteTrack(trackId: track.id);
-
-      // ========================================================
-      // STORAGE
-      // ========================================================
-
-      if (track.storagePath.trim().isNotEmpty) {
-        await _trackService.deleteTrackFile(storagePath: track.storagePath);
-      }
+        trackId: trackId,
+      );
 
       // ========================================================
-      // ESTADO LOCAL
+      // REMOVER REQUEST PENDENTE
+      // ========================================================
+
+      _playbackRequests.remove(
+        trackId,
+      );
+
+      // ========================================================
+      // LOCAL
       // ========================================================
 
       if (!_disposed) {
-        _tracks = List<ProfileTrackModel>.unmodifiable(
-          _tracks.where((current) {
-            return current.id != track.id;
-          }),
-        );
+        _tracks =
+            List<
+              ProfileTrackModel
+            >.unmodifiable(
+              _tracks.where(
+                (
+                  current,
+                ) {
+                  return current.id !=
+                      trackId;
+                },
+              ),
+            );
 
         _notify();
       }
 
+      debugPrint(
+        '[PUBLIC PROFILE] '
+        'Demo removida: '
+        '$trackId',
+      );
+
       return true;
-    } catch (error) {
-      _setError('Não foi possível remover a música.');
+    } catch (
+      error
+    ) {
+      _setError(
+        'Não foi possível remover a música.',
+      );
 
       debugPrint(
         '[PUBLIC PROFILE] '
@@ -572,79 +811,179 @@ class PublicProfileController extends ChangeNotifier {
   }
 
   // ============================================================
-  // URL PARA REPRODUÇÃO
+  // PLAYBACK URL
+  // ============================================================
+  //
+  // Esta função é o ÚNICO caminho do controller para solicitar
+  // uma presigned GET URL.
+  //
+  // Se já existir uma chamada em andamento para a mesma track,
+  // reutilizamos o Future.
+  //
   // ============================================================
 
-  Future<String> getTrackPlaybackUrl(ProfileTrackModel track) async {
-    if (track.hasAudioUrl) {
-      return track.audioUrl!;
-    }
+  Future<
+    String
+  >
+  getTrackPlaybackUrl(
+    ProfileTrackModel track,
+  ) {
+    final trackId = track.id.trim();
 
-    if (track.storagePath.trim().isEmpty) {
-      return '';
-    }
-
-    try {
-      return await _trackService.createSignedUrl(
-        storagePath: track.storagePath,
+    if (_disposed ||
+        trackId.isEmpty) {
+      return Future<
+        String
+      >.value(
+        '',
       );
-    } catch (error) {
+    }
+
+    // ==========================================================
+    // REQUEST JÁ EM ANDAMENTO
+    // ==========================================================
+
+    final existingRequest = _playbackRequests[trackId];
+
+    if (existingRequest !=
+        null) {
       debugPrint(
         '[PUBLIC PROFILE] '
-        'Erro ao criar URL da música: '
+        'Reutilizando solicitação '
+        'de playback em andamento.',
+      );
+
+      return existingRequest;
+    }
+
+    // ==========================================================
+    // NOVA REQUEST
+    // ==========================================================
+
+    final request = _requestTrackPlaybackUrl(
+      trackId,
+    );
+
+    _playbackRequests[trackId] = request;
+
+    return request;
+  }
+
+  // ============================================================
+  // REQUEST PLAYBACK
+  // ============================================================
+
+  Future<
+    String
+  >
+  _requestTrackPlaybackUrl(
+    String trackId,
+  ) async {
+    try {
+      final url = await _trackService.createPlaybackUrl(
+        trackId: trackId,
+      );
+
+      if (url.trim().isEmpty) {
+        debugPrint(
+          '[PUBLIC PROFILE] '
+          'URL de reprodução vazia.',
+        );
+
+        return '';
+      }
+
+      debugPrint(
+        '[PUBLIC PROFILE] '
+        'Playback URL obtida com sucesso.',
+      );
+
+      // IMPORTANTE:
+      //
+      // Não logar a URL assinada completa.
+
+      return url;
+    } catch (
+      error
+    ) {
+      debugPrint(
+        '[PUBLIC PROFILE] '
+        'Erro ao obter URL de reprodução: '
         '$error',
       );
 
       return '';
+    } finally {
+      _playbackRequests.remove(
+        trackId,
+      );
     }
   }
 
   // ============================================================
-  // PRIMEIRA DEMO + URL
+  // PRIMEIRA DEMO + PLAYBACK
   // ============================================================
   //
-  // Helper útil para o Match.
+  // Match chama apenas este método.
   //
-  // Não abre modal e não toca áudio.
+  // Fluxo:
   //
-  // Apenas resolve:
-  //
-  // usuário
-  //   ↓
-  // primeira demo
-  //   ↓
-  // signed URL
+  // getFirstTrack()
+  //      ↓
+  // getTrackPlaybackUrl()
+  //      ↓
+  // TrackPlaybackData
   //
   // ============================================================
 
-  Future<TrackPlaybackData?> getFirstTrackPlaybackForUser({
+  Future<
+    TrackPlaybackData?
+  >
+  getFirstTrackPlaybackForUser({
     required String userId,
   }) async {
-    final track = await getFirstTrackForUser(userId: userId);
+    final normalizedUserId = userId.trim();
 
-    if (track == null) {
+    if (_disposed ||
+        normalizedUserId.isEmpty) {
       return null;
     }
 
-    final url = await getTrackPlaybackUrl(track);
+    // ==========================================================
+    // TRACK
+    // ==========================================================
 
-    if (url.isEmpty) {
-      return TrackPlaybackData(track: track, url: '');
+    final track = await getFirstTrackForUser(
+      userId: normalizedUserId,
+    );
+
+    if (track ==
+        null) {
+      return null;
     }
 
-    return TrackPlaybackData(track: track, url: url);
+    // ==========================================================
+    // PLAYBACK
+    // ==========================================================
+
+    final url = await getTrackPlaybackUrl(
+      track,
+    );
+
+    return TrackPlaybackData(
+      track: track,
+
+      url: url,
+    );
   }
 
   // ============================================================
-  // ROLE PODE OUVIR?
+  // ROLE LOCAL
   // ============================================================
   //
-  // Validação útil para interface.
+  // Apenas UI.
   //
-  // Segurança real:
-  //
-  // - RLS;
-  // - Storage Policy.
+  // A validação real deve permanecer no backend.
   //
   // ============================================================
 
@@ -652,75 +991,127 @@ class PublicProfileController extends ChangeNotifier {
     required ProfileTrackModel track,
     required String role,
   }) {
-    return track.allowsRole(role);
+    return track.allowsRole(
+      role,
+    );
   }
 
   // ============================================================
-  // USER ROLES PODEM OUVIR?
+  // MULTIPLE ROLES
   // ============================================================
 
   bool canAnyRoleListenToTrack({
     required ProfileTrackModel track,
-    required Iterable<String> roles,
+    required Iterable<
+      String
+    >
+    roles,
   }) {
-    return track.allowsAnyRole(roles);
+    return track.allowsAnyRole(
+      roles,
+    );
   }
 
   // ============================================================
-  // STREAM DAS MÚSICAS
+  // REALTIME
   // ============================================================
 
-  void _startTracksStream(String userId) {
-    unawaited(_tracksSubscription?.cancel());
+  void _startTracksStream(
+    String userId,
+  ) {
+    unawaited(
+      _tracksSubscription?.cancel(),
+    );
 
     _tracksSubscription = _repository
-        .watchTracks(userId: userId)
+        .watchTracks(
+          userId: userId,
+        )
         .listen(
-          (tracks) {
+          (
+            tracks,
+          ) {
             if (_disposed) {
               return;
             }
 
-            _tracks = List<ProfileTrackModel>.unmodifiable(tracks);
+            _tracks =
+                List<
+                  ProfileTrackModel
+                >.unmodifiable(
+                  tracks,
+                );
 
             _notify();
           },
-          onError: (error) {
-            debugPrint(
-              '[PUBLIC PROFILE] '
-              'Erro no stream das músicas: '
-              '$error',
-            );
-          },
+          onError:
+              (
+                error,
+              ) {
+                debugPrint(
+                  '[PUBLIC PROFILE] '
+                  'Erro no realtime das demos: '
+                  '$error',
+                );
+              },
         );
   }
 
   // ============================================================
-  // NORMALIZAR AUDIÊNCIA
+  // NORMALIZE AUDIENCE
   // ============================================================
 
-  List<String> _normalizeAudienceRoles(Iterable<String> roles) {
+  List<
+    String
+  >
+  _normalizeAudienceRoles(
+    Iterable<
+      String
+    >
+    roles,
+  ) {
     final normalized = roles
-        .map((role) {
-          return role.trim().toLowerCase().replaceAll(' ', '_');
-        })
-        .where((role) {
-          return role.isNotEmpty;
-        })
+        .map(
+          (
+            role,
+          ) {
+            return role.trim().toLowerCase().replaceAll(
+              RegExp(
+                r'\s+',
+              ),
+              '_',
+            );
+          },
+        )
+        .where(
+          (
+            role,
+          ) {
+            return role.isNotEmpty;
+          },
+        )
         .toSet()
         .toList();
 
     normalized.sort();
 
-    return List<String>.unmodifiable(normalized);
+    return List<
+      String
+    >.unmodifiable(
+      normalized,
+    );
   }
 
   // ============================================================
   // LOADING
   // ============================================================
 
-  void _setLoading(bool value) {
-    if (_disposed || _isLoading == value) {
+  void _setLoading(
+    bool value,
+  ) {
+    if (_disposed ||
+        _isLoading ==
+            value) {
       return;
     }
 
@@ -733,8 +1124,12 @@ class PublicProfileController extends ChangeNotifier {
   // SAVING
   // ============================================================
 
-  void _setSaving(bool value) {
-    if (_disposed || _isSaving == value) {
+  void _setSaving(
+    bool value,
+  ) {
+    if (_disposed ||
+        _isSaving ==
+            value) {
       return;
     }
 
@@ -747,8 +1142,12 @@ class PublicProfileController extends ChangeNotifier {
   // UPLOAD
   // ============================================================
 
-  void _setUploadingTrack(bool value) {
-    if (_disposed || _isUploadingTrack == value) {
+  void _setUploadingTrack(
+    bool value,
+  ) {
+    if (_disposed ||
+        _isUploadingTrack ==
+            value) {
       return;
     }
 
@@ -758,10 +1157,12 @@ class PublicProfileController extends ChangeNotifier {
   }
 
   // ============================================================
-  // ERRO
+  // ERROR
   // ============================================================
 
-  void _setError(String message) {
+  void _setError(
+    String message,
+  ) {
     if (_disposed) {
       return;
     }
@@ -772,7 +1173,9 @@ class PublicProfileController extends ChangeNotifier {
   }
 
   void _clearError() {
-    if (_disposed || _errorMessage == null) {
+    if (_disposed ||
+        _errorMessage ==
+            null) {
       return;
     }
 
@@ -780,10 +1183,6 @@ class PublicProfileController extends ChangeNotifier {
 
     _notify();
   }
-
-  // ============================================================
-  // LIMPAR ERRO PUBLICAMENTE
-  // ============================================================
 
   void clearError() {
     _clearError();
@@ -813,9 +1212,13 @@ class PublicProfileController extends ChangeNotifier {
 
     _disposed = true;
 
-    unawaited(_tracksSubscription?.cancel());
+    unawaited(
+      _tracksSubscription?.cancel(),
+    );
 
     _tracksSubscription = null;
+
+    _playbackRequests.clear();
 
     super.dispose();
   }
@@ -825,11 +1228,13 @@ class PublicProfileController extends ChangeNotifier {
 // TRACK PLAYBACK DATA
 // ============================================================
 //
-// Resultado pronto para o Match:
+// Resultado entregue ao Match.
 //
-// track + signed URL.
+// track:
+// metadata da demo.
 //
-// Não contém player.
+// url:
+// presigned GET URL temporária.
 //
 // ============================================================
 
@@ -838,7 +1243,10 @@ class TrackPlaybackData {
 
   final String url;
 
-  const TrackPlaybackData({required this.track, required this.url});
+  const TrackPlaybackData({
+    required this.track,
+    required this.url,
+  });
 
   bool get hasUrl => url.trim().isNotEmpty;
 }

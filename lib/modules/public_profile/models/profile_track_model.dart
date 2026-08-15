@@ -2,26 +2,31 @@
 // PROFILE TRACK MODEL
 // ============================================================
 //
-// Representa uma música ou demo publicada no perfil público.
+// Representa uma música/demo publicada no perfil público.
 //
-// Responsabilidades:
+// Banco:
 //
-// - armazenar metadados da faixa;
-// - armazenar público permitido;
-// - converter Map -> Model;
-// - converter Model -> Map;
-// - formatar duração;
-// - formatar tamanho do arquivo;
-// - fornecer helpers;
-// - permitir cópias imutáveis.
+// public.profile_tracks
 //
-// NÃO:
+// Arquivo:
 //
-// - acessa Supabase;
-// - faz upload;
-// - reproduz áudio;
-// - controla UI;
-// - aplica segurança de banco.
+// Cloudflare R2
+//
+// O model armazena apenas metadados.
+//
+// IMPORTANTE:
+//
+// storagePath
+//
+// agora representa o objectKey permanente do R2:
+//
+// profiles/<user-id>/tracks/<uuid>.mp3
+//
+// playbackUrl NÃO é persistida.
+//
+// Ela é temporária e obtida através de:
+//
+// create-track-playback-url
 //
 // ============================================================
 
@@ -40,21 +45,40 @@ class ProfileTrackModel {
 
   final String title;
 
+  // ============================================================
+  // STORAGE
+  // ============================================================
+  //
+  // Cloudflare R2 object key.
+  //
+  // Exemplo:
+  //
+  // profiles/
+  //   user-id/
+  //     tracks/
+  //       uuid.mp3
+  //
+  // ============================================================
+
   final String storagePath;
+
+  // ============================================================
+  // AUDIO URL LEGADA
+  // ============================================================
+  //
+  // Mantida apenas porque a coluna audio_url ainda existe no
+  // Postgres.
+  //
+  // NÃO usamos essa URL para playback.
+  //
+  // O playback usa signed URL temporária.
+  //
+  // ============================================================
 
   final String? audioUrl;
 
   // ============================================================
   // AUDIÊNCIA
-  // ============================================================
-  //
-  // Exemplo:
-  //
-  // [
-  //   'artist',
-  //   'beatmaker',
-  // ]
-  //
   // ============================================================
 
   final List<String> audienceRoles;
@@ -129,6 +153,8 @@ class ProfileTrackModel {
 
   bool get hasId => id.trim().isNotEmpty;
 
+  bool get hasUserId => userId.trim().isNotEmpty;
+
   bool get hasTitle => title.trim().isNotEmpty;
 
   bool get hasStoragePath => storagePath.trim().isNotEmpty;
@@ -140,6 +166,8 @@ class ProfileTrackModel {
   bool get hasFileSize => fileSizeBytes != null && fileSizeBytes! > 0;
 
   bool get hasAudience => audienceRoles.isNotEmpty;
+
+  bool get isPlayable => hasId && hasStoragePath && isActive;
 
   // ============================================================
   // AUDIENCE
@@ -217,7 +245,7 @@ class ProfileTrackModel {
   }
 
   // ============================================================
-  // FORMATO
+  // MIME FORMAT
   // ============================================================
 
   String get formatLabel {
@@ -227,11 +255,50 @@ class ProfileTrackModel {
       return '';
     }
 
+    switch (normalizedMimeType.toLowerCase()) {
+      case 'audio/mpeg':
+      case 'audio/mp3':
+        return 'MP3';
+
+      case 'audio/wav':
+      case 'audio/x-wav':
+        return 'WAV';
+
+      case 'audio/mp4':
+        return 'M4A';
+
+      case 'audio/aac':
+        return 'AAC';
+
+      case 'audio/ogg':
+        return 'OGG';
+    }
+
     if (!normalizedMimeType.contains('/')) {
       return normalizedMimeType.toUpperCase();
     }
 
     return normalizedMimeType.split('/').last.toUpperCase();
+  }
+
+  // ============================================================
+  // STORAGE FILE NAME
+  // ============================================================
+
+  String get storageFileName {
+    final path = storagePath.trim();
+
+    if (path.isEmpty) {
+      return '';
+    }
+
+    final parts = path.split('/');
+
+    if (parts.isEmpty) {
+      return '';
+    }
+
+    return parts.last;
   }
 
   // ============================================================
@@ -271,6 +338,12 @@ class ProfileTrackModel {
   // ============================================================
   // TO MAP
   // ============================================================
+  //
+  // Representação completa do model.
+  //
+  // audio_url continua aqui apenas para compatibilidade.
+  //
+  // ============================================================
 
   Map<String, dynamic> toMap() {
     return {
@@ -288,7 +361,7 @@ class ProfileTrackModel {
 
       'duration_seconds': durationSeconds,
 
-      'mime_type': _normalizeNullableString(mimeType),
+      'mime_type': _normalizeMimeType(mimeType),
 
       'file_size_bytes': fileSizeBytes,
 
@@ -305,6 +378,17 @@ class ProfileTrackModel {
   // ============================================================
   // INSERT MAP
   // ============================================================
+  //
+  // Não envia:
+  //
+  // - id;
+  // - audio_url;
+  // - created_at;
+  // - updated_at.
+  //
+  // audio_url não é usada com R2 privado.
+  //
+  // ============================================================
 
   Map<String, dynamic> toInsertMap() {
     return {
@@ -314,13 +398,11 @@ class ProfileTrackModel {
 
       'storage_path': storagePath.trim(),
 
-      'audio_url': _normalizeNullableString(audioUrl),
-
       'audience_roles': _normalizeRoles(audienceRoles),
 
       'duration_seconds': durationSeconds,
 
-      'mime_type': _normalizeNullableString(mimeType),
+      'mime_type': _normalizeMimeType(mimeType),
 
       'file_size_bytes': fileSizeBytes,
 
@@ -333,18 +415,26 @@ class ProfileTrackModel {
   // ============================================================
   // UPDATE MAP
   // ============================================================
+  //
+  // Não alteramos:
+  //
+  // - id;
+  // - user_id;
+  // - storage_path;
+  // - audio_url;
+  // - created_at.
+  //
+  // ============================================================
 
   Map<String, dynamic> toUpdateMap() {
     return {
       'title': title.trim(),
 
-      'audio_url': _normalizeNullableString(audioUrl),
-
       'audience_roles': _normalizeRoles(audienceRoles),
 
       'duration_seconds': durationSeconds,
 
-      'mime_type': _normalizeNullableString(mimeType),
+      'mime_type': _normalizeMimeType(mimeType),
 
       'file_size_bytes': fileSizeBytes,
 
@@ -445,20 +535,34 @@ class ProfileTrackModel {
   }
 
   // ============================================================
+  // NORMALIZE MIME TYPE
+  // ============================================================
+
+  static String? _normalizeMimeType(String? value) {
+    final normalized = value?.trim().toLowerCase();
+
+    if (normalized == null || normalized.isEmpty) {
+      return null;
+    }
+
+    if (normalized == 'audio/mp3') {
+      return 'audio/mpeg';
+    }
+
+    if (normalized == 'audio/x-wav') {
+      return 'audio/wav';
+    }
+
+    return normalized;
+  }
+
+  // ============================================================
   // READ STRING LIST
   // ============================================================
 
   static List<String> _readStringList(dynamic value) {
     if (value == null) {
       return const <String>[];
-    }
-
-    if (value is List) {
-      return _normalizeRoles(
-        value.map((item) {
-          return item.toString();
-        }),
-      );
     }
 
     if (value is Iterable) {
@@ -477,7 +581,7 @@ class ProfileTrackModel {
   // ============================================================
 
   static String _normalizeRole(String value) {
-    return value.trim().toLowerCase().replaceAll(' ', '_');
+    return value.trim().toLowerCase().replaceAll(RegExp(r'\s+'), '_');
   }
 
   // ============================================================
@@ -602,7 +706,10 @@ class ProfileTrackModel {
         'id: $id, '
         'userId: $userId, '
         'title: $title, '
+        'storagePath: $storagePath, '
         'audienceRoles: $audienceRoles, '
+        'durationSeconds: $durationSeconds, '
+        'mimeType: $mimeType, '
         'position: $position, '
         'isActive: $isActive'
         ')';

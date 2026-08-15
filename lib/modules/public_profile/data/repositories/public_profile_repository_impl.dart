@@ -11,18 +11,35 @@ import '../datasources/public_profile_remote_datasource.dart';
 //
 // - converter Map -> Model;
 // - converter Model -> Map;
-// - delegar operações ao datasource.
+// - delegar operações de banco ao Datasource.
 //
-// NÃO:
+// Arquitetura:
 //
-// - acessa Supabase diretamente;
-// - controla UI;
-// - reproduz áudio;
-// - possui regra de Match.
+// UI / Controller
+//      ↓
+// Repository
+//      ↓
+// Datasource
+//      ↓
+// Supabase Postgres
+//
+// Arquivos de áudio:
+//
+// NÃO passam por este Repository.
+//
+// Eles usam:
+//
+// ProfileTrackService
+//      ↓
+// Supabase Edge Functions
+//      ↓
+// Cloudflare R2
 //
 // ============================================================
 
-class PublicProfileRepositoryImpl implements PublicProfileRepository {
+class PublicProfileRepositoryImpl
+    implements
+        PublicProfileRepository {
   // ============================================================
   // DATASOURCE
   // ============================================================
@@ -33,23 +50,41 @@ class PublicProfileRepositoryImpl implements PublicProfileRepository {
   // CONSTRUTOR
   // ============================================================
 
-  PublicProfileRepositoryImpl({PublicProfileRemoteDatasource? remoteDatasource})
-    : _remoteDatasource =
-          remoteDatasource ?? PublicProfileRemoteDatasourceImpl();
+  PublicProfileRepositoryImpl({
+    PublicProfileRemoteDatasource? remoteDatasource,
+  }) : _remoteDatasource =
+           remoteDatasource ??
+           PublicProfileRemoteDatasourceImpl();
 
   // ============================================================
   // PERFIL
   // ============================================================
 
   @override
-  Future<PublicProfileModel?> getProfile({required String userId}) async {
-    final data = await _remoteDatasource.getProfile(userId: userId);
+  Future<
+    PublicProfileModel?
+  >
+  getProfile({
+    required String userId,
+  }) async {
+    final normalizedUserId = userId.trim();
 
-    if (data == null) {
+    if (normalizedUserId.isEmpty) {
       return null;
     }
 
-    return PublicProfileModel.fromMap(data);
+    final data = await _remoteDatasource.getProfile(
+      userId: normalizedUserId,
+    );
+
+    if (data ==
+        null) {
+      return null;
+    }
+
+    return PublicProfileModel.fromMap(
+      data,
+    );
   }
 
   // ============================================================
@@ -57,15 +92,28 @@ class PublicProfileRepositoryImpl implements PublicProfileRepository {
   // ============================================================
 
   @override
-  Future<PublicProfileModel> updateProfile({
+  Future<
+    PublicProfileModel
+  >
+  updateProfile({
     required PublicProfileModel profile,
   }) async {
+    final userId = profile.userId.trim();
+
+    if (userId.isEmpty) {
+      throw ArgumentError(
+        'O perfil não possui userId válido.',
+      );
+    }
+
     final data = await _remoteDatasource.updateProfile(
-      userId: profile.userId,
+      userId: userId,
       data: profile.toUpdateMap(),
     );
 
-    return PublicProfileModel.fromMap(data);
+    return PublicProfileModel.fromMap(
+      data,
+    );
   }
 
   // ============================================================
@@ -73,20 +121,47 @@ class PublicProfileRepositoryImpl implements PublicProfileRepository {
   // ============================================================
 
   @override
-  Future<List<ProfileTrackModel>> getTracks({
+  Future<
+    List<
+      ProfileTrackModel
+    >
+  >
+  getTracks({
     required String userId,
     bool onlyActive = true,
   }) async {
+    final normalizedUserId = userId.trim();
+
+    if (normalizedUserId.isEmpty) {
+      return const <
+        ProfileTrackModel
+      >[];
+    }
+
     final rows = await _remoteDatasource.getTracks(
-      userId: userId,
+      userId: normalizedUserId,
       onlyActive: onlyActive,
     );
 
-    return rows
-        .map((row) {
-          return ProfileTrackModel.fromMap(row);
-        })
-        .toList(growable: false);
+    final tracks = rows.map(
+      (
+        row,
+      ) {
+        return ProfileTrackModel.fromMap(
+          row,
+        );
+      },
+    ).toList();
+
+    _sortTracks(
+      tracks,
+    );
+
+    return List<
+      ProfileTrackModel
+    >.unmodifiable(
+      tracks,
+    );
   }
 
   // ============================================================
@@ -101,33 +176,80 @@ class PublicProfileRepositoryImpl implements PublicProfileRepository {
   //    ↓
   // ProfileTrackModel?
   //
+  // Essa função retorna apenas METADADOS.
+  //
+  // A playbackUrl é gerada depois pelo:
+  //
+  // ProfileTrackService
+  //    ↓
+  // create-track-playback-url
+  //    ↓
+  // Cloudflare R2
+  //
   // ============================================================
 
   @override
-  Future<ProfileTrackModel?> getFirstTrack({required String userId}) async {
-    final data = await _remoteDatasource.getFirstTrack(
-      userId: userId,
-      onlyActive: true,
-    );
+  Future<
+    ProfileTrackModel?
+  >
+  getFirstTrack({
+    required String userId,
+  }) async {
+    final normalizedUserId = userId.trim();
 
-    if (data == null) {
+    if (normalizedUserId.isEmpty) {
       return null;
     }
 
-    return ProfileTrackModel.fromMap(data);
+    final data = await _remoteDatasource.getFirstTrack(
+      userId: normalizedUserId,
+      onlyActive: true,
+    );
+
+    if (data ==
+        null) {
+      return null;
+    }
+
+    return ProfileTrackModel.fromMap(
+      data,
+    );
   }
 
   // ============================================================
   // CRIAR TRACK
   // ============================================================
+  //
+  // IMPORTANTE:
+  //
+  // O arquivo já deve ter sido enviado para o R2 antes daqui.
+  //
+  // storagePath contém o objectKey do R2.
+  //
+  // Exemplo:
+  //
+  // profiles/<user-id>/tracks/<uuid>.mp3
+  //
+  // ============================================================
 
   @override
-  Future<ProfileTrackModel> createTrack({
+  Future<
+    ProfileTrackModel
+  >
+  createTrack({
     required ProfileTrackModel track,
   }) async {
-    final data = await _remoteDatasource.createTrack(data: track.toInsertMap());
+    _validateTrackForCreate(
+      track,
+    );
 
-    return ProfileTrackModel.fromMap(data);
+    final data = await _remoteDatasource.createTrack(
+      data: track.toInsertMap(),
+    );
+
+    return ProfileTrackModel.fromMap(
+      data,
+    );
   }
 
   // ============================================================
@@ -135,24 +257,72 @@ class PublicProfileRepositoryImpl implements PublicProfileRepository {
   // ============================================================
 
   @override
-  Future<ProfileTrackModel> updateTrack({
+  Future<
+    ProfileTrackModel
+  >
+  updateTrack({
     required ProfileTrackModel track,
   }) async {
+    final trackId = track.id.trim();
+
+    if (trackId.isEmpty) {
+      throw ArgumentError(
+        'A track não possui id válido.',
+      );
+    }
+
     final data = await _remoteDatasource.updateTrack(
-      trackId: track.id,
+      trackId: trackId,
       data: track.toUpdateMap(),
     );
 
-    return ProfileTrackModel.fromMap(data);
+    return ProfileTrackModel.fromMap(
+      data,
+    );
   }
 
   // ============================================================
-  // EXCLUIR TRACK
+  // EXCLUIR TRACK - LEGADO
+  // ============================================================
+  //
+  // IMPORTANTE:
+  //
+  // O fluxo normal NÃO deve usar este método.
+  //
+  // Para excluir uma demo use:
+  //
+  // ProfileTrackService.deleteTrack(
+  //   trackId: track.id,
+  // )
+  //
+  // A Edge Function delete-profile-track remove:
+  //
+  // - arquivo do R2;
+  // - registro no Postgres.
+  //
+  // Este método permanece apenas porque a interface
+  // PublicProfileRepository ainda o expõe.
+  //
   // ============================================================
 
   @override
-  Future<void> deleteTrack({required String trackId}) {
-    return _remoteDatasource.deleteTrack(trackId: trackId);
+  Future<
+    void
+  >
+  deleteTrack({
+    required String trackId,
+  }) {
+    final normalizedTrackId = trackId.trim();
+
+    if (normalizedTrackId.isEmpty) {
+      return Future<
+        void
+      >.value();
+    }
+
+    return _remoteDatasource.deleteTrack(
+      trackId: normalizedTrackId,
+    );
   }
 
   // ============================================================
@@ -160,27 +330,139 @@ class PublicProfileRepositoryImpl implements PublicProfileRepository {
   // ============================================================
 
   @override
-  Stream<List<ProfileTrackModel>> watchTracks({required String userId}) {
-    return _remoteDatasource.watchTracks(userId: userId).map((rows) {
-      final tracks = rows.map((row) {
-        return ProfileTrackModel.fromMap(row);
-      }).toList();
+  Stream<
+    List<
+      ProfileTrackModel
+    >
+  >
+  watchTracks({
+    required String userId,
+  }) {
+    final normalizedUserId = userId.trim();
 
-      tracks.sort((a, b) {
-        final positionComparison = a.position.compareTo(b.position);
+    if (normalizedUserId.isEmpty) {
+      return Stream<
+        List<
+          ProfileTrackModel
+        >
+      >.value(
+        const <
+          ProfileTrackModel
+        >[],
+      );
+    }
 
-        if (positionComparison != 0) {
+    return _remoteDatasource
+        .watchTracks(
+          userId: normalizedUserId,
+        )
+        .map(
+          (
+            rows,
+          ) {
+            final tracks = rows.map(
+              (
+                row,
+              ) {
+                return ProfileTrackModel.fromMap(
+                  row,
+                );
+              },
+            ).toList();
+
+            _sortTracks(
+              tracks,
+            );
+
+            return List<
+              ProfileTrackModel
+            >.unmodifiable(
+              tracks,
+            );
+          },
+        );
+  }
+
+  // ============================================================
+  // VALIDAR TRACK PARA CREATE
+  // ============================================================
+
+  void _validateTrackForCreate(
+    ProfileTrackModel track,
+  ) {
+    if (!track.hasUserId) {
+      throw ArgumentError(
+        'A track não possui userId válido.',
+      );
+    }
+
+    if (!track.hasTitle) {
+      throw ArgumentError(
+        'A track precisa possuir título.',
+      );
+    }
+
+    if (!track.hasStoragePath) {
+      throw ArgumentError(
+        'A track não possui storagePath do R2.',
+      );
+    }
+
+    if (!track.hasAudience) {
+      throw ArgumentError(
+        'A track precisa possuir pelo menos um grupo de audiência.',
+      );
+    }
+  }
+
+  // ============================================================
+  // SORT
+  // ============================================================
+
+  void _sortTracks(
+    List<
+      ProfileTrackModel
+    >
+    tracks,
+  ) {
+    tracks.sort(
+      (
+        a,
+        b,
+      ) {
+        // ======================================================
+        // POSITION
+        // ======================================================
+
+        final positionComparison = a.position.compareTo(
+          b.position,
+        );
+
+        if (positionComparison !=
+            0) {
           return positionComparison;
         }
 
-        final aCreated = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+        // ======================================================
+        // CREATED AT
+        // ======================================================
 
-        final bCreated = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+        final aCreated =
+            a.createdAt ??
+            DateTime.fromMillisecondsSinceEpoch(
+              0,
+            );
 
-        return bCreated.compareTo(aCreated);
-      });
+        final bCreated =
+            b.createdAt ??
+            DateTime.fromMillisecondsSinceEpoch(
+              0,
+            );
 
-      return List<ProfileTrackModel>.unmodifiable(tracks);
-    });
+        return bCreated.compareTo(
+          aCreated,
+        );
+      },
+    );
   }
 }

@@ -4,21 +4,31 @@
 //
 // Representa os dados públicos do perfil profissional.
 //
+// Banco:
+//
+// public.profiles
+//
 // Responsabilidades:
 //
 // - armazenar dados do perfil público;
 // - converter Map -> Model;
 // - converter Model -> Map;
-// - fornecer dados derivados para apresentação;
+// - fornecer helpers de apresentação;
 // - permitir cópias imutáveis.
 //
 // NÃO:
 //
 // - acessa Supabase;
+// - acessa Cloudflare R2;
 // - faz upload;
 // - controla UI;
 // - executa navegação;
-// - possui regras do Match.
+// - possui regras de Match;
+// - armazena músicas.
+//
+// As músicas ficam em:
+//
+// public.profile_tracks
 //
 // ============================================================
 
@@ -85,47 +95,25 @@ class PublicProfileModel {
   }
 
   // ============================================================
-  // HAS AVATAR
+  // GETTERS
   // ============================================================
 
-  bool get hasAvatar {
-    return avatarUrl?.trim().isNotEmpty == true;
-  }
+  bool get hasUserId => userId.trim().isNotEmpty;
+
+  bool get hasAvatar => avatarUrl?.trim().isNotEmpty == true;
+
+  bool get hasBio => bio.trim().isNotEmpty;
+
+  bool get hasUsername => username.trim().isNotEmpty;
+
+  bool get hasDisplayName => displayName.trim().isNotEmpty;
+
+  bool get isEmpty => !hasUsername && !hasDisplayName && !hasBio && !hasAvatar;
+
+  bool get isComplete => hasUserId && hasUsername && hasDisplayName;
 
   // ============================================================
-  // HAS BIO
-  // ============================================================
-
-  bool get hasBio {
-    return bio.trim().isNotEmpty;
-  }
-
-  // ============================================================
-  // HAS USERNAME
-  // ============================================================
-
-  bool get hasUsername {
-    return username.trim().isNotEmpty;
-  }
-
-  // ============================================================
-  // HAS DISPLAY NAME
-  // ============================================================
-
-  bool get hasDisplayName {
-    return displayName.trim().isNotEmpty;
-  }
-
-  // ============================================================
-  // EMPTY
-  // ============================================================
-
-  bool get isEmpty {
-    return !hasUsername && !hasDisplayName && !hasBio && !hasAvatar;
-  }
-
-  // ============================================================
-  // USERNAME LABEL
+  // USERNAME
   // ============================================================
 
   String get usernameLabel {
@@ -163,7 +151,7 @@ class PublicProfileModel {
   }
 
   // ============================================================
-  // INICIAIS
+  // INITIALS
   // ============================================================
 
   String get initials {
@@ -193,15 +181,32 @@ class PublicProfileModel {
   }
 
   // ============================================================
+  // BIO RESUMIDA
+  // ============================================================
+
+  String get shortBio {
+    final normalizedBio = bio.trim();
+
+    if (normalizedBio.length <= 160) {
+      return normalizedBio;
+    }
+
+    return '${normalizedBio.substring(0, 157)}...';
+  }
+
+  // ============================================================
   // FROM MAP
   // ============================================================
   //
-  // Compatível com public.profiles.
+  // Compatível com:
   //
-  // Para o nome público:
+  // public.profiles
+  //
+  // Prioridade para nome público:
   //
   // 1. artist_name
   // 2. name
+  // 3. username
   //
   // ============================================================
 
@@ -210,12 +215,20 @@ class PublicProfileModel {
 
     final name = _readString(map['name']);
 
+    final username = _readString(map['username']);
+
+    final resolvedName = artistName.isNotEmpty
+        ? artistName
+        : name.isNotEmpty
+        ? name
+        : username;
+
     return PublicProfileModel(
       userId: _readString(map['id']),
 
-      username: _readString(map['username']),
+      username: username,
 
-      displayName: artistName.isNotEmpty ? artistName : name,
+      displayName: resolvedName,
 
       avatarUrl: _readNullableString(map['avatar_url']),
 
@@ -231,6 +244,10 @@ class PublicProfileModel {
 
   // ============================================================
   // TO MAP
+  // ============================================================
+  //
+  // Representação completa.
+  //
   // ============================================================
 
   Map<String, dynamic> toMap() {
@@ -254,10 +271,10 @@ class PublicProfileModel {
   }
 
   // ============================================================
-  // UPDATE MAP
+  // TO UPDATE MAP
   // ============================================================
   //
-  // Utilizado ao editar o perfil.
+  // Utilizado na edição do perfil.
   //
   // Não envia:
   //

@@ -3,32 +3,46 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 
-import '../models/profile_track_model.dart';
+import 'package:versin/modules/public_profile/models/profile_track_model.dart';
 
 // ============================================================
 // PROFILE TRACK PLAYER CONTROLLER
 // ============================================================
 //
-// Player compartilhável para demos do perfil/Match.
+// Player reutilizável para demos.
+//
+// Fluxo:
+//
+// Cloudflare R2
+//      ↓
+// presigned HTTPS URL
+//      ↓
+// ProfileTrackPlayerController
+//      ↓
+// just_audio
 //
 // Responsabilidades:
 //
-// - carregar URL;
+// - carregar URL temporária;
 // - play;
 // - pause;
 // - toggle;
-// - stop;
 // - seek;
-// - limitar reprodução de preview;
-// - expor posição/duração;
-// - controlar loading/erro.
+// - stop;
+// - limitar preview;
+// - controlar posição;
+// - controlar duração;
+// - tratar conclusão;
+// - tratar erros;
+// - expor estado para UI.
 //
 // NÃO:
 //
-// - busca signed URL;
-// - verifica RLS;
+// - busca URL no R2;
+// - chama Edge Function;
 // - acessa Supabase;
-// - registra like.
+// - verifica audience_roles;
+// - registra likes.
 //
 // ============================================================
 
@@ -42,20 +56,18 @@ class ProfileTrackPlayerController extends ChangeNotifier {
   // ============================================================
   // PREVIEW
   // ============================================================
-  //
-  // O player pode tocar no máximo 60 segundos.
-  //
-  // ============================================================
 
   static const Duration previewLimit = Duration(seconds: 60);
 
   // ============================================================
-  // STATE
+  // ESTADO
   // ============================================================
 
   ProfileTrackModel? _track;
 
   bool _isLoading = false;
+
+  bool _isCompleted = false;
 
   String? _errorMessage;
 
@@ -72,6 +84,8 @@ class ProfileTrackPlayerController extends ChangeNotifier {
   StreamSubscription<Duration?>? _durationSubscription;
 
   StreamSubscription<PlayerState>? _stateSubscription;
+
+  StreamSubscription<PlayerException>? _errorSubscription;
 
   // ============================================================
   // DISPOSE
@@ -97,15 +111,19 @@ class ProfileTrackPlayerController extends ChangeNotifier {
 
   bool get isLoading => _isLoading;
 
+  bool get isCompleted => _isCompleted;
+
   String? get errorMessage => _errorMessage;
 
-  bool get hasError => _errorMessage?.isNotEmpty == true;
+  bool get hasError => _errorMessage?.trim().isNotEmpty == true;
 
-  bool get isPlaying => _player.playing;
+  bool get isPlaying => _player.playing && !_isCompleted;
 
   Duration get position => _position;
 
   Duration get duration => _effectiveDuration;
+
+  bool get hasTrack => _track != null;
 
   // ============================================================
   // DURAÇÃO EFETIVA
@@ -143,13 +161,9 @@ class ProfileTrackPlayerController extends ChangeNotifier {
   // FORMAT
   // ============================================================
 
-  String get formattedPosition {
-    return _formatDuration(_position);
-  }
+  String get formattedPosition => _formatDuration(_position);
 
-  String get formattedDuration {
-    return _formatDuration(_effectiveDuration);
-  }
+  String get formattedDuration => _formatDuration(_effectiveDuration);
 
   // ============================================================
   // LOAD
@@ -161,7 +175,7 @@ class ProfileTrackPlayerController extends ChangeNotifier {
   }) async {
     final normalizedUrl = url.trim();
 
-    if (normalizedUrl.isEmpty || _disposed) {
+    if (_disposed || normalizedUrl.isEmpty) {
       return false;
     }
 
@@ -169,28 +183,83 @@ class ProfileTrackPlayerController extends ChangeNotifier {
 
     _clearError();
 
+    _isCompleted = false;
+
     try {
+      // ========================================================
+      // PARAR PLAYER ANTERIOR
+      // ========================================================
+
       await _player.stop();
+
+      if (_disposed) {
+        return false;
+      }
+
+      // ========================================================
+      // ESTADO
+      // ========================================================
 
       _track = track;
 
       _position = Duration.zero;
 
+      _duration = Duration.zero;
+
+      // ========================================================
+      // URL TEMPORÁRIA R2
+      // ========================================================
+
       final duration = await _player.setUrl(normalizedUrl);
+
+      if (_disposed) {
+        return false;
+      }
 
       _duration = duration ?? Duration.zero;
 
       // ========================================================
-      // CLIP
+      // LIMITAR A 60 SEGUNDOS
       // ========================================================
 
       if (_duration > previewLimit) {
         await _player.setClip(start: Duration.zero, end: previewLimit);
       }
 
+      if (_disposed) {
+        return false;
+      }
+
       _notify();
 
+      debugPrint(
+        '[TRACK PLAYER] '
+        'Demo carregada: '
+        '${track.title}',
+      );
+
       return true;
+    } on PlayerException catch (error) {
+      _setError('Não foi possível carregar a demo.');
+
+      debugPrint(
+        '[TRACK PLAYER] '
+        'PlayerException: '
+        '${error.code} | '
+        '${error.message}',
+      );
+
+      return false;
+    } on PlayerInterruptedException catch (error) {
+      _setError('O carregamento da demo foi interrompido.');
+
+      debugPrint(
+        '[TRACK PLAYER] '
+        'Carregamento interrompido: '
+        '${error.message}',
+      );
+
+      return false;
     } catch (error) {
       _setError('Não foi possível carregar a demo.');
 
@@ -222,7 +291,7 @@ class ProfileTrackPlayerController extends ChangeNotifier {
 
     await play();
 
-    return true;
+    return !hasError;
   }
 
   // ============================================================
@@ -230,16 +299,41 @@ class ProfileTrackPlayerController extends ChangeNotifier {
   // ============================================================
 
   Future<void> play() async {
-    if (_disposed || _track == null) {
+    if (_disposed || _track == null || _isLoading) {
       return;
     }
 
-    if (_position >= _effectiveDuration) {
-      await seek(Duration.zero);
-    }
+    _clearError();
 
     try {
-      await _player.play();
+      // ========================================================
+      // REPLAY
+      // ========================================================
+
+      if (_isCompleted || _position >= _effectiveDuration) {
+        await _player.seek(Duration.zero);
+
+        _position = Duration.zero;
+
+        _isCompleted = false;
+      }
+
+      // ========================================================
+      // PLAY
+      // ========================================================
+
+      unawaited(_player.play());
+
+      _notify();
+    } on PlayerException catch (error) {
+      _setError('Não foi possível reproduzir a demo.');
+
+      debugPrint(
+        '[TRACK PLAYER] '
+        'Erro de reprodução: '
+        '${error.code} | '
+        '${error.message}',
+      );
     } catch (error) {
       _setError('Não foi possível reproduzir a demo.');
 
@@ -260,7 +354,17 @@ class ProfileTrackPlayerController extends ChangeNotifier {
       return;
     }
 
-    await _player.pause();
+    try {
+      await _player.pause();
+
+      _notify();
+    } catch (error) {
+      debugPrint(
+        '[TRACK PLAYER] '
+        'Erro ao pausar: '
+        '$error',
+      );
+    }
   }
 
   // ============================================================
@@ -268,6 +372,10 @@ class ProfileTrackPlayerController extends ChangeNotifier {
   // ============================================================
 
   Future<void> toggle() async {
+    if (_disposed || _isLoading || _track == null) {
+      return;
+    }
+
     if (isPlaying) {
       await pause();
 
@@ -282,7 +390,7 @@ class ProfileTrackPlayerController extends ChangeNotifier {
   // ============================================================
 
   Future<void> seek(Duration position) async {
-    if (_disposed) {
+    if (_disposed || _track == null) {
       return;
     }
 
@@ -296,11 +404,25 @@ class ProfileTrackPlayerController extends ChangeNotifier {
       normalized = _effectiveDuration;
     }
 
-    await _player.seek(normalized);
+    try {
+      await _player.seek(normalized);
+
+      _position = normalized;
+
+      _isCompleted = normalized >= _effectiveDuration;
+
+      _notify();
+    } catch (error) {
+      debugPrint(
+        '[TRACK PLAYER] '
+        'Erro ao buscar posição: '
+        '$error',
+      );
+    }
   }
 
   // ============================================================
-  // SEEK POR PROGRESS
+  // SEEK POR PROGRESSO
   // ============================================================
 
   Future<void> seekToProgress(double value) async {
@@ -321,11 +443,21 @@ class ProfileTrackPlayerController extends ChangeNotifier {
       return;
     }
 
-    await _player.stop();
+    try {
+      await _player.stop();
 
-    _position = Duration.zero;
+      _position = Duration.zero;
 
-    _notify();
+      _isCompleted = false;
+
+      _notify();
+    } catch (error) {
+      debugPrint(
+        '[TRACK PLAYER] '
+        'Erro ao parar: '
+        '$error',
+      );
+    }
   }
 
   // ============================================================
@@ -337,13 +469,19 @@ class ProfileTrackPlayerController extends ChangeNotifier {
       return;
     }
 
-    await _player.stop();
+    try {
+      await _player.stop();
+    } catch (_) {
+      // Ignora falha no cleanup.
+    }
 
     _track = null;
 
     _position = Duration.zero;
 
     _duration = Duration.zero;
+
+    _isCompleted = false;
 
     _clearError();
 
@@ -355,19 +493,39 @@ class ProfileTrackPlayerController extends ChangeNotifier {
   // ============================================================
 
   void _setupStreams() {
+    // ==========================================================
+    // POSITION
+    // ==========================================================
+
     _positionSubscription = _player.positionStream.listen((position) {
       if (_disposed) {
         return;
       }
 
-      _position = position;
+      final effectiveDuration = _effectiveDuration;
 
-      if (_position >= _effectiveDuration) {
+      if (position > effectiveDuration) {
+        _position = effectiveDuration;
+      } else {
+        _position = position;
+      }
+
+      // ======================================================
+      // GARANTIR LIMITE DE PREVIEW
+      // ======================================================
+
+      if (_position >= effectiveDuration) {
+        _isCompleted = true;
+
         unawaited(_player.pause());
       }
 
       _notify();
     });
+
+    // ==========================================================
+    // DURATION
+    // ==========================================================
 
     _durationSubscription = _player.durationStream.listen((duration) {
       if (_disposed) {
@@ -379,8 +537,56 @@ class ProfileTrackPlayerController extends ChangeNotifier {
       _notify();
     });
 
-    _stateSubscription = _player.playerStateStream.listen((_) {
+    // ==========================================================
+    // PLAYER STATE
+    // ==========================================================
+
+    _stateSubscription = _player.playerStateStream.listen((state) {
+      if (_disposed) {
+        return;
+      }
+
+      // ======================================================
+      // COMPLETED
+      // ======================================================
+
+      if (state.processingState == ProcessingState.completed) {
+        _isCompleted = true;
+
+        _position = _effectiveDuration;
+
+        unawaited(_player.pause());
+      }
+
+      // ======================================================
+      // NOVA REPRODUÇÃO
+      // ======================================================
+
+      if (state.processingState == ProcessingState.ready &&
+          _position < _effectiveDuration) {
+        _isCompleted = false;
+      }
+
       _notify();
+    });
+
+    // ==========================================================
+    // ERROS ASSÍNCRONOS
+    // ==========================================================
+
+    _errorSubscription = _player.errorStream.listen((error) {
+      if (_disposed) {
+        return;
+      }
+
+      _setError('A reprodução da demo foi interrompida.');
+
+      debugPrint(
+        '[TRACK PLAYER] '
+        'Erro assíncrono: '
+        '${error.code} | '
+        '${error.message}',
+      );
     });
   }
 
@@ -407,7 +613,7 @@ class ProfileTrackPlayerController extends ChangeNotifier {
       return;
     }
 
-    _errorMessage = message;
+    _errorMessage = message.trim();
 
     _notify();
   }
@@ -427,7 +633,7 @@ class ProfileTrackPlayerController extends ChangeNotifier {
   }
 
   // ============================================================
-  // FORMAT
+  // FORMAT DURATION
   // ============================================================
 
   String _formatDuration(Duration duration) {
@@ -468,6 +674,8 @@ class ProfileTrackPlayerController extends ChangeNotifier {
     unawaited(_durationSubscription?.cancel());
 
     unawaited(_stateSubscription?.cancel());
+
+    unawaited(_errorSubscription?.cancel());
 
     unawaited(_player.dispose());
 

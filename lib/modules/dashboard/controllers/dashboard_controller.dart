@@ -6,12 +6,24 @@ import 'package:versin/modules/login/domain/repositories/auth_repository.dart';
 import '../data/models/hardware_status_model.dart';
 import '../repositories/dashboard_repository.dart';
 
+// ============================================================
+// DASHBOARD CONTROLLER
+// ============================================================
+
 class DashboardController
     extends
         ChangeNotifier {
+  // ============================================================
+  // REPOSITORIES
+  // ============================================================
+
   final DashboardRepository _repository = DashboardRepository();
 
   final AuthRepository _authRepository = AuthRepositoryImpl();
+
+  // ============================================================
+  // PAGE CONTROLLER
+  // ============================================================
 
   PageController? _pageController;
 
@@ -65,16 +77,50 @@ class DashboardController
 
   bool isProfileCardExpanded = true;
 
-  bool isCalendarExpanded = false;
+  // ============================================================
+  // CALENDÁRIO LEGADO
+  // ============================================================
+  //
+  // Estes estados permanecem temporariamente porque alguns
+  // componentes antigos do Dashboard ainda podem utilizá-los.
+  //
+  // O novo módulo de calendário utiliza:
+  //
+  // CalendarController
+  // CalendarService
+  // CalendarRepository
+  //
+  // ============================================================
 
-  bool hasActiveProject = false;
+  bool isCalendarExpanded = false;
 
   DateTime focusedDay = DateTime.now();
 
   int selectedDay = DateTime.now().day;
 
   // ============================================================
-  // COMPROMISSOS
+  // PROJETO
+  // ============================================================
+
+  bool hasActiveProject = false;
+
+  // ============================================================
+  // COMPROMISSOS LEGADOS
+  // ============================================================
+  //
+  // IMPORTANTE:
+  //
+  // As tarefas fake foram REMOVIDAS.
+  //
+  // Esta lista fica vazia apenas por compatibilidade temporária
+  // com widgets antigos do Dashboard.
+  //
+  // Novas tarefas NÃO devem ser persistidas aqui.
+  //
+  // A fonte real passa a ser o módulo:
+  //
+  // modules/calendar
+  //
   // ============================================================
 
   final List<
@@ -83,29 +129,7 @@ class DashboardController
       dynamic
     >
   >
-  appointments = [
-    {
-      'day': DateTime.now().day,
-      'month': DateTime.now().month,
-      'year': DateTime.now().year,
-      'time': '14:00',
-      'title': 'Sessão de Mixagem - Trap Beat',
-    },
-    {
-      'day': DateTime.now().day,
-      'month': DateTime.now().month,
-      'year': DateTime.now().year,
-      'time': '18:30',
-      'title': 'Sync do banco com Supabase V2',
-    },
-    {
-      'day': 20,
-      'month': 5,
-      'year': 2026,
-      'time': '10:00',
-      'title': 'Recuperar batidas antigas',
-    },
-  ];
+  appointments = [];
 
   // ============================================================
   // GETTERS
@@ -124,7 +148,9 @@ class DashboardController
       HardwareStatusModel
     >
   >
-  get hardwareStatusStream => _repository.getHardwareStatusStream();
+  get hardwareStatusStream {
+    return _repository.getHardwareStatusStream();
+  }
 
   // ============================================================
   // INIT
@@ -171,13 +197,15 @@ class DashboardController
       }
 
       debugPrint(
-        '[DASHBOARD] Nome artístico carregado: $_artistName',
+        '[DASHBOARD] '
+        'Nome artístico carregado: $_artistName',
       );
     } catch (
       error
     ) {
       debugPrint(
-        '[DASHBOARD] Erro ao carregar nome artístico: $error',
+        '[DASHBOARD] '
+        'Erro ao carregar nome artístico: $error',
       );
 
       _artistName = 'Artista';
@@ -211,6 +239,17 @@ class DashboardController
   // ============================================================
 
   void _checkActiveProjects() {
+    // ==========================================================
+    // TEMPORÁRIO
+    // ==========================================================
+    //
+    // Mantido com o comportamento anterior.
+    //
+    // Posteriormente esta informação deve vir do módulo de
+    // projetos / banco de dados.
+    //
+    // ==========================================================
+
     hasActiveProject = true;
 
     notifyListeners();
@@ -345,7 +384,14 @@ class DashboardController
   }
 
   // ============================================================
-  // CALENDÁRIO
+  // CALENDÁRIO LEGADO
+  // ============================================================
+  //
+  // Estes métodos permanecem temporariamente para evitar
+  // quebrar widgets antigos.
+  //
+  // A CalendarPage nova possui seu próprio CalendarController.
+  //
   // ============================================================
 
   void toggleCalendarExpanded() {
@@ -357,6 +403,13 @@ class DashboardController
   void updateFocusedMonth(
     int newMonth,
   ) {
+    if (newMonth <
+            1 ||
+        newMonth >
+            12) {
+      return;
+    }
+
     focusedDay = DateTime(
       focusedDay.year,
       newMonth,
@@ -402,13 +455,41 @@ class DashboardController
   void selectDay(
     int day,
   ) {
+    final maxDay = DateTime(
+      focusedDay.year,
+      focusedDay.month +
+          1,
+      0,
+    ).day;
+
+    if (day <
+            1 ||
+        day >
+            maxDay) {
+      return;
+    }
+
     selectedDay = day;
 
     notifyListeners();
   }
 
   // ============================================================
-  // COMPROMISSOS
+  // ADICIONAR COMPROMISSO LEGADO
+  // ============================================================
+  //
+  // Mantido somente para compatibilidade com código antigo.
+  //
+  // NÃO deve mais ser utilizado para novos compromissos.
+  //
+  // Os novos compromissos devem utilizar:
+  //
+  // CalendarController.createPersonalEvent()
+  //
+  // ou
+  //
+  // CalendarController.createCollaborativeEvent()
+  //
   // ============================================================
 
   void addAppointment({
@@ -424,17 +505,30 @@ class DashboardController
       return;
     }
 
-    appointments.add(
-      {
-        'day': selectedDay,
-        'month': focusedDay.month,
-        'year': focusedDay.year,
-        'time': normalizedTime,
-        'title': normalizedTitle,
-      },
+    debugPrint(
+      '[DASHBOARD] '
+      'addAppointment() legado ignorado. '
+      'Use o novo módulo Calendar.',
     );
+  }
+
+  // ============================================================
+  // LIMPAR COMPROMISSOS LEGADOS
+  // ============================================================
+
+  void clearLegacyAppointments() {
+    if (appointments.isEmpty) {
+      return;
+    }
+
+    appointments.clear();
 
     notifyListeners();
+
+    debugPrint(
+      '[DASHBOARD] '
+      'Compromissos legados removidos.',
+    );
   }
 
   // ============================================================

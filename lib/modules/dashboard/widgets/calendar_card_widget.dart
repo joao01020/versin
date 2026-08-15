@@ -309,7 +309,7 @@ class CalendarCardWidget
                     ),
                   ),
                   child: Text(
-                    "${filteredAppointments.length} Tasks",
+                    "${filteredAppointments.length} Tarefas",
                     style: TextStyle(
                       color: controller.calendarPurpleAccent,
                       fontSize: 10,
@@ -521,7 +521,7 @@ class CalendarCardWidget
                 size: 14,
               ),
               label: Text(
-                "ADD TASK",
+                "Adicionar tarefa",
                 style: TextStyle(
                   color: controller.calendarPurpleAccent,
                   fontSize: 10,

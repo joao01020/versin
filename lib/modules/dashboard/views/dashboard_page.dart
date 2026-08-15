@@ -13,13 +13,13 @@ import '../layouts/dashboard_home_layout.dart';
 import '../navigation/dashboard_bottom_navigation.dart';
 import '../navigation/dashboard_navigation.dart';
 import '../navigation/dashboard_side_rail.dart';
-import '../sheets/add_appointment_sheet.dart';
 import '../widgets/dashboard_header_widget.dart';
 
 // ============================================================
 // ECOSSISTEMA
 // ============================================================
 
+import 'package:versin/modules/calendar/views/calendar_page.dart';
 import 'package:versin/modules/chat/views/chat_page.dart';
 import 'package:versin/modules/hub/views/hub_page.dart';
 import 'package:versin/modules/market/market_page.dart';
@@ -147,19 +147,35 @@ class _DashboardPageState
   }
 
   // ============================================================
-  // NOVO COMPROMISSO
+  // ABRIR CALENDÁRIO
+  // ============================================================
+  //
+  // O antigo AddAppointmentSheet foi removido deste fluxo.
+  //
+  // A criação de tarefas e compromissos agora fica centralizada
+  // no módulo Calendar.
+  //
   // ============================================================
 
   Future<
     void
   >
-  _showAddAppointmentSheet({
-    String? fixedTime,
-  }) async {
-    await AddAppointmentSheet.show(
-      context: context,
-      controller: _controller,
-      fixedTime: fixedTime,
+  _openCalendarPage() async {
+    if (!mounted) {
+      return;
+    }
+
+    await Navigator.of(
+      context,
+    ).push(
+      MaterialPageRoute(
+        builder:
+            (
+              _,
+            ) {
+              return const CalendarPage();
+            },
+      ),
     );
 
     if (!mounted) {
@@ -336,7 +352,7 @@ class _DashboardPageState
           controller: _controller,
           rhymesController: _rhymesController,
           onAddAppointment: () {
-            _showAddAppointmentSheet();
+            _openCalendarPage();
           },
         ),
 

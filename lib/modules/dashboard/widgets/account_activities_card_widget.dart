@@ -6,6 +6,7 @@ import 'package:versin/app/routes/app_routes.dart';
 import 'package:versin/modules/activities/controllers/recent_activity_controller.dart';
 import 'package:versin/modules/activities/views/recent_activities_page.dart';
 import 'package:versin/modules/activities/widgets/recent_activities_card_widget.dart';
+import 'package:versin/modules/calendar/views/calendar_page.dart';
 import 'package:versin/modules/notifications/widgets/notification_button_widget.dart';
 import 'package:versin/modules/profile/controllers/professional_profile_controller.dart';
 
@@ -281,7 +282,11 @@ class _AccountActivitiesCardWidgetState
                       _buildCircularActionIcon(
                         context,
                         Icons.calendar_today_outlined,
-                        route: AppRoutes.calendar,
+                        onTap: () {
+                          _openCalendarPage(
+                            context,
+                          );
+                        },
                       ),
 
                       const SizedBox(
@@ -382,6 +387,40 @@ class _AccountActivitiesCardWidgetState
           ),
         ),
       ),
+    );
+  }
+
+  // ============================================================
+  // ABRIR CALENDÁRIO
+  // ============================================================
+
+  Future<
+    void
+  >
+  _openCalendarPage(
+    BuildContext context,
+  ) async {
+    await Navigator.of(
+      context,
+    ).push(
+      MaterialPageRoute<
+        void
+      >(
+        builder:
+            (
+              context,
+            ) {
+              return const CalendarPage();
+            },
+      ),
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(
+      () {},
     );
   }
 

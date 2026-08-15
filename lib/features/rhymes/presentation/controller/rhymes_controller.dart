@@ -43,7 +43,32 @@ class RhymesController
   int _currentStep = 1;
   double _stepProgress = 0.0;
 
-  String? _userApiKey = 'VERSIN-PRO-TRIAL-2026-FREE';
+  // =========================================================
+  // FONTE DA IA
+  // =========================================================
+  //
+  // A credencial não fica mais hardcoded neste controller.
+  //
+  // Quando a API oficial do Versin é usada:
+  //
+  // - a cota mensal continua sendo aplicada;
+  // - os dados retornados pelo backend atualizam a barra.
+  //
+  // Quando uma API privada é usada:
+  //
+  // - a cota Versin não é consumida;
+  // - a barra mantém o último estado conhecido da cota Versin;
+  // - o controller informa que a API privada está ativa.
+  //
+  // =========================================================
+
+  String? _userApiKey;
+
+  bool _usingPrivateApi = false;
+
+  String? _activeAiProvider;
+
+  String? _activeAiModel;
 
   int connectionSeconds = 0;
 
@@ -93,19 +118,61 @@ class RhymesController
 
   double get aiUsageProgress => _aiUsageProgress;
 
-  String get aiUsageLevel => _aiUsageLevel;
+  String get aiUsageLevel {
+    if (_usingPrivateApi) {
+      return 'private';
+    }
 
-  String get aiUsageMessage => _aiUsageMessage;
+    return _aiUsageLevel;
+  }
 
-  bool get aiQuotaBlocked => _aiQuotaBlocked;
+  String get aiUsageMessage {
+    if (_usingPrivateApi) {
+      final provider = _activeAiProvider?.trim();
 
-  bool get aiCanUse => _aiCanUse;
+      if (provider !=
+              null &&
+          provider.isNotEmpty) {
+        return 'API privada $provider ativa. '
+            'A cota mensal do Versin não está sendo consumida.';
+      }
+
+      return 'API privada ativa. '
+          'A cota mensal do Versin não está sendo consumida.';
+    }
+
+    return _aiUsageMessage;
+  }
+
+  bool get aiQuotaBlocked {
+    if (_usingPrivateApi) {
+      return false;
+    }
+
+    return _aiQuotaBlocked;
+  }
+
+  bool get aiCanUse {
+    if (_usingPrivateApi) {
+      return true;
+    }
+
+    return _aiCanUse;
+  }
 
   int get aiUsedTokens => _aiUsedTokens;
 
   int get aiRemainingTokens => _aiRemainingTokens;
 
   int get aiLimitTokens => _aiLimitTokens;
+
+  bool get usingPrivateApi => _usingPrivateApi;
+
+  bool get usingVersinApi => !_usingPrivateApi;
+
+  String? get activeAiProvider => _activeAiProvider;
+
+  String? get activeAiModel => _activeAiModel;
 
   int get currentStep => _currentStep;
 
@@ -380,7 +447,15 @@ class RhymesController
   }
 
   // =========================================================
-  // API KEY
+  // API KEY LEGADA
+  // =========================================================
+  //
+  // Mantida por compatibilidade com fluxos antigos que ainda
+  // chamam RhymesRepository.postChat diretamente.
+  //
+  // A API Key privada do usuário NÃO deve ser copiada para
+  // este campo. Ela deve permanecer no PrivateApiService.
+  //
   // =========================================================
 
   void setApiKey(
@@ -393,6 +468,170 @@ class RhymesController
         : normalized;
 
     notifyListeners();
+  }
+
+  // =========================================================
+  // DEFINIR FONTE DA IA
+  // =========================================================
+
+  void setAiSource({
+    required bool usingPrivateApi,
+    String? provider,
+    String? model,
+    bool notify = true,
+  }) {
+    final normalizedProvider = provider?.trim();
+
+    final normalizedModel = model?.trim();
+
+    _usingPrivateApi = usingPrivateApi;
+
+    _activeAiProvider =
+        normalizedProvider ==
+                null ||
+            normalizedProvider.isEmpty
+        ? null
+        : normalizedProvider;
+
+    _activeAiModel =
+        normalizedModel ==
+                null ||
+            normalizedModel.isEmpty
+        ? null
+        : normalizedModel;
+
+    if (notify) {
+      notifyListeners();
+    }
+  }
+
+  // =========================================================
+  // APLICAR METADADOS DE UMA RESPOSTA DA IA
+  // =========================================================
+  //
+  // O ChatRepository devolve, além de "content":
+  //
+  // used_versin_api
+  // used_private_api
+  // provider
+  // model
+  //
+  // Este método sincroniza o estado da barra de cota com a
+  // fonte realmente utilizada.
+  //
+  // IMPORTANTE:
+  //
+  // Se a API privada respondeu, NÃO atualizamos a quota Versin.
+  //
+  // =========================================================
+
+  void applyAiResponseMetadata(
+    Map<
+      String,
+      dynamic
+    >
+    data, {
+    bool notify = true,
+  }) {
+    final usedPrivateApi =
+        data['used_private_api'] ==
+        true;
+
+    final usedVersinApi =
+        data['used_versin_api'] ==
+        true;
+
+    if (usedPrivateApi) {
+      setAiSource(
+        usingPrivateApi: true,
+        provider: data['provider']?.toString(),
+        model: data['model']?.toString(),
+        notify: false,
+      );
+
+      if (notify) {
+        notifyListeners();
+      }
+
+      return;
+    }
+
+    if (usedVersinApi) {
+      setAiSource(
+        usingPrivateApi: false,
+        provider: data['provider']?.toString(),
+        model: data['model']?.toString(),
+        notify: false,
+      );
+
+      _tryUpdateAiQuota(
+        data,
+      );
+
+      if (notify) {
+        notifyListeners();
+      }
+
+      return;
+    }
+
+    // Compatibilidade com respostas antigas que ainda não
+    // enviam os campos used_versin_api / used_private_api.
+    //
+    // Se houver quota na resposta, assumimos que veio da
+    // infraestrutura Versin.
+
+    if (_containsAiQuotaData(
+      data,
+    )) {
+      setAiSource(
+        usingPrivateApi: false,
+        provider: data['provider']?.toString(),
+        model: data['model']?.toString(),
+        notify: false,
+      );
+
+      _tryUpdateAiQuota(
+        data,
+      );
+    }
+
+    if (notify) {
+      notifyListeners();
+    }
+  }
+
+  // =========================================================
+  // API PRIVADA ATIVADA NA CONFIGURAÇÃO
+  // =========================================================
+  //
+  // Pode ser usado pela tela de configuração assim que o
+  // usuário salva/ativa a própria credencial, antes mesmo da
+  // primeira requisição.
+  //
+  // =========================================================
+
+  void activatePrivateAi({
+    String? provider,
+    String? model,
+  }) {
+    setAiSource(
+      usingPrivateApi: true,
+      provider: provider,
+      model: model,
+    );
+  }
+
+  // =========================================================
+  // VOLTAR PARA IA VERSIN
+  // =========================================================
+
+  void activateVersinAi() {
+    setAiSource(
+      usingPrivateApi: false,
+      provider: 'versin',
+      model: null,
+    );
   }
 
   // =========================================================
@@ -708,6 +947,49 @@ class RhymesController
   }
 
   // =========================================================
+  // POSSUI DADOS DE QUOTA?
+  // =========================================================
+
+  bool _containsAiQuotaData(
+    Map<
+      String,
+      dynamic
+    >
+    data,
+  ) {
+    if (data.containsKey(
+          'quota',
+        ) ||
+        data.containsKey(
+          'ai_quota',
+        ) ||
+        data.containsKey(
+          'usage',
+        )) {
+      return true;
+    }
+
+    return data.containsKey(
+          'usage_percentage',
+        ) ||
+        data.containsKey(
+          'used_tokens',
+        ) ||
+        data.containsKey(
+          'remaining_tokens',
+        ) ||
+        data.containsKey(
+          'limit_tokens',
+        ) ||
+        data.containsKey(
+          'blocked',
+        ) ||
+        data.containsKey(
+          'can_use_ai',
+        );
+  }
+
+  // =========================================================
   // IA
   // =========================================================
 
@@ -781,6 +1063,27 @@ class RhymesController
       );
       debugPrint(
         'Vocabulário: ${vocabulary.length} palavras',
+      );
+
+      // ======================================================
+      // FLUXO LEGADO / IA VERSIN
+      // ======================================================
+      //
+      // O fluxo principal do Chat deve passar por:
+      //
+      // ChatController
+      //   -> ChatRepository
+      //   -> AiProviderService
+      //
+      // Este método permanece para compatibilidade com recursos
+      // antigos do módulo de rimas.
+      //
+      // ======================================================
+
+      setAiSource(
+        usingPrivateApi: false,
+        provider: 'versin',
+        notify: false,
       );
 
       final response = await _repository.postChat(

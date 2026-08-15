@@ -8,59 +8,72 @@ import 'package:versin/features/rhymes/data/repositories/rhymes_repository.dart'
 import 'package:versin/features/rhymes/domain/services/audio_service.dart';
 import 'package:versin/modules/chat/views/components/suggestion_balloon/controllers/suggestion_controller.dart';
 
+// ============================================================
+// RHYMES CONTROLLER
+// ============================================================
+
 class RhymesController
     extends
         ChangeNotifier {
+  // ============================================================
+  // DEPENDÊNCIAS
+  // ============================================================
+
   final RhymesRepository _repository = RhymesRepository();
 
   final AudioService _audioService = AudioService();
 
   final SuggestionController suggestionController = SuggestionController();
 
+  // ============================================================
+  // TIMERS
+  // ============================================================
+
   Timer? _debounce;
+
   Timer? _connectionTimer;
 
+  // ============================================================
+  // CARREGAMENTO
+  // ============================================================
+
   bool _isLoading = false;
+
   bool _isVocabularyLoading = false;
 
-  // =========================================================
+  // ============================================================
   // QUOTA MENSAL DA IA
-  // =========================================================
+  // ============================================================
 
   double _aiUsagePercentage = 0.0;
+
   double _aiUsageProgress = 0.0;
 
   String _aiUsageLevel = 'normal';
+
   String _aiUsageMessage = 'Uso normal da IA.';
 
   bool _aiQuotaBlocked = false;
+
   bool _aiCanUse = true;
 
   int _aiUsedTokens = 0;
+
   int _aiRemainingTokens = 100000;
+
   int _aiLimitTokens = 100000;
 
+  // ============================================================
+  // PROGRESSO
+  // ============================================================
+
   int _currentStep = 1;
+
   double _stepProgress = 0.0;
 
-  // =========================================================
+  // ============================================================
   // FONTE DA IA
-  // =========================================================
-  //
-  // A credencial não fica mais hardcoded neste controller.
-  //
-  // Quando a API oficial do Versin é usada:
-  //
-  // - a cota mensal continua sendo aplicada;
-  // - os dados retornados pelo backend atualizam a barra.
-  //
-  // Quando uma API privada é usada:
-  //
-  // - a cota Versin não é consumida;
-  // - a barra mantém o último estado conhecido da cota Versin;
-  // - o controller informa que a API privada está ativa.
-  //
-  // =========================================================
+  // ============================================================
 
   String? _userApiKey;
 
@@ -70,11 +83,15 @@ class RhymesController
 
   String? _activeAiModel;
 
+  // ============================================================
+  // CONEXÃO
+  // ============================================================
+
   int connectionSeconds = 0;
 
-  double starProgress = 0.0;
-
-  String currentFeedback = 'Comece a escrever para validar sua letra...';
+  // ============================================================
+  // ESTÚDIO
+  // ============================================================
 
   String selectedTechnique = 'Melódico';
 
@@ -84,9 +101,9 @@ class RhymesController
 
   bool isBpmPlaying = false;
 
-  // =========================================================
-  // VOCABULÁRIO CENTRAL
-  // =========================================================
+  // ============================================================
+  // VOCABULÁRIO
+  // ============================================================
 
   List<
     Rhyme
@@ -101,9 +118,9 @@ class RhymesController
   >
   trendingWords = [];
 
-  // =========================================================
+  // ============================================================
   // GETTERS
-  // =========================================================
+  // ============================================================
 
   List<
     String
@@ -180,14 +197,6 @@ class RhymesController
 
   String? get userApiKey => _userApiKey;
 
-  double get fireProgress =>
-      (starProgress *
-              0.7)
-          .clamp(
-            0.0,
-            1.0,
-          );
-
   List<
     String
   >
@@ -201,9 +210,9 @@ class RhymesController
 
   int get vocabularyCount => vocabulary.length;
 
-  // =========================================================
+  // ============================================================
   // NORMALIZAÇÃO
-  // =========================================================
+  // ============================================================
 
   String _normalizeWord(
     String word,
@@ -211,9 +220,9 @@ class RhymesController
     return word.trim().toLowerCase();
   }
 
-  // =========================================================
+  // ============================================================
   // VERIFICAR PALAVRA
-  // =========================================================
+  // ============================================================
 
   bool containsWord(
     String word,
@@ -237,9 +246,9 @@ class RhymesController
     );
   }
 
-  // =========================================================
+  // ============================================================
   // ADICIONAR UMA PALAVRA
-  // =========================================================
+  // ============================================================
 
   Future<
     void
@@ -287,9 +296,9 @@ class RhymesController
     }
   }
 
-  // =========================================================
+  // ============================================================
   // ADICIONAR VÁRIAS PALAVRAS
-  // =========================================================
+  // ============================================================
 
   Future<
     int
@@ -340,9 +349,9 @@ class RhymesController
     return addedCount;
   }
 
-  // =========================================================
+  // ============================================================
   // REMOVER POR ÍNDICE
-  // =========================================================
+  // ============================================================
 
   Future<
     void
@@ -378,9 +387,9 @@ class RhymesController
     }
   }
 
-  // =========================================================
+  // ============================================================
   // REMOVER PELO TEXTO
-  // =========================================================
+  // ============================================================
 
   Future<
     void
@@ -412,9 +421,9 @@ class RhymesController
     );
   }
 
-  // =========================================================
+  // ============================================================
   // TRENDING
-  // =========================================================
+  // ============================================================
 
   Future<
     void
@@ -434,29 +443,9 @@ class RhymesController
     notifyListeners();
   }
 
-  // =========================================================
-  // GAMIFICAÇÃO
-  // =========================================================
-
-  void updateGamification(
-    double value,
-  ) {
-    starProgress = value;
-
-    notifyListeners();
-  }
-
-  // =========================================================
+  // ============================================================
   // API KEY LEGADA
-  // =========================================================
-  //
-  // Mantida por compatibilidade com fluxos antigos que ainda
-  // chamam RhymesRepository.postChat diretamente.
-  //
-  // A API Key privada do usuário NÃO deve ser copiada para
-  // este campo. Ela deve permanecer no PrivateApiService.
-  //
-  // =========================================================
+  // ============================================================
 
   void setApiKey(
     String key,
@@ -470,9 +459,9 @@ class RhymesController
     notifyListeners();
   }
 
-  // =========================================================
+  // ============================================================
   // DEFINIR FONTE DA IA
-  // =========================================================
+  // ============================================================
 
   void setAiSource({
     required bool usingPrivateApi,
@@ -505,25 +494,9 @@ class RhymesController
     }
   }
 
-  // =========================================================
-  // APLICAR METADADOS DE UMA RESPOSTA DA IA
-  // =========================================================
-  //
-  // O ChatRepository devolve, além de "content":
-  //
-  // used_versin_api
-  // used_private_api
-  // provider
-  // model
-  //
-  // Este método sincroniza o estado da barra de cota com a
-  // fonte realmente utilizada.
-  //
-  // IMPORTANTE:
-  //
-  // Se a API privada respondeu, NÃO atualizamos a quota Versin.
-  //
-  // =========================================================
+  // ============================================================
+  // APLICAR METADADOS DA IA
+  // ============================================================
 
   void applyAiResponseMetadata(
     Map<
@@ -575,12 +548,6 @@ class RhymesController
       return;
     }
 
-    // Compatibilidade com respostas antigas que ainda não
-    // enviam os campos used_versin_api / used_private_api.
-    //
-    // Se houver quota na resposta, assumimos que veio da
-    // infraestrutura Versin.
-
     if (_containsAiQuotaData(
       data,
     )) {
@@ -601,15 +568,9 @@ class RhymesController
     }
   }
 
-  // =========================================================
-  // API PRIVADA ATIVADA NA CONFIGURAÇÃO
-  // =========================================================
-  //
-  // Pode ser usado pela tela de configuração assim que o
-  // usuário salva/ativa a própria credencial, antes mesmo da
-  // primeira requisição.
-  //
-  // =========================================================
+  // ============================================================
+  // ATIVAR API PRIVADA
+  // ============================================================
 
   void activatePrivateAi({
     String? provider,
@@ -622,9 +583,9 @@ class RhymesController
     );
   }
 
-  // =========================================================
-  // VOLTAR PARA IA VERSIN
-  // =========================================================
+  // ============================================================
+  // ATIVAR IA VERSIN
+  // ============================================================
 
   void activateVersinAi() {
     setAiSource(
@@ -634,9 +595,9 @@ class RhymesController
     );
   }
 
-  // =========================================================
+  // ============================================================
   // METRÔNOMO
-  // =========================================================
+  // ============================================================
 
   void toggleMetronome() {
     isBpmPlaying = !isBpmPlaying;
@@ -652,18 +613,14 @@ class RhymesController
     notifyListeners();
   }
 
-  // =========================================================
+  // ============================================================
   // TEXTO E SUGESTÕES
-  // =========================================================
+  // ============================================================
 
   void onTextChanged(
     String text,
   ) {
     _debounce?.cancel();
-
-    _processarProgressoTecnico(
-      text,
-    );
 
     suggestionController.updateFromText(
       text,
@@ -753,50 +710,9 @@ class RhymesController
     );
   }
 
-  // =========================================================
-  // PROGRESSO TÉCNICO
-  // =========================================================
-
-  void _processarProgressoTecnico(
-    String texto,
-  ) {
-    if (texto.trim().isEmpty) {
-      starProgress = 0.0;
-
-      currentFeedback = 'Comece a escrever para validar sua letra...';
-
-      notifyListeners();
-
-      return;
-    }
-
-    currentFeedback = 'Versin analisando seu flow...';
-
-    final totalLinhas = texto
-        .split(
-          '\n',
-        )
-        .where(
-          (
-            linha,
-          ) => linha.trim().isNotEmpty,
-        )
-        .length;
-
-    starProgress =
-        (totalLinhas /
-                10)
-            .clamp(
-              0.0,
-              3.0,
-            );
-
-    notifyListeners();
-  }
-
-  // =========================================================
+  // ============================================================
   // QUOTA DA IA
-  // =========================================================
+  // ============================================================
 
   void updateAiQuotaFromMap(
     Map<
@@ -807,11 +723,17 @@ class RhymesController
     bool notify = true,
   }) {
     final percentageRaw = quota['usage_percentage'];
+
     final progressRaw = quota['progress'];
+
     final usedRaw = quota['used_tokens'];
+
     final remainingRaw = quota['remaining_tokens'];
+
     final limitRaw = quota['limit_tokens'];
+
     final blockedRaw = quota['blocked'];
+
     final canUseRaw = quota['can_use_ai'];
 
     if (percentageRaw
@@ -882,26 +804,39 @@ class RhymesController
     }
   }
 
+  // ============================================================
+  // RESETAR QUOTA
+  // ============================================================
+
   void resetAiQuota({
     bool notify = true,
   }) {
     _aiUsagePercentage = 0.0;
+
     _aiUsageProgress = 0.0;
 
     _aiUsageLevel = 'normal';
+
     _aiUsageMessage = 'Uso normal da IA.';
 
     _aiQuotaBlocked = false;
+
     _aiCanUse = true;
 
     _aiUsedTokens = 0;
+
     _aiRemainingTokens = 100000;
+
     _aiLimitTokens = 100000;
 
     if (notify) {
       notifyListeners();
     }
   }
+
+  // ============================================================
+  // ATUALIZAR QUOTA
+  // ============================================================
 
   void _tryUpdateAiQuota(
     Map<
@@ -913,6 +848,7 @@ class RhymesController
     dynamic rawQuota = data['quota'];
 
     rawQuota ??= data['ai_quota'];
+
     rawQuota ??= data['usage'];
 
     if (rawQuota
@@ -946,9 +882,9 @@ class RhymesController
     }
   }
 
-  // =========================================================
+  // ============================================================
   // POSSUI DADOS DE QUOTA?
-  // =========================================================
+  // ============================================================
 
   bool _containsAiQuotaData(
     Map<
@@ -989,9 +925,9 @@ class RhymesController
         );
   }
 
-  // =========================================================
+  // ============================================================
   // IA
-  // =========================================================
+  // ============================================================
 
   Future<
     Map<
@@ -1046,38 +982,33 @@ class RhymesController
       debugPrint(
         '',
       );
+
       debugPrint(
         '================ IA REQUEST ================',
       );
+
       debugPrint(
         'Mensagem: $normalizedMessage',
       );
+
       debugPrint(
         'BPM: $currentBpm',
       );
+
       debugPrint(
         'Vibe: $selectedVibe',
       );
+
       debugPrint(
         'Técnica: $selectedTechnique',
       );
+
       debugPrint(
         'Vocabulário: ${vocabulary.length} palavras',
       );
 
       // ======================================================
       // FLUXO LEGADO / IA VERSIN
-      // ======================================================
-      //
-      // O fluxo principal do Chat deve passar por:
-      //
-      // ChatController
-      //   -> ChatRepository
-      //   -> AiProviderService
-      //
-      // Este método permanece para compatibilidade com recursos
-      // antigos do módulo de rimas.
-      //
       // ======================================================
 
       setAiSource(
@@ -1234,9 +1165,9 @@ class RhymesController
     }
   }
 
-  // =========================================================
+  // ============================================================
   // ERRO DO SERVIDOR
-  // =========================================================
+  // ============================================================
 
   String _buildServerErrorMessage(
     int statusCode,
@@ -1291,9 +1222,13 @@ class RhymesController
 
     if (quotaReached) {
       _aiQuotaBlocked = true;
+
       _aiCanUse = false;
+
       _aiUsagePercentage = 100.0;
+
       _aiUsageProgress = 1.0;
+
       _aiUsageLevel = 'blocked';
 
       _aiUsageMessage =
@@ -1365,9 +1300,9 @@ class RhymesController
     }
   }
 
-  // =========================================================
+  // ============================================================
   // CARREGAMENTO
-  // =========================================================
+  // ============================================================
 
   Future<
     void
@@ -1421,9 +1356,9 @@ class RhymesController
     }
   }
 
-  // =========================================================
+  // ============================================================
   // CONFIGURAÇÕES DO ESTÚDIO
-  // =========================================================
+  // ============================================================
 
   void updateStudioConfig({
     int? bpm,
@@ -1454,9 +1389,9 @@ class RhymesController
     notifyListeners();
   }
 
-  // =========================================================
+  // ============================================================
   // PROGRESSO
-  // =========================================================
+  // ============================================================
 
   void updateProgress(
     int step,
@@ -1469,9 +1404,9 @@ class RhymesController
     notifyListeners();
   }
 
-  // =========================================================
+  // ============================================================
   // COR
-  // =========================================================
+  // ============================================================
 
   Color getActiveColor() {
     return const Color(
@@ -1479,9 +1414,9 @@ class RhymesController
     );
   }
 
-  // =========================================================
+  // ============================================================
   // LIMPAR SUGESTÕES
-  // =========================================================
+  // ============================================================
 
   void clearSuggestions() {
     suggestionController.clearSuggestions();
@@ -1489,13 +1424,14 @@ class RhymesController
     notifyListeners();
   }
 
-  // =========================================================
+  // ============================================================
   // DISPOSE
-  // =========================================================
+  // ============================================================
 
   @override
   void dispose() {
     _debounce?.cancel();
+
     _connectionTimer?.cancel();
 
     _audioService.dispose();

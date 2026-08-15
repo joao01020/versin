@@ -2,27 +2,27 @@
 // PRIVATE API CONFIG
 // ============================================================
 //
-// Representa a configuração da API privada do usuário.
-//
-// Este model é utilizado por:
-//
-// PrivateApiSettingsPage
-//        ↓
-// PrivateApiService
-//        ↓
-// AiProviderService
-//        ↓
-// PrivateAiClient
+// Representa SOMENTE os metadados da configuração da API
+// privada do usuário.
 //
 // IMPORTANTE:
 //
-// Este model NÃO:
+// A API KEY NÃO FICA NESTE MODEL.
 //
-// - salva dados;
-// - faz requisições HTTP;
-// - conhece widgets;
-// - conhece Supabase;
-// - imprime a API Key em logs.
+// A chave deve permanecer exclusivamente no:
+//
+// PrivateApiService
+//        ↓
+// flutter_secure_storage
+//
+// Este model pode circular com segurança por:
+//
+// - UI;
+// - controllers;
+// - services;
+// - logs controlados;
+// - analytics;
+// - Supabase, caso sejam salvos apenas metadados.
 //
 // ============================================================
 
@@ -44,16 +44,26 @@ class PrivateApiConfig {
   static const String providerCustom = 'custom';
 
   // ============================================================
+  // PROVIDERS SUPORTADOS
+  // ============================================================
+
+  static const Set<
+    String
+  >
+  supportedProviders = {
+    providerOpenAi,
+    providerAnthropic,
+    providerGemini,
+    providerGroq,
+    providerOpenRouter,
+    providerCustom,
+  };
+
+  // ============================================================
   // PROVIDER
   // ============================================================
 
   final String provider;
-
-  // ============================================================
-  // API KEY
-  // ============================================================
-
-  final String apiKey;
 
   // ============================================================
   // MODELO
@@ -68,10 +78,22 @@ class PrivateApiConfig {
   final String? baseUrl;
 
   // ============================================================
-  // ATIVA?
+  // API PRIVADA ATIVA?
   // ============================================================
 
   final bool enabled;
+
+  // ============================================================
+  // EXISTE UMA API KEY SALVA?
+  // ============================================================
+  //
+  // Este campo informa apenas a existência da chave.
+  //
+  // Ele NÃO contém a chave.
+  //
+  // ============================================================
+
+  final bool hasApiKey;
 
   // ============================================================
   // CONSTRUTOR
@@ -79,8 +101,8 @@ class PrivateApiConfig {
 
   const PrivateApiConfig({
     required this.provider,
-    required this.apiKey,
     required this.enabled,
+    required this.hasApiKey,
     this.model,
     this.baseUrl,
   });
@@ -93,18 +115,10 @@ class PrivateApiConfig {
     return const PrivateApiConfig(
       provider: 'OpenAI',
 
-      apiKey: '',
-
       enabled: false,
+
+      hasApiKey: false,
     );
-  }
-
-  // ============================================================
-  // API KEY
-  // ============================================================
-
-  bool get hasApiKey {
-    return apiKey.trim().isNotEmpty;
   }
 
   // ============================================================
@@ -172,77 +186,35 @@ class PrivateApiConfig {
   // ============================================================
   // PROVIDER NORMALIZADO
   // ============================================================
-  //
-  // A interface pode salvar:
-  //
-  // OpenAI
-  // Google Gemini
-  // OpenRouter
-  //
-  // Internamente padronizamos para:
-  //
-  // openai
-  // gemini
-  // openrouter
-  //
-  // ============================================================
 
   String get normalizedProvider {
     final value = provider.trim().toLowerCase();
 
     switch (value) {
-      // ========================================================
-      // OPENAI
-      // ========================================================
-
       case 'openai':
       case 'open ai':
         return providerOpenAi;
 
-      // ========================================================
-      // ANTHROPIC
-      // ========================================================
-
       case 'anthropic':
       case 'claude':
         return providerAnthropic;
-
-      // ========================================================
-      // GEMINI
-      // ========================================================
 
       case 'gemini':
       case 'google':
       case 'google gemini':
         return providerGemini;
 
-      // ========================================================
-      // GROQ
-      // ========================================================
-
       case 'groq':
         return providerGroq;
-
-      // ========================================================
-      // OPENROUTER
-      // ========================================================
 
       case 'openrouter':
       case 'open router':
         return providerOpenRouter;
 
-      // ========================================================
-      // CUSTOM
-      // ========================================================
-
       case 'custom':
       case 'personalizado':
       case 'personalizada':
         return providerCustom;
-
-      // ========================================================
-      // DESCONHECIDO
-      // ========================================================
 
       default:
         return value;
@@ -250,7 +222,7 @@ class PrivateApiConfig {
   }
 
   // ============================================================
-  // PROVIDER É VÁLIDO?
+  // PROVIDER VÁLIDO?
   // ============================================================
 
   bool get hasValidProvider {
@@ -260,23 +232,7 @@ class PrivateApiConfig {
   }
 
   // ============================================================
-  // LISTA DE PROVIDERS
-  // ============================================================
-
-  static const Set<
-    String
-  >
-  supportedProviders = {
-    providerOpenAi,
-    providerAnthropic,
-    providerGemini,
-    providerGroq,
-    providerOpenRouter,
-    providerCustom,
-  };
-
-  // ============================================================
-  // NOME VISUAL
+  // LABEL DO PROVIDER
   // ============================================================
 
   String get providerLabel {
@@ -345,14 +301,7 @@ class PrivateApiConfig {
   }
 
   // ============================================================
-  // API COMPATÍVEL COM OPENAI
-  // ============================================================
-  //
-  // Esses providers podem compartilhar parte importante da
-  // estrutura de requisição.
-  //
-  // O PrivateAiClient decidirá os detalhes.
-  //
+  // COMPATÍVEL COM OPENAI
   // ============================================================
 
   bool get usesOpenAiCompatibleApi {
@@ -369,7 +318,7 @@ class PrivateApiConfig {
   }
 
   // ============================================================
-  // BASE URL PERSONALIZÁVEL
+  // SUPORTA BASE URL CUSTOMIZADA
   // ============================================================
 
   bool get supportsCustomBaseUrl {
@@ -380,7 +329,7 @@ class PrivateApiConfig {
   }
 
   // ============================================================
-  // PODE USAR API PRIVADA?
+  // API PRIVADA PODE SER UTILIZADA?
   // ============================================================
 
   bool get canUsePrivateApi {
@@ -396,10 +345,6 @@ class PrivateApiConfig {
       return false;
     }
 
-    // ==========================================================
-    // CUSTOM PRECISA DE URL
-    // ==========================================================
-
     if (isCustom &&
         !hasBaseUrl) {
       return false;
@@ -409,7 +354,7 @@ class PrivateApiConfig {
   }
 
   // ============================================================
-  // CONFIGURAÇÃO COMPLETA?
+  // CONFIGURAÇÃO VÁLIDA
   // ============================================================
 
   bool get isValid {
@@ -417,7 +362,7 @@ class PrivateApiConfig {
   }
 
   // ============================================================
-  // MOTIVO DA CONFIGURAÇÃO SER INVÁLIDA
+  // MOTIVO DA CONFIGURAÇÃO INVÁLIDA
   // ============================================================
 
   String? get validationError {
@@ -426,7 +371,7 @@ class PrivateApiConfig {
     }
 
     if (!hasApiKey) {
-      return 'Informe uma API Key.';
+      return 'Nenhuma API Key privada está salva neste dispositivo.';
     }
 
     if (!hasValidProvider) {
@@ -447,11 +392,10 @@ class PrivateApiConfig {
 
   PrivateApiConfig copyWith({
     String? provider,
-    String? apiKey,
     String? model,
     String? baseUrl,
     bool? enabled,
-    bool clearApiKey = false,
+    bool? hasApiKey,
     bool clearModel = false,
     bool clearBaseUrl = false,
   }) {
@@ -459,11 +403,6 @@ class PrivateApiConfig {
       provider:
           provider ??
           this.provider,
-
-      apiKey: clearApiKey
-          ? ''
-          : apiKey ??
-                this.apiKey,
 
       model: clearModel
           ? null
@@ -478,6 +417,10 @@ class PrivateApiConfig {
       enabled:
           enabled ??
           this.enabled,
+
+      hasApiKey:
+          hasApiKey ??
+          this.hasApiKey,
     );
   }
 
@@ -502,20 +445,34 @@ class PrivateApiConfig {
   }
 
   // ============================================================
+  // MARCAR QUE EXISTE CHAVE
+  // ============================================================
+
+  PrivateApiConfig withStoredApiKey() {
+    return copyWith(
+      hasApiKey: true,
+    );
+  }
+
+  // ============================================================
+  // MARCAR QUE A CHAVE FOI REMOVIDA
+  // ============================================================
+
+  PrivateApiConfig withoutStoredApiKey() {
+    return copyWith(
+      hasApiKey: false,
+
+      enabled: false,
+    );
+  }
+
+  // ============================================================
   // TO MAP
   // ============================================================
   //
-  // IMPORTANTE:
+  // SEGURO:
   //
-  // Este método inclui a API Key.
-  //
-  // Deve ser usado somente quando realmente for necessário
-  // serializar a configuração completa para armazenamento
-  // seguro.
-  //
-  // Para logs, UI, Supabase ou analytics, utilize:
-  //
-  // toSafeMap()
+  // NÃO contém API Key.
   //
   // ============================================================
 
@@ -527,29 +484,26 @@ class PrivateApiConfig {
     return {
       'provider': normalizedProvider,
 
-      'api_key': apiKey,
+      'provider_label': providerLabel,
 
       'model': normalizedModel,
 
       'base_url': normalizedBaseUrl,
 
       'enabled': enabled,
+
+      'has_api_key': hasApiKey,
     };
   }
 
   // ============================================================
-  // MAP SEGURO
+  // SAFE MAP
   // ============================================================
   //
-  // NÃO CONTÉM API KEY.
+  // Mantido como alias de toMap() para compatibilidade com
+  // código anterior.
   //
-  // Pode ser usado para:
-  //
-  // - logs;
-  // - analytics;
-  // - debug;
-  // - persistência de metadados;
-  // - Supabase, caso você queira sincronizar apenas configuração.
+  // Ambos são seguros porque este model não contém segredo.
   //
   // ============================================================
 
@@ -559,17 +513,7 @@ class PrivateApiConfig {
   >
   toSafeMap() {
     return {
-      'provider': normalizedProvider,
-
-      'provider_label': providerLabel,
-
-      'has_api_key': hasApiKey,
-
-      'model': normalizedModel,
-
-      'base_url': normalizedBaseUrl,
-
-      'enabled': enabled,
+      ...toMap(),
 
       'valid': isValid,
     };
@@ -598,12 +542,6 @@ class PrivateApiConfig {
     return PrivateApiConfig(
       provider: provider,
 
-      apiKey:
-          _parseString(
-            map['api_key'],
-          ) ??
-          '',
-
       model: _nullableString(
         map['model'],
       ),
@@ -614,6 +552,10 @@ class PrivateApiConfig {
 
       enabled: _parseBool(
         map['enabled'],
+      ),
+
+      hasApiKey: _parseBool(
+        map['has_api_key'],
       ),
     );
   }
@@ -685,7 +627,12 @@ class PrivateApiConfig {
   }
 
   // ============================================================
-  // IGUALDADE DE CONFIGURAÇÃO
+  // MESMA CONFIGURAÇÃO DE CONEXÃO
+  // ============================================================
+  //
+  // API Key propositalmente não participa porque ela não faz
+  // mais parte deste objeto.
+  //
   // ============================================================
 
   bool hasSameConnectionConfig(
@@ -693,25 +640,23 @@ class PrivateApiConfig {
   ) {
     return normalizedProvider ==
             other.normalizedProvider &&
-        apiKey ==
-            other.apiKey &&
         normalizedModel ==
             other.normalizedModel &&
         normalizedBaseUrl ==
             other.normalizedBaseUrl &&
         enabled ==
-            other.enabled;
+            other.enabled &&
+        hasApiKey ==
+            other.hasApiKey;
   }
 
   // ============================================================
   // TO STRING
   // ============================================================
   //
-  // NUNCA COLOCAR:
+  // Seguro por construção:
   //
-  // apiKey
-  //
-  // aqui.
+  // não existe API Key neste model.
   //
   // ============================================================
 

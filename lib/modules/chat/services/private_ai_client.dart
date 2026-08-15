@@ -33,7 +33,11 @@ import 'ai_provider_service.dart';
 // - NÃO altera a quota Versin;
 // - NÃO imprime API Keys em logs.
 //
-// A chave chega através de PrivateAiRequest.
+// A chave chega através de PrivateAiRequest e existe somente
+// durante o fluxo da requisição privada.
+//
+// O PrivateAiClient não persiste a chave em nenhum campo.
+// A chave existe somente durante o request temporário da chamada.
 //
 // ============================================================
 
@@ -108,19 +112,16 @@ class PrivateAiClient {
   ) async {
     final prompt = request.prompt.trim();
 
-    final apiKey = request.apiKey.trim();
-
     if (prompt.isEmpty) {
       throw ArgumentError(
         'Prompt não pode ficar vazio.',
       );
     }
 
-    if (apiKey.isEmpty) {
-      throw StateError(
-        'API Key privada não configurada.',
-      );
-    }
+    // Valida a credencial sem manter uma referência extra.
+    _requireApiKey(
+      request,
+    );
 
     final provider = _normalizeProvider(
       request.provider,
@@ -226,7 +227,7 @@ class PrivateAiClient {
       uri: uri,
 
       headers: {
-        'Authorization': 'Bearer ${request.apiKey.trim()}',
+        'Authorization': 'Bearer ${_requireApiKey(request)}',
       },
 
       body: {
@@ -276,7 +277,7 @@ class PrivateAiClient {
       uri: uri,
 
       headers: {
-        'Authorization': 'Bearer ${request.apiKey.trim()}',
+        'Authorization': 'Bearer ${_requireApiKey(request)}',
       },
 
       body: {
@@ -318,7 +319,9 @@ class PrivateAiClient {
       _defaultGeminiModel,
     );
 
-    final apiKey = request.apiKey.trim();
+    final apiKey = _requireApiKey(
+      request,
+    );
 
     final uri = Uri.parse(
       '$baseUrl/models/$model:generateContent',
@@ -380,7 +383,9 @@ class PrivateAiClient {
       uri: uri,
 
       headers: {
-        'x-api-key': request.apiKey.trim(),
+        'x-api-key': _requireApiKey(
+          request,
+        ),
 
         'anthropic-version': '2023-06-01',
       },
@@ -966,14 +971,18 @@ class PrivateAiClient {
       if (message !=
               null &&
           message.isNotEmpty) {
-        return message;
+        return _sanitizeErrorMessage(
+          message,
+        );
       }
     }
 
     if (error
             is String &&
         error.trim().isNotEmpty) {
-      return error.trim();
+      return _sanitizeErrorMessage(
+        error.trim(),
+      );
     }
 
     final message = data['message']?.toString().trim();
@@ -981,7 +990,9 @@ class PrivateAiClient {
     if (message !=
             null &&
         message.isNotEmpty) {
-      return message;
+      return _sanitizeErrorMessage(
+        message,
+      );
     }
 
     final detail = data['detail']?.toString().trim();
@@ -989,7 +1000,9 @@ class PrivateAiClient {
     if (detail !=
             null &&
         detail.isNotEmpty) {
-      return detail;
+      return _sanitizeErrorMessage(
+        detail,
+      );
     }
 
     if (rawBody.trim().isNotEmpty) {
@@ -999,13 +1012,84 @@ class PrivateAiClient {
 
       if (normalized.length <=
           maxLength) {
-        return normalized;
+        return _sanitizeErrorMessage(
+          normalized,
+        );
       }
 
-      return '${normalized.substring(0, maxLength)}...';
+      return _sanitizeErrorMessage(
+        '${normalized.substring(0, maxLength)}...',
+      );
     }
 
     return 'O provedor recusou a requisição.';
+  }
+
+  // ============================================================
+  // SANITIZAR MENSAGEM DE ERRO
+  // ============================================================
+
+  String _sanitizeErrorMessage(
+    String value,
+  ) {
+    var sanitized = value.trim();
+
+    if (sanitized.isEmpty) {
+      return 'O provedor recusou a requisição.';
+    }
+
+    sanitized = sanitized.replaceAll(
+      RegExp(
+        r'Bearer\s+[A-Za-z0-9._~+/=-]+',
+        caseSensitive: false,
+      ),
+      'Bearer [REDACTED]',
+    );
+
+    sanitized = sanitized.replaceAll(
+      RegExp(
+        r'(?i)(api[_ -]?key|x-api-key|authorization)\s*[:=]\s*[^,\s}]+',
+      ),
+      '[CREDENTIAL REDACTED]',
+    );
+
+    const maxLength = 500;
+
+    if (sanitized.length >
+        maxLength) {
+      sanitized = '${sanitized.substring(0, maxLength)}...';
+    }
+
+    return sanitized;
+  }
+
+  // ============================================================
+  // API KEY DA REQUISIÇÃO
+  // ============================================================
+  //
+  // Centraliza a leitura temporária da chave.
+  //
+  // A chave:
+  //
+  // - não é armazenada em campo;
+  // - não é adicionada a logs;
+  // - não é incluída em exceptions;
+  // - existe apenas enquanto a requisição está em execução.
+  //
+  // ============================================================
+
+  String _requireApiKey(
+    PrivateAiRequest request,
+  ) {
+    final value = request.apiKey.trim();
+
+    if (value.isEmpty) {
+      throw StateError(
+        'API Key privada não configurada.',
+      );
+    }
+
+    return value;
   }
 
   // ============================================================
@@ -1018,9 +1102,9 @@ class PrivateAiClient {
     final config = PrivateApiConfig(
       provider: provider,
 
-      apiKey: 'placeholder',
+      enabled: false,
 
-      enabled: true,
+      hasApiKey: false,
     );
 
     return config.normalizedProvider;

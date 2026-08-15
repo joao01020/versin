@@ -7,20 +7,27 @@ import '../models/private_api_config.dart';
 // PRIVATE API SERVICE
 // ============================================================
 //
-// Responsável pelo armazenamento seguro da configuração da
-// API privada.
+// Responsável pelo armazenamento seguro da API privada.
 //
-// A API Key é armazenada utilizando flutter_secure_storage.
+// RESPONSABILIDADES:
+//
+// - salvar a API Key no secure storage;
+// - ler a API Key somente quando necessário;
+// - salvar metadados da configuração;
+// - ativar/desativar a API privada;
+// - remover a chave;
+// - carregar PrivateApiConfig SEM expor a chave.
 //
 // IMPORTANTE:
 //
-// Não utilizar:
+// A API Key:
 //
-// - SharedPreferences para API Key;
-// - logs contendo a chave;
-// - código-fonte;
-// - arquivo .dart;
-// - banco público.
+// - NÃO fica em PrivateApiConfig;
+// - NÃO deve ir para logs;
+// - NÃO deve ir para SharedPreferences;
+// - NÃO deve ir para Supabase em texto puro;
+// - NÃO deve ser enviada para analytics;
+// - NÃO deve aparecer em toString();
 //
 // ============================================================
 
@@ -32,7 +39,7 @@ class PrivateApiService {
   final FlutterSecureStorage _storage;
 
   // ============================================================
-  // KEYS
+  // STORAGE KEYS
   // ============================================================
 
   static const String _providerKey = 'versin_private_api_provider';
@@ -56,74 +63,217 @@ class PrivateApiService {
            const FlutterSecureStorage();
 
   // ============================================================
-  // SALVAR CONFIGURAÇÃO
+  // SALVAR CONFIGURAÇÃO COMPLETA
+  // ============================================================
+  //
+  // Recebe:
+  //
+  // - metadados seguros;
+  // - API Key separadamente.
+  //
+  // Dessa forma a chave nunca precisa entrar em
+  // PrivateApiConfig.
+  //
   // ============================================================
 
   Future<
     void
   >
-  saveConfig(
-    PrivateApiConfig config,
-  ) async {
-    final provider = config.provider.trim();
+  saveConfig({
+    required PrivateApiConfig config,
+    required String apiKey,
+  }) async {
+    final normalizedApiKey = apiKey.trim();
 
-    final apiKey = config.apiKey.trim();
+    final normalizedProvider = config.normalizedProvider;
 
-    if (provider.isEmpty) {
+    // ==========================================================
+    // VALIDAR PROVIDER
+    // ==========================================================
+
+    if (!config.hasValidProvider) {
       throw ArgumentError(
-        'Provider inválido.',
+        'Provider inválido ou não suportado.',
       );
     }
 
-    if (apiKey.isEmpty) {
+    // ==========================================================
+    // VALIDAR API KEY
+    // ==========================================================
+
+    if (normalizedApiKey.isEmpty) {
       throw ArgumentError(
         'API Key não pode ficar vazia.',
       );
     }
 
     // ==========================================================
-    // PROVIDER
+    // CUSTOM PRECISA DE BASE URL
     // ==========================================================
+
+    if (config.isCustom &&
+        !config.hasBaseUrl) {
+      throw ArgumentError(
+        'Provider Custom exige uma Base URL.',
+      );
+    }
+
+    try {
+      // ========================================================
+      // PROVIDER
+      // ========================================================
+
+      await _storage.write(
+        key: _providerKey,
+
+        value: normalizedProvider,
+      );
+
+      // ========================================================
+      // API KEY
+      // ========================================================
+      //
+      // Único ponto onde a chave é persistida.
+      //
+      // ========================================================
+
+      await _storage.write(
+        key: _apiKeyKey,
+
+        value: normalizedApiKey,
+      );
+
+      // ========================================================
+      // MODEL
+      // ========================================================
+
+      await _writeNullable(
+        key: _modelKey,
+
+        value: config.normalizedModel,
+      );
+
+      // ========================================================
+      // BASE URL
+      // ========================================================
+
+      await _writeNullable(
+        key: _baseUrlKey,
+
+        value: config.normalizedBaseUrl,
+      );
+
+      // ========================================================
+      // ENABLED
+      // ========================================================
+
+      await _storage.write(
+        key: _enabledKey,
+
+        value: config.enabled
+            ? 'true'
+            : 'false',
+      );
+
+      // ========================================================
+      // LOG SEGURO
+      // ========================================================
+
+      debugPrint(
+        '[PRIVATE API] '
+        'Configuração salva.',
+      );
+
+      debugPrint(
+        '[PRIVATE API] '
+        'Provider: ${config.providerLabel}',
+      );
+
+      debugPrint(
+        '[PRIVATE API] '
+        'Modelo: ${config.normalizedModel ?? 'padrão'}',
+      );
+
+      debugPrint(
+        '[PRIVATE API] '
+        'Ativa: ${config.enabled}',
+      );
+
+      // ========================================================
+      // NUNCA:
+      //
+      // debugPrint(apiKey);
+      //
+      // ========================================================
+    } catch (
+      error,
+      stackTrace
+    ) {
+      debugPrint(
+        '[PRIVATE API] '
+        'Erro ao salvar configuração: $error',
+      );
+
+      debugPrint(
+        '[PRIVATE API] '
+        'Stack trace: $stackTrace',
+      );
+
+      rethrow;
+    }
+  }
+
+  // ============================================================
+  // SALVAR SOMENTE METADADOS
+  // ============================================================
+  //
+  // Útil quando:
+  //
+  // - trocar provider;
+  // - trocar modelo;
+  // - trocar base URL;
+  // - ativar/desativar.
+  //
+  // Não altera a API Key já armazenada.
+  //
+  // ============================================================
+
+  Future<
+    void
+  >
+  saveMetadata(
+    PrivateApiConfig config,
+  ) async {
+    if (!config.hasValidProvider) {
+      throw ArgumentError(
+        'Provider inválido ou não suportado.',
+      );
+    }
+
+    if (config.isCustom &&
+        !config.hasBaseUrl) {
+      throw ArgumentError(
+        'Provider Custom exige uma Base URL.',
+      );
+    }
 
     await _storage.write(
       key: _providerKey,
 
-      value: provider,
+      value: config.normalizedProvider,
     );
-
-    // ==========================================================
-    // API KEY
-    // ==========================================================
-
-    await _storage.write(
-      key: _apiKeyKey,
-
-      value: apiKey,
-    );
-
-    // ==========================================================
-    // MODEL
-    // ==========================================================
 
     await _writeNullable(
       key: _modelKey,
 
-      value: config.model,
+      value: config.normalizedModel,
     );
-
-    // ==========================================================
-    // BASE URL
-    // ==========================================================
 
     await _writeNullable(
       key: _baseUrlKey,
 
-      value: config.baseUrl,
+      value: config.normalizedBaseUrl,
     );
-
-    // ==========================================================
-    // ENABLED
-    // ==========================================================
 
     await _storage.write(
       key: _enabledKey,
@@ -135,24 +285,56 @@ class PrivateApiService {
 
     debugPrint(
       '[PRIVATE API] '
-      'Configuração salva.',
+      'Metadados atualizados.',
+    );
+  }
+
+  // ============================================================
+  // ATUALIZAR SOMENTE API KEY
+  // ============================================================
+
+  Future<
+    void
+  >
+  saveApiKey(
+    String apiKey,
+  ) async {
+    final normalized = apiKey.trim();
+
+    if (normalized.isEmpty) {
+      throw ArgumentError(
+        'API Key não pode ficar vazia.',
+      );
+    }
+
+    await _storage.write(
+      key: _apiKeyKey,
+
+      value: normalized,
     );
 
     debugPrint(
       '[PRIVATE API] '
-      'Provider: $provider',
+      'API Key atualizada.',
     );
-
-    debugPrint(
-      '[PRIVATE API] '
-      'Ativa: ${config.enabled}',
-    );
-
-    // NÃO imprimir apiKey.
   }
 
   // ============================================================
   // CARREGAR CONFIGURAÇÃO
+  // ============================================================
+  //
+  // IMPORTANTE:
+  //
+  // A API Key NÃO é retornada.
+  //
+  // Retornamos apenas:
+  //
+  // - provider;
+  // - model;
+  // - baseUrl;
+  // - enabled;
+  // - hasApiKey.
+  //
   // ============================================================
 
   Future<
@@ -162,10 +344,6 @@ class PrivateApiService {
     try {
       final provider = await _storage.read(
         key: _providerKey,
-      );
-
-      final apiKey = await _storage.read(
-        key: _apiKeyKey,
       );
 
       final model = await _storage.read(
@@ -180,16 +358,27 @@ class PrivateApiService {
         key: _enabledKey,
       );
 
-      return PrivateApiConfig(
-        provider:
-            provider?.trim().isNotEmpty ==
-                true
-            ? provider!.trim()
-            : 'OpenAI',
+      // ========================================================
+      // SÓ VERIFICAR EXISTÊNCIA
+      // ========================================================
+      //
+      // Não colocamos a chave dentro do config.
+      //
+      // ========================================================
 
-        apiKey:
-            apiKey?.trim() ??
-            '',
+      final storedApiKey = await _storage.read(
+        key: _apiKeyKey,
+      );
+
+      final hasStoredApiKey =
+          storedApiKey !=
+              null &&
+          storedApiKey.trim().isNotEmpty;
+
+      return PrivateApiConfig(
+        provider: _normalizeProviderOrDefault(
+          provider,
+        ),
 
         model: _normalizeNullable(
           model,
@@ -202,6 +391,8 @@ class PrivateApiService {
         enabled:
             enabled ==
             'true',
+
+        hasApiKey: hasStoredApiKey,
       );
     } catch (
       error,
@@ -222,7 +413,7 @@ class PrivateApiService {
   }
 
   // ============================================================
-  // API PRIVADA ATIVA?
+  // API PRIVADA PODE SER USADA?
   // ============================================================
 
   Future<
@@ -242,23 +433,49 @@ class PrivateApiService {
     bool
   >
   hasApiKey() async {
-    final apiKey = await _storage.read(
-      key: _apiKeyKey,
-    );
+    try {
+      final value = await _storage.read(
+        key: _apiKeyKey,
+      );
 
-    return apiKey !=
-            null &&
-        apiKey.trim().isNotEmpty;
+      return value !=
+              null &&
+          value.trim().isNotEmpty;
+    } catch (
+      error,
+      stackTrace
+    ) {
+      debugPrint(
+        '[PRIVATE API] '
+        'Erro ao verificar API Key: $error',
+      );
+
+      debugPrint(
+        '[PRIVATE API] '
+        'Stack trace: $stackTrace',
+      );
+
+      return false;
+    }
   }
 
   // ============================================================
   // LER API KEY
   // ============================================================
   //
-  // Deve ser utilizada apenas pelo serviço responsável por
-  // montar a requisição.
+  // ESTE MÉTODO DEVE SER USADO SOMENTE NO MOMENTO DA REQUISIÇÃO.
   //
-  // Não enviar esse valor para logs.
+  // Fluxo esperado:
+  //
+  // ChatRepository
+  //      ↓
+  // PrivateApiService.readApiKey()
+  //      ↓
+  // PrivateAiClient
+  //      ↓
+  // provider
+  //
+  // Não guardar o resultado em campos permanentes.
   //
   // ============================================================
 
@@ -266,22 +483,39 @@ class PrivateApiService {
     String?
   >
   readApiKey() async {
-    final value = await _storage.read(
-      key: _apiKeyKey,
-    );
+    try {
+      final value = await _storage.read(
+        key: _apiKeyKey,
+      );
 
-    if (value ==
-        null) {
-      return null;
+      if (value ==
+          null) {
+        return null;
+      }
+
+      final normalized = value.trim();
+
+      if (normalized.isEmpty) {
+        return null;
+      }
+
+      return normalized;
+    } catch (
+      error,
+      stackTrace
+    ) {
+      debugPrint(
+        '[PRIVATE API] '
+        'Erro ao acessar API Key.',
+      );
+
+      debugPrint(
+        '[PRIVATE API] '
+        'Stack trace: $stackTrace',
+      );
+
+      rethrow;
     }
-
-    final normalized = value.trim();
-
-    if (normalized.isEmpty) {
-      return null;
-    }
-
-    return normalized;
   }
 
   // ============================================================
@@ -292,9 +526,24 @@ class PrivateApiService {
     void
   >
   enable() async {
-    if (!await hasApiKey()) {
+    final config = await loadConfig();
+
+    if (!config.hasApiKey) {
       throw StateError(
         'Nenhuma API Key privada foi configurada.',
+      );
+    }
+
+    if (!config.hasValidProvider) {
+      throw StateError(
+        'Provider inválido.',
+      );
+    }
+
+    if (config.isCustom &&
+        !config.hasBaseUrl) {
+      throw StateError(
+        'Provider Custom exige uma Base URL.',
       );
     }
 
@@ -331,23 +580,65 @@ class PrivateApiService {
   }
 
   // ============================================================
+  // ALTERAR ENABLED
+  // ============================================================
+
+  Future<
+    void
+  >
+  setEnabled(
+    bool enabled,
+  ) async {
+    if (enabled) {
+      await enable();
+
+      return;
+    }
+
+    await disable();
+  }
+
+  // ============================================================
   // REMOVER API KEY
+  // ============================================================
+  //
+  // Ao remover a chave:
+  //
+  // - API privada é automaticamente desativada.
+  //
   // ============================================================
 
   Future<
     void
   >
   removeApiKey() async {
-    await _storage.delete(
-      key: _apiKeyKey,
-    );
+    try {
+      await _storage.delete(
+        key: _apiKeyKey,
+      );
 
-    await disable();
+      await disable();
 
-    debugPrint(
-      '[PRIVATE API] '
-      'API Key removida.',
-    );
+      debugPrint(
+        '[PRIVATE API] '
+        'API Key removida deste dispositivo.',
+      );
+    } catch (
+      error,
+      stackTrace
+    ) {
+      debugPrint(
+        '[PRIVATE API] '
+        'Erro ao remover API Key: $error',
+      );
+
+      debugPrint(
+        '[PRIVATE API] '
+        'Stack trace: $stackTrace',
+      );
+
+      rethrow;
+    }
   }
 
   // ============================================================
@@ -358,34 +649,67 @@ class PrivateApiService {
     void
   >
   clear() async {
-    await Future.wait(
-      [
-        _storage.delete(
-          key: _providerKey,
-        ),
+    try {
+      await Future.wait(
+        [
+          _storage.delete(
+            key: _providerKey,
+          ),
 
-        _storage.delete(
-          key: _apiKeyKey,
-        ),
+          _storage.delete(
+            key: _apiKeyKey,
+          ),
 
-        _storage.delete(
-          key: _modelKey,
-        ),
+          _storage.delete(
+            key: _modelKey,
+          ),
 
-        _storage.delete(
-          key: _baseUrlKey,
-        ),
+          _storage.delete(
+            key: _baseUrlKey,
+          ),
 
-        _storage.delete(
-          key: _enabledKey,
-        ),
-      ],
-    );
+          _storage.delete(
+            key: _enabledKey,
+          ),
+        ],
+      );
 
-    debugPrint(
-      '[PRIVATE API] '
-      'Configuração removida.',
-    );
+      debugPrint(
+        '[PRIVATE API] '
+        'Toda configuração privada foi removida.',
+      );
+    } catch (
+      error,
+      stackTrace
+    ) {
+      debugPrint(
+        '[PRIVATE API] '
+        'Erro ao limpar configuração: $error',
+      );
+
+      debugPrint(
+        '[PRIVATE API] '
+        'Stack trace: $stackTrace',
+      );
+
+      rethrow;
+    }
+  }
+
+  // ============================================================
+  // CONFIGURAÇÃO EXISTE?
+  // ============================================================
+
+  Future<
+    bool
+  >
+  hasConfiguration() async {
+    final config = await loadConfig();
+
+    return config.hasApiKey ||
+        config.hasModel ||
+        config.hasBaseUrl ||
+        config.enabled;
   }
 
   // ============================================================
@@ -419,7 +743,7 @@ class PrivateApiService {
   }
 
   // ============================================================
-  // NORMALIZAR
+  // NORMALIZAR STRING
   // ============================================================
 
   String? _normalizeNullable(
@@ -434,6 +758,24 @@ class PrivateApiService {
 
     if (normalized.isEmpty) {
       return null;
+    }
+
+    return normalized;
+  }
+
+  // ============================================================
+  // NORMALIZAR PROVIDER
+  // ============================================================
+
+  String _normalizeProviderOrDefault(
+    String? value,
+  ) {
+    final normalized = value?.trim();
+
+    if (normalized ==
+            null ||
+        normalized.isEmpty) {
+      return 'OpenAI';
     }
 
     return normalized;

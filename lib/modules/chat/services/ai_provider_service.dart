@@ -27,21 +27,44 @@ enum AiProviderSource {
 // - texto retornado;
 // - fonte utilizada;
 // - provider;
-// - modelo;
+// - modelo.
 //
-// Essa informação será importante para decidir se os tokens
-// devem ou não ser descontados da cota Versin.
+// Essa informação é utilizada pelo restante do aplicativo para:
+//
+// - saber se a cota Versin deve ser atualizada;
+// - indicar que uma API privada está ativa;
+// - exibir provider/modelo utilizados.
 //
 // ============================================================
 
 class AiProviderResult {
+  // ============================================================
+  // CONTEÚDO
+  // ============================================================
+
   final String content;
+
+  // ============================================================
+  // FONTE
+  // ============================================================
 
   final AiProviderSource source;
 
+  // ============================================================
+  // PROVIDER
+  // ============================================================
+
   final String? provider;
 
+  // ============================================================
+  // MODELO
+  // ============================================================
+
   final String? model;
+
+  // ============================================================
+  // CONSTRUTOR
+  // ============================================================
 
   const AiProviderResult({
     required this.content,
@@ -51,13 +74,17 @@ class AiProviderResult {
   });
 
   // ============================================================
-  // HELPERS
+  // USOU VERSIN?
   // ============================================================
 
   bool get usedVersinApi {
     return source ==
         AiProviderSource.versin;
   }
+
+  // ============================================================
+  // USOU API PRIVADA?
+  // ============================================================
 
   bool get usedPrivateApi {
     return source ==
@@ -83,22 +110,59 @@ class AiProviderResult {
 // PRIVATE AI REQUEST
 // ============================================================
 //
-// Dados enviados para o callback que fará a requisição privada.
+// Objeto de curta duração criado SOMENTE no momento em que
+// uma requisição privada será enviada.
 //
-// A API key nunca deve ser impressa em logs.
+// IMPORTANTE:
+//
+// A API Key não fica em:
+//
+// - PrivateApiConfig;
+// - controllers;
+// - widgets;
+// - estado da aplicação.
+//
+// Ela é lida do PrivateApiService imediatamente antes da
+// requisição e colocada temporariamente neste objeto.
+//
+// Nunca imprimir este objeto inteiro em logs.
 //
 // ============================================================
 
 class PrivateAiRequest {
+  // ============================================================
+  // PROMPT
+  // ============================================================
+
   final String prompt;
+
+  // ============================================================
+  // PROVIDER
+  // ============================================================
 
   final String provider;
 
+  // ============================================================
+  // API KEY
+  // ============================================================
+
   final String apiKey;
+
+  // ============================================================
+  // MODELO
+  // ============================================================
 
   final String? model;
 
+  // ============================================================
+  // BASE URL
+  // ============================================================
+
   final String? baseUrl;
+
+  // ============================================================
+  // CONSTRUTOR
+  // ============================================================
 
   const PrivateAiRequest({
     required this.prompt,
@@ -107,16 +171,34 @@ class PrivateAiRequest {
     this.model,
     this.baseUrl,
   });
+
+  // ============================================================
+  // TO STRING SEGURO
+  // ============================================================
+  //
+  // API Key propositalmente NÃO aparece.
+  //
+  // ============================================================
+
+  @override
+  String toString() {
+    return 'PrivateAiRequest('
+        'provider: $provider, '
+        'model: $model, '
+        'baseUrl: $baseUrl, '
+        'promptLength: ${prompt.length}'
+        ')';
+  }
 }
 
 // ============================================================
 // AI PROVIDER SERVICE
 // ============================================================
 //
-// Decide automaticamente:
+// Responsável por decidir qual fonte deve responder:
 //
 // ┌───────────────────────────────┐
-// │ API privada está configurada? │
+// │ API privada pode ser usada?   │
 // └───────────────┬───────────────┘
 //                 │
 //          ┌──────┴──────┐
@@ -124,20 +206,20 @@ class PrivateAiRequest {
 //         NÃO           SIM
 //          │             │
 //          ▼             ▼
-//       VERSIN      API PRIVADA
+//       VERSIN       API PRIVADA
 //
-// IMPORTANTE:
+// SEGURANÇA:
 //
-// Este serviço não conhece Widgets.
-//
-// Também não contabiliza a cota diretamente.
-// Ele informa qual fonte foi usada através de AiProviderResult.
+// - PrivateApiConfig NÃO contém API Key;
+// - a chave só é lida quando realmente necessária;
+// - a chave não é logada;
+// - a chave não é devolvida em AiProviderResult.
 //
 // ============================================================
 
 class AiProviderService {
   // ============================================================
-  // PRIVATE API
+  // PRIVATE API SERVICE
   // ============================================================
 
   final PrivateApiService privateApiService;
@@ -156,11 +238,11 @@ class AiProviderService {
   //
   // generateWithVersin:
   //
-  // callback para sua implementação atual.
+  // executa a infraestrutura oficial do Versin.
   //
   // generateWithPrivateApi:
   //
-  // callback que recebe os dados necessários para a API privada.
+  // executa o PrivateAiClient.
   //
   // ============================================================
 
@@ -195,7 +277,7 @@ class AiProviderService {
     }
 
     // ==========================================================
-    // CARREGAR CONFIGURAÇÃO
+    // CARREGAR APENAS METADADOS
     // ==========================================================
 
     final config = await privateApiService.loadConfig();
@@ -245,15 +327,23 @@ class AiProviderService {
   }) async {
     debugPrint(
       '[AI PROVIDER] '
-      'Utilizando API Versin.',
+      'Utilizando IA Versin.',
     );
 
     final content = await generate(
       prompt,
     );
 
+    final normalizedContent = content.trim();
+
+    if (normalizedContent.isEmpty) {
+      throw StateError(
+        'A IA Versin retornou conteúdo vazio.',
+      );
+    }
+
     return AiProviderResult(
-      content: content,
+      content: normalizedContent,
 
       source: AiProviderSource.versin,
 
@@ -281,6 +371,17 @@ class AiProviderService {
     )
     generate,
   }) async {
+    // ==========================================================
+    // VALIDAÇÃO
+    // ==========================================================
+
+    if (!config.canUsePrivateApi) {
+      throw StateError(
+        config.validationError ??
+            'A API privada não pode ser utilizada.',
+      );
+    }
+
     debugPrint(
       '[AI PROVIDER] '
       'Utilizando API privada.',
@@ -288,59 +389,111 @@ class AiProviderService {
 
     debugPrint(
       '[AI PROVIDER] '
-      'Provider: ${config.provider}',
+      'Provider: ${config.providerLabel}',
     );
 
     if (config.hasModel) {
       debugPrint(
         '[AI PROVIDER] '
-        'Modelo: ${config.model}',
+        'Modelo: ${config.normalizedModel}',
       );
     }
 
     // ==========================================================
-    // NUNCA:
+    // LER API KEY SOMENTE AGORA
+    // ==========================================================
     //
-    // debugPrint(config.apiKey);
+    // A chave não estava em memória dentro do config.
     //
+    // Ela é recuperada somente imediatamente antes da chamada.
+    //
+    // ==========================================================
+
+    final apiKey = await privateApiService.readApiKey();
+
+    if (apiKey ==
+            null ||
+        apiKey.isEmpty) {
+      // ========================================================
+      // ESTADO INCONSISTENTE
+      // ========================================================
+      //
+      // Exemplo:
+      //
+      // enabled = true
+      // hasApiKey do config ficou verdadeiro
+      // mas a chave foi removida externamente.
+      //
+      // ========================================================
+
+      await privateApiService.disable();
+
+      throw StateError(
+        'A API privada estava ativa, mas a credencial não foi encontrada.',
+      );
+    }
+
+    // ==========================================================
+    // REQUEST TEMPORÁRIO
     // ==========================================================
 
     final request = PrivateAiRequest(
       prompt: prompt,
 
-      provider: config.provider,
+      provider: config.normalizedProvider,
 
-      apiKey: config.apiKey,
+      apiKey: apiKey,
 
-      model: config.model,
+      model: config.normalizedModel,
 
-      baseUrl: config.baseUrl,
+      baseUrl: config.normalizedBaseUrl,
     );
+
+    // ==========================================================
+    // EXECUTAR
+    // ==========================================================
 
     final content = await generate(
       request,
     );
 
+    final normalizedContent = content.trim();
+
+    if (normalizedContent.isEmpty) {
+      throw StateError(
+        'A API privada retornou conteúdo vazio.',
+      );
+    }
+
+    // ==========================================================
+    // RESULTADO
+    // ==========================================================
+    //
+    // A API Key NÃO é devolvida.
+    //
+    // ==========================================================
+
     return AiProviderResult(
-      content: content,
+      content: normalizedContent,
 
       source: AiProviderSource.privateApi,
 
-      provider: config.provider,
+      provider: config.providerLabel,
 
-      model: config.model,
+      model: config.normalizedModel,
     );
   }
 
   // ============================================================
-  // QUAL FONTE SERÁ USADA?
+  // QUAL FONTE ESTÁ CONFIGURADA?
   // ============================================================
   //
-  // Útil para interface.
+  // Útil para:
   //
-  // Exemplo:
-  //
-  // "API privada ativa"
+  // - Settings;
+  // - barra de IA;
+  // - badges;
+  // - status visual.
   //
   // ============================================================
 
@@ -380,5 +533,51 @@ class AiProviderService {
 
     return source ==
         AiProviderSource.privateApi;
+  }
+
+  // ============================================================
+  // ESTÁ UTILIZANDO IA VERSIN?
+  // ============================================================
+
+  Future<
+    bool
+  >
+  isUsingVersinApi() async {
+    return !await isUsingPrivateApi();
+  }
+
+  // ============================================================
+  // POSSUI API PRIVADA CONFIGURADA?
+  // ============================================================
+
+  Future<
+    bool
+  >
+  hasPrivateApiConfiguration() async {
+    final config = await privateApiService.loadConfig();
+
+    return config.hasApiKey;
+  }
+
+  // ============================================================
+  // ATIVAR API PRIVADA
+  // ============================================================
+
+  Future<
+    void
+  >
+  enablePrivateApi() async {
+    await privateApiService.enable();
+  }
+
+  // ============================================================
+  // DESATIVAR API PRIVADA
+  // ============================================================
+
+  Future<
+    void
+  >
+  disablePrivateApi() async {
+    await privateApiService.disable();
   }
 }

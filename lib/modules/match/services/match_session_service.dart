@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 
 import 'package:versin/modules/match/controllers/match_controllers.dart';
 import 'package:versin/modules/match/data/repositories/match_repository.dart';
+import 'package:versin/modules/match/models/match_discovery_mode.dart';
+import 'package:versin/modules/match/services/match_location_service.dart';
 
 import 'package:versin/modules/profile/controllers/professional_profile_controller.dart';
 
@@ -17,6 +19,10 @@ import 'package:versin/modules/profile/controllers/professional_profile_controll
 // - inicializar MatchController;
 // - iniciar stream de candidatos;
 // - reiniciar sessão;
+// - alterar modo de descoberta;
+// - capturar localização ao entrar em nearby;
+// - salvar latitude/longitude antes do stream nearby;
+// - reiniciar o stream ao trocar o modo;
 // - atualizar perfil profissional;
 // - interromper stream;
 // - impedir execuções concorrentes.
@@ -43,6 +49,8 @@ class MatchSessionService {
 
   final ProfessionalProfileController _professionalProfileController;
 
+  final MatchLocationService _matchLocationService;
+
   // ============================================================
   // ESTADO
   // ============================================================
@@ -63,9 +71,14 @@ class MatchSessionService {
     required MatchController matchController,
     required MatchRepository matchRepository,
     required ProfessionalProfileController professionalProfileController,
-  }) : _matchController = matchController,
+    MatchLocationService? matchLocationService,
+  }) : _matchController =
+           matchController,
        _matchRepository = matchRepository,
-       _professionalProfileController = professionalProfileController;
+       _professionalProfileController = professionalProfileController,
+       _matchLocationService =
+           matchLocationService ??
+           MatchLocationService();
 
   // ============================================================
   // GETTERS
@@ -132,6 +145,27 @@ class MatchSessionService {
       await _matchController.initMatchSession();
 
       if (_isDisposed) {
+        return;
+      }
+
+      // ========================================================
+      // LOCALIZAÇÃO
+      // ========================================================
+
+      final locationReady = await _prepareLocationForCurrentMode();
+
+      if (_isDisposed) {
+        return;
+      }
+
+      if (!locationReady) {
+        debugPrint(
+          '[MATCH SESSION] '
+          'Stream não iniciado: localização necessária indisponível.',
+        );
+
+        _matchController.clearMatchResults();
+
         return;
       }
 
@@ -225,6 +259,27 @@ class MatchSessionService {
       }
 
       // ========================================================
+      // LOCALIZAÇÃO
+      // ========================================================
+
+      final locationReady = await _prepareLocationForCurrentMode();
+
+      if (_isDisposed) {
+        return;
+      }
+
+      if (!locationReady) {
+        debugPrint(
+          '[MATCH SESSION] '
+          'Reinício interrompido: localização necessária indisponível.',
+        );
+
+        _matchController.clearMatchResults();
+
+        return;
+      }
+
+      // ========================================================
       // NOVO STREAM
       // ========================================================
 
@@ -244,6 +299,173 @@ class MatchSessionService {
 
       _logError(
         operation: 'reiniciar sessão',
+        error: error,
+        stackTrace: stackTrace,
+      );
+
+      rethrow;
+    } finally {
+      _isRestarting = false;
+
+      _logSeparator();
+    }
+  }
+
+  // ============================================================
+  // ALTERAR MODO DE DESCOBERTA
+  // ============================================================
+  //
+  // Fluxo:
+  //
+  // UI
+  //   ↓
+  // changeDiscoveryMode()
+  //   ↓
+  // MatchController.setDiscoveryMode()
+  //   ↓
+  // parar stream atual
+  //   ↓
+  // iniciar novo stream
+  //   ↓
+  // Repository lê controller.discoveryMode
+  //
+  // ============================================================
+
+  Future<
+    void
+  >
+  changeDiscoveryMode(
+    MatchDiscoveryMode mode,
+  ) async {
+    if (_isDisposed ||
+        _isRestarting) {
+      return;
+    }
+
+    final currentMode = _matchController.discoveryMode;
+
+    final sameMode =
+        currentMode ==
+        mode;
+
+    // ==========================================================
+    // MESMO MODO
+    // ==========================================================
+    //
+    // Para compatible/global não há nada a refazer.
+    //
+    // Para nearby NÃO podemos simplesmente retornar:
+    //
+    // - a localização pode ainda não ter sido capturada;
+    // - a permissão pode ter sido concedida depois;
+    // - latitude/longitude podem estar nulas ou antigas.
+    //
+    // Por isso nearby sempre força uma nova tentativa de captura.
+    //
+    // ==========================================================
+
+    if (sameMode &&
+        mode !=
+            MatchDiscoveryMode.nearby) {
+      return;
+    }
+
+    _isRestarting = true;
+
+    _logSeparator();
+
+    debugPrint(
+      '[MATCH SESSION] '
+      '${sameMode ? "Revalidando" : "Alterando"} '
+      'modo de descoberta: ${mode.name}',
+    );
+
+    try {
+      // ========================================================
+      // PARAR STREAM ATUAL
+      // ========================================================
+
+      await _matchRepository.stopStreaming();
+
+      if (_isDisposed) {
+        return;
+      }
+
+      // ========================================================
+      // ALTERAR MODO
+      // ========================================================
+
+      if (!sameMode) {
+        _matchController.setDiscoveryMode(
+          mode,
+        );
+      }
+
+      if (_isDisposed) {
+        return;
+      }
+
+      // ========================================================
+      // PREPARAR LOCALIZAÇÃO
+      // ========================================================
+
+      final locationReady = await _prepareLocationForCurrentMode();
+
+      if (_isDisposed) {
+        return;
+      }
+
+      // ========================================================
+      // NEARBY SEM LOCALIZAÇÃO
+      // ========================================================
+      //
+      // Não iniciamos o Repository com latitude/longitude nulas.
+      //
+      // Isso evita exatamente o estado:
+      //
+      // Location enabled: false
+      // Latitude: null
+      // Longitude: null
+      //
+      // ========================================================
+
+      if (!locationReady) {
+        debugPrint(
+          '[MATCH SESSION] '
+          'Modo nearby não pôde ser iniciado.',
+        );
+
+        debugPrint(
+          '[MATCH SESSION] '
+          'A localização atual não está disponível.',
+        );
+
+        _matchController.clearMatchResults();
+
+        _isInitialized = true;
+
+        return;
+      }
+
+      // ========================================================
+      // INICIAR NOVO STREAM
+      // ========================================================
+
+      _startMatchStream();
+
+      _isInitialized = true;
+
+      debugPrint(
+        '[MATCH SESSION] '
+        'Modo ativo: '
+        '${_matchController.discoveryMode.name}',
+      );
+    } catch (
+      error,
+      stackTrace
+    ) {
+      _logError(
+        operation: 'alterar modo de descoberta',
         error: error,
         stackTrace: stackTrace,
       );
@@ -343,6 +565,127 @@ class MatchSessionService {
   }
 
   // ============================================================
+  // PREPARAR LOCALIZAÇÃO PARA O MODO ATUAL
+  // ============================================================
+  //
+  // A localização só é necessária no modo nearby.
+  //
+  // Nos modos compatible e global este método não faz nada.
+  //
+  // ============================================================
+
+  Future<
+    bool
+  >
+  _prepareLocationForCurrentMode() async {
+    if (_isDisposed) {
+      return false;
+    }
+
+    // ==========================================================
+    // OUTROS MODOS
+    // ==========================================================
+
+    if (_matchController.discoveryMode !=
+        MatchDiscoveryMode.nearby) {
+      return true;
+    }
+
+    // ==========================================================
+    // NEARBY
+    // ==========================================================
+
+    debugPrint(
+      '[MATCH SESSION] '
+      'Modo nearby: iniciando captura de localização.',
+    );
+
+    try {
+      // ========================================================
+      // CAPTURAR E SALVAR
+      // ========================================================
+      //
+      // updateCurrentLocation():
+      //
+      // - verifica serviço de localização;
+      // - verifica/solicita permissão;
+      // - obtém a posição;
+      // - salva latitude;
+      // - salva longitude;
+      // - define location_enabled = true;
+      // - atualiza location_updated_at.
+      //
+      // ========================================================
+
+      final position = await _matchLocationService.updateCurrentLocation();
+
+      if (_isDisposed) {
+        return false;
+      }
+
+      // ========================================================
+      // FALHA
+      // ========================================================
+
+      if (position ==
+          null) {
+        debugPrint(
+          '[MATCH SESSION] '
+          'Falha ao capturar localização para nearby.',
+        );
+
+        debugPrint(
+          '[MATCH SESSION] '
+          'Verifique serviço de localização e permissões.',
+        );
+
+        return false;
+      }
+
+      // ========================================================
+      // SUCESSO
+      // ========================================================
+
+      debugPrint(
+        '[MATCH SESSION] '
+        'Localização capturada e salva.',
+      );
+
+      debugPrint(
+        '[MATCH SESSION] '
+        'Latitude: ${position.latitude}',
+      );
+
+      debugPrint(
+        '[MATCH SESSION] '
+        'Longitude: ${position.longitude}',
+      );
+
+      debugPrint(
+        '[MATCH SESSION] '
+        'Precisão: ${position.accuracy.toStringAsFixed(1)} m',
+      );
+
+      return true;
+    } catch (
+      error,
+      stackTrace
+    ) {
+      debugPrint(
+        '[MATCH SESSION] '
+        'Erro ao preparar localização para nearby: $error',
+      );
+
+      debugPrint(
+        '[MATCH SESSION] '
+        'StackTrace: $stackTrace',
+      );
+
+      return false;
+    }
+  }
+
+  // ============================================================
   // INICIAR STREAM
   // ============================================================
 
@@ -350,6 +693,12 @@ class MatchSessionService {
     if (_isDisposed) {
       return;
     }
+
+    debugPrint(
+      '[MATCH SESSION] '
+      'Iniciando stream no modo '
+      '${_matchController.discoveryMode.name}.',
+    );
 
     _matchRepository.streamCrossRoleMatches(
       _matchController,

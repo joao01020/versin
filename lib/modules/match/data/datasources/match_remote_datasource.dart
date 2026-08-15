@@ -11,8 +11,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 // Responsabilidades:
 //
 // - consultar profiles no Supabase;
-// - pesquisar usuários;
-// - observar usuários online via Realtime.
+// - pesquisar usuários ONLINE;
+// - observar usuários ONLINE via Realtime.
 //
 // Esta camada NÃO:
 //
@@ -23,6 +23,16 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 // - atualiza Discovery;
 // - atualiza recomendações;
 // - possui regra de negócio.
+//
+// Regra de visibilidade:
+//
+// is_online = true
+//     ↓
+// perfil pode aparecer no Match
+//
+// is_online = false
+//     ↓
+// perfil não aparece no Match
 //
 // Fluxo:
 //
@@ -51,8 +61,6 @@ abstract class MatchRemoteDatasource {
   //
   // is_online = true
   //
-  // A interpretação dos dados pertence ao Repository.
-  //
   // ==========================================================
 
   Stream<
@@ -69,15 +77,13 @@ abstract class MatchRemoteDatasource {
   // PESQUISAR PERFIS
   // ==========================================================
   //
-  // Pesquisa por:
+  // Pesquisa somente perfis ONLINE por:
   //
   // - username;
   // - artist_name;
   // - name.
   //
-  // Retorna mapas brutos.
-  //
-  // A conversão para MatchUserEntity pertence ao Repository.
+  // Também pode remover o próprio usuário da busca.
   //
   // ==========================================================
 
@@ -110,15 +116,13 @@ class MatchRemoteDatasourceImpl
   final SupabaseClient _supabase;
 
   // ============================================================
-  // CONSTRUTOR
+  // TABELA
   // ============================================================
-  //
-  // Permite injetar outro SupabaseClient em testes.
-  //
-  // No app normal:
-  //
-  // MatchRemoteDatasourceImpl()
-  //
+
+  static const String _profilesTable = 'profiles';
+
+  // ============================================================
+  // CONSTRUTOR
   // ============================================================
 
   MatchRemoteDatasourceImpl({
@@ -167,7 +171,7 @@ class MatchRemoteDatasourceImpl
 
     return _supabase
         .from(
-          'profiles',
+          _profilesTable,
         )
         .stream(
           primaryKey: [
@@ -182,7 +186,30 @@ class MatchRemoteDatasourceImpl
           (
             rows,
           ) {
-            return rows
+            // ==================================================
+            // PROTEÇÃO EXTRA
+            // ==================================================
+            //
+            // O Supabase já aplica:
+            //
+            // is_online = true
+            //
+            // mas mantemos a validação local para garantir que
+            // nenhum registro offline seja propagado caso o
+            // estado do realtime mude inesperadamente.
+            //
+            // ==================================================
+
+            final onlineRows = rows.where(
+              (
+                row,
+              ) {
+                return row['is_online'] ==
+                    true;
+              },
+            );
+
+            return onlineRows
                 .map(
                   (
                     row,
@@ -258,20 +285,33 @@ class MatchRemoteDatasourceImpl
 
     debugPrint(
       '[MATCH REMOTE] '
-      'Pesquisando perfis: $normalizedQuery',
+      'Pesquisando perfis online: '
+      '$normalizedQuery',
     );
 
     try {
       // ========================================================
       // QUERY BASE
       // ========================================================
+      //
+      // IMPORTANTE:
+      //
+      // O filtro ONLINE fica aqui.
+      //
+      // Um perfil OFFLINE não é retornado pelo Supabase.
+      //
+      // ========================================================
 
       var request = _supabase
           .from(
-            'profiles',
+            _profilesTable,
           )
           .select(
             _profileColumns,
+          )
+          .eq(
+            'is_online',
+            true,
           )
           .or(
             'username.ilike.%$normalizedQuery%,'
@@ -314,12 +354,41 @@ class MatchRemoteDatasourceImpl
             response,
           );
 
+      // ========================================================
+      // PROTEÇÃO EXTRA LOCAL
+      // ========================================================
+
+      final onlineRows = rows
+          .where(
+            (
+              row,
+            ) {
+              return row['is_online'] ==
+                  true;
+            },
+          )
+          .map(
+            (
+              row,
+            ) {
+              return Map<
+                String,
+                dynamic
+              >.from(
+                row,
+              );
+            },
+          )
+          .toList(
+            growable: false,
+          );
+
       debugPrint(
         '[MATCH REMOTE] '
-        '${rows.length} perfil(is) encontrado(s).',
+        '${onlineRows.length} perfil(is) online encontrado(s).',
       );
 
-      return rows;
+      return onlineRows;
     } on PostgrestException catch (
       error
     ) {
@@ -364,9 +433,7 @@ class MatchRemoteDatasourceImpl
   // Permite:
   //
   // astryvo
-  //
   // @astryvo
-  //
   // @@@astryvo
   //
   // Todos resultam em:

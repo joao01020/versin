@@ -6,12 +6,18 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:versin/app/locator.dart';
 
 // ============================================================
+// MATCH - CONSENTIMENTO
+// ============================================================
+import 'package:versin/modules/match/views/location_privacy_page.dart';
+import 'package:versin/modules/match/services/match_location_consent_service.dart';
+// ============================================================
 // MATCH
 // ============================================================
 
 import 'package:versin/modules/match/controllers/match_controllers.dart';
 import 'package:versin/modules/match/controllers/match_search_controller.dart';
 import 'package:versin/modules/match/data/repositories/match_repository.dart';
+import 'package:versin/modules/match/models/match_discovery_mode.dart';
 import 'package:versin/modules/match/models/match_filter_state.dart';
 import 'package:versin/modules/match/services/match_session_service.dart';
 
@@ -60,6 +66,7 @@ import 'package:versin/modules/public_profile/widgets/public_profile_avatar_widg
 // - inicializar Match;
 // - controlar busca;
 // - controlar filtros;
+// - controlar modo de descoberta;
 // - abrir perfis;
 // - abrir Networking;
 // - buscar uma demo;
@@ -119,6 +126,8 @@ class _MatchPageState
 
   late final MatchSessionService _sessionService;
 
+  late final MatchLocationConsentService _locationConsentService;
+
   // ============================================================
   // SEARCH
   // ============================================================
@@ -128,6 +137,328 @@ class _MatchPageState
   final FocusNode _searchFocusNode = FocusNode();
 
   bool _isSearchPanelOpen = false;
+
+  // ============================================================
+  // CONFIRMAR MODO POR PROXIMIDADE
+  // ============================================================
+
+  Future<
+    void
+  >
+  _confirmNearbyDiscovery() async {
+    if (!mounted ||
+        _isInitializingMatch ||
+        _sessionService.isRestarting) {
+      return;
+    }
+
+    // ==========================================================
+    // VERIFICAR SE JÁ EXISTE CONSENTIMENTO
+    // ==========================================================
+
+    try {
+      final alreadyAccepted = await _locationConsentService.hasAcceptedNearbyLocation();
+
+      if (!mounted) {
+        return;
+      }
+
+      if (alreadyAccepted) {
+        debugPrint(
+          '[MATCH PAGE] '
+          'Consentimento de localização já registrado.',
+        );
+
+        await _changeDiscoveryMode(
+          MatchDiscoveryMode.nearby,
+        );
+
+        return;
+      }
+    } catch (
+      error,
+      stackTrace
+    ) {
+      debugPrint(
+        '[MATCH PAGE] '
+        'Erro ao consultar consentimento: $error',
+      );
+
+      debugPrint(
+        '[MATCH PAGE] '
+        'Stack trace: $stackTrace',
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(
+          context,
+        )
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Não foi possível verificar a confirmação de localização.',
+            ),
+          ),
+        );
+
+      return;
+    }
+
+    // ==========================================================
+    // MOSTRAR AVISO
+    // ==========================================================
+
+    bool accepted = false;
+
+    debugPrint(
+      '[MATCH PAGE] '
+      'Exibindo confirmação inicial de localização.',
+    );
+
+    final confirmed =
+        await showDialog<
+          bool
+        >(
+          context: context,
+          barrierDismissible: false,
+
+          builder:
+              (
+                dialogContext,
+              ) {
+                return StatefulBuilder(
+                  builder:
+                      (
+                        context,
+                        setDialogState,
+                      ) {
+                        return AlertDialog(
+                          backgroundColor: const Color(
+                            0xFF17132D,
+                          ),
+
+                          surfaceTintColor: Colors.transparent,
+
+                          title: const Text(
+                            'Encontrar profissionais próximos',
+
+                            style: TextStyle(
+                              color: Colors.white,
+
+                              fontSize: 16,
+
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+
+                          content: Column(
+                            mainAxisSize: MainAxisSize.min,
+
+                            crossAxisAlignment: CrossAxisAlignment.start,
+
+                            children: [
+                              const Text(
+                                'Usamos sua localização apenas para '
+                                'encontrar profissionais próximos de você.\n\n'
+                                'Sua posição é usada para calcular a '
+                                'distância entre perfis e melhorar os '
+                                'resultados do modo Próximos.',
+
+                                style: TextStyle(
+                                  color: Colors.white60,
+
+                                  fontSize: 12,
+
+                                  height: 1.5,
+                                ),
+                              ),
+
+                              const SizedBox(
+                                height: 16,
+                              ),
+                              Align(
+                                alignment: Alignment.centerLeft,
+
+                                child: TextButton.icon(
+                                  onPressed: () async {
+                                    await Navigator.of(
+                                      dialogContext,
+                                    ).push(
+                                      MaterialPageRoute(
+                                        builder:
+                                            (
+                                              _,
+                                            ) {
+                                              return const LocationPrivacyPage();
+                                            },
+                                      ),
+                                    );
+                                  },
+
+                                  icon: const Icon(
+                                    Icons.open_in_new_rounded,
+
+                                    size: 15,
+                                  ),
+
+                                  label: const Text(
+                                    'Como usamos sua localização',
+                                  ),
+                                ),
+                              ),
+                              CheckboxListTile(
+                                contentPadding: EdgeInsets.zero,
+
+                                controlAffinity: ListTileControlAffinity.leading,
+
+                                value: accepted,
+
+                                activeColor: _matchController.accentNeon,
+
+                                checkColor: Colors.black,
+
+                                title: const Text(
+                                  'Confirmo que entendi e permito '
+                                  'o uso da minha localização para '
+                                  'encontrar profissionais próximos.',
+
+                                  style: TextStyle(
+                                    color: Colors.white70,
+
+                                    fontSize: 11,
+
+                                    height: 1.4,
+                                  ),
+                                ),
+
+                                onChanged:
+                                    (
+                                      value,
+                                    ) {
+                                      setDialogState(
+                                        () {
+                                          accepted =
+                                              value ??
+                                              false;
+                                        },
+                                      );
+                                    },
+                              ),
+                            ],
+                          ),
+
+                          actions: [
+                            TextButton(
+                              onPressed: () {
+                                Navigator.of(
+                                  dialogContext,
+                                ).pop(
+                                  false,
+                                );
+                              },
+
+                              child: const Text(
+                                'CANCELAR',
+                              ),
+                            ),
+
+                            FilledButton(
+                              onPressed: accepted
+                                  ? () {
+                                      Navigator.of(
+                                        dialogContext,
+                                      ).pop(
+                                        true,
+                                      );
+                                    }
+                                  : null,
+
+                              child: const Text(
+                                'CONTINUAR',
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                );
+              },
+        );
+
+    // ==========================================================
+    // CANCELADO
+    // ==========================================================
+
+    if (!mounted ||
+        confirmed !=
+            true) {
+      debugPrint(
+        '[MATCH PAGE] '
+        'Consentimento de localização não confirmado.',
+      );
+
+      return;
+    }
+
+    // ==========================================================
+    // SALVAR CONSENTIMENTO
+    // ==========================================================
+
+    try {
+      await _locationConsentService.acceptNearbyLocation();
+
+      debugPrint(
+        '[MATCH PAGE] '
+        'Consentimento de localização salvo.',
+      );
+    } catch (
+      error,
+      stackTrace
+    ) {
+      debugPrint(
+        '[MATCH PAGE] '
+        'Erro ao salvar consentimento: $error',
+      );
+
+      debugPrint(
+        '[MATCH PAGE] '
+        'Stack trace: $stackTrace',
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(
+          context,
+        )
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Não foi possível salvar sua confirmação.',
+            ),
+          ),
+        );
+
+      return;
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    // ==========================================================
+    // ENTRAR NO MODO PRÓXIMOS
+    // ==========================================================
+
+    await _changeDiscoveryMode(
+      MatchDiscoveryMode.nearby,
+    );
+  }
 
   // ============================================================
   // FILTER
@@ -218,6 +549,7 @@ class _MatchPageState
       professionalProfileController: _professionalProfileController,
     );
 
+    _locationConsentService = MatchLocationConsentService();
     _publicProfileController = PublicProfileController(
       repository: PublicProfileRepositoryImpl(),
       trackService: ProfileTrackService(),
@@ -746,6 +1078,81 @@ class _MatchPageState
   }
 
   // ============================================================
+  // DISCOVERY MODE
+  // ============================================================
+
+  Future<
+    void
+  >
+  _changeDiscoveryMode(
+    MatchDiscoveryMode mode,
+  ) async {
+    if (!mounted ||
+        _isInitializingMatch ||
+        _sessionService.isRestarting) {
+      return;
+    }
+
+    if (_matchController.discoveryMode ==
+        mode) {
+      return;
+    }
+
+    setState(
+      () {
+        _isInitializingMatch = true;
+      },
+    );
+
+    try {
+      await _sessionService.changeDiscoveryMode(
+        mode,
+      );
+    } catch (
+      error,
+      stackTrace
+    ) {
+      debugPrint(
+        '[MATCH PAGE] '
+        'Erro ao alterar modo de descoberta: '
+        '$error',
+      );
+
+      debugPrint(
+        '[MATCH PAGE] '
+        'Stack trace: '
+        '$stackTrace',
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(
+          context,
+        )
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Não foi possível alterar o modo de descoberta.',
+            ),
+          ),
+        );
+    } finally {
+      if (!mounted) {
+        return;
+      }
+
+      setState(
+        () {
+          _isInitializingMatch = false;
+        },
+      );
+    }
+  }
+
+  // ============================================================
   // FILTERS
   // ============================================================
 
@@ -944,6 +1351,12 @@ class _MatchPageState
             _buildDiscoveryHeader(),
 
             const SizedBox(
+              height: 14,
+            ),
+
+            _buildDiscoveryModeSelector(),
+
+            const SizedBox(
               height: 24,
             ),
 
@@ -1095,6 +1508,260 @@ class _MatchPageState
   }
 
   // ============================================================
+  // DISCOVERY MODE SELECTOR
+  // ============================================================
+
+  Widget _buildDiscoveryModeSelector() {
+    final activeMode = _matchController.discoveryMode;
+
+    final disabled =
+        _isInitializingMatch ||
+        _sessionService.isRestarting;
+
+    return Container(
+      width: double.infinity,
+
+      padding: const EdgeInsets.all(
+        4,
+      ),
+
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(
+          alpha: 0.035,
+        ),
+
+        borderRadius: BorderRadius.circular(
+          14,
+        ),
+
+        border: Border.all(
+          color: Colors.white.withValues(
+            alpha: 0.06,
+          ),
+        ),
+      ),
+
+      child: Row(
+        children: [
+          // ========================================================
+          // COMPATÍVEIS
+          // ========================================================
+          Expanded(
+            child: _buildDiscoveryModeButton(
+              mode: MatchDiscoveryMode.compatible,
+
+              icon: Icons.auto_awesome_rounded,
+
+              label: 'COMPATÍVEIS',
+
+              selected:
+                  activeMode ==
+                  MatchDiscoveryMode.compatible,
+
+              disabled: disabled,
+            ),
+          ),
+
+          const SizedBox(
+            width: 6,
+          ),
+
+          // ========================================================
+          // PROXIMIDADE
+          // ========================================================
+          Expanded(
+            child: _buildDiscoveryModeButton(
+              mode: MatchDiscoveryMode.nearby,
+
+              icon: Icons.near_me_rounded,
+
+              label: 'PRÓXIMOS',
+
+              selected:
+                  activeMode ==
+                  MatchDiscoveryMode.nearby,
+
+              disabled: disabled,
+            ),
+          ),
+
+          const SizedBox(
+            width: 6,
+          ),
+
+          // ========================================================
+          // GLOBAL
+          // ========================================================
+          Expanded(
+            child: _buildDiscoveryModeButton(
+              mode: MatchDiscoveryMode.global,
+
+              icon: Icons.public_rounded,
+
+              label: 'GLOBAL',
+
+              selected:
+                  activeMode ==
+                  MatchDiscoveryMode.global,
+
+              disabled: disabled,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ============================================================
+  // DISCOVERY MODE BUTTON
+  // ============================================================
+
+  Widget _buildDiscoveryModeButton({
+    required MatchDiscoveryMode mode,
+    required IconData icon,
+    required String label,
+    required bool selected,
+    required bool disabled,
+  }) {
+    final accentColor = _matchController.accentNeon;
+
+    return Material(
+      color: Colors.transparent,
+
+      child: InkWell(
+        onTap: disabled
+            ? null
+            : () {
+                if (mode.requiresLocationConsent) {
+                  unawaited(
+                    _confirmNearbyDiscovery(),
+                  );
+
+                  return;
+                }
+
+                unawaited(
+                  _changeDiscoveryMode(
+                    mode,
+                  ),
+                );
+              },
+
+        borderRadius: BorderRadius.circular(
+          10,
+        ),
+
+        child: AnimatedContainer(
+          duration: const Duration(
+            milliseconds: 180,
+          ),
+
+          curve: Curves.easeOut,
+
+          height: 42,
+
+          padding: const EdgeInsets.symmetric(
+            horizontal: 12,
+          ),
+
+          decoration: BoxDecoration(
+            color: selected
+                ? accentColor.withValues(
+                    alpha: 0.16,
+                  )
+                : Colors.transparent,
+
+            borderRadius: BorderRadius.circular(
+              10,
+            ),
+
+            border: Border.all(
+              color: selected
+                  ? accentColor.withValues(
+                      alpha: 0.36,
+                    )
+                  : Colors.transparent,
+            ),
+          ),
+
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+
+            children: [
+              if (disabled &&
+                  selected)
+                SizedBox(
+                  width: 14,
+
+                  height: 14,
+
+                  child: CircularProgressIndicator(
+                    strokeWidth: 1.7,
+
+                    color: accentColor,
+                  ),
+                )
+              else
+                Icon(
+                  icon,
+
+                  size: 16,
+
+                  color: selected
+                      ? accentColor
+                      : Colors.white38,
+                ),
+
+              const SizedBox(
+                width: 7,
+              ),
+
+              Flexible(
+                child: Text(
+                  label,
+
+                  maxLines: 1,
+
+                  overflow: TextOverflow.ellipsis,
+
+                  style: TextStyle(
+                    color: selected
+                        ? accentColor
+                        : Colors.white38,
+
+                    fontSize: 9,
+
+                    fontWeight: FontWeight.bold,
+
+                    letterSpacing: 0.55,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ============================================================
+  // DISCOVERY SUBTITLE
+  // ============================================================
+
+  String _getDiscoverySubtitle() {
+    switch (_matchController.discoveryMode) {
+      case MatchDiscoveryMode.compatible:
+        return 'Profissionais compatíveis com você';
+
+      case MatchDiscoveryMode.nearby:
+        return 'Profissionais próximos de você';
+
+      case MatchDiscoveryMode.global:
+        return 'Todos os profissionais online';
+    }
+  }
+
+  // ============================================================
   // DISCOVERY HEADER
   // ============================================================
 
@@ -1103,28 +1770,33 @@ class _MatchPageState
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
 
       children: [
-        const Expanded(
+        Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
 
             children: [
-              Text(
+              const Text(
                 'Novas Conexões',
+
                 style: TextStyle(
                   color: Colors.white,
+
                   fontSize: 18,
+
                   fontWeight: FontWeight.bold,
                 ),
               ),
 
-              SizedBox(
+              const SizedBox(
                 height: 2,
               ),
 
               Text(
-                'Encontre sua parceria profissional',
-                style: TextStyle(
+                _getDiscoverySubtitle(),
+
+                style: const TextStyle(
                   color: Colors.white38,
+
                   fontSize: 12,
                 ),
               ),

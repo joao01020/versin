@@ -1,10 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:get_it/get_it.dart';
 
 import 'package:versin/modules/chat/domain/repositories/chat_repository.dart';
 import 'package:versin/features/rhymes/presentation/controller/rhymes_controller.dart';
 import 'package:versin/modules/brain/controller/brain_controller.dart';
+import 'package:versin/modules/studio/controllers/studio_controller.dart';
 
 enum ChatRole {
   user,
@@ -80,6 +82,22 @@ class ChatController
   final ChatRepository repository;
   final RhymesController rhymesController;
 
+  late final StudioController studioController;
+
+  // ============================================================
+  // ÚLTIMO ESTADO SINCRONIZADO DO STUDIO
+  // ============================================================
+  //
+  // Evita atualizações repetidas quando o próprio Chat altera o
+  // StudioController e o listener global é disparado em seguida.
+  //
+  // ============================================================
+
+  late String _lastStudioTitle;
+  late int _lastStudioBpm;
+  String? _lastStudioVibe;
+  String? _lastStudioTechnique;
+
   BrainController? get brain =>
       rhymesController
           is BrainController
@@ -102,7 +120,21 @@ class ChatController
 
   final bool isInitializing = false;
 
-  String projectName = 'SEM TÍTULO';
+  // ============================================================
+  // PROJETO COMPARTILHADO COM O STUDIO
+  // ============================================================
+
+  String get projectName => studioController.title;
+
+  int get projectBpm => studioController.bpm;
+
+  String get projectVibe =>
+      studioController.vibe ??
+      rhymesController.selectedVibe;
+
+  String get projectTechnique =>
+      studioController.technique ??
+      rhymesController.selectedTechnique;
 
   String lastConfirmedStructure = '';
 
@@ -115,7 +147,253 @@ class ChatController
   ChatController({
     required this.repository,
     required this.rhymesController,
-  });
+  }) {
+    // ==========================================================
+    // STUDIO CONTROLLER GLOBAL
+    // ==========================================================
+    //
+    // Chat e Studio usam exatamente a mesma instância.
+    //
+    // Se o Studio ainda não foi aberto, criamos o controller
+    // aqui. Quando o Studio abrir depois, ele reutilizará esta
+    // mesma instância pelo GetIt.
+    //
+    // ==========================================================
+
+    if (!GetIt.I
+        .isRegistered<
+          StudioController
+        >()) {
+      GetIt.I.registerLazySingleton<
+        StudioController
+      >(
+        () => StudioController(
+          rhymesController: rhymesController,
+        ),
+      );
+    }
+
+    studioController =
+        GetIt.I<
+          StudioController
+        >();
+
+    // ==========================================================
+    // ESTADO INICIAL DA SESSÃO
+    // ==========================================================
+
+    _lastStudioTitle = studioController.title;
+
+    _lastStudioBpm = studioController.bpm;
+
+    _lastStudioVibe = studioController.vibe;
+
+    _lastStudioTechnique = studioController.technique;
+
+    studioController.addListener(
+      _onStudioChanged,
+    );
+
+    // ==========================================================
+    // SINCRONIZAR CONFIGURAÇÃO DA IA
+    // ==========================================================
+    //
+    // O Studio é a fonte do projeto.
+    // O RhymesController continua recebendo os mesmos dados
+    // porque BPM/vibe/técnica são usados nas requisições de IA.
+    //
+    // ==========================================================
+
+    rhymesController.updateStudioConfig(
+      bpm: studioController.bpm,
+      vibe:
+          studioController.vibe ??
+          rhymesController.selectedVibe,
+      technique:
+          studioController.technique ??
+          rhymesController.selectedTechnique,
+    );
+  }
+
+  // ============================================================
+  // ALTERAÇÃO VINDO DO STUDIO
+  // ============================================================
+
+  void _onStudioChanged() {
+    if (_isDisposed) {
+      return;
+    }
+
+    final currentTitle = studioController.title;
+
+    final currentBpm = studioController.bpm;
+
+    final currentVibe = studioController.vibe;
+
+    final currentTechnique = studioController.technique;
+
+    // ==========================================================
+    // BPM
+    // ==========================================================
+    //
+    // Se o BPM mudou diretamente no Studio, atualiza também o
+    // RhymesController porque ele envia esse valor para a IA.
+    //
+    // ==========================================================
+
+    if (currentBpm !=
+        _lastStudioBpm) {
+      _lastStudioBpm = currentBpm;
+
+      rhymesController.updateStudioConfig(
+        bpm: currentBpm,
+      );
+    }
+
+    // ==========================================================
+    // VIBE
+    // ==========================================================
+
+    if (currentVibe !=
+        _lastStudioVibe) {
+      _lastStudioVibe = currentVibe;
+
+      if (currentVibe !=
+              null &&
+          currentVibe.trim().isNotEmpty) {
+        rhymesController.updateStudioConfig(
+          vibe: currentVibe,
+        );
+      }
+    }
+
+    // ==========================================================
+    // TÉCNICA
+    // ==========================================================
+
+    if (currentTechnique !=
+        _lastStudioTechnique) {
+      _lastStudioTechnique = currentTechnique;
+
+      if (currentTechnique !=
+              null &&
+          currentTechnique.trim().isNotEmpty) {
+        rhymesController.updateStudioConfig(
+          technique: currentTechnique,
+        );
+      }
+    }
+
+    // ==========================================================
+    // TÍTULO
+    // ==========================================================
+
+    if (currentTitle !=
+        _lastStudioTitle) {
+      _lastStudioTitle = currentTitle;
+    }
+
+    notifyListeners();
+  }
+
+  // ============================================================
+  // TÍTULO COMPARTILHADO
+  // ============================================================
+
+  void updateProjectName(
+    String value,
+  ) {
+    final normalized = value.trim();
+
+    if (normalized.isEmpty) {
+      return;
+    }
+
+    _lastStudioTitle = normalized;
+
+    studioController.updateTitle(
+      normalized,
+    );
+
+    notifyListeners();
+  }
+
+  // ============================================================
+  // BPM COMPARTILHADO
+  // ============================================================
+
+  void updateProjectBpm(
+    int value,
+  ) {
+    if (value <=
+        0) {
+      return;
+    }
+
+    _lastStudioBpm = value;
+
+    studioController.updateBpm(
+      value,
+    );
+
+    rhymesController.updateStudioConfig(
+      bpm: value,
+    );
+
+    notifyListeners();
+  }
+
+  // ============================================================
+  // VIBE COMPARTILHADA
+  // ============================================================
+
+  void updateProjectVibe(
+    String value,
+  ) {
+    final normalized = value.trim();
+
+    if (normalized.isEmpty) {
+      return;
+    }
+
+    _lastStudioVibe = normalized;
+
+    studioController.updateVibe(
+      normalized,
+    );
+
+    rhymesController.updateStudioConfig(
+      vibe: normalized,
+    );
+
+    notifyListeners();
+  }
+
+  // ============================================================
+  // TÉCNICA COMPARTILHADA
+  // ============================================================
+
+  void updateProjectTechnique(
+    String value,
+  ) {
+    final normalized = value.trim();
+
+    if (normalized.isEmpty) {
+      return;
+    }
+
+    _lastStudioTechnique = normalized;
+
+    studioController.updateTechnique(
+      normalized,
+    );
+
+    rhymesController.updateStudioConfig(
+      technique: normalized,
+    );
+
+    notifyListeners();
+  }
 
   static const Set<
     String
@@ -755,50 +1033,141 @@ class ChatController
   void editProjectName(
     BuildContext context,
   ) {
-    final nameController = TextEditingController(
-      text: projectName,
-    );
+    String draftName = projectName;
 
-    showDialog(
+    showDialog<
+      void
+    >(
       context: context,
+      barrierDismissible: true,
       builder:
           (
-            context,
+            dialogContext,
           ) {
             return AlertDialog(
+              backgroundColor: const Color(
+                0xFF1A1A1A,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(
+                  18,
+                ),
+              ),
               title: const Text(
                 'Nome do Projeto',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
-              content: TextField(
-                controller: nameController,
+              content: TextFormField(
+                initialValue: projectName,
+                autofocus: true,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                ),
+                cursorColor: const Color(
+                  0xFFE100FF,
+                ),
+                textInputAction: TextInputAction.done,
+                onChanged:
+                    (
+                      value,
+                    ) {
+                      draftName = value;
+                    },
+                onFieldSubmitted:
+                    (
+                      value,
+                    ) {
+                      final name = value.trim();
+
+                      if (name.isEmpty) {
+                        return;
+                      }
+
+                      updateProjectName(
+                        name,
+                      );
+
+                      Navigator.of(
+                        dialogContext,
+                      ).pop();
+                    },
+                decoration: InputDecoration(
+                  hintText: 'Nome da música',
+                  hintStyle: const TextStyle(
+                    color: Colors.white30,
+                  ),
+                  filled: true,
+                  fillColor: Colors.white.withValues(
+                    alpha: 0.04,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(
+                      12,
+                    ),
+                    borderSide: BorderSide(
+                      color: Colors.white.withValues(
+                        alpha: 0.08,
+                      ),
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(
+                      12,
+                    ),
+                    borderSide: const BorderSide(
+                      color: Color(
+                        0xFFE100FF,
+                      ),
+                    ),
+                  ),
+                ),
               ),
               actions: [
                 TextButton(
                   onPressed: () {
-                    Navigator.pop(
-                      context,
-                    );
+                    Navigator.of(
+                      dialogContext,
+                    ).pop();
                   },
                   child: const Text(
                     'Cancelar',
+                    style: TextStyle(
+                      color: Colors.white54,
+                    ),
                   ),
                 ),
-                TextButton(
+                FilledButton(
                   onPressed: () {
-                    final name = nameController.text.trim();
+                    final name = draftName.trim();
 
-                    if (name.isNotEmpty) {
-                      projectName = name;
+                    if (name.isEmpty) {
+                      return;
                     }
 
-                    notifyListeners();
-
-                    Navigator.pop(
-                      context,
+                    updateProjectName(
+                      name,
                     );
+
+                    Navigator.of(
+                      dialogContext,
+                    ).pop();
                   },
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(
+                      0xFFE100FF,
+                    ),
+                    foregroundColor: Colors.black,
+                  ),
                   child: const Text(
                     'Salvar',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ],
@@ -1034,6 +1403,10 @@ class ChatController
   @override
   void dispose() {
     _isDisposed = true;
+
+    studioController.removeListener(
+      _onStudioChanged,
+    );
 
     _creativeHelpTimer?.cancel();
 

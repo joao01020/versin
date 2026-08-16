@@ -476,9 +476,9 @@ class _ChatPageState
                               context,
                             );
                           },
-                          currentBpm: rhymesCtrl.currentBpm,
-                          selectedVibe: rhymesCtrl.selectedVibe,
-                          selectedTechnique: rhymesCtrl.selectedTechnique,
+                          currentBpm: _controller.projectBpm,
+                          selectedVibe: _controller.projectVibe,
+                          selectedTechnique: _controller.projectTechnique,
                           activeColor: activeColor,
 
                           // ================================================
@@ -531,8 +531,8 @@ class _ChatPageState
                               (
                                 value,
                               ) {
-                                rhymesCtrl.updateStudioConfig(
-                                  bpm: value,
+                                _controller.updateProjectBpm(
+                                  value,
                                 );
                               },
 
@@ -543,8 +543,8 @@ class _ChatPageState
                               (
                                 value,
                               ) {
-                                rhymesCtrl.updateStudioConfig(
-                                  technique: value,
+                                _controller.updateProjectTechnique(
+                                  value,
                                 );
                               },
 
@@ -555,8 +555,8 @@ class _ChatPageState
                               (
                                 value,
                               ) {
-                                rhymesCtrl.updateStudioConfig(
-                                  vibe: value,
+                                _controller.updateProjectVibe(
+                                  value,
                                 );
                               },
                         ),

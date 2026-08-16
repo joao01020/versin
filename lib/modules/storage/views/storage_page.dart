@@ -10,6 +10,7 @@ import '../widgets/storage_summary_card.dart';
 import 'beats/register_beats_page.dart';
 import 'lyrics/register_lyrics_page.dart';
 import 'storage_details_page.dart';
+import 'transfer_authorship_page.dart';
 
 class StoragePage
     extends
@@ -488,6 +489,51 @@ class _StoragePageState
     );
   }
 
+  // ============================================================
+  // TRANSFERIR AUTORIA
+  // ============================================================
+
+  Future<
+    void
+  >
+  _openTransferAuthorship(
+    StoredWorkModel work,
+  ) async {
+    final transferred =
+        await Navigator.of(
+          context,
+        ).push<
+          bool
+        >(
+          MaterialPageRoute(
+            builder:
+                (
+                  _,
+                ) => TransferAuthorshipPage(
+                  work: work,
+                  controller: controller,
+                  accentColor: _accentColor,
+                ),
+          ),
+        );
+
+    if (!mounted ||
+        transferred !=
+            true) {
+      return;
+    }
+
+    await controller.refresh();
+
+    if (!mounted) {
+      return;
+    }
+
+    _showMessage(
+      'Autoria transferida com sucesso.',
+    );
+  }
+
   void _showWorkActions(
     StoredWorkModel work,
   ) {
@@ -548,8 +594,9 @@ class _StoragePageState
                         Navigator.pop(
                           sheetContext,
                         );
-                        _showMessage(
-                          'A transferência de autoria será conectada na próxima etapa.',
+
+                        _openTransferAuthorship(
+                          work,
                         );
                       },
                     ),

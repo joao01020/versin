@@ -115,6 +115,34 @@ abstract class StorageRepository {
   });
 
   // ==========================================================
+  // TRANSFERIR AUTORIA / PROPRIEDADE
+  // ==========================================================
+  //
+  // originalAuthorUserId permanece inalterado.
+  //
+  // Somente ownerUserId deve ser atualizado.
+  //
+  // Em implementações remotas, este método poderá chamar uma
+  // RPC segura no backend, por exemplo:
+  //
+  // transfer_work(
+  //   p_work_id,
+  //   p_to_user_id,
+  //   p_note
+  // )
+  //
+  // ==========================================================
+
+  Future<
+    StoredWorkModel
+  >
+  transferWork({
+    required String workId,
+    required String toUserId,
+    String? note,
+  });
+
+  // ==========================================================
   // VERIFICAR EXISTÊNCIA DO HASH
   // ==========================================================
 
@@ -512,6 +540,77 @@ class InMemoryStorageRepository
     _works.removeAt(
       index,
     );
+  }
+
+  // ==========================================================
+  // TRANSFERIR AUTORIA / PROPRIEDADE
+  // ==========================================================
+  //
+  // Implementação em memória.
+  //
+  // Observação:
+  // - note não é persistida nesta implementação simples;
+  // - originalAuthorUserId é preservado;
+  // - ownerUserId recebe o novo usuário;
+  // - updatedAt é atualizado.
+  //
+  // ==========================================================
+
+  @override
+  Future<
+    StoredWorkModel
+  >
+  transferWork({
+    required String workId,
+    required String toUserId,
+    String? note,
+  }) async {
+    final normalizedWorkId = _normalizeRequiredString(
+      workId,
+      fieldName: 'workId',
+    );
+
+    final normalizedToUserId = _normalizeRequiredString(
+      toUserId,
+      fieldName: 'toUserId',
+    );
+
+    final index = _works.indexWhere(
+      (
+        work,
+      ) =>
+          work.id ==
+          normalizedWorkId,
+    );
+
+    if (index ==
+        -1) {
+      throw StateError(
+        'Obra não encontrada: $normalizedWorkId',
+      );
+    }
+
+    final currentWork = _works[index];
+
+    if (currentWork.ownerUserId ==
+        normalizedToUserId) {
+      throw StateError(
+        'Esse usuário já é o proprietário atual da obra.',
+      );
+    }
+
+    final updatedWork = currentWork.copyWith(
+      ownerUserId: normalizedToUserId,
+      updatedAt: DateTime.now().toUtc(),
+    );
+
+    _validateWork(
+      updatedWork,
+    );
+
+    _works[index] = updatedWork;
+
+    return updatedWork;
   }
 
   // ==========================================================

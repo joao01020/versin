@@ -19,6 +19,7 @@ import '../data/repositories/storage_repository.dart';
 // - atualizar obra;
 // - remover obra;
 // - sincronizar registros;
+// - coordenar transferência de propriedade;
 // - tratar loading e erros.
 //
 // NÃO é responsabilidade deste controller:
@@ -27,11 +28,13 @@ import '../data/repositories/storage_repository.dart';
 // - ler arquivos;
 // - criptografar conteúdo;
 // - acessar diretamente Supabase/SQLite;
-// - transferir autoria.
+// - validar regras de segurança do backend.
 //
 // ============================================================
 
-class StorageController extends ChangeNotifier {
+class StorageController
+    extends
+        ChangeNotifier {
   // ==========================================================
   // REPOSITORY
   // ==========================================================
@@ -42,19 +45,26 @@ class StorageController extends ChangeNotifier {
   // CONSTRUTOR
   // ==========================================================
 
-  StorageController({required this.repository});
+  StorageController({
+    required this.repository,
+  });
 
   // ==========================================================
   // ESTADO
   // ==========================================================
 
-  final List<StoredWorkModel> _works = [];
+  final List<
+    StoredWorkModel
+  >
+  _works = [];
 
   bool _isLoading = false;
 
   bool _isSaving = false;
 
   bool _isDeleting = false;
+
+  bool _isTransferring = false;
 
   bool _isInitialized = false;
 
@@ -72,9 +82,14 @@ class StorageController extends ChangeNotifier {
 
   bool get isDeleting => _isDeleting;
 
+  bool get isTransferring => _isTransferring;
+
   bool get isInitialized => _isInitialized;
 
-  bool get hasError => _errorMessage != null && _errorMessage!.isNotEmpty;
+  bool get hasError =>
+      _errorMessage !=
+          null &&
+      _errorMessage!.isNotEmpty;
 
   String? get errorMessage => _errorMessage;
 
@@ -84,30 +99,61 @@ class StorageController extends ChangeNotifier {
   // TODAS AS OBRAS
   // ==========================================================
 
-  List<StoredWorkModel> get works => List.unmodifiable(_works);
+  List<
+    StoredWorkModel
+  >
+  get works => List.unmodifiable(
+    _works,
+  );
 
   // ==========================================================
   // LETRAS
   // ==========================================================
 
-  List<StoredWorkModel> get lyrics => List.unmodifiable(
-    _works.where((work) => work.type == StoredWorkType.lyrics),
+  List<
+    StoredWorkModel
+  >
+  get lyrics => List.unmodifiable(
+    _works.where(
+      (
+        work,
+      ) =>
+          work.type ==
+          StoredWorkType.lyrics,
+    ),
   );
 
   // ==========================================================
   // BEATS
   // ==========================================================
 
-  List<StoredWorkModel> get beats => List.unmodifiable(
-    _works.where((work) => work.type == StoredWorkType.beat),
+  List<
+    StoredWorkModel
+  >
+  get beats => List.unmodifiable(
+    _works.where(
+      (
+        work,
+      ) =>
+          work.type ==
+          StoredWorkType.beat,
+    ),
   );
 
   // ==========================================================
   // OBRAS ÍNTEGRAS
   // ==========================================================
 
-  List<StoredWorkModel> get verifiedWorks =>
-      List.unmodifiable(_works.where((work) => work.integrityVerified));
+  List<
+    StoredWorkModel
+  >
+  get verifiedWorks => List.unmodifiable(
+    _works.where(
+      (
+        work,
+      ) => work.integrityVerified,
+    ),
+  );
 
   // ==========================================================
   // CONTADORES
@@ -142,14 +188,23 @@ class StorageController extends ChangeNotifier {
   //
   // ==========================================================
 
-  Future<void> init({required String userId}) async {
-    final normalizedUserId = _normalizeUserId(userId);
+  Future<
+    void
+  >
+  init({
+    required String userId,
+  }) async {
+    final normalizedUserId = _normalizeUserId(
+      userId,
+    );
 
     // ========================================================
     // MESMO USUÁRIO
     // ========================================================
 
-    if (_isInitialized && _currentUserId == normalizedUserId) {
+    if (_isInitialized &&
+        _currentUserId ==
+            normalizedUserId) {
       await refresh();
 
       return;
@@ -187,15 +242,27 @@ class StorageController extends ChangeNotifier {
   //
   // ==========================================================
 
-  Future<void> ensureInitialized({required String userId}) async {
-    final normalizedUserId = _normalizeUserId(userId);
+  Future<
+    void
+  >
+  ensureInitialized({
+    required String userId,
+  }) async {
+    final normalizedUserId = _normalizeUserId(
+      userId,
+    );
 
     // ========================================================
     // AINDA NÃO INICIALIZADO
     // ========================================================
 
-    if (!_isInitialized || _currentUserId == null || _currentUserId!.isEmpty) {
-      await init(userId: normalizedUserId);
+    if (!_isInitialized ||
+        _currentUserId ==
+            null ||
+        _currentUserId!.isEmpty) {
+      await init(
+        userId: normalizedUserId,
+      );
 
       return;
     }
@@ -204,8 +271,11 @@ class StorageController extends ChangeNotifier {
     // USUÁRIO DIFERENTE
     // ========================================================
 
-    if (_currentUserId != normalizedUserId) {
-      await init(userId: normalizedUserId);
+    if (_currentUserId !=
+        normalizedUserId) {
+      await init(
+        userId: normalizedUserId,
+      );
     }
   }
 
@@ -218,10 +288,16 @@ class StorageController extends ChangeNotifier {
   //
   // ==========================================================
 
-  void setCurrentUser({required String userId}) {
-    final normalizedUserId = _normalizeUserId(userId);
+  void setCurrentUser({
+    required String userId,
+  }) {
+    final normalizedUserId = _normalizeUserId(
+      userId,
+    );
 
-    if (_currentUserId == normalizedUserId && _isInitialized) {
+    if (_currentUserId ==
+            normalizedUserId &&
+        _isInitialized) {
       return;
     }
 
@@ -236,22 +312,36 @@ class StorageController extends ChangeNotifier {
   // CARREGAR OBRAS
   // ==========================================================
 
-  Future<void> loadWorks() async {
+  Future<
+    void
+  >
+  loadWorks() async {
     final userId = _requireCurrentUserId();
 
-    _setLoading(true);
+    _setLoading(
+      true,
+    );
 
-    _clearError(notify: false);
+    _clearError(
+      notify: false,
+    );
 
     try {
-      final result = await repository.getWorks(userId: userId);
+      final result = await repository.getWorks(
+        userId: userId,
+      );
 
       _works
         ..clear()
-        ..addAll(result);
+        ..addAll(
+          result,
+        );
 
       _sortWorks();
-    } catch (error, stackTrace) {
+    } catch (
+      error,
+      stackTrace
+    ) {
       _setError(
         'Não foi possível carregar as obras.',
         error: error,
@@ -259,7 +349,9 @@ class StorageController extends ChangeNotifier {
         notify: false,
       );
     } finally {
-      _setLoading(false);
+      _setLoading(
+        false,
+      );
     }
   }
 
@@ -267,12 +359,17 @@ class StorageController extends ChangeNotifier {
   // RECARREGAR
   // ==========================================================
 
-  Future<void> refresh() async {
+  Future<
+    void
+  >
+  refresh() async {
     if (!_isInitialized) {
       return;
     }
 
-    if (_currentUserId == null || _currentUserId!.isEmpty) {
+    if (_currentUserId ==
+            null ||
+        _currentUserId!.isEmpty) {
       return;
     }
 
@@ -283,7 +380,12 @@ class StorageController extends ChangeNotifier {
   // BUSCAR OBRA POR ID
   // ==========================================================
 
-  Future<StoredWorkModel?> getWorkById(String workId) async {
+  Future<
+    StoredWorkModel?
+  >
+  getWorkById(
+    String workId,
+  ) async {
     final normalizedWorkId = workId.trim();
 
     if (normalizedWorkId.isEmpty) {
@@ -295,7 +397,8 @@ class StorageController extends ChangeNotifier {
     // ========================================================
 
     for (final work in _works) {
-      if (work.id == normalizedWorkId) {
+      if (work.id ==
+          normalizedWorkId) {
         return work;
       }
     }
@@ -305,8 +408,13 @@ class StorageController extends ChangeNotifier {
     // ========================================================
 
     try {
-      return await repository.getWorkById(workId: normalizedWorkId);
-    } catch (error, stackTrace) {
+      return await repository.getWorkById(
+        workId: normalizedWorkId,
+      );
+    } catch (
+      error,
+      stackTrace
+    ) {
       _setError(
         'Não foi possível buscar a obra.',
         error: error,
@@ -321,7 +429,12 @@ class StorageController extends ChangeNotifier {
   // BUSCAR OBRA POR HASH
   // ==========================================================
 
-  Future<StoredWorkModel?> getWorkByHash(String contentHash) async {
+  Future<
+    StoredWorkModel?
+  >
+  getWorkByHash(
+    String contentHash,
+  ) async {
     final normalizedHash = contentHash.trim().toLowerCase();
 
     if (normalizedHash.isEmpty) {
@@ -329,8 +442,13 @@ class StorageController extends ChangeNotifier {
     }
 
     try {
-      return await repository.getWorkByHash(contentHash: normalizedHash);
-    } catch (error, stackTrace) {
+      return await repository.getWorkByHash(
+        contentHash: normalizedHash,
+      );
+    } catch (
+      error,
+      stackTrace
+    ) {
       _setError(
         'Não foi possível buscar a obra pelo hash.',
         error: error,
@@ -345,7 +463,12 @@ class StorageController extends ChangeNotifier {
   // HASH JÁ EXISTE
   // ==========================================================
 
-  Future<bool> hashExists(String contentHash) async {
+  Future<
+    bool
+  >
+  hashExists(
+    String contentHash,
+  ) async {
     final normalizedHash = contentHash.trim().toLowerCase();
 
     if (normalizedHash.isEmpty) {
@@ -353,8 +476,13 @@ class StorageController extends ChangeNotifier {
     }
 
     try {
-      return await repository.hashExists(contentHash: normalizedHash);
-    } catch (error, stackTrace) {
+      return await repository.hashExists(
+        contentHash: normalizedHash,
+      );
+    } catch (
+      error,
+      stackTrace
+    ) {
       _setError(
         'Não foi possível verificar o hash.',
         error: error,
@@ -369,7 +497,12 @@ class StorageController extends ChangeNotifier {
   // SALVAR OBRA
   // ==========================================================
 
-  Future<bool> saveWork(StoredWorkModel work) async {
+  Future<
+    bool
+  >
+  saveWork(
+    StoredWorkModel work,
+  ) async {
     if (_isSaving) {
       return false;
     }
@@ -378,33 +511,51 @@ class StorageController extends ChangeNotifier {
     // GARANTIR USUÁRIO
     // ========================================================
 
-    if (!_isInitialized || _currentUserId == null || _currentUserId!.isEmpty) {
-      _setError('StorageController ainda não foi inicializado com userId.');
+    if (!_isInitialized ||
+        _currentUserId ==
+            null ||
+        _currentUserId!.isEmpty) {
+      _setError(
+        'StorageController ainda não foi inicializado com userId.',
+      );
 
       return false;
     }
 
-    _setSaving(true);
+    _setSaving(
+      true,
+    );
 
-    _clearError(notify: false);
+    _clearError(
+      notify: false,
+    );
 
     try {
       // ======================================================
       // SALVAR NO REPOSITORY
       // ======================================================
 
-      final savedWork = await repository.saveWork(work);
+      final savedWork = await repository.saveWork(
+        work,
+      );
 
       // ======================================================
       // EVITAR DUPLICIDADE LOCAL
       // ======================================================
 
       final existingIndex = _works.indexWhere(
-        (item) => item.id == savedWork.id,
+        (
+          item,
+        ) =>
+            item.id ==
+            savedWork.id,
       );
 
-      if (existingIndex == -1) {
-        _works.add(savedWork);
+      if (existingIndex ==
+          -1) {
+        _works.add(
+          savedWork,
+        );
       } else {
         _works[existingIndex] = savedWork;
       }
@@ -414,7 +565,10 @@ class StorageController extends ChangeNotifier {
       notifyListeners();
 
       return true;
-    } catch (error, stackTrace) {
+    } catch (
+      error,
+      stackTrace
+    ) {
       _setError(
         'Não foi possível registrar a obra.',
         error: error,
@@ -426,7 +580,9 @@ class StorageController extends ChangeNotifier {
 
       return false;
     } finally {
-      _setSaving(false);
+      _setSaving(
+        false,
+      );
     }
   }
 
@@ -434,24 +590,44 @@ class StorageController extends ChangeNotifier {
   // ATUALIZAR OBRA
   // ==========================================================
 
-  Future<bool> updateWork(StoredWorkModel work) async {
+  Future<
+    bool
+  >
+  updateWork(
+    StoredWorkModel work,
+  ) async {
     if (_isSaving) {
       return false;
     }
 
-    _setSaving(true);
+    _setSaving(
+      true,
+    );
 
-    _clearError(notify: false);
+    _clearError(
+      notify: false,
+    );
 
     try {
-      final updatedWork = await repository.updateWork(work);
+      final updatedWork = await repository.updateWork(
+        work,
+      );
 
-      final index = _works.indexWhere((item) => item.id == updatedWork.id);
+      final index = _works.indexWhere(
+        (
+          item,
+        ) =>
+            item.id ==
+            updatedWork.id,
+      );
 
-      if (index != -1) {
+      if (index !=
+          -1) {
         _works[index] = updatedWork;
       } else {
-        _works.add(updatedWork);
+        _works.add(
+          updatedWork,
+        );
       }
 
       _sortWorks();
@@ -459,7 +635,10 @@ class StorageController extends ChangeNotifier {
       notifyListeners();
 
       return true;
-    } catch (error, stackTrace) {
+    } catch (
+      error,
+      stackTrace
+    ) {
       _setError(
         'Não foi possível atualizar a obra.',
         error: error,
@@ -471,7 +650,9 @@ class StorageController extends ChangeNotifier {
 
       return false;
     } finally {
-      _setSaving(false);
+      _setSaving(
+        false,
+      );
     }
   }
 
@@ -490,11 +671,18 @@ class StorageController extends ChangeNotifier {
   //
   // ==========================================================
 
-  Future<bool> deleteWork(String workId) async {
+  Future<
+    bool
+  >
+  deleteWork(
+    String workId,
+  ) async {
     final normalizedWorkId = workId.trim();
 
     if (normalizedWorkId.isEmpty) {
-      _setError('ID da obra inválido.');
+      _setError(
+        'ID da obra inválido.',
+      );
 
       return false;
     }
@@ -503,8 +691,13 @@ class StorageController extends ChangeNotifier {
       return false;
     }
 
-    if (!_isInitialized || _currentUserId == null || _currentUserId!.isEmpty) {
-      _setError('StorageController ainda não foi inicializado com userId.');
+    if (!_isInitialized ||
+        _currentUserId ==
+            null ||
+        _currentUserId!.isEmpty) {
+      _setError(
+        'StorageController ainda não foi inicializado com userId.',
+      );
 
       return false;
     }
@@ -514,38 +707,60 @@ class StorageController extends ChangeNotifier {
     // ========================================================
 
     final existingIndex = _works.indexWhere(
-      (work) => work.id == normalizedWorkId,
+      (
+        work,
+      ) =>
+          work.id ==
+          normalizedWorkId,
     );
 
-    if (existingIndex == -1) {
-      _setError('Obra não encontrada.');
+    if (existingIndex ==
+        -1) {
+      _setError(
+        'Obra não encontrada.',
+      );
 
       return false;
     }
 
-    _setDeleting(true);
+    _setDeleting(
+      true,
+    );
 
-    _clearError(notify: false);
+    _clearError(
+      notify: false,
+    );
 
     try {
       // ======================================================
       // REMOVER DO REPOSITORY
       // ======================================================
 
-      await repository.deleteWork(workId: normalizedWorkId);
+      await repository.deleteWork(
+        workId: normalizedWorkId,
+      );
 
       // ======================================================
       // REMOVER DO ESTADO LOCAL
       // ======================================================
 
-      _works.removeWhere((work) => work.id == normalizedWorkId);
+      _works.removeWhere(
+        (
+          work,
+        ) =>
+            work.id ==
+            normalizedWorkId,
+      );
 
       _sortWorks();
 
       notifyListeners();
 
       return true;
-    } catch (error, stackTrace) {
+    } catch (
+      error,
+      stackTrace
+    ) {
       _setError(
         'Não foi possível apagar a obra.',
         error: error,
@@ -557,7 +772,9 @@ class StorageController extends ChangeNotifier {
 
       return false;
     } finally {
-      _setDeleting(false);
+      _setDeleting(
+        false,
+      );
     }
   }
 
@@ -565,13 +782,19 @@ class StorageController extends ChangeNotifier {
   // MARCAR INTEGRIDADE
   // ==========================================================
 
-  Future<bool> setIntegrityVerified({
+  Future<
+    bool
+  >
+  setIntegrityVerified({
     required String workId,
     required bool verified,
   }) async {
-    final work = await getWorkById(workId);
+    final work = await getWorkById(
+      workId,
+    );
 
-    if (work == null) {
+    if (work ==
+        null) {
       return false;
     }
 
@@ -581,38 +804,234 @@ class StorageController extends ChangeNotifier {
       updatedAt: DateTime.now().toUtc(),
     );
 
-    return updateWork(updated);
+    return updateWork(
+      updated,
+    );
+  }
+
+  // ==========================================================
+  // TRANSFERIR AUTORIA / PROPRIEDADE
+  // ==========================================================
+  //
+  // O controller coordena a operação, mas a alteração real
+  // fica no repository.
+  //
+  // Em um repository Supabase, este método poderá chamar a RPC:
+  //
+  // transfer_work(
+  //   p_work_id,
+  //   p_to_user_id,
+  //   p_note
+  // )
+  //
+  // ==========================================================
+
+  Future<
+    bool
+  >
+  transferWork({
+    required String workId,
+    required String toUserId,
+    String? note,
+  }) async {
+    final normalizedWorkId = workId.trim();
+
+    final normalizedToUserId = toUserId.trim();
+
+    final normalizedNote = note?.trim();
+
+    // ========================================================
+    // VALIDAR ID DA OBRA
+    // ========================================================
+
+    if (normalizedWorkId.isEmpty) {
+      _setError(
+        'ID da obra inválido.',
+      );
+
+      return false;
+    }
+
+    // ========================================================
+    // VALIDAR DESTINATÁRIO
+    // ========================================================
+
+    if (normalizedToUserId.isEmpty) {
+      _setError(
+        'Novo proprietário inválido.',
+      );
+
+      return false;
+    }
+
+    // ========================================================
+    // GARANTIR INICIALIZAÇÃO
+    // ========================================================
+
+    if (!_isInitialized ||
+        _currentUserId ==
+            null ||
+        _currentUserId!.isEmpty) {
+      _setError(
+        'StorageController ainda não foi inicializado com userId.',
+      );
+
+      return false;
+    }
+
+    // ========================================================
+    // OPERAÇÃO JÁ EM ANDAMENTO
+    // ========================================================
+
+    if (_isTransferring) {
+      return false;
+    }
+
+    // ========================================================
+    // BUSCAR OBRA
+    // ========================================================
+
+    final work = await getWorkById(
+      normalizedWorkId,
+    );
+
+    if (work ==
+        null) {
+      _setError(
+        'Obra não encontrada.',
+      );
+
+      return false;
+    }
+
+    // ========================================================
+    // MESMO PROPRIETÁRIO
+    // ========================================================
+
+    if (work.ownerUserId ==
+        normalizedToUserId) {
+      _setError(
+        'Esse usuário já é o proprietário atual da obra.',
+      );
+
+      return false;
+    }
+
+    // ========================================================
+    // EXECUTAR
+    // ========================================================
+
+    _setTransferring(
+      true,
+    );
+
+    _clearError(
+      notify: false,
+    );
+
+    try {
+      final updatedWork = await repository.transferWork(
+        workId: normalizedWorkId,
+        toUserId: normalizedToUserId,
+        note:
+            normalizedNote ==
+                    null ||
+                normalizedNote.isEmpty
+            ? null
+            : normalizedNote,
+      );
+
+      // ======================================================
+      // ATUALIZAR ESTADO LOCAL
+      // ======================================================
+
+      final index = _works.indexWhere(
+        (
+          item,
+        ) =>
+            item.id ==
+            updatedWork.id,
+      );
+
+      // ======================================================
+      // A OBRA DEIXA DE PERTENCER AO USUÁRIO ATUAL
+      // ======================================================
+      //
+      // Como a StoragePage normalmente mostra apenas obras cujo
+      // ownerUserId é o usuário atual, removemos a obra da lista
+      // depois de uma transferência bem-sucedida.
+      //
+      // Se no futuro quisermos mostrar "obras transferidas",
+      // isso deverá vir de outra consulta/histórico.
+      //
+      // ======================================================
+
+      if (updatedWork.ownerUserId !=
+          _currentUserId) {
+        if (index !=
+            -1) {
+          _works.removeAt(
+            index,
+          );
+        }
+      } else {
+        if (index !=
+            -1) {
+          _works[index] = updatedWork;
+        } else {
+          _works.add(
+            updatedWork,
+          );
+        }
+      }
+
+      _sortWorks();
+
+      notifyListeners();
+
+      return true;
+    } catch (
+      error,
+      stackTrace
+    ) {
+      _setError(
+        'Não foi possível transferir a autoria.',
+        error: error,
+        stackTrace: stackTrace,
+        notify: false,
+      );
+
+      notifyListeners();
+
+      return false;
+    } finally {
+      _setTransferring(
+        false,
+      );
+    }
   }
 
   // ==========================================================
   // ALTERAR PROPRIETÁRIO
   // ==========================================================
+  //
+  // Mantido por compatibilidade com código antigo.
+  //
+  // Novos fluxos devem usar transferWork(...).
+  //
+  // ==========================================================
 
-  Future<bool> updateOwner({
+  Future<
+    bool
+  >
+  updateOwner({
     required String workId,
     required String newOwnerUserId,
-  }) async {
-    final normalizedOwnerId = newOwnerUserId.trim();
-
-    if (normalizedOwnerId.isEmpty) {
-      _setError('Novo proprietário inválido.');
-
-      return false;
-    }
-
-    final work = await getWorkById(workId);
-
-    if (work == null) {
-      return false;
-    }
-
-    final updated = work.copyWith(
-      ownerUserId: normalizedOwnerId,
-
-      updatedAt: DateTime.now().toUtc(),
+  }) {
+    return transferWork(
+      workId: workId,
+      toUserId: newOwnerUserId,
     );
-
-    return updateWork(updated);
   }
 
   // ==========================================================
@@ -642,6 +1061,8 @@ class StorageController extends ChangeNotifier {
 
     _isDeleting = false;
 
+    _isTransferring = false;
+
     _isInitialized = false;
 
     _errorMessage = null;
@@ -654,18 +1075,29 @@ class StorageController extends ChangeNotifier {
   // ==========================================================
 
   void _sortWorks() {
-    _works.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    _works.sort(
+      (
+        a,
+        b,
+      ) => b.createdAt.compareTo(
+        a.createdAt,
+      ),
+    );
   }
 
   // ==========================================================
   // VALIDAR USUÁRIO
   // ==========================================================
 
-  String _normalizeUserId(String userId) {
+  String _normalizeUserId(
+    String userId,
+  ) {
     final normalized = userId.trim();
 
     if (normalized.isEmpty) {
-      throw ArgumentError('userId não pode ser vazio.');
+      throw ArgumentError(
+        'userId não pode ser vazio.',
+      );
     }
 
     return normalized;
@@ -678,7 +1110,9 @@ class StorageController extends ChangeNotifier {
   String _requireCurrentUserId() {
     final userId = _currentUserId;
 
-    if (userId == null || userId.isEmpty) {
+    if (userId ==
+            null ||
+        userId.isEmpty) {
       throw StateError(
         'StorageController ainda não foi inicializado com userId.',
       );
@@ -691,8 +1125,11 @@ class StorageController extends ChangeNotifier {
   // LOADING
   // ==========================================================
 
-  void _setLoading(bool value) {
-    if (_isLoading == value) {
+  void _setLoading(
+    bool value,
+  ) {
+    if (_isLoading ==
+        value) {
       return;
     }
 
@@ -705,8 +1142,11 @@ class StorageController extends ChangeNotifier {
   // SAVING
   // ==========================================================
 
-  void _setSaving(bool value) {
-    if (_isSaving == value) {
+  void _setSaving(
+    bool value,
+  ) {
+    if (_isSaving ==
+        value) {
       return;
     }
 
@@ -719,12 +1159,32 @@ class StorageController extends ChangeNotifier {
   // DELETING
   // ==========================================================
 
-  void _setDeleting(bool value) {
-    if (_isDeleting == value) {
+  void _setDeleting(
+    bool value,
+  ) {
+    if (_isDeleting ==
+        value) {
       return;
     }
 
     _isDeleting = value;
+
+    notifyListeners();
+  }
+
+  // ==========================================================
+  // TRANSFERRING
+  // ==========================================================
+
+  void _setTransferring(
+    bool value,
+  ) {
+    if (_isTransferring ==
+        value) {
+      return;
+    }
+
+    _isTransferring = value;
 
     notifyListeners();
   }
@@ -741,14 +1201,22 @@ class StorageController extends ChangeNotifier {
   }) {
     _errorMessage = message;
 
-    if (error != null) {
-      debugPrint('[STORAGE] $message');
+    if (error !=
+        null) {
+      debugPrint(
+        '[STORAGE] $message',
+      );
 
-      debugPrint('[STORAGE] Erro: $error');
+      debugPrint(
+        '[STORAGE] Erro: $error',
+      );
     }
 
-    if (stackTrace != null) {
-      debugPrint('[STORAGE] StackTrace: $stackTrace');
+    if (stackTrace !=
+        null) {
+      debugPrint(
+        '[STORAGE] StackTrace: $stackTrace',
+      );
     }
 
     if (notify) {
@@ -760,8 +1228,11 @@ class StorageController extends ChangeNotifier {
   // LIMPAR ERRO INTERNO
   // ==========================================================
 
-  void _clearError({bool notify = true}) {
-    if (_errorMessage == null) {
+  void _clearError({
+    bool notify = true,
+  }) {
+    if (_errorMessage ==
+        null) {
       return;
     }
 

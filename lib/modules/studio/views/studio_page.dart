@@ -56,14 +56,56 @@ class _StudioPageState
   void initState() {
     super.initState();
 
+    // ==========================================================
+    // BRAIN CONTROLLER GLOBAL
+    // ==========================================================
+
     brainController =
         GetIt.I<
           BrainController
         >();
 
-    controller = StudioController(
-      rhymesController: brainController,
-    );
+    // ==========================================================
+    // STUDIO CONTROLLER PERSISTENTE
+    // ==========================================================
+    //
+    // O StudioController passa a pertencer à sessão do app.
+    //
+    // Se ainda não existir no GetIt, criamos uma única instância.
+    // Se já existir, reutilizamos exatamente a mesma.
+    //
+    // Isso mantém ao sair e voltar para o Studio:
+    //
+    // - letra;
+    // - título;
+    // - BPM;
+    // - timeline;
+    // - mapa mental;
+    // - estado atual do projeto.
+    //
+    // ==========================================================
+
+    if (!GetIt.I
+        .isRegistered<
+          StudioController
+        >()) {
+      GetIt.I.registerLazySingleton<
+        StudioController
+      >(
+        () => StudioController(
+          rhymesController: brainController,
+        ),
+      );
+    }
+
+    controller =
+        GetIt.I<
+          StudioController
+        >();
+
+    // ==========================================================
+    // CARREGAR VOCABULÁRIO
+    // ==========================================================
 
     WidgetsBinding.instance.addPostFrameCallback(
       (
@@ -80,7 +122,18 @@ class _StudioPageState
 
   @override
   void dispose() {
-    controller.dispose();
+    // ==========================================================
+    // NÃO DESTRUIR O STUDIO CONTROLLER
+    // ==========================================================
+    //
+    // O StudioController está registrado como singleton no GetIt.
+    // Ele deve permanecer vivo mesmo quando esta página sair da
+    // árvore de widgets.
+    //
+    // Isso é o que permite voltar para o Studio sem perder a
+    // letra ou o restante do projeto.
+    //
+    // ==========================================================
 
     super.dispose();
   }

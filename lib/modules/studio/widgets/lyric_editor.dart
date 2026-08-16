@@ -52,6 +52,95 @@ class _LyricEditorState
   String _selectedText = '';
 
   // ============================================================
+  // CICLO DE VIDA
+  // ============================================================
+  //
+  // O texto pertence ao TextEditingController recebido do
+  // StudioController.
+  //
+  // O LyricEditor não mantém uma cópia própria da letra.
+  // Assim, ao sair do Studio e voltar, o mesmo controller pode
+  // ser reutilizado e o texto continua exatamente onde estava.
+  //
+  // ============================================================
+
+  @override
+  void initState() {
+    super.initState();
+
+    widget.controller.addListener(
+      _handleControllerChanged,
+    );
+
+    WidgetsBinding.instance.addPostFrameCallback(
+      (
+        _,
+      ) {
+        if (!mounted) {
+          return;
+        }
+
+        _updateSelection();
+      },
+    );
+  }
+
+  @override
+  void didUpdateWidget(
+    covariant LyricEditor oldWidget,
+  ) {
+    super.didUpdateWidget(
+      oldWidget,
+    );
+
+    if (identical(
+      oldWidget.controller,
+      widget.controller,
+    )) {
+      return;
+    }
+
+    oldWidget.controller.removeListener(
+      _handleControllerChanged,
+    );
+
+    widget.controller.addListener(
+      _handleControllerChanged,
+    );
+
+    _selectedText = '';
+
+    WidgetsBinding.instance.addPostFrameCallback(
+      (
+        _,
+      ) {
+        if (!mounted) {
+          return;
+        }
+
+        _updateSelection();
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(
+      _handleControllerChanged,
+    );
+
+    super.dispose();
+  }
+
+  void _handleControllerChanged() {
+    if (!mounted) {
+      return;
+    }
+
+    _updateSelection();
+  }
+
+  // ============================================================
   // SELEÇÃO
   // ============================================================
 
@@ -228,11 +317,16 @@ class _LyricEditorState
                     (
                       _,
                     ) {
-                      Future.delayed(
-                        const Duration(
-                          milliseconds: 30,
-                        ),
-                        _updateSelection,
+                      WidgetsBinding.instance.addPostFrameCallback(
+                        (
+                          _,
+                        ) {
+                          if (!mounted) {
+                            return;
+                          }
+
+                          _updateSelection();
+                        },
                       );
                     },
                 child: TextField(
@@ -259,12 +353,29 @@ class _LyricEditorState
                     border: InputBorder.none,
                     isCollapsed: true,
                   ),
+                  onChanged:
+                      (
+                        _,
+                      ) {
+                        // O StudioController já escuta este mesmo
+                        // TextEditingController e salva a letra no
+                        // SongProject da sessão.
+                        //
+                        // Aqui apenas mantemos a seleção visual
+                        // sincronizada após alterações no texto.
+                        _updateSelection();
+                      },
                   onTap: () {
-                    Future.delayed(
-                      const Duration(
-                        milliseconds: 30,
-                      ),
-                      _updateSelection,
+                    WidgetsBinding.instance.addPostFrameCallback(
+                      (
+                        _,
+                      ) {
+                        if (!mounted) {
+                          return;
+                        }
+
+                        _updateSelection();
+                      },
                     );
                   },
                 ),

@@ -29,6 +29,35 @@ class StudioController
     extends
         ChangeNotifier {
   // ============================================================
+  // RASCUNHO DA SESSÃO
+  // ============================================================
+  //
+  // Mantém o projeto atual vivo enquanto o aplicativo estiver
+  // aberto.
+  //
+  // Isso permite sair do Studio e voltar sem perder:
+  //
+  // - letra;
+  // - título;
+  // - BPM;
+  // - vibe;
+  // - técnica;
+  // - timeline;
+  // - mapa mental.
+  //
+  // O TextEditingController pode ser destruído normalmente.
+  // Ao criar outro StudioController, ele é reconstruído usando
+  // este SongProject mantido em memória.
+  //
+  // ============================================================
+
+  static SongProject? _sessionProject;
+
+  static bool get hasSessionProject =>
+      _sessionProject !=
+      null;
+
+  // ============================================================
   // BANCO GLOBAL DE RIMAS
   // ============================================================
 
@@ -97,7 +126,11 @@ class StudioController
     SongProject? initialProject,
   }) : _project =
            initialProject ??
+           _sessionProject ??
            SongProject.create() {
+    // Mantém esta instância como o projeto atual da sessão.
+    _sessionProject = _project;
+
     lyricController = TextEditingController(
       text: _project.lyrics,
     );
@@ -753,6 +786,8 @@ class StudioController
       bpm: bpm,
     );
 
+    _sessionProject = _project;
+
     lyricController.value = const TextEditingValue(
       text: '',
     );
@@ -781,6 +816,8 @@ class StudioController
   ) {
     _project = project;
 
+    _sessionProject = _project;
+
     lyricController.value = TextEditingValue(
       text: project.lyrics,
       selection: TextSelection.collapsed(
@@ -798,6 +835,25 @@ class StudioController
 
     notifyListeners();
   }
+
+  // ============================================================
+  // LIMPAR RASCUNHO DA SESSÃO
+  // ============================================================
+  //
+  // Use somente quando o usuário realmente quiser descartar o
+  // projeto atual e começar sem recuperar o rascunho anterior.
+  //
+  // ============================================================
+
+  static void clearSessionProject() {
+    _sessionProject = null;
+  }
+
+  // ============================================================
+  // PROJETO DA SESSÃO
+  // ============================================================
+
+  static SongProject? get sessionProject => _sessionProject;
 
   // ============================================================
   // EXPORTAÇÃO
@@ -835,6 +891,14 @@ class StudioController
 
   // ============================================================
   // DISPOSE
+  // ============================================================
+  //
+  // Importante:
+  //
+  // destruir os controllers visuais NÃO remove _sessionProject.
+  // Por isso o rascunho continua disponível quando o Studio for
+  // aberto novamente durante a mesma execução do aplicativo.
+  //
   // ============================================================
 
   @override

@@ -5,6 +5,10 @@ import 'package:versin/modules/chat/views/components/chat/message/animated_chat_
 import 'package:versin/modules/chat/views/components/chat/message/typing_indicator.dart';
 import 'package:versin/modules/chat/views/widgets/chat_welcome_card.dart';
 
+// ============================================================
+// CHAT LIST VIEW
+// ============================================================
+
 class ChatListView
     extends
         StatelessWidget {
@@ -26,6 +30,25 @@ class ChatListView
 
   final int secondsActive;
 
+  // ============================================================
+  // ADICIONAR RIMA
+  // ============================================================
+
+  final ValueChanged<
+    String
+  >
+  onAddRhyme;
+
+  // ============================================================
+  // METRÔNOMO
+  // ============================================================
+
+  final bool isBpmPlaying;
+
+  final int currentBpm;
+
+  final VoidCallback onToggleBpm;
+
   const ChatListView({
     super.key,
     required this.isInitializing,
@@ -33,8 +56,16 @@ class ChatListView
     required this.isAiTyping,
     required this.scrollController,
     required this.activeColor,
+    required this.onAddRhyme,
+    required this.isBpmPlaying,
+    required this.currentBpm,
+    required this.onToggleBpm,
     this.secondsActive = 0,
   });
+
+  // ============================================================
+  // BUILD
+  // ============================================================
 
   @override
   Widget build(
@@ -121,12 +152,16 @@ class ChatListView
                 padding: const EdgeInsets.only(
                   bottom: 12,
                 ),
+
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
 
                   mainAxisSize: MainAxisSize.min,
 
                   children: [
+                    // =================================================
+                    // BOLHA DA MENSAGEM
+                    // =================================================
                     ChatMessageBubble(
                       message: {
                         'role': role,
@@ -138,12 +173,24 @@ class ChatListView
 
                       activeColor: activeColor,
 
-                      onAddRhyme:
-                          (
-                            word,
-                          ) {},
+                      // ===============================================
+                      // ADICIONAR RIMA
+                      // ===============================================
+                      onAddRhyme: onAddRhyme,
+
+                      // ===============================================
+                      // METRÔNOMO
+                      // ===============================================
+                      isBpmPlaying: isBpmPlaying,
+
+                      currentBpm: currentBpm,
+
+                      onToggleBpm: onToggleBpm,
                     ),
 
+                    // =================================================
+                    // WIDGET CUSTOMIZADO
+                    // =================================================
                     if (customWidget !=
                         null)
                       Padding(
@@ -153,6 +200,7 @@ class ChatListView
                           8,
                           8,
                         ),
+
                         child: customWidget,
                       ),
                   ],
@@ -350,6 +398,27 @@ class _NeonGlintTextState
           ) {
             final value = _animationController.value;
 
+            final start =
+                (value -
+                        0.3)
+                    .clamp(
+                      0.0,
+                      1.0,
+                    );
+
+            final middle = value.clamp(
+              0.0,
+              1.0,
+            );
+
+            final end =
+                (value +
+                        0.3)
+                    .clamp(
+                      0.0,
+                      1.0,
+                    );
+
             return ShaderMask(
               blendMode: BlendMode.srcIn,
 
@@ -363,24 +432,9 @@ class _NeonGlintTextState
                       end: Alignment.bottomRight,
 
                       stops: [
-                        (value -
-                                0.3)
-                            .clamp(
-                              0.0,
-                              1.0,
-                            ),
-
-                        value.clamp(
-                          0.0,
-                          1.0,
-                        ),
-
-                        (value +
-                                0.3)
-                            .clamp(
-                              0.0,
-                              1.0,
-                            ),
+                        start,
+                        middle,
+                        end,
                       ],
 
                       colors: [

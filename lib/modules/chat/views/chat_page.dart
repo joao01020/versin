@@ -445,6 +445,7 @@ class _ChatPageState
                         Expanded(
                           child: ChatListView(
                             isInitializing: _controller.isInitializing,
+
                             messages:
                                 _controller.messages.map<
                                   Map<
@@ -458,10 +459,42 @@ class _ChatPageState
                                     return message.toJson();
                                   },
                                 ).toList(),
+
                             isAiTyping: _controller.isAiTyping,
+
                             scrollController: _controller.scrollController,
+
                             activeColor: activeColor,
+
                             secondsActive: rhymesCtrl.connectionSeconds,
+
+                            // ==============================================
+                            // ADICIONAR RIMA PELO BOTÃO DIREITO
+                            // ==============================================
+                            onAddRhyme:
+                                (
+                                  word,
+                                ) async {
+                                  final normalized = word.trim();
+
+                                  if (normalized.isEmpty) {
+                                    return;
+                                  }
+
+                                  await _rhymesController.addWord(
+                                    normalized,
+                                    false,
+                                  );
+                                },
+
+                            // ==============================================
+                            // METRÔNOMO / BPM
+                            // ==============================================
+                            isBpmPlaying: rhymesCtrl.isBpmPlaying,
+
+                            currentBpm: _controller.projectBpm,
+
+                            onToggleBpm: _controller.toggleBpm,
                           ),
                         ),
 

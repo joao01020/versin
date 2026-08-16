@@ -1,102 +1,528 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:markdown/markdown.dart' as md;
 
-class ChatMessageBubble extends StatelessWidget {
-  final Map<String, dynamic> message;
+// ============================================================
+// CHAT MESSAGE BUBBLE
+// ============================================================
+
+class ChatMessageBubble
+    extends
+        StatefulWidget {
+  final Map<
+    String,
+    dynamic
+  >
+  message;
+
   final Color activeColor;
-  final Function(String word)? onAddRhyme;
+
+  final Function(
+    String word,
+  )?
+  onAddRhyme;
+
+  // ============================================================
+  // METRÔNOMO
+  // ============================================================
+
+  final bool isBpmPlaying;
+
+  final int currentBpm;
+
+  final VoidCallback onToggleBpm;
 
   const ChatMessageBubble({
     super.key,
     required this.message,
     required this.activeColor,
+    required this.isBpmPlaying,
+    required this.currentBpm,
+    required this.onToggleBpm,
     this.onAddRhyme,
   });
 
   @override
-  Widget build(BuildContext context) {
-    final isUser = message['role'] == 'user';
+  State<
+    ChatMessageBubble
+  >
+  createState() => _ChatMessageBubbleState();
+}
 
+// ============================================================
+// STATE
+// ============================================================
+
+class _ChatMessageBubbleState
+    extends
+        State<
+          ChatMessageBubble
+        > {
+  String _selectedText = '';
+
+  // ============================================================
+  // HELPERS
+  // ============================================================
+
+  bool get _isUser =>
+      widget.message['role'] ==
+      'user';
+
+  String get _content =>
+      widget.message['content']?.toString() ??
+      '';
+
+  bool get _canAddSelection =>
+      !_isUser &&
+      widget.onAddRhyme !=
+          null &&
+      _selectedText.trim().isNotEmpty;
+
+  // ============================================================
+  // NORMALIZAR TEXTO
+  // ============================================================
+
+  String _normalizeSelectedText(
+    String value,
+  ) {
+    var normalized = value
+        .replaceAll(
+          RegExp(
+            r'\s+',
+          ),
+          ' ',
+        )
+        .trim();
+
+    // Remove pontuação apenas do começo e final.
+    //
+    // "amor," -> amor
+    // "(vida)" -> vida
+
+    normalized = normalized.replaceAll(
+      RegExp(
+        r'^[\s\p{P}]+|[\s\p{P}]+$',
+        unicode: true,
+      ),
+      '',
+    );
+
+    return normalized.trim();
+  }
+
+  // ============================================================
+  // SELEÇÃO
+  // ============================================================
+
+  void _handleSelectionChanged(
+    SelectedContent? selectedContent,
+  ) {
+    final selected = _normalizeSelectedText(
+      selectedContent?.plainText ??
+          '',
+    );
+
+    if (_selectedText ==
+        selected) {
+      return;
+    }
+
+    setState(
+      () {
+        _selectedText = selected;
+      },
+    );
+  }
+
+  // ============================================================
+  // ADICIONAR À LISTA
+  // ============================================================
+
+  void _addSelectedText(
+    BuildContext context,
+  ) {
+    if (!_canAddSelection) {
+      return;
+    }
+
+    final selected = _normalizeSelectedText(
+      _selectedText,
+    );
+
+    if (selected.isEmpty) {
+      return;
+    }
+
+    widget.onAddRhyme?.call(
+      selected,
+    );
+
+    ContextMenuController.removeAny();
+
+    _showAddedMessage(
+      context,
+      selected,
+    );
+  }
+
+  // ============================================================
+  // ADICIONAR TAG
+  // ============================================================
+
+  void _addRhymeTag(
+    BuildContext context,
+    String word,
+  ) {
+    final normalized = _normalizeSelectedText(
+      word,
+    );
+
+    if (normalized.isEmpty ||
+        widget.onAddRhyme ==
+            null) {
+      return;
+    }
+
+    widget.onAddRhyme?.call(
+      normalized,
+    );
+
+    _showAddedMessage(
+      context,
+      normalized,
+    );
+  }
+
+  // ============================================================
+  // FEEDBACK
+  // ============================================================
+
+  void _showAddedMessage(
+    BuildContext context,
+    String value,
+  ) {
+    if (!mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(
+        context,
+      )
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          duration: const Duration(
+            milliseconds: 1100,
+          ),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: const Color(
+            0xFF1B1B1B,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(
+              12,
+            ),
+          ),
+          content: Row(
+            children: [
+              Icon(
+                Icons.add_circle_outline_rounded,
+                color: widget.activeColor,
+                size: 17,
+              ),
+
+              const SizedBox(
+                width: 8,
+              ),
+
+              Expanded(
+                child: Text(
+                  '"$value" adicionado à lista',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+  }
+
+  // ============================================================
+  // MENU DO BOTÃO DIREITO
+  // ============================================================
+
+  Widget _buildContextMenu(
+    BuildContext context,
+    SelectableRegionState selectionState,
+  ) {
+    final items =
+        List<
+          ContextMenuButtonItem
+        >.from(
+          selectionState.contextMenuButtonItems,
+        );
+
+    if (_canAddSelection) {
+      items.insert(
+        0,
+        ContextMenuButtonItem(
+          label: '+ Adicionar à lista',
+          onPressed: () {
+            _addSelectedText(
+              context,
+            );
+          },
+        ),
+      );
+    }
+
+    return AdaptiveTextSelectionToolbar.buttonItems(
+      anchors: selectionState.contextMenuAnchors,
+      buttonItems: items,
+    );
+  }
+
+  // ============================================================
+  // BUILD
+  // ============================================================
+
+  @override
+  Widget build(
+    BuildContext context,
+  ) {
     return Align(
-      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+      alignment: _isUser
+          ? Alignment.centerRight
+          : Alignment.centerLeft,
       child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 8.0),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        margin: const EdgeInsets.symmetric(
+          vertical: 8,
+        ),
+        padding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 12,
+        ),
         constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.85,
+          maxWidth:
+              MediaQuery.of(
+                context,
+              ).size.width *
+              0.85,
         ),
         decoration: BoxDecoration(
-          color: isUser ? const Color(0xFF2D2D2D) : Colors.transparent,
-          borderRadius: BorderRadius.circular(18),
+          color: _isUser
+              ? const Color(
+                  0xFF2D2D2D,
+                )
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(
+            18,
+          ),
         ),
-        child: isUser ? _buildUserContent() : _buildAiContent(),
+        child: _isUser
+            ? _buildUserContent()
+            : _buildAiContent(
+                context,
+              ),
       ),
     );
   }
 
+  // ============================================================
+  // MENSAGEM DO USUÁRIO
+  // ============================================================
+
   Widget _buildUserContent() {
     return Text(
-      message['content'] ?? "",
-      style: const TextStyle(color: Colors.white, fontSize: 15),
+      _content,
+      style: const TextStyle(
+        color: Colors.white,
+        fontSize: 15,
+        height: 1.45,
+      ),
     );
   }
 
-  Widget _buildAiContent() {
-    return MarkdownBody(
-      data: message['content'] ?? "",
-      builders: {
-        'word': RhymeTagBuilder(
-          activeColor: activeColor,
-          onTap: (word) => onAddRhyme?.call(word),
-        ),
-      },
-      inlineSyntaxes: [RhymeSyntax()],
-      styleSheet: MarkdownStyleSheet(
-        p: const TextStyle(
-          color: Colors.white,
-          fontSize: 16,
-          height: 1.5,
+  // ============================================================
+  // MENSAGEM DA IA
+  // ============================================================
+
+  Widget _buildAiContent(
+    BuildContext context,
+  ) {
+    return SelectionArea(
+      onSelectionChanged: _handleSelectionChanged,
+
+      contextMenuBuilder:
+          (
+            context,
+            selectionState,
+          ) {
+            return _buildContextMenu(
+              context,
+              selectionState,
+            );
+          },
+
+      child: MarkdownBody(
+        data: _content,
+
+        builders: {
+          'word': RhymeTagBuilder(
+            activeColor: widget.activeColor,
+            onTap:
+                (
+                  word,
+                ) {
+                  _addRhymeTag(
+                    context,
+                    word,
+                  );
+                },
+          ),
+        },
+
+        inlineSyntaxes: [
+          RhymeSyntax(),
+        ],
+
+        styleSheet: MarkdownStyleSheet(
+          p: const TextStyle(
+            color: Colors.white,
+            fontSize: 16,
+            height: 1.5,
+          ),
+
+          strong: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w700,
+          ),
+
+          em: const TextStyle(
+            color: Colors.white70,
+            fontStyle: FontStyle.italic,
+          ),
+
+          code: TextStyle(
+            color: widget.activeColor,
+            backgroundColor: Colors.white.withValues(
+              alpha: 0.05,
+            ),
+            fontSize: 13,
+          ),
         ),
       ),
     );
   }
 }
 
-// --- Lógica de Parsing (Mantida pois é correta) ---
+// ============================================================
+// RHYME SYNTAX
+// ============================================================
+//
+// Converte:
+//
+// [WORD:amor]
+//
+// em um elemento Markdown customizado.
+//
+// ============================================================
 
-class RhymeSyntax extends md.InlineSyntax {
-  RhymeSyntax() : super(r'\[WORD:(.*?)\]');
+class RhymeSyntax
+    extends
+        md.InlineSyntax {
+  RhymeSyntax()
+    : super(
+        r'\[WORD:(.*?)\]',
+      );
 
   @override
-  bool onMatch(md.InlineParser parser, Match match) {
-    final word = match.group(1);
-    if (word != null) {
-      parser.addNode(md.Element.text('word', word));
+  bool onMatch(
+    md.InlineParser parser,
+    Match match,
+  ) {
+    final word = match.group(
+      1,
+    );
+
+    if (word !=
+        null) {
+      parser.addNode(
+        md.Element.text(
+          'word',
+          word,
+        ),
+      );
     }
+
     return true;
   }
 }
 
-class RhymeTagBuilder extends MarkdownElementBuilder {
-  final Color activeColor;
-  final Function(String) onTap;
+// ============================================================
+// RHYME TAG BUILDER
+// ============================================================
 
-  RhymeTagBuilder({required this.activeColor, required this.onTap});
+class RhymeTagBuilder
+    extends
+        MarkdownElementBuilder {
+  final Color activeColor;
+
+  final Function(
+    String,
+  )
+  onTap;
+
+  RhymeTagBuilder({
+    required this.activeColor,
+    required this.onTap,
+  });
 
   @override
-  Widget? visitElementAfter(md.Element element, TextStyle? preferredStyle) {
+  Widget? visitElementAfter(
+    md.Element element,
+    TextStyle? preferredStyle,
+  ) {
     final word = element.textContent.trim();
-    return InkWell(
-      onTap: () => onTap(word),
-      borderRadius: BorderRadius.circular(4),
-      child: Text(
-        word,
-        style: TextStyle(
-          color: activeColor,
-          fontWeight: FontWeight.bold,
-          decoration: TextDecoration.underline,
-          decorationColor: activeColor.withOpacity(0.5),
+
+    if (word.isEmpty) {
+      return null;
+    }
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          onTap(
+            word,
+          );
+        },
+        borderRadius: BorderRadius.circular(
+          5,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: 2,
+            vertical: 1,
+          ),
+          child: Text(
+            word,
+            style: TextStyle(
+              color: activeColor,
+              fontWeight: FontWeight.bold,
+              decoration: TextDecoration.underline,
+              decorationColor: activeColor.withValues(
+                alpha: 0.5,
+              ),
+              decorationThickness: 1.3,
+            ),
+          ),
         ),
       ),
     );

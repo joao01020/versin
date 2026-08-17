@@ -28,11 +28,9 @@ import 'package:versin/modules/match/services/match_session_service.dart';
 import 'package:versin/modules/match/widgets/connection_profile_card_widget.dart';
 import 'package:versin/modules/match/widgets/discovery_section_widget.dart';
 import 'package:versin/modules/match/widgets/match_filter_sheet.dart';
-import 'package:versin/modules/match/widgets/match_header_widget.dart';
 import 'package:versin/modules/match/widgets/match_search_panel_widget.dart';
 import 'package:versin/modules/match/widgets/match_search_results_widget.dart';
 import 'package:versin/modules/match/widgets/profile_track_player_sheet.dart';
-import 'package:versin/modules/match/widgets/recommendations_section_widget.dart';
 
 // ============================================================
 // NETWORKING
@@ -55,7 +53,6 @@ import 'package:versin/modules/public_profile/controllers/public_profile_control
 import 'package:versin/modules/public_profile/data/repositories/public_profile_repository_impl.dart';
 import 'package:versin/modules/public_profile/services/profile_track_service.dart';
 import 'package:versin/modules/public_profile/views/public_profile_page.dart';
-import 'package:versin/modules/public_profile/widgets/public_profile_avatar_widget.dart';
 
 // ============================================================
 // MATCH PAGE
@@ -1261,13 +1258,8 @@ class _MatchPageState
 
           children: [
             const SizedBox(
-              height: 20,
+              height: 2,
             ),
-
-            // ==================================================
-            // HEADER
-            // ==================================================
-            _buildHeader(),
 
             // ==================================================
             // SEARCH
@@ -1325,7 +1317,24 @@ class _MatchPageState
             ],
 
             const SizedBox(
-              height: 22,
+              height: 12,
+            ),
+
+            // ==================================================
+            // NOVAS CONEXÕES
+            // ==================================================
+            //
+            // Esta passa a ser a área principal da tela.
+            //
+            // O perfil profissional fica logo abaixo do título
+            // e pode recolher automaticamente para ocupar o
+            // mínimo possível de espaço.
+            //
+            // ==================================================
+            _buildDiscoveryHeader(),
+
+            const SizedBox(
+              height: 10,
             ),
 
             // ==================================================
@@ -1342,22 +1351,16 @@ class _MatchPageState
             ),
 
             const SizedBox(
-              height: 26,
+              height: 10,
             ),
 
             // ==================================================
-            // DISCOVERY HEADER
+            // DISCOVERY MODE
             // ==================================================
-            _buildDiscoveryHeader(),
-
-            const SizedBox(
-              height: 14,
-            ),
-
             _buildDiscoveryModeSelector(),
 
             const SizedBox(
-              height: 24,
+              height: 14,
             ),
 
             // ==================================================
@@ -1365,15 +1368,42 @@ class _MatchPageState
             // ==================================================
             Stack(
               children: [
-                DiscoverySectionWidget(
-                  controller: _matchController,
+                // ==================================================
+                // DISCOVERY CARD
+                // ==================================================
+                //
+                // A chave acompanha o usuário atual para garantir
+                // que o card seja reconstruído corretamente quando
+                // o controller avançar para o próximo candidato.
+                //
+                // ==================================================
+                AnimatedSwitcher(
+                  duration: const Duration(
+                    milliseconds: 220,
+                  ),
 
-                  isInitializingMatch: _isInitializingMatch,
+                  switchInCurve: Curves.easeOut,
 
-                  // ============================================
-                  // ASYNC CALLBACK
-                  // ============================================
-                  onListenDemo: _openUserDemo,
+                  switchOutCurve: Curves.easeIn,
+
+                  child: DiscoverySectionWidget(
+                    key:
+                        ValueKey<
+                          String
+                        >(
+                          _matchController.discoveryUser?.id ??
+                              'discovery-empty',
+                        ),
+
+                    controller: _matchController,
+
+                    isInitializingMatch: _isInitializingMatch,
+
+                    // ============================================
+                    // ASYNC CALLBACK
+                    // ============================================
+                    onListenDemo: _openUserDemo,
+                  ),
                 ),
 
                 // ==============================================
@@ -1405,105 +1435,11 @@ class _MatchPageState
             ),
 
             const SizedBox(
-              height: 24,
-            ),
-
-            // ==================================================
-            // RECOMMENDATIONS
-            // ==================================================
-            const Text(
-              'Recomendados para você',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-
-            const SizedBox(
-              height: 16,
-            ),
-
-            RecommendationsSectionWidget(
-              controller: _matchController,
-
-              isInitializingMatch: _isInitializingMatch,
-            ),
-
-            const SizedBox(
               height: 30,
             ),
           ],
         ),
       ),
-    );
-  }
-
-  // ============================================================
-  // HEADER
-  // ============================================================
-
-  Widget _buildHeader() {
-    final profile = _publicProfileController.profile;
-
-    final authUser = Supabase.instance.client.auth.currentUser;
-
-    final metadata = authUser?.userMetadata;
-
-    final fallbackName = metadata?['display_name']?.toString().trim();
-
-    final fallbackUsername = metadata?['username']?.toString().trim();
-
-    final displayName =
-        profile?.resolvedDisplayName ??
-        (fallbackName?.isNotEmpty ==
-                true
-            ? fallbackName!
-            : fallbackUsername?.isNotEmpty ==
-                  true
-            ? fallbackUsername!
-            : 'Usuário');
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-
-      children: [
-        Expanded(
-          child: MatchHeaderWidget(
-            isSearchPanelOpen: _isSearchPanelOpen,
-
-            accentColor: _matchController.accentNeon,
-
-            onSearchToggle: _toggleSearchPanel,
-          ),
-        ),
-
-        const SizedBox(
-          width: 12,
-        ),
-
-        Tooltip(
-          message: 'Abrir meu perfil',
-
-          child: PublicProfileAvatarWidget(
-            avatarUrl: profile?.avatarUrl,
-
-            displayName: displayName,
-
-            size: 44,
-
-            showOnlineIndicator: true,
-
-            isOnline:
-                profile?.isOnline ??
-                false,
-
-            accentColor: _matchController.accentNeon,
-
-            onTap: _openPublicProfile,
-          ),
-        ),
-      ],
     );
   }
 
@@ -1745,23 +1681,6 @@ class _MatchPageState
   }
 
   // ============================================================
-  // DISCOVERY SUBTITLE
-  // ============================================================
-
-  String _getDiscoverySubtitle() {
-    switch (_matchController.discoveryMode) {
-      case MatchDiscoveryMode.compatible:
-        return 'Profissionais compatíveis com você';
-
-      case MatchDiscoveryMode.nearby:
-        return 'Profissionais próximos de você';
-
-      case MatchDiscoveryMode.global:
-        return 'Todos os profissionais online';
-    }
-  }
-
-  // ============================================================
   // DISCOVERY HEADER
   // ============================================================
 
@@ -1770,37 +1689,19 @@ class _MatchPageState
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
 
       children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        const Expanded(
+          child: Text(
+            'Novas Conexões',
 
-            children: [
-              const Text(
-                'Novas Conexões',
+            style: TextStyle(
+              color: Colors.white,
 
-                style: TextStyle(
-                  color: Colors.white,
+              fontSize: 26,
 
-                  fontSize: 18,
+              fontWeight: FontWeight.w800,
 
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-
-              const SizedBox(
-                height: 2,
-              ),
-
-              Text(
-                _getDiscoverySubtitle(),
-
-                style: const TextStyle(
-                  color: Colors.white38,
-
-                  fontSize: 12,
-                ),
-              ),
-            ],
+              letterSpacing: -0.45,
+            ),
           ),
         ),
 

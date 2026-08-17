@@ -323,6 +323,14 @@ class LoginController {
         '[VERSIN AUTH] Login falhou: ${error.message}',
       );
 
+      debugPrint(
+        '[VERSIN AUTH] Código: ${error.code ?? "sem código"}',
+      );
+
+      debugPrint(
+        '[VERSIN AUTH] Status: ${error.statusCode ?? "sem status"}',
+      );
+
       if (!_disposed) {
         _setError(
           _translateAuthError(
@@ -942,9 +950,14 @@ class LoginController {
     }
 
     if (message.contains(
-      'email not confirmed',
-    )) {
-      return 'Confirme seu email antes de entrar.';
+          'email not confirmed',
+        ) ||
+        message.contains(
+          'email_not_confirmed',
+        )) {
+      return 'Esta conta ainda está marcada como não confirmada no Supabase. '
+          'Se você desativou Confirm email depois de criar essa conta, '
+          'apague/recrie a conta de teste ou confirme o usuário no painel.';
     }
 
     if (message.contains(

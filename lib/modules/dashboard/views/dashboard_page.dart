@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:versin/app/locator.dart';
 import 'package:versin/features/rhymes/presentation/controller/rhymes_controller.dart';
@@ -29,6 +32,10 @@ import 'package:versin/modules/storage/views/storage_page.dart';
 import 'package:versin/modules/studio/views/studio_page.dart';
 import 'package:versin/modules/vnode/vnode_page.dart';
 import 'package:versin/modules/wallet/views/wallet_page.dart';
+
+import 'package:versin/modules/networking/call/data/repositories/project_call_repository_impl.dart';
+import 'package:versin/modules/networking/call/views/call_view.dart';
+import 'package:versin/modules/networking/call/views/widgets/global_call_banner.dart';
 
 // ============================================================
 // DASHBOARD PAGE
@@ -93,6 +100,36 @@ class _DashboardPageState
       >();
 
   // ============================================================
+  // GLOBAL CALL
+  // ============================================================
+
+  final SupabaseClient _supabase = Supabase.instance.client;
+
+  final ProjectCallRepositoryImpl _callRepository = ProjectCallRepositoryImpl();
+
+  bool _isGlobalCallActionProcessing = false;
+
+  String? _globalCallAction;
+
+  Timer? _globalCallClockTimer;
+
+  DateTime _globalCallClockNow = DateTime.now();
+
+  // ============================================================
+  // CACHE DE NOMES DA CHAMADA
+  // ============================================================
+
+  final Map<
+    String,
+    String
+  >
+  _callParticipantNameCache =
+      <
+        String,
+        String
+      >{};
+
+  // ============================================================
   // MENUS VISÍVEIS
   // ============================================================
 
@@ -118,6 +155,25 @@ class _DashboardPageState
     super.initState();
 
     _controller.init();
+
+    _globalCallClockTimer = Timer.periodic(
+      const Duration(
+        seconds: 1,
+      ),
+      (
+        _,
+      ) {
+        if (!mounted) {
+          return;
+        }
+
+        setState(
+          () {
+            _globalCallClockNow = DateTime.now();
+          },
+        );
+      },
+    );
   }
 
   // ============================================================
@@ -247,9 +303,7 @@ class _DashboardPageState
             const Color(
               0xFF2E1A47,
             ),
-
             _controller.deepBg,
-
             Colors.black,
           ],
         ),
@@ -271,29 +325,665 @@ class _DashboardPageState
           // CONTEÚDO
           // ====================================================
           Expanded(
-            child: SafeArea(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // ============================================
-                  // HEADER
-                  // ============================================
-                  DashboardHeaderWidget(
-                    controller: _controller,
-                  ),
+            child: Stack(
+              children: [
+                SafeArea(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      DashboardHeaderWidget(
+                        controller: _controller,
+                      ),
 
-                  // ============================================
-                  // MÓDULOS
-                  // ============================================
-                  Expanded(
-                    child: _buildPageView(),
+                      Expanded(
+                        child: _buildPageView(),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: _buildGlobalCallBanner(),
+                ),
+              ],
             ),
           ),
         ],
       ),
+    );
+  }
+
+  // ============================================================
+  // GLOBAL CALL BANNER
+  // ============================================================
+
+  Widget _buildGlobalCallBanner() {
+    final currentUserId = _supabase.auth.currentUser?.id.trim();
+
+    if (currentUserId ==
+            null ||
+        currentUserId.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return StreamBuilder<
+      List<
+        Map<
+          String,
+          dynamic
+        >
+      >
+    >(
+      stream: _supabase
+          .from(
+            'project_calls',
+          )
+          .stream(
+            primaryKey: [
+              'id',
+            ],
+          )
+          .order(
+            'created_at',
+            ascending: false,
+          ),
+
+      builder:
+          (
+            context,
+            snapshot,
+          ) {
+            final rows =
+                snapshot.data ??
+                const <
+                  Map<
+                    String,
+                    dynamic
+                  >
+                >[];
+
+            Map<
+              String,
+              dynamic
+            >?
+            activeRow;
+
+            for (final row in rows) {
+              final status = row['status']?.toString().trim();
+
+              if (status !=
+                      'ringing' &&
+                  status !=
+                      'active') {
+                continue;
+              }
+
+              final createdBy = row['created_by']?.toString().trim();
+
+              final targetUserId = row['target_user_id']?.toString().trim();
+
+              final directlyInvolved =
+                  createdBy ==
+                      currentUserId ||
+                  targetUserId ==
+                      currentUserId;
+
+              final groupCall =
+                  targetUserId ==
+                      null ||
+                  targetUserId.isEmpty;
+
+              if (!directlyInvolved &&
+                  !groupCall) {
+                continue;
+              }
+
+              activeRow = row;
+
+              break;
+            }
+
+            if (activeRow ==
+                null) {
+              return const SizedBox.shrink();
+            }
+
+            return _buildGlobalCallBannerFromRow(
+              activeRow,
+              currentUserId,
+            );
+          },
+    );
+  }
+
+  // ============================================================
+  // GLOBAL CALL FROM ROW
+  // ============================================================
+
+  Widget _buildGlobalCallBannerFromRow(
+    Map<
+      String,
+      dynamic
+    >
+    row,
+    String currentUserId,
+  ) {
+    final callId =
+        row['id']?.toString().trim() ??
+        '';
+
+    final projectId =
+        row['project_id']?.toString().trim() ??
+        '';
+
+    final createdBy =
+        row['created_by']?.toString().trim() ??
+        '';
+
+    final targetUserId = row['target_user_id']?.toString().trim();
+
+    final status =
+        row['status']?.toString().trim() ??
+        '';
+
+    final mediaTypeValue =
+        row['media_type']?.toString().trim().toLowerCase() ??
+        'audio';
+
+    final bannerMediaType =
+        mediaTypeValue ==
+            'video'
+        ? GlobalCallMediaType.video
+        : GlobalCallMediaType.audio;
+
+    final incoming =
+        status ==
+            'ringing' &&
+        createdBy !=
+            currentUserId &&
+        (targetUserId ==
+                currentUserId ||
+            targetUserId ==
+                null ||
+            targetUserId.isEmpty);
+
+    final outgoing =
+        status ==
+            'ringing' &&
+        createdBy ==
+            currentUserId;
+
+    final active =
+        status ==
+        'active';
+
+    GlobalCallBannerState state = GlobalCallBannerState.hidden;
+
+    if (_isGlobalCallActionProcessing &&
+        _globalCallAction ==
+            'end') {
+      state = GlobalCallBannerState.ending;
+    } else if (incoming) {
+      state = GlobalCallBannerState.incoming;
+    } else if (outgoing) {
+      state = GlobalCallBannerState.calling;
+    } else if (active) {
+      state = GlobalCallBannerState.active;
+    }
+
+    final createdAt = DateTime.tryParse(
+      row['created_at']?.toString() ??
+          '',
+    );
+
+    final startedAt = DateTime.tryParse(
+      row['started_at']?.toString() ??
+          '',
+    );
+
+    final ringingDuration =
+        createdAt ==
+                null ||
+            !(incoming ||
+                outgoing)
+        ? null
+        : _safeDurationDifference(
+            _globalCallClockNow.toUtc(),
+            createdAt.toUtc(),
+          );
+
+    final duration =
+        startedAt ==
+                null ||
+            !active
+        ? null
+        : _safeDurationDifference(
+            _globalCallClockNow.toUtc(),
+            startedAt.toUtc(),
+          );
+
+    final participantUserId = _resolveCallParticipantUserId(
+      createdBy: createdBy,
+      targetUserId: targetUserId,
+      currentUserId: currentUserId,
+    );
+
+    return FutureBuilder<
+      String
+    >(
+      future: _resolveCallParticipantName(
+        participantUserId,
+      ),
+
+      builder:
+          (
+            context,
+            snapshot,
+          ) {
+            final participantName =
+                snapshot.data ??
+                _callParticipantNameCache[participantUserId] ??
+                'Membro da sessão';
+
+            return GlobalCallBanner(
+              state: state,
+
+              mediaType: bannerMediaType,
+
+              participantName: participantName,
+
+              ringingDuration: ringingDuration,
+
+              duration: duration,
+
+              onOpen: projectId.isEmpty
+                  ? null
+                  : () {
+                      _openCallPage(
+                        projectId,
+                      );
+                    },
+
+              onAccept:
+                  incoming &&
+                      callId.isNotEmpty
+                  ? () {
+                      _acceptGlobalCall(
+                        callId,
+                        projectId,
+                      );
+                    }
+                  : null,
+
+              onReject:
+                  incoming &&
+                      callId.isNotEmpty
+                  ? () {
+                      _rejectGlobalCall(
+                        callId,
+                      );
+                    }
+                  : null,
+
+              onEnd:
+                  (outgoing ||
+                          active) &&
+                      callId.isNotEmpty
+                  ? () {
+                      _endGlobalCall(
+                        callId,
+                      );
+                    }
+                  : null,
+            );
+          },
+    );
+  }
+
+  // ============================================================
+  // SAFE DURATION DIFFERENCE
+  // ============================================================
+
+  Duration _safeDurationDifference(
+    DateTime now,
+    DateTime startedAt,
+  ) {
+    final value = now.difference(
+      startedAt,
+    );
+
+    if (value.isNegative) {
+      return Duration.zero;
+    }
+
+    return value;
+  }
+
+  // ============================================================
+  // RESOLVER ID DO OUTRO PARTICIPANTE
+  // ============================================================
+
+  String _resolveCallParticipantUserId({
+    required String createdBy,
+    required String? targetUserId,
+    required String currentUserId,
+  }) {
+    final normalizedCreatedBy = createdBy.trim();
+
+    final normalizedTargetUserId = targetUserId?.trim();
+
+    // ========================================================
+    // EU CRIEI A CHAMADA
+    // ========================================================
+
+    if (normalizedCreatedBy ==
+        currentUserId) {
+      if (normalizedTargetUserId !=
+              null &&
+          normalizedTargetUserId.isNotEmpty) {
+        return normalizedTargetUserId;
+      }
+
+      return '';
+    }
+
+    // ========================================================
+    // OUTRO USUÁRIO CRIOU A CHAMADA
+    // ========================================================
+
+    return normalizedCreatedBy;
+  }
+
+  // ============================================================
+  // RESOLVER NOME DO OUTRO PARTICIPANTE
+  // ============================================================
+  //
+  // Ordem de prioridade:
+  //
+  // 1. artist_name
+  // 2. name
+  // 3. @username
+  // 4. Membro da sessão
+  //
+  // ============================================================
+
+  Future<
+    String
+  >
+  _resolveCallParticipantName(
+    String userId,
+  ) async {
+    final normalizedUserId = userId.trim();
+
+    if (normalizedUserId.isEmpty) {
+      return 'Membro da sessão';
+    }
+
+    final cached = _callParticipantNameCache[normalizedUserId];
+
+    if (cached !=
+            null &&
+        cached.isNotEmpty) {
+      return cached;
+    }
+
+    try {
+      final profile = await _supabase
+          .from(
+            'profiles',
+          )
+          .select(
+            'id, artist_name, name, username',
+          )
+          .eq(
+            'id',
+            normalizedUserId,
+          )
+          .maybeSingle();
+
+      if (profile ==
+          null) {
+        return 'Membro da sessão';
+      }
+
+      final artistName = profile['artist_name']?.toString().trim();
+
+      if (artistName !=
+              null &&
+          artistName.isNotEmpty) {
+        _callParticipantNameCache[normalizedUserId] = artistName;
+
+        return artistName;
+      }
+
+      final name = profile['name']?.toString().trim();
+
+      if (name !=
+              null &&
+          name.isNotEmpty) {
+        _callParticipantNameCache[normalizedUserId] = name;
+
+        return name;
+      }
+
+      final username = profile['username']?.toString().trim().replaceFirst(
+        RegExp(
+          r'^@+',
+        ),
+        '',
+      );
+
+      if (username !=
+              null &&
+          username.isNotEmpty) {
+        final usernameLabel = '@$username';
+
+        _callParticipantNameCache[normalizedUserId] = usernameLabel;
+
+        return usernameLabel;
+      }
+    } catch (
+      error,
+      stackTrace
+    ) {
+      debugPrint(
+        '[DASHBOARD] '
+        'Erro ao buscar nome do participante da chamada: '
+        '$error',
+      );
+
+      debugPrint(
+        '$stackTrace',
+      );
+    }
+
+    return 'Membro da sessão';
+  }
+
+  // ============================================================
+  // OPEN CALL
+  // ============================================================
+
+  Future<
+    void
+  >
+  _openCallPage(
+    String projectId,
+  ) async {
+    if (!mounted ||
+        projectId.trim().isEmpty) {
+      return;
+    }
+
+    await Navigator.of(
+      context,
+    ).push(
+      MaterialPageRoute(
+        builder:
+            (
+              _,
+            ) => CallView(
+              projectId: projectId,
+            ),
+      ),
+    );
+  }
+
+  // ============================================================
+  // ACCEPT CALL
+  // ============================================================
+
+  Future<
+    void
+  >
+  _acceptGlobalCall(
+    String callId,
+    String projectId,
+  ) async {
+    if (_isGlobalCallActionProcessing) {
+      return;
+    }
+
+    _setGlobalCallProcessing(
+      true,
+      'accept',
+    );
+
+    try {
+      await _callRepository.acceptCall(
+        callId: callId,
+      );
+
+      if (mounted &&
+          projectId.trim().isNotEmpty) {
+        await _openCallPage(
+          projectId,
+        );
+      }
+    } catch (
+      error,
+      stackTrace
+    ) {
+      debugPrint(
+        '[DASHBOARD] Erro ao aceitar chamada global: $error',
+      );
+
+      debugPrint(
+        '$stackTrace',
+      );
+    } finally {
+      _setGlobalCallProcessing(
+        false,
+        null,
+      );
+    }
+  }
+
+  // ============================================================
+  // REJECT CALL
+  // ============================================================
+
+  Future<
+    void
+  >
+  _rejectGlobalCall(
+    String callId,
+  ) async {
+    if (_isGlobalCallActionProcessing) {
+      return;
+    }
+
+    _setGlobalCallProcessing(
+      true,
+      'reject',
+    );
+
+    try {
+      await _callRepository.rejectCall(
+        callId: callId,
+      );
+    } catch (
+      error,
+      stackTrace
+    ) {
+      debugPrint(
+        '[DASHBOARD] Erro ao recusar chamada global: $error',
+      );
+
+      debugPrint(
+        '$stackTrace',
+      );
+    } finally {
+      _setGlobalCallProcessing(
+        false,
+        null,
+      );
+    }
+  }
+
+  // ============================================================
+  // END CALL
+  // ============================================================
+
+  Future<
+    void
+  >
+  _endGlobalCall(
+    String callId,
+  ) async {
+    if (_isGlobalCallActionProcessing) {
+      return;
+    }
+
+    _setGlobalCallProcessing(
+      true,
+      'end',
+    );
+
+    try {
+      await _callRepository.endCall(
+        callId: callId,
+      );
+    } catch (
+      error,
+      stackTrace
+    ) {
+      debugPrint(
+        '[DASHBOARD] Erro ao encerrar chamada global: $error',
+      );
+
+      debugPrint(
+        '$stackTrace',
+      );
+    } finally {
+      _setGlobalCallProcessing(
+        false,
+        null,
+      );
+    }
+  }
+
+  // ============================================================
+  // PROCESSING
+  // ============================================================
+
+  void _setGlobalCallProcessing(
+    bool value,
+    String? action,
+  ) {
+    if (!mounted) {
+      return;
+    }
+
+    setState(
+      () {
+        _isGlobalCallActionProcessing = value;
+
+        _globalCallAction = action;
+      },
     );
   }
 
@@ -410,5 +1100,17 @@ class _DashboardPageState
         const StudioPage(),
       ],
     );
+  }
+  // ============================================================
+  // DISPOSE
+  // ============================================================
+
+  @override
+  void dispose() {
+    _globalCallClockTimer?.cancel();
+
+    _globalCallClockTimer = null;
+
+    super.dispose();
   }
 }

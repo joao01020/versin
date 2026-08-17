@@ -8,8 +8,8 @@ import 'discovery_card_widget.dart';
 // DISCOVERY SECTION WIDGET
 // ============================================================
 //
-// Responsável somente por decidir qual estado do Discovery
-// deve ser exibido.
+// Responsável por decidir qual estado do Discovery deve ser
+// exibido.
 //
 // Estados:
 //
@@ -17,21 +17,46 @@ import 'discovery_card_widget.dart';
 // - candidato encontrado;
 // - nenhum candidato.
 //
+// Também faz a ponte entre:
+//
+// DiscoveryCardWidget
+//
+// e
+//
+// MatchController.
+//
+// AÇÕES:
+//
+// X
+// -> ignora usuário atual;
+// -> tenta avançar para o próximo.
+//
+// Coração
+// -> registra like;
+// -> verifica match;
+// -> tenta avançar para o próximo.
+//
+// IMPORTANTE:
+//
+// Se não existir próximo usuário:
+//
+// - o usuário atual permanece;
+// - o card não desaparece.
+//
 // Também repassa:
 //
 // - ação assíncrona de ouvir demo.
 //
 // NÃO:
 //
-// - consulta Supabase;
+// - consulta Supabase diretamente;
 // - acessa Cloudflare R2;
 // - calcula compatibilidade;
-// - inicia Match;
-// - controla recomendações;
-// - abre perfil;
+// - cria projeto manualmente;
+// - navega para Networking;
 // - reproduz demo.
 //
-// Essas ações pertencem aos níveis superiores.
+// Essas responsabilidades continuam nos níveis superiores.
 //
 // ============================================================
 
@@ -114,6 +139,20 @@ class DiscoverySectionWidget
         controller: controller,
 
         user: discoveryUser,
+
+        // ======================================================
+        // REJEITAR / IGNORAR
+        // ======================================================
+        onDismiss: () {
+          controller.dismissCurrentDiscoveryUser();
+        },
+
+        // ======================================================
+        // LIKE
+        // ======================================================
+        onLike: () async {
+          await controller.likeCurrentDiscoveryUserAndAdvance();
+        },
 
         // ======================================================
         // OUVIR DEMO
@@ -233,7 +272,9 @@ class DiscoverySectionWidget
           // ====================================================
           Icon(
             Icons.wifi_tethering_rounded,
+
             color: Colors.white24,
+
             size: 32,
           ),
 
@@ -246,10 +287,14 @@ class DiscoverySectionWidget
           // ====================================================
           Text(
             'Nenhum profissional compatível encontrado.',
+
             textAlign: TextAlign.center,
+
             style: TextStyle(
               color: Colors.white38,
+
               fontSize: 13,
+
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -262,11 +307,16 @@ class DiscoverySectionWidget
           // SUBTÍTULO
           // ====================================================
           Text(
-            'Novos profissionais aparecerão aqui quando forem encontrados.',
+            'Novos profissionais aparecerão aqui '
+            'quando forem encontrados.',
+
             textAlign: TextAlign.center,
+
             style: TextStyle(
               color: Colors.white24,
+
               fontSize: 10,
+
               height: 1.4,
             ),
           ),

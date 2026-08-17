@@ -13,24 +13,48 @@ import 'action_button_widget.dart';
 // Exibe:
 //
 // - showcase;
+// - status ONLINE AGORA;
 // - nome artístico;
 // - username;
 // - função principal;
 // - bio;
-// - tipo de conexão;
 // - timer;
 // - profissionais procurados;
 // - ações;
 // - botão para ouvir demo.
 //
+// AÇÕES:
+//
+// X
+// -> ignora o usuário atual;
+// -> tenta mostrar o próximo.
+//
+// Coração
+// -> registra like;
+// -> verifica match;
+// -> tenta mostrar o próximo.
+//
+// IMPORTANTE:
+//
+// Se não existir próximo usuário:
+//
+// - o card atual permanece;
+// - o usuário não desaparece.
+//
 // NÃO:
 //
-// - consulta Supabase;
+// - consulta Supabase diretamente;
 // - carrega música;
 // - gera signed URL;
-// - reproduz áudio.
+// - reproduz áudio;
+// - cria projeto;
+// - navega para Networking.
 //
 // O fluxo da demo é delegado para onListenDemo.
+//
+// O fluxo do X é delegado para onDismiss.
+//
+// O fluxo do coração é delegado para onLike.
 //
 // ============================================================
 
@@ -48,6 +72,18 @@ class DiscoveryCardWidget
   // ============================================================
 
   final MatchUserEntity user;
+
+  // ============================================================
+  // ACTIONS
+  // ============================================================
+
+  final VoidCallback? onDismiss;
+
+  final Future<
+    void
+  >
+  Function()?
+  onLike;
 
   // ============================================================
   // DEMO
@@ -79,6 +115,8 @@ class DiscoveryCardWidget
     super.key,
     required this.controller,
     required this.user,
+    this.onDismiss,
+    this.onLike,
     this.onListenDemo,
   });
 
@@ -107,6 +145,32 @@ class _DiscoveryCardWidgetState
   bool _isOpeningDemo = false;
 
   // ============================================================
+  // DID UPDATE WIDGET
+  // ============================================================
+  //
+  // Quando o controller troca o usuário principal, garantimos
+  // que o novo card não herde o estado visual de processamento
+  // do usuário anterior.
+  //
+  // ============================================================
+
+  @override
+  void didUpdateWidget(
+    covariant DiscoveryCardWidget oldWidget,
+  ) {
+    super.didUpdateWidget(
+      oldWidget,
+    );
+
+    if (oldWidget.user.id !=
+        widget.user.id) {
+      _isWaitingForNetworking = false;
+
+      _isOpeningDemo = false;
+    }
+  }
+
+  // ============================================================
   // MATCH INTENT
   // ============================================================
 
@@ -114,12 +178,13 @@ class _DiscoveryCardWidgetState
     void
   >
   _handleMatchIntent() async {
-    final userId = widget.controller.currentUserId;
+    final callback = widget.onLike;
 
-    if (userId ==
+    if (callback ==
         null) {
       debugPrint(
-        '[DISCOVERY] Usuário não autenticado.',
+        '[DISCOVERY] '
+        'Callback de like não configurado.',
       );
 
       return;
@@ -129,44 +194,19 @@ class _DiscoveryCardWidgetState
       return;
     }
 
-    setState(
-      () {
-        _isWaitingForNetworking = true;
-      },
-    );
+    if (mounted) {
+      setState(
+        () {
+          _isWaitingForNetworking = true;
+        },
+      );
+    }
 
     try {
-      // ========================================================
-      // LIKE
-      // ========================================================
-
-      await widget.controller.registerLike(
-        widget.user.id,
-      );
-
-      // ========================================================
-      // VERIFICAR MATCH MÚTUO
-      // ========================================================
-
-      final started = await widget.controller.checkAndStartNetworking(
-        userId,
-        widget.user.id,
-      );
-
-      // ========================================================
-      // AINDA NÃO É MATCH MÚTUO
-      // ========================================================
-
-      if (!started &&
-          mounted) {
-        setState(
-          () {
-            _isWaitingForNetworking = false;
-          },
-        );
-      }
+      await callback();
     } catch (
-      error
+      error,
+      stackTrace
     ) {
       debugPrint(
         '[DISCOVERY] '
@@ -174,6 +214,12 @@ class _DiscoveryCardWidgetState
         '$error',
       );
 
+      debugPrint(
+        '[DISCOVERY] '
+        'Stack trace: '
+        '$stackTrace',
+      );
+    } finally {
       if (mounted) {
         setState(
           () {
@@ -182,6 +228,25 @@ class _DiscoveryCardWidgetState
         );
       }
     }
+  }
+
+  // ============================================================
+  // DISMISS
+  // ============================================================
+
+  void _handleDismiss() {
+    if (_isWaitingForNetworking ||
+        _isOpeningDemo) {
+      return;
+    }
+
+    debugPrint(
+      '[DISCOVERY] '
+      'Perfil ignorado: '
+      '${widget.user.id}',
+    );
+
+    widget.onDismiss?.call();
   }
 
   // ============================================================
@@ -287,44 +352,6 @@ class _DiscoveryCardWidgetState
   }
 
   // ============================================================
-  // CONNECTION ICON
-  // ============================================================
-
-  IconData _getConnectionIcon(
-    ConnectionType type,
-  ) {
-    switch (type) {
-      case ConnectionType.chat:
-        return Icons.chat_bubble_outline;
-
-      case ConnectionType.video:
-        return Icons.videocam_outlined;
-
-      case ConnectionType.proximity:
-        return Icons.location_on_outlined;
-    }
-  }
-
-  // ============================================================
-  // CONNECTION LABEL
-  // ============================================================
-
-  String _getConnectionLabel(
-    ConnectionType type,
-  ) {
-    switch (type) {
-      case ConnectionType.chat:
-        return 'CHAT';
-
-      case ConnectionType.video:
-        return 'VÍDEO';
-
-      case ConnectionType.proximity:
-        return 'PROXIMIDADE';
-    }
-  }
-
-  // ============================================================
   // BUILD
   // ============================================================
 
@@ -352,21 +379,26 @@ class _DiscoveryCardWidgetState
 
     return Container(
       height: 270,
+
       width: double.infinity,
+
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(
           24,
         ),
+
         border: Border.all(
           color: Colors.white.withValues(
             alpha: 0.10,
           ),
         ),
       ),
+
       child: ClipRRect(
         borderRadius: BorderRadius.circular(
           24,
         ),
+
         child: Stack(
           children: [
             // ==================================================
@@ -377,7 +409,9 @@ class _DiscoveryCardWidgetState
                 widget.user.showcaseMediaUrl.isNotEmpty
                     ? widget.user.showcaseMediaUrl
                     : 'https://images.unsplash.com/photo-1514525253361-bee8718a7439?q=80&w=500',
+
                 fit: BoxFit.cover,
+
                 errorBuilder:
                     (
                       context,
@@ -386,9 +420,12 @@ class _DiscoveryCardWidgetState
                     ) {
                       return Container(
                         color: Colors.black45,
+
                         child: const Icon(
                           Icons.music_note,
+
                           color: Colors.white24,
+
                           size: 50,
                         ),
                       );
@@ -404,14 +441,18 @@ class _DiscoveryCardWidgetState
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.bottomRight,
+
                     end: Alignment.topLeft,
+
                     colors: [
                       widget.controller.primaryPurple.withValues(
                         alpha: 0.85,
                       ),
+
                       Colors.black.withValues(
                         alpha: 0.78,
                       ),
+
                       Colors.black26,
                     ],
                   ),
@@ -426,60 +467,24 @@ class _DiscoveryCardWidgetState
               padding: const EdgeInsets.all(
                 20,
               ),
+
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+
                 mainAxisAlignment: MainAxisAlignment.end,
+
                 children: [
                   // ==================================================
                   // TOP BAR
                   // ==================================================
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
+
                     children: [
                       // ==========================================
-                      // CONNECTION TYPE
+                      // ONLINE AGORA
                       // ==========================================
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(
-                            alpha: 0.45,
-                          ),
-                          borderRadius: BorderRadius.circular(
-                            8,
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              _getConnectionIcon(
-                                widget.user.preferredConnection,
-                              ),
-                              color: Colors.white70,
-                              size: 14,
-                            ),
-
-                            const SizedBox(
-                              width: 4,
-                            ),
-
-                            Text(
-                              _getConnectionLabel(
-                                widget.user.preferredConnection,
-                              ),
-                              style: const TextStyle(
-                                color: Colors.white70,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                      _buildOnlineBadge(),
 
                       // ==========================================
                       // TIMER
@@ -487,21 +492,28 @@ class _DiscoveryCardWidgetState
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 8,
+
                           vertical: 4,
                         ),
+
                         decoration: BoxDecoration(
                           color: Colors.black.withValues(
                             alpha: 0.86,
                           ),
+
                           borderRadius: BorderRadius.circular(
                             8,
                           ),
                         ),
+
                         child: Text(
                           '$minutes:$seconds',
+
                           style: TextStyle(
                             color: widget.controller.accentNeon,
+
                             fontSize: 12,
+
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -519,11 +531,16 @@ class _DiscoveryCardWidgetState
                       Flexible(
                         child: Text(
                           widget.user.name,
+
                           maxLines: 1,
+
                           overflow: TextOverflow.ellipsis,
+
                           style: const TextStyle(
                             color: Colors.white,
+
                             fontSize: 22,
+
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -535,7 +552,9 @@ class _DiscoveryCardWidgetState
 
                       Icon(
                         Icons.verified,
+
                         color: widget.controller.accentNeon,
+
                         size: 18,
                       ),
                     ],
@@ -551,11 +570,16 @@ class _DiscoveryCardWidgetState
 
                     Text(
                       widget.user.usernameLabel,
+
                       maxLines: 1,
+
                       overflow: TextOverflow.ellipsis,
+
                       style: const TextStyle(
                         color: Colors.white54,
+
                         fontSize: 10,
+
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -570,11 +594,16 @@ class _DiscoveryCardWidgetState
                   // ==================================================
                   Text(
                     widget.user.primaryRoleLabel,
+
                     maxLines: 1,
+
                     overflow: TextOverflow.ellipsis,
+
                     style: TextStyle(
                       color: widget.controller.accentNeon,
+
                       fontSize: 11,
+
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -590,11 +619,16 @@ class _DiscoveryCardWidgetState
                     widget.user.bio.trim().isEmpty
                         ? 'Sem bio informada.'
                         : widget.user.bio,
+
                     maxLines: 2,
+
                     overflow: TextOverflow.ellipsis,
+
                     style: const TextStyle(
                       color: Colors.white70,
+
                       fontSize: 12,
+
                       height: 1.3,
                     ),
                   ),
@@ -630,28 +664,101 @@ class _DiscoveryCardWidgetState
   }
 
   // ============================================================
+  // ONLINE BADGE
+  // ============================================================
+
+  Widget _buildOnlineBadge() {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 9,
+
+        vertical: 5,
+      ),
+
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(
+          alpha: 0.48,
+        ),
+
+        borderRadius: BorderRadius.circular(
+          8,
+        ),
+
+        border: Border.all(
+          color:
+              const Color(
+                0xFF34D399,
+              ).withValues(
+                alpha: 0.18,
+              ),
+        ),
+      ),
+
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
+
+        children: [
+          // ====================================================
+          // DOT
+          // ====================================================
+          _OnlineDot(),
+
+          SizedBox(
+            width: 6,
+          ),
+
+          // ====================================================
+          // LABEL
+          // ====================================================
+          Text(
+            'ONLINE AGORA',
+
+            style: TextStyle(
+              color: Color(
+                0xFF34D399,
+              ),
+
+              fontSize: 9,
+
+              fontWeight: FontWeight.w800,
+
+              letterSpacing: 0.55,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ============================================================
   // WAITING
   // ============================================================
 
   Widget _buildWaiting() {
     return Container(
       width: double.infinity,
+
       padding: const EdgeInsets.all(
         12,
       ),
+
       decoration: BoxDecoration(
         color: Colors.white.withValues(
           alpha: 0.10,
         ),
+
         borderRadius: BorderRadius.circular(
           12,
         ),
       ),
+
       child: const Center(
         child: Text(
-          'ESPERANDO NETWORKING...',
+          'VERIFICANDO NETWORKING...',
+
           style: TextStyle(
             color: Colors.white70,
+
             fontSize: 12,
           ),
         ),
@@ -671,14 +778,14 @@ class _DiscoveryCardWidgetState
         // ======================================================
         ActionButtonWidget(
           icon: Icons.close,
+
           color: Colors.white24,
-          onTap: () {
-            debugPrint(
-              '[DISCOVERY] '
-              'Perfil ignorado: '
-              '${widget.user.id}',
-            );
-          },
+
+          onTap:
+              widget.onDismiss ==
+                  null
+              ? null
+              : _handleDismiss,
         ),
 
         const SizedBox(
@@ -690,8 +797,14 @@ class _DiscoveryCardWidgetState
         // ======================================================
         ActionButtonWidget(
           icon: Icons.favorite,
+
           color: widget.controller.accentNeon,
-          onTap: _handleMatchIntent,
+
+          onTap:
+              widget.onLike ==
+                  null
+              ? null
+              : _handleMatchIntent,
         ),
 
         const Spacer(),
@@ -706,36 +819,49 @@ class _DiscoveryCardWidgetState
                   _isOpeningDemo
               ? null
               : _handleListenDemo,
+
           style: ElevatedButton.styleFrom(
             backgroundColor: widget.controller.accentNeon,
+
             disabledBackgroundColor: Colors.white12,
+
             foregroundColor: Colors.black,
+
             disabledForegroundColor: Colors.white38,
+
             elevation: 0,
+
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(
                 12,
               ),
             ),
           ),
+
           icon: _isOpeningDemo
               ? const SizedBox(
                   width: 14,
+
                   height: 14,
+
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
                   ),
                 )
               : const Icon(
                   Icons.play_arrow_rounded,
+
                   size: 17,
                 ),
+
           label: Text(
             _isOpeningDemo
                 ? 'CARREGANDO...'
                 : 'OUVIR DEMO',
+
             style: const TextStyle(
               fontSize: 10,
+
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -757,10 +883,13 @@ class _DiscoveryCardWidgetState
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
+
       children: [
         const Icon(
           Icons.person_search_outlined,
+
           color: Colors.white38,
+
           size: 13,
         ),
 
@@ -770,9 +899,12 @@ class _DiscoveryCardWidgetState
 
         const Text(
           'Procura:',
+
           style: TextStyle(
             color: Colors.white38,
+
             fontSize: 9,
+
             fontWeight: FontWeight.w500,
           ),
         ),
@@ -792,10 +924,14 @@ class _DiscoveryCardWidgetState
                 .join(
                   ' • ',
                 ),
+
             maxLines: 1,
+
             overflow: TextOverflow.ellipsis,
+
             style: const TextStyle(
               color: Colors.white70,
+
               fontSize: 9,
             ),
           ),
@@ -805,13 +941,58 @@ class _DiscoveryCardWidgetState
             3)
           Text(
             '+${roles.length - 3}',
+
             style: TextStyle(
               color: widget.controller.accentNeon,
+
               fontSize: 9,
+
               fontWeight: FontWeight.bold,
             ),
           ),
       ],
+    );
+  }
+}
+
+// ============================================================
+// ONLINE DOT
+// ============================================================
+
+class _OnlineDot
+    extends
+        StatelessWidget {
+  const _OnlineDot();
+
+  @override
+  Widget build(
+    BuildContext context,
+  ) {
+    return Container(
+      width: 7,
+
+      height: 7,
+
+      decoration: BoxDecoration(
+        color: const Color(
+          0xFF34D399,
+        ),
+
+        shape: BoxShape.circle,
+
+        boxShadow: [
+          BoxShadow(
+            color:
+                const Color(
+                  0xFF34D399,
+                ).withValues(
+                  alpha: 0.50,
+                ),
+
+            blurRadius: 6,
+          ),
+        ],
+      ),
     );
   }
 }

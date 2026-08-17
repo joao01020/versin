@@ -268,6 +268,46 @@ class ProjectMessageModel {
   }
 
   // ==========================================================
+  // PRAZO PARA APAGAR
+  // ==========================================================
+
+  static const Duration deleteWindow = Duration(
+    hours: 24,
+  );
+
+  DateTime get deleteExpiresAt => createdAt.add(
+    deleteWindow,
+  );
+
+  Duration get remainingDeleteTime {
+    final remaining = deleteExpiresAt.difference(
+      DateTime.now(),
+    );
+
+    if (remaining.isNegative) {
+      return Duration.zero;
+    }
+
+    return remaining;
+  }
+
+  bool get canDelete {
+    return !DateTime.now().isAfter(
+      deleteExpiresAt,
+    );
+  }
+
+  bool get deleteExpired => !canDelete;
+
+  bool get canDeleteText =>
+      isText &&
+      canDelete;
+
+  bool get canDeleteAudio =>
+      isAudio &&
+      canDelete;
+
+  // ==========================================================
   // É VÁLIDA?
   // ==========================================================
 
@@ -681,7 +721,9 @@ class ProjectMessageModel {
         'type: ${_messageTypeToDatabase(type)}, '
         'audioPath: $audioPath, '
         'audioDurationMs: $audioDurationMs, '
-        'createdAt: $createdAt'
+        'createdAt: $createdAt, '
+        'deleteExpiresAt: $deleteExpiresAt, '
+        'canDelete: $canDelete'
         ')';
   }
 }

@@ -5,6 +5,7 @@ import 'package:versin/app/locator.dart';
 import '../../controllers/storage_controller.dart';
 import '../../data/models/stored_work_model.dart';
 import '../../services/storage_hash_service.dart';
+import '../../services/work_storage_service.dart';
 
 class RegisterLyricsPage
     extends
@@ -40,6 +41,11 @@ class _RegisterLyricsPageState
   final StorageHashService _hashService =
       sl<
         StorageHashService
+      >();
+
+  final WorkStorageService _workStorageService =
+      sl<
+        WorkStorageService
       >();
 
   bool _isRegistering = false;
@@ -594,22 +600,44 @@ class _RegisterLyricsPageState
         updatedAt: now,
       );
 
-      final saved = await _storageController.saveWork(
-        work,
+      // ======================================================
+      // SALVAR PERMANENTEMENTE
+      // ======================================================
+      //
+      // Letras não precisam ir para o Cloudflare R2.
+      //
+      // O conteúdo fica diretamente em:
+      //
+      // public.stored_works.lyrics_content
+      //
+      // ======================================================
+
+      final savedWork = await _workStorageService.saveLyrics(
+        work: work,
       );
 
       if (!mounted) {
         return;
       }
 
-      if (!saved) {
-        _showMessage(
-          _storageController.errorMessage ??
-              'Não foi possível registrar a letra.',
-          isError: true,
-        );
+      // ======================================================
+      // SINCRONIZAR LISTA LOCAL
+      // ======================================================
+
+      await _storageController.refresh();
+
+      if (!mounted) {
         return;
       }
+
+      debugPrint(
+        '[STORAGE] Letra permanente salva: '
+        '${savedWork.id}',
+      );
+
+      _showMessage(
+        'Letra registrada permanentemente com sucesso.',
+      );
 
       Navigator.of(
         context,

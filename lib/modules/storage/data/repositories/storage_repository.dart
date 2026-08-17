@@ -1,4 +1,5 @@
 import '../models/stored_work_model.dart';
+import '../../services/storage_hash_service.dart';
 
 // ============================================================
 // STORAGE REPOSITORY
@@ -220,6 +221,12 @@ class InMemoryStorageRepository
     implements
         StorageRepository {
   // ==========================================================
+  // HASH SERVICE
+  // ==========================================================
+
+  final StorageHashService _hashService;
+
+  // ==========================================================
   // BANCO EM MEMÓRIA
   // ==========================================================
 
@@ -227,6 +234,16 @@ class InMemoryStorageRepository
     StoredWorkModel
   >
   _works = [];
+
+  // ==========================================================
+  // CONSTRUTOR
+  // ==========================================================
+
+  InMemoryStorageRepository({
+    StorageHashService? hashService,
+  }) : _hashService =
+           hashService ??
+           StorageHashService();
 
   // ==========================================================
   // LISTAR TODAS
@@ -307,12 +324,14 @@ class InMemoryStorageRepository
   getWorkByHash({
     required String contentHash,
   }) async {
-    final normalizedHash = _normalizeHash(
+    final normalizedHash = _normalizeAndValidateHash(
       contentHash,
     );
 
     for (final work in _works) {
-      if (work.contentHash.toLowerCase() ==
+      if (_normalizeAndValidateHash(
+            work.contentHash,
+          ) ==
           normalizedHash) {
         return work;
       }
@@ -470,8 +489,12 @@ class InMemoryStorageRepository
       ) =>
           storedWork.id !=
               work.id &&
-          storedWork.contentHash.toLowerCase() ==
-              work.contentHash.toLowerCase(),
+          _normalizeAndValidateHash(
+                storedWork.contentHash,
+              ) ==
+              _normalizeAndValidateHash(
+                work.contentHash,
+              ),
     );
 
     if (conflictingHash) {
@@ -624,7 +647,7 @@ class InMemoryStorageRepository
   hashExists({
     required String contentHash,
   }) async {
-    final normalizedHash = _normalizeHash(
+    final normalizedHash = _normalizeAndValidateHash(
       contentHash,
     );
 
@@ -632,7 +655,9 @@ class InMemoryStorageRepository
       (
         work,
       ) =>
-          work.contentHash.toLowerCase() ==
+          _normalizeAndValidateHash(
+            work.contentHash,
+          ) ==
           normalizedHash,
     );
   }
@@ -757,14 +782,25 @@ class InMemoryStorageRepository
       fieldName: 'title',
     );
 
-    _normalizeHash(
+    // ========================================================
+    // HASH DA OBRA
+    // ========================================================
+
+    _normalizeAndValidateHash(
       work.contentHash,
     );
 
-    _normalizeRequiredString(
+    final hashAlgorithm = _normalizeRequiredString(
       work.hashAlgorithm,
       fieldName: 'hashAlgorithm',
     );
+
+    if (hashAlgorithm.toUpperCase() !=
+        StorageHashService.algorithm) {
+      throw ArgumentError(
+        'A obra precisa utilizar ${StorageHashService.algorithm}.',
+      );
+    }
 
     if (work.version <=
         0) {
@@ -788,6 +824,17 @@ class InMemoryStorageRepository
           'Uma letra precisa possuir conteúdo.',
         );
       }
+
+      final hashMatches = _hashService.verifyLyricsWork(
+        lyrics: content,
+        expectedHash: work.contentHash,
+      );
+
+      if (!hashMatches) {
+        throw StateError(
+          'O contentHash não corresponde ao conteúdo da letra.',
+        );
+      }
     }
 
     // ========================================================
@@ -798,11 +845,43 @@ class InMemoryStorageRepository
         StoredWorkType.beat) {
       final path = work.filePath?.trim();
 
+      final fileName = work.fileName?.trim();
+
       if (path ==
               null ||
           path.isEmpty) {
         throw ArgumentError(
-          'Um beat precisa possuir um arquivo.',
+          'Um beat precisa possuir filePath.',
+        );
+      }
+
+      if (fileName ==
+              null ||
+          fileName.isEmpty) {
+        throw ArgumentError(
+          'Um beat precisa possuir fileName.',
+        );
+      }
+
+      if (work.fileSizeBytes ==
+              null ||
+          work.fileSizeBytes! <=
+              0) {
+        throw ArgumentError(
+          'Um beat precisa possuir fileSizeBytes válido.',
+        );
+      }
+
+      final bpm = work.bpm;
+
+      if (bpm !=
+              null &&
+          (bpm <=
+                  0 ||
+              bpm >
+                  400)) {
+        throw ArgumentError(
+          'BPM inválido. Use um valor entre 1 e 400.',
         );
       }
     }
@@ -828,20 +907,15 @@ class InMemoryStorageRepository
   }
 
   // ==========================================================
-  // NORMALIZAR HASH
+  // NORMALIZAR + VALIDAR HASH
   // ==========================================================
 
-  String _normalizeHash(
+  String _normalizeAndValidateHash(
     String value,
   ) {
-    final normalized = value.trim().toLowerCase();
-
-    if (normalized.isEmpty) {
-      throw ArgumentError(
-        'contentHash não pode ser vazio.',
-      );
-    }
-
-    return normalized;
+    return _hashService.requireValidSha256(
+      value,
+      fieldName: 'contentHash',
+    );
   }
 }

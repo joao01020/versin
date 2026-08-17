@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:flutter/material.dart';
 
@@ -7,6 +9,7 @@ import '../../controllers/storage_controller.dart';
 import '../../data/models/stored_work_model.dart';
 import '../../services/storage_file_service.dart';
 import '../../services/storage_hash_service.dart';
+import '../../services/work_storage_service.dart';
 
 // ============================================================
 // REGISTER BEATS PAGE
@@ -23,8 +26,8 @@ import '../../services/storage_hash_service.dart';
 // - gerar SHA-256;
 // - impedir registro duplicado;
 // - criar StoredWorkModel;
-// - copiar o beat para o armazenamento local;
-// - salvar através do StorageController.
+// - enviar o beat permanentemente para Cloudflare R2;
+// - salvar os metadados em stored_works.
 //
 // ============================================================
 
@@ -76,6 +79,11 @@ class _RegisterBeatsPageState
   final StorageFileService _fileService =
       sl<
         StorageFileService
+      >();
+
+  final WorkStorageService _workStorageService =
+      sl<
+        WorkStorageService
       >();
 
   // ==========================================================
@@ -1240,8 +1248,14 @@ class _RegisterBeatsPageState
   >
   _registerBeat() async {
     final file = _selectedFile;
+
     final title = _titleController.text.trim();
+
     final bpmText = _bpmController.text.trim();
+
+    // ========================================================
+    // ARQUIVO
+    // ========================================================
 
     if (file ==
         null) {
@@ -1249,16 +1263,26 @@ class _RegisterBeatsPageState
         'Selecione ou arraste um beat antes de registrar.',
         isError: true,
       );
+
       return;
     }
+
+    // ========================================================
+    // TÍTULO
+    // ========================================================
 
     if (title.isEmpty) {
       _showMessage(
         'Digite o título do beat.',
         isError: true,
       );
+
       return;
     }
+
+    // ========================================================
+    // BPM
+    // ========================================================
 
     final bpm = bpmText.isEmpty
         ? null
@@ -1270,23 +1294,31 @@ class _RegisterBeatsPageState
         (bpm ==
                 null ||
             bpm <=
-                0)) {
+                0 ||
+            bpm >
+                400)) {
       _showMessage(
-        'Digite um BPM válido.',
+        'Digite um BPM válido entre 1 e 400.',
         isError: true,
       );
+
       return;
     }
+
+    // ========================================================
+    // USUÁRIO
+    // ========================================================
 
     final userId = _storageController.currentUserId;
 
     if (userId ==
             null ||
-        userId.isEmpty) {
+        userId.trim().isEmpty) {
       _showMessage(
         'Usuário do armazenamento não inicializado.',
         isError: true,
       );
+
       return;
     }
 
@@ -1296,18 +1328,25 @@ class _RegisterBeatsPageState
       },
     );
 
-    StorageFileInfo? localFile;
-
     try {
-      if (!await _fileService.exists(
+      // ======================================================
+      // VALIDAR ARQUIVO
+      // ======================================================
+
+      final exists = await _fileService.exists(
         file.path,
-      )) {
+      );
+
+      if (!exists) {
         throw StateError(
           'O arquivo selecionado não existe mais.',
         );
       }
 
-      // Gera o hash do arquivo original antes da cópia.
+      // ======================================================
+      // HASH SHA-256
+      // ======================================================
+
       final contentHash = await _hashService.hashFile(
         file.path,
       );
@@ -1316,38 +1355,51 @@ class _RegisterBeatsPageState
         contentHash,
       );
 
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       if (alreadyExists) {
         _showMessage(
           'Este beat já possui um registro com o mesmo hash.',
           isError: true,
         );
+
         return;
       }
 
+      // ======================================================
+      // ID
+      // ======================================================
+
       final now = DateTime.now().toUtc();
+
       final workId = 'beat_${now.microsecondsSinceEpoch}';
 
-      // Copia o arquivo para o diretório privado local do Versin.
-      localFile = await _fileService.saveBeatLocally(
-        sourcePath: file.path,
-        workId: workId,
-      );
+      // ======================================================
+      // BYTES
+      // ======================================================
+      //
+      // Não fazemos mais uma cópia local permanente.
+      //
+      // Os bytes serão enviados pelo BeatStorageService para
+      // uma URL assinada e armazenados no Cloudflare R2.
+      //
+      // ======================================================
 
-      // Confirma que a cópia é exatamente o mesmo arquivo.
-      final localHash = await _hashService.hashFile(
-        localFile.path,
-      );
+      final bytes = await File(
+        file.path,
+      ).readAsBytes();
 
-      if (!_hashService.hashesMatch(
-        contentHash,
-        localHash,
-      )) {
+      if (bytes.isEmpty) {
         throw StateError(
-          'A cópia local do beat falhou na verificação de integridade.',
+          'O beat selecionado está vazio.',
         );
       }
+
+      // ======================================================
+      // MODELO
+      // ======================================================
 
       final work = StoredWorkModel(
         id: workId,
@@ -1359,36 +1411,52 @@ class _RegisterBeatsPageState
         hashAlgorithm: StorageHashService.algorithm,
         version: 1,
         integrityVerified: true,
-        filePath: localFile.path,
-        fileName: localFile.fileName,
-        mimeType: localFile.mimeType,
-        fileSizeBytes: localFile.sizeBytes,
+        fileName: file.fileName,
+        mimeType: file.mimeType,
+        fileSizeBytes: file.sizeBytes,
         bpm: bpm,
         createdAt: now,
         updatedAt: now,
       );
 
-      final saved = await _storageController.saveWork(
-        work,
+      // ======================================================
+      // SALVAR PERMANENTEMENTE
+      // ======================================================
+      //
+      // 1. envia o arquivo ao Cloudflare R2;
+      // 2. recebe objectKey;
+      // 3. coloca objectKey em filePath;
+      // 4. salva a obra em public.stored_works.
+      //
+      // ======================================================
+
+      final savedWork = await _workStorageService.saveBeat(
+        work: work,
+        bytes: bytes,
       );
 
-      if (!mounted) return;
-
-      if (!saved) {
-        await _fileService.deleteLocalFile(
-          localFile.path,
-        );
-
-        _showMessage(
-          _storageController.errorMessage ??
-              'Não foi possível registrar o beat.',
-          isError: true,
-        );
+      if (!mounted) {
         return;
       }
 
+      // ======================================================
+      // SINCRONIZAR LISTA LOCAL
+      // ======================================================
+
+      await _storageController.refresh();
+
+      if (!mounted) {
+        return;
+      }
+
+      debugPrint(
+        '[STORAGE] Beat permanente salvo: '
+        '${savedWork.id} | '
+        '${savedWork.filePath}',
+      );
+
       _showMessage(
-        'Beat salvo localmente e registrado com sucesso.',
+        'Beat registrado permanentemente com sucesso.',
       );
 
       Navigator.of(
@@ -1399,18 +1467,9 @@ class _RegisterBeatsPageState
     } catch (
       error
     ) {
-      if (localFile !=
-          null) {
-        try {
-          await _fileService.deleteLocalFile(
-            localFile.path,
-          );
-        } catch (
-          _
-        ) {}
+      if (!mounted) {
+        return;
       }
-
-      if (!mounted) return;
 
       _showMessage(
         'Erro ao registrar o beat: $error',

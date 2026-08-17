@@ -45,9 +45,14 @@ import 'package:versin/modules/studio/controllers/studio_controller.dart';
 // ============================================================
 
 import 'package:versin/modules/storage/controllers/storage_controller.dart';
+
 import 'package:versin/modules/storage/data/repositories/storage_repository.dart';
+import 'package:versin/modules/storage/data/repositories/supabase_storage_repository.dart';
+
+import 'package:versin/modules/storage/services/beat_storage_service.dart';
 import 'package:versin/modules/storage/services/storage_file_service.dart';
 import 'package:versin/modules/storage/services/storage_hash_service.dart';
+import 'package:versin/modules/storage/services/work_storage_service.dart';
 
 // ============================================================
 // REPOSITÓRIOS
@@ -89,41 +94,6 @@ setupLocator() {
 
   // ==========================================================
   // ACTIVITIES MODULE
-  // ==========================================================
-  //
-  // Fluxo:
-  //
-  // Dashboard / Outros módulos
-  //              ↓
-  // RecentActivityService
-  //              ↓
-  // RecentActivityController
-  //              ↓
-  // RecentActivityRepository
-  //              ↓
-  // RecentActivityRepositoryImpl
-  //              ↓
-  // RecentActivityRemoteDatasource
-  //              ↓
-  // Supabase
-  //
-  // IMPORTANTE:
-  //
-  // RecentActivityRepository precisa ser registrado antes do
-  // RecentActivityController.
-  //
-  // RecentActivityController é LazySingleton porque:
-  //
-  // - Dashboard;
-  // - Realtime;
-  // - Service;
-  // - outros módulos;
-  //
-  // precisam compartilhar a mesma instância e o mesmo estado.
-  //
-  // RecentActivityService também é LazySingleton porque deve
-  // sempre utilizar esse mesmo Controller.
-  //
   // ==========================================================
 
   sl.registerLazySingleton<
@@ -244,15 +214,41 @@ setupLocator() {
   // ==========================================================
   // STORAGE MODULE
   // ==========================================================
-
-  sl.registerLazySingleton<
-    StorageRepository
-  >(
-    () => InMemoryStorageRepository(),
-  );
+  //
+  // FLUXO:
+  //
+  // StorageHashService
+  //        ↓
+  // SupabaseStorageRepository
+  //        ↓
+  // StorageController
+  //
+  // E:
+  //
+  // BeatStorageService
+  //        ↓
+  // WorkStorageService
+  //        ↓
+  // R2 + Supabase
+  //
+  // ==========================================================
 
   // ==========================================================
   // STORAGE HASH SERVICE
+  // ==========================================================
+  //
+  // IMPORTANTE:
+  //
+  // Deve ser registrado ANTES do StorageRepository.
+  //
+  // Dessa forma:
+  //
+  // - telas;
+  // - WorkStorageService;
+  // - SupabaseStorageRepository;
+  //
+  // utilizam a mesma instância.
+  //
   // ==========================================================
 
   sl.registerLazySingleton<
@@ -264,6 +260,20 @@ setupLocator() {
   // ==========================================================
   // STORAGE FILE SERVICE
   // ==========================================================
+  //
+  // Continua responsável por:
+  //
+  // - selecionar arquivo;
+  // - drag & drop;
+  // - inspecionar arquivo;
+  // - nome;
+  // - extensão;
+  // - MIME;
+  // - tamanho.
+  //
+  // O arquivo permanente do beat fica no R2.
+  //
+  // ==========================================================
 
   sl.registerLazySingleton<
     StorageFileService
@@ -272,7 +282,116 @@ setupLocator() {
   );
 
   // ==========================================================
+  // STORAGE REPOSITORY
+  // ==========================================================
+  //
+  // Persistência real:
+  //
+  // SupabaseStorageRepository
+  //        ↓
+  // public.stored_works
+  //
+  // O repository também valida:
+  //
+  // - contentHash;
+  // - SHA-256;
+  // - proprietário;
+  // - conteúdo de letras;
+  // - metadados dos beats.
+  //
+  // ==========================================================
+
+  sl.registerLazySingleton<
+    StorageRepository
+  >(
+    () => SupabaseStorageRepository(
+      hashService:
+          sl<
+            StorageHashService
+          >(),
+    ),
+  );
+
+  // ==========================================================
+  // BEAT STORAGE SERVICE
+  // ==========================================================
+  //
+  // Responsável por:
+  //
+  // Flutter
+  //    ↓
+  // Edge Function
+  //    ↓
+  // URL assinada
+  //    ↓
+  // Cloudflare R2
+  //
+  // ==========================================================
+
+  sl.registerLazySingleton<
+    BeatStorageService
+  >(
+    () => BeatStorageService(),
+  );
+
+  // ==========================================================
+  // WORK STORAGE SERVICE
+  // ==========================================================
+  //
+  // Coordena a persistência completa:
+  //
+  // LETRA
+  //
+  // conteúdo
+  //    ↓
+  // SHA-256
+  //    ↓
+  // stored_works
+  //
+  //
+  // BEAT
+  //
+  // arquivo
+  //    ↓
+  // SHA-256
+  //    ↓
+  // Cloudflare R2
+  //    ↓
+  // objectKey
+  //    ↓
+  // stored_works.file_path
+  //
+  // ==========================================================
+
+  sl.registerLazySingleton<
+    WorkStorageService
+  >(
+    () => WorkStorageService(
+      repository:
+          sl<
+            StorageRepository
+          >(),
+
+      beatStorageService:
+          sl<
+            BeatStorageService
+          >(),
+    ),
+  );
+
+  // ==========================================================
   // STORAGE CONTROLLER
+  // ==========================================================
+  //
+  // A UI acessa principalmente este controller para:
+  //
+  // - carregar obras;
+  // - listar;
+  // - pesquisar;
+  // - excluir;
+  // - transferir;
+  // - atualizar estado.
+  //
   // ==========================================================
 
   sl.registerLazySingleton<

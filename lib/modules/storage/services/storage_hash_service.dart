@@ -8,20 +8,51 @@ import 'package:crypto/crypto.dart';
 // STORAGE HASH SERVICE
 // ============================================================
 //
-// Responsabilidades:
+// Responsável por:
 //
 // - normalizar letras;
+// - gerar SHA-256 de obras;
 // - gerar SHA-256 de letras;
 // - gerar SHA-256 de textos;
 // - gerar SHA-256 de bytes;
 // - gerar SHA-256 de arquivos;
 // - verificar integridade de letras;
-// - verificar integridade de arquivos.
+// - verificar integridade de beats;
+// - validar hashes SHA-256;
+// - comparar hashes.
+//
+// IMPORTANTE:
+//
+// O contentHash de StoredWorkModel deve representar o conteúdo
+// original da obra:
+//
+// LETRA
+//   conteúdo normalizado da letra
+//       ↓
+//   SHA-256
+//
+// BEAT
+//   bytes exatos do arquivo original
+//       ↓
+//   SHA-256
+//
+// NÃO entram no hash:
+//
+// - título;
+// - BPM;
+// - ownerUserId;
+// - originalAuthorUserId;
+// - data;
+// - nome do arquivo;
+// - filePath.
+//
+// Dessa forma, transferência de propriedade ou alteração de
+// metadados NÃO altera a identidade criptográfica da obra.
 //
 // NÃO é responsabilidade deste service:
 //
 // - salvar no banco;
-// - salvar arquivo;
+// - enviar arquivo ao R2;
 // - alterar StoredWorkModel;
 // - controlar UI;
 // - transferir autoria.
@@ -35,26 +66,22 @@ class StorageHashService {
 
   static const String algorithm = 'SHA-256';
 
+  static const int sha256HexLength = 64;
+
   // ==========================================================
   // NORMALIZAR LETRA
   // ==========================================================
   //
-  // É importante gerar o hash sempre sobre uma forma
-  // previsível do texto.
+  // A mesma letra precisa produzir o mesmo hash em diferentes
+  // sistemas operacionais.
   //
-  // Exemplo:
+  // Por isso:
   //
-  // Windows:
-  // \r\n
+  // \r\n → \n
+  // \r   → \n
   //
-  // Linux:
-  // \n
-  //
-  // Visualmente podem representar a mesma letra,
-  // mas os bytes seriam diferentes.
-  //
-  // Por isso normalizamos as quebras de linha antes
-  // de gerar o SHA-256.
+  // Também removemos espaços no final das linhas e espaços /
+  // quebras extras no começo e final do documento.
   //
   // ==========================================================
 
@@ -64,7 +91,7 @@ class StorageHashService {
     var normalized = content;
 
     // ========================================================
-    // NORMALIZAR QUEBRA DE LINHA
+    // NORMALIZAR QUEBRAS DE LINHA
     // ========================================================
 
     normalized = normalized.replaceAll(
@@ -90,24 +117,48 @@ class StorageHashService {
             line,
           ) => line.replaceFirst(
             RegExp(
-              r'\s+$',
+              r'[ \t]+$',
             ),
             '',
           ),
         )
-        .toList();
+        .toList(
+          growable: false,
+        );
 
     normalized = lines.join(
       '\n',
     );
 
     // ========================================================
-    // REMOVER QUEBRAS EXTRAS NO INÍCIO/FIM
+    // REMOVER ESPAÇO / QUEBRAS EXTRAS NAS EXTREMIDADES
     // ========================================================
 
     normalized = normalized.trim();
 
     return normalized;
+  }
+
+  // ==========================================================
+  // HASH DA OBRA — LETRA
+  // ==========================================================
+  //
+  // Este é o método recomendado para preencher:
+  //
+  // StoredWorkModel.contentHash
+  //
+  // quando:
+  //
+  // type == StoredWorkType.lyrics
+  //
+  // ==========================================================
+
+  String generateLyricsWorkHash(
+    String lyrics,
+  ) {
+    return hashLyrics(
+      lyrics,
+    );
   }
 
   // ==========================================================
@@ -131,47 +182,37 @@ class StorageHashService {
       normalized,
     );
 
-    final digest = sha256.convert(
+    return _digestBytes(
       bytes,
     );
-
-    return digest.toString();
   }
 
   // ==========================================================
-  // GERAR HASH DE TEXTO PARA REGISTRO
+  // COMPATIBILIDADE — REGISTRO DE LETRA
   // ==========================================================
   //
-  // Método usado pela interface de registro de letra.
+  // Mantido porque RegisterLyricsPage já utiliza:
   //
-  // Mantemos este nome para deixar a API do service
-  // mais clara na camada de UI:
-  //
-  // hashService.generateTextHash(...)
-  //
-  // Para letras, reutilizamos hashLyrics() porque ele
-  // já faz a normalização correta do conteúdo.
+  // generateTextHash(...)
   //
   // ==========================================================
 
   String generateTextHash(
     String content,
   ) {
-    return hashLyrics(
+    return generateLyricsWorkHash(
       content,
     );
   }
 
   // ==========================================================
-  // GERAR HASH DE STRING GENÉRICA
+  // HASH DE STRING GENÉRICA
   // ==========================================================
   //
-  // Diferente de hashLyrics():
+  // NÃO normaliza o conteúdo.
   //
-  // Este método NÃO normaliza a string.
-  //
-  // É útil quando queremos que qualquer diferença no texto,
-  // inclusive espaços ou quebras, altere o hash.
+  // Qualquer diferença de espaço, quebra de linha ou caractere
+  // produz outro hash.
   //
   // ==========================================================
 
@@ -184,19 +225,32 @@ class StorageHashService {
       );
     }
 
-    final bytes = utf8.encode(
-      content,
+    return _digestBytes(
+      utf8.encode(
+        content,
+      ),
     );
-
-    return sha256
-        .convert(
-          bytes,
-        )
-        .toString();
   }
 
   // ==========================================================
-  // GERAR HASH DE BYTES
+  // HASH DA OBRA — BEAT EM BYTES
+  // ==========================================================
+  //
+  // Este é o método recomendado quando os bytes já estiverem
+  // carregados em memória.
+  //
+  // ==========================================================
+
+  String generateBeatWorkHashFromBytes(
+    Uint8List bytes,
+  ) {
+    return hashUint8List(
+      bytes,
+    );
+  }
+
+  // ==========================================================
+  // HASH DE BYTES
   // ==========================================================
 
   String hashBytes(
@@ -211,15 +265,13 @@ class StorageHashService {
       );
     }
 
-    return sha256
-        .convert(
-          bytes,
-        )
-        .toString();
+    return _digestBytes(
+      bytes,
+    );
   }
 
   // ==========================================================
-  // GERAR HASH DE UINT8LIST
+  // HASH DE UINT8LIST
   // ==========================================================
 
   String hashUint8List(
@@ -231,20 +283,36 @@ class StorageHashService {
   }
 
   // ==========================================================
-  // GERAR HASH DE ARQUIVO
+  // HASH DA OBRA — BEAT EM ARQUIVO
   // ==========================================================
   //
-  // Útil para:
+  // Este é o método recomendado para preencher:
   //
-  // .wav
-  // .mp3
-  // .flac
-  // .aiff
-  // etc.
+  // StoredWorkModel.contentHash
   //
-  // Para arquivos grandes, usamos stream.
+  // quando:
   //
-  // Isso evita carregar o beat inteiro na RAM.
+  // type == StoredWorkType.beat
+  //
+  // ==========================================================
+
+  Future<
+    String
+  >
+  generateBeatWorkHashFromFile(
+    String filePath,
+  ) {
+    return hashFile(
+      filePath,
+    );
+  }
+
+  // ==========================================================
+  // HASH DE ARQUIVO
+  // ==========================================================
+  //
+  // Usa stream para não carregar arquivos grandes inteiros na
+  // memória apenas para calcular o SHA-256.
   //
   // ==========================================================
 
@@ -290,7 +358,23 @@ class StorageHashService {
         )
         .first;
 
-    return digest.toString();
+    return normalizeHash(
+      digest.toString(),
+    );
+  }
+
+  // ==========================================================
+  // VERIFICAR OBRA — LETRA
+  // ==========================================================
+
+  bool verifyLyricsWork({
+    required String lyrics,
+    required String expectedHash,
+  }) {
+    return verifyLyrics(
+      content: lyrics,
+      expectedHash: expectedHash,
+    );
   }
 
   // ==========================================================
@@ -301,11 +385,13 @@ class StorageHashService {
     required String content,
     required String expectedHash,
   }) {
-    final normalizedExpectedHash = _normalizeHash(
+    final normalizedExpectedHash = normalizeHash(
       expectedHash,
     );
 
-    if (normalizedExpectedHash.isEmpty) {
+    if (!isValidSha256(
+      normalizedExpectedHash,
+    )) {
       return false;
     }
 
@@ -313,23 +399,27 @@ class StorageHashService {
       content,
     );
 
-    return generatedHash ==
-        normalizedExpectedHash;
+    return constantTimeEquals(
+      generatedHash,
+      normalizedExpectedHash,
+    );
   }
 
   // ==========================================================
-  // VERIFICAR HASH DE TEXTO
+  // VERIFICAR TEXTO GENÉRICO
   // ==========================================================
 
   bool verifyText({
     required String content,
     required String expectedHash,
   }) {
-    final normalizedExpectedHash = _normalizeHash(
+    final normalizedExpectedHash = normalizeHash(
       expectedHash,
     );
 
-    if (normalizedExpectedHash.isEmpty) {
+    if (!isValidSha256(
+      normalizedExpectedHash,
+    )) {
       return false;
     }
 
@@ -337,8 +427,24 @@ class StorageHashService {
       content,
     );
 
-    return generatedHash ==
-        normalizedExpectedHash;
+    return constantTimeEquals(
+      generatedHash,
+      normalizedExpectedHash,
+    );
+  }
+
+  // ==========================================================
+  // VERIFICAR OBRA — BEAT EM BYTES
+  // ==========================================================
+
+  bool verifyBeatWorkBytes({
+    required Uint8List bytes,
+    required String expectedHash,
+  }) {
+    return verifyBytes(
+      bytes: bytes,
+      expectedHash: expectedHash,
+    );
   }
 
   // ==========================================================
@@ -352,11 +458,13 @@ class StorageHashService {
     bytes,
     required String expectedHash,
   }) {
-    final normalizedExpectedHash = _normalizeHash(
+    final normalizedExpectedHash = normalizeHash(
       expectedHash,
     );
 
-    if (normalizedExpectedHash.isEmpty) {
+    if (!isValidSha256(
+      normalizedExpectedHash,
+    )) {
       return false;
     }
 
@@ -364,8 +472,27 @@ class StorageHashService {
       bytes,
     );
 
-    return generatedHash ==
-        normalizedExpectedHash;
+    return constantTimeEquals(
+      generatedHash,
+      normalizedExpectedHash,
+    );
+  }
+
+  // ==========================================================
+  // VERIFICAR OBRA — BEAT EM ARQUIVO
+  // ==========================================================
+
+  Future<
+    bool
+  >
+  verifyBeatWorkFile({
+    required String filePath,
+    required String expectedHash,
+  }) {
+    return verifyFile(
+      filePath: filePath,
+      expectedHash: expectedHash,
+    );
   }
 
   // ==========================================================
@@ -379,11 +506,13 @@ class StorageHashService {
     required String filePath,
     required String expectedHash,
   }) async {
-    final normalizedExpectedHash = _normalizeHash(
+    final normalizedExpectedHash = normalizeHash(
       expectedHash,
     );
 
-    if (normalizedExpectedHash.isEmpty) {
+    if (!isValidSha256(
+      normalizedExpectedHash,
+    )) {
       return false;
     }
 
@@ -391,8 +520,10 @@ class StorageHashService {
       filePath,
     );
 
-    return generatedHash ==
-        normalizedExpectedHash;
+    return constantTimeEquals(
+      generatedHash,
+      normalizedExpectedHash,
+    );
   }
 
   // ==========================================================
@@ -401,36 +532,60 @@ class StorageHashService {
   //
   // SHA-256 hexadecimal:
   //
-  // 64 caracteres.
+  // 64 caracteres
+  // 0-9
+  // a-f
   //
   // ==========================================================
 
   bool isValidSha256(
     String hash,
   ) {
-    final normalized = _normalizeHash(
+    final normalized = normalizeHash(
       hash,
     );
 
-    final regex = RegExp(
-      r'^[a-f0-9]{64}$',
-    );
+    if (normalized.length !=
+        sha256HexLength) {
+      return false;
+    }
 
-    return regex.hasMatch(
+    return RegExp(
+      r'^[a-f0-9]{64}$',
+    ).hasMatch(
       normalized,
     );
   }
 
   // ==========================================================
-  // HASH CURTO PARA INTERFACE
+  // EXIGIR SHA-256 VÁLIDO
   // ==========================================================
   //
-  // O banco sempre guarda o hash completo.
+  // Útil antes de persistir dados recebidos de outra camada.
   //
-  // Na interface podemos mostrar:
-  //
-  // 68f84d34...9e21
-  //
+  // ==========================================================
+
+  String requireValidSha256(
+    String hash, {
+    String fieldName = 'contentHash',
+  }) {
+    final normalized = normalizeHash(
+      hash,
+    );
+
+    if (!isValidSha256(
+      normalized,
+    )) {
+      throw ArgumentError(
+        '$fieldName não contém um SHA-256 válido.',
+      );
+    }
+
+    return normalized;
+  }
+
+  // ==========================================================
+  // HASH CURTO PARA INTERFACE
   // ==========================================================
 
   String shortenHash(
@@ -438,12 +593,21 @@ class StorageHashService {
     int startLength = 8,
     int endLength = 4,
   }) {
-    final normalized = _normalizeHash(
+    final normalized = normalizeHash(
       hash,
     );
 
     if (normalized.isEmpty) {
       return '';
+    }
+
+    if (startLength <
+            0 ||
+        endLength <
+            0) {
+      throw ArgumentError(
+        'Os tamanhos do hash curto não podem ser negativos.',
+      );
     }
 
     if (normalized.length <=
@@ -466,37 +630,111 @@ class StorageHashService {
   }
 
   // ==========================================================
-  // COMPARAR DOIS HASHES
+  // COMPARAR HASHES
   // ==========================================================
 
   bool hashesMatch(
     String first,
     String second,
   ) {
-    final firstNormalized = _normalizeHash(
+    final firstNormalized = normalizeHash(
       first,
     );
 
-    final secondNormalized = _normalizeHash(
+    final secondNormalized = normalizeHash(
       second,
     );
 
-    if (firstNormalized.isEmpty ||
-        secondNormalized.isEmpty) {
+    if (!isValidSha256(
+          firstNormalized,
+        ) ||
+        !isValidSha256(
+          secondNormalized,
+        )) {
       return false;
     }
 
-    return firstNormalized ==
-        secondNormalized;
+    return constantTimeEquals(
+      firstNormalized,
+      secondNormalized,
+    );
+  }
+
+  // ==========================================================
+  // COMPARAÇÃO EM TEMPO CONSTANTE
+  // ==========================================================
+  //
+  // Não é estritamente necessário para comparação de hash de
+  // conteúdo público, mas evita comparação caractere-a-caractere
+  // com retorno antecipado e mantém o helper robusto.
+  //
+  // ==========================================================
+
+  bool constantTimeEquals(
+    String first,
+    String second,
+  ) {
+    final a = utf8.encode(
+      first,
+    );
+
+    final b = utf8.encode(
+      second,
+    );
+
+    if (a.length !=
+        b.length) {
+      return false;
+    }
+
+    var difference = 0;
+
+    for (
+      var index = 0;
+      index <
+          a.length;
+      index++
+    ) {
+      difference |=
+          a[index] ^
+          b[index];
+    }
+
+    return difference ==
+        0;
   }
 
   // ==========================================================
   // NORMALIZAR HASH
   // ==========================================================
+  //
+  // Público porque repository/services podem precisar garantir
+  // que o valor persistido esteja sempre em lowercase.
+  //
+  // ==========================================================
 
-  String _normalizeHash(
+  String normalizeHash(
     String hash,
   ) {
     return hash.trim().toLowerCase();
+  }
+
+  // ==========================================================
+  // DIGEST INTERNO
+  // ==========================================================
+
+  String _digestBytes(
+    List<
+      int
+    >
+    bytes,
+  ) {
+    return normalizeHash(
+      sha256
+          .convert(
+            bytes,
+          )
+          .toString(),
+    );
   }
 }

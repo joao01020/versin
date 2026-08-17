@@ -1685,6 +1685,12 @@ class _MatchPageState
   // ============================================================
 
   Widget _buildDiscoveryHeader() {
+    final publicProfile = _publicProfileController.profile;
+
+    final hasPublicProfile =
+        publicProfile !=
+        null;
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
 
@@ -1705,60 +1711,193 @@ class _MatchPageState
           ),
         ),
 
-        Stack(
-          clipBehavior: Clip.none,
+        const SizedBox(
+          width: 12,
+        ),
+
+        // ======================================================
+        // AÇÕES DO CANTO SUPERIOR
+        // ======================================================
+        Row(
+          mainAxisSize: MainAxisSize.min,
 
           children: [
-            IconButton(
-              tooltip: 'Filtros',
+            // ==================================================
+            // PERFIL PÚBLICO
+            // ==================================================
+            Tooltip(
+              message: 'Meu perfil público',
 
-              onPressed: _openFilters,
+              child: Material(
+                color: Colors.transparent,
 
-              icon: Icon(
-                Icons.tune,
+                child: InkWell(
+                  onTap: _openPublicProfile,
 
-                color: _filterState.hasActiveFilters
-                    ? _matchController.accentNeon
-                    : Colors.white54,
-              ),
-            ),
-
-            if (_filterState.hasActiveFilters)
-              Positioned(
-                top: 2,
-
-                right: 2,
-
-                child: Container(
-                  constraints: const BoxConstraints(
-                    minWidth: 16,
-                    minHeight: 16,
+                  borderRadius: BorderRadius.circular(
+                    14,
                   ),
 
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 4,
-                  ),
+                  child: Container(
+                    width: 42,
 
-                  decoration: BoxDecoration(
-                    color: _matchController.accentNeon,
+                    height: 42,
 
-                    borderRadius: BorderRadius.circular(
-                      20,
+                    alignment: Alignment.center,
+
+                    decoration: BoxDecoration(
+                      color: hasPublicProfile
+                          ? _matchController.accentNeon.withValues(
+                              alpha: 0.10,
+                            )
+                          : Colors.white.withValues(
+                              alpha: 0.035,
+                            ),
+
+                      borderRadius: BorderRadius.circular(
+                        14,
+                      ),
+
+                      border: Border.all(
+                        color: hasPublicProfile
+                            ? _matchController.accentNeon.withValues(
+                                alpha: 0.30,
+                              )
+                            : Colors.white.withValues(
+                                alpha: 0.06,
+                              ),
+                      ),
                     ),
-                  ),
 
-                  alignment: Alignment.center,
+                    child: Icon(
+                      Icons.account_circle_outlined,
 
-                  child: Text(
-                    '${_filterState.activeFilterCount}',
-                    style: const TextStyle(
-                      color: Colors.black,
-                      fontSize: 9,
-                      fontWeight: FontWeight.bold,
+                      size: 22,
+
+                      color: hasPublicProfile
+                          ? _matchController.accentNeon
+                          : Colors.white54,
                     ),
                   ),
                 ),
               ),
+            ),
+
+            const SizedBox(
+              width: 6,
+            ),
+
+            // ==================================================
+            // FILTROS
+            // ==================================================
+            Stack(
+              clipBehavior: Clip.none,
+
+              children: [
+                Material(
+                  color: Colors.transparent,
+
+                  child: InkWell(
+                    onTap: _openFilters,
+
+                    borderRadius: BorderRadius.circular(
+                      14,
+                    ),
+
+                    child: Container(
+                      width: 42,
+
+                      height: 42,
+
+                      alignment: Alignment.center,
+
+                      decoration: BoxDecoration(
+                        color: _filterState.hasActiveFilters
+                            ? _matchController.accentNeon.withValues(
+                                alpha: 0.10,
+                              )
+                            : Colors.white.withValues(
+                                alpha: 0.035,
+                              ),
+
+                        borderRadius: BorderRadius.circular(
+                          14,
+                        ),
+
+                        border: Border.all(
+                          color: _filterState.hasActiveFilters
+                              ? _matchController.accentNeon.withValues(
+                                  alpha: 0.30,
+                                )
+                              : Colors.white.withValues(
+                                  alpha: 0.06,
+                                ),
+                        ),
+                      ),
+
+                      child: Icon(
+                        Icons.tune,
+
+                        size: 20,
+
+                        color: _filterState.hasActiveFilters
+                            ? _matchController.accentNeon
+                            : Colors.white54,
+                      ),
+                    ),
+                  ),
+                ),
+
+                if (_filterState.hasActiveFilters)
+                  Positioned(
+                    top: -3,
+
+                    right: -3,
+
+                    child: Container(
+                      constraints: const BoxConstraints(
+                        minWidth: 17,
+
+                        minHeight: 17,
+                      ),
+
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 4,
+                      ),
+
+                      decoration: BoxDecoration(
+                        color: _matchController.accentNeon,
+
+                        borderRadius: BorderRadius.circular(
+                          20,
+                        ),
+
+                        border: Border.all(
+                          color: const Color(
+                            0xFF0D0B1F,
+                          ),
+
+                          width: 2,
+                        ),
+                      ),
+
+                      alignment: Alignment.center,
+
+                      child: Text(
+                        '${_filterState.activeFilterCount}',
+
+                        style: const TextStyle(
+                          color: Colors.black,
+
+                          fontSize: 8,
+
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ],
         ),
       ],

@@ -1312,6 +1312,10 @@ class _ChatViewState
   void _showMessageOptions(
     ProjectMessageModel message,
   ) {
+    final canDelete = _controller.canDeleteMessage(
+      message,
+    );
+
     showModalBottomSheet<
       void
     >(
@@ -1326,40 +1330,176 @@ class _ChatViewState
             bottomSheetContext,
           ) {
             return SafeArea(
-              child: ListTile(
-                leading: const Icon(
-                  Icons.delete_outline,
-                  color: Colors.redAccent,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  vertical: 6,
                 ),
 
-                title: const Text(
-                  'Apagar mensagem',
-                  style: TextStyle(
-                    color: Colors.white,
-                  ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+
+                  children: [
+                    ListTile(
+                      leading: Icon(
+                        canDelete
+                            ? Icons.delete_outline_rounded
+                            : Icons.lock_clock_outlined,
+                        color: canDelete
+                            ? Colors.redAccent
+                            : Colors.white30,
+                      ),
+
+                      title: Text(
+                        canDelete
+                            ? message.isAudio
+                                  ? 'Apagar áudio'
+                                  : 'Apagar mensagem'
+                            : 'Não é mais possível apagar',
+                        style: TextStyle(
+                          color: canDelete
+                              ? Colors.white
+                              : Colors.white38,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+
+                      subtitle: Text(
+                        canDelete
+                            ? 'Você pode apagar durante as primeiras 24 horas.'
+                            : 'O prazo de 24 horas para apagar terminou.',
+                        style: TextStyle(
+                          color: Colors.white.withValues(
+                            alpha: 0.35,
+                          ),
+                          fontSize: 11,
+                        ),
+                      ),
+
+                      onTap: canDelete
+                          ? () async {
+                              Navigator.pop(
+                                bottomSheetContext,
+                              );
+
+                              final confirmed = await _confirmDeleteMessage(
+                                message,
+                              );
+
+                              if (!confirmed ||
+                                  !mounted) {
+                                return;
+                              }
+
+                              final deleted = await _controller.deleteMessage(
+                                message.id,
+                              );
+
+                              if (!mounted) {
+                                return;
+                              }
+
+                              if (!deleted) {
+                                _showError(
+                                  _controller.errorMessage ??
+                                      'Não foi possível apagar a mensagem.',
+                                );
+                              }
+                            }
+                          : null,
+                    ),
+                  ],
                 ),
-
-                onTap: () async {
-                  Navigator.pop(
-                    bottomSheetContext,
-                  );
-
-                  final deleted = await _controller.deleteMessage(
-                    message.id,
-                  );
-
-                  if (!deleted &&
-                      mounted) {
-                    _showError(
-                      _controller.errorMessage ??
-                          'Não foi possível apagar a mensagem.',
-                    );
-                  }
-                },
               ),
             );
           },
     );
+  }
+
+  // ==========================================================
+  // CONFIRMAR EXCLUSÃO
+  // ==========================================================
+
+  Future<
+    bool
+  >
+  _confirmDeleteMessage(
+    ProjectMessageModel message,
+  ) async {
+    final result =
+        await showDialog<
+          bool
+        >(
+          context: context,
+
+          builder:
+              (
+                dialogContext,
+              ) {
+                return AlertDialog(
+                  backgroundColor: const Color(
+                    0xFF202020,
+                  ),
+
+                  title: Text(
+                    message.isAudio
+                        ? 'Apagar áudio?'
+                        : 'Apagar mensagem?',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+
+                  content: Text(
+                    message.isAudio
+                        ? 'O áudio será removido do chat e não poderá ser recuperado.'
+                        : 'A mensagem será removida do chat e não poderá ser recuperada.',
+                    style: const TextStyle(
+                      color: Colors.white60,
+                      fontSize: 13,
+                      height: 1.35,
+                    ),
+                  ),
+
+                  actions: [
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pop(
+                          dialogContext,
+                          false,
+                        );
+                      },
+                      child: const Text(
+                        'Cancelar',
+                        style: TextStyle(
+                          color: Colors.white54,
+                        ),
+                      ),
+                    ),
+
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pop(
+                          dialogContext,
+                          true,
+                        );
+                      },
+                      child: const Text(
+                        'Apagar',
+                        style: TextStyle(
+                          color: Colors.redAccent,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
+        );
+
+    return result ??
+        false;
   }
 
   // ==========================================================

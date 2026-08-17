@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../call/views/call_view.dart';
 import '../controllers/networking_controller.dart';
-import 'sub_features/call_view.dart';
 import 'sub_features/chat_view.dart';
 import 'sub_features/contract_view.dart';
 import 'sub_features/members_view.dart';
@@ -296,5 +296,12 @@ class _NetworkingSessionViewState
         ],
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+
+    super.dispose();
   }
 }

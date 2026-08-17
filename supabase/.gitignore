@@ -1,0 +1,235 @@
+# ============================================================
+# VERSIN - GITIGNORE
+# Flutter + Dart + Supabase + Node.js
+# ============================================================
+
+
+# ============================================================
+# SEGREDOS / VARIÁVEIS DE AMBIENTE
+# ============================================================
+
+.env
+.env.*
+.env.local
+.env.*.local
+
+# dotenvx
+.env.keys
+
+# Permite somente um modelo sem credenciais reais
+!.env.example
+
+
+# ============================================================
+# CHAVES / CERTIFICADOS / CREDENCIAIS
+# ============================================================
+
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+
+credentials.json
+service-account.json
+service_account.json
+
+secrets.json
+secrets.yaml
+secrets.yml
+
+
+# ============================================================
+# SUPABASE
+# ============================================================
+
+.branches
+.temp
+
+.supabase/
+
+supabase/.branches/
+supabase/.temp/
+
+# Arquivos locais que podem conter configuração sensível
+supabase/.env
+supabase/.env.*
+supabase/functions/.env
+supabase/functions/.env.*
+
+
+# ============================================================
+# NODE.JS
+# ============================================================
+
+node_modules/
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+.npm/
+.yarn/cache/
+.pnpm-store/
+
+
+# ============================================================
+# FLUTTER / DART
+# ============================================================
+
+.dart_tool/
+.packages
+.pub/
+.pub-cache/
+
+build/
+
+flutter_export_environment.sh
+
+.flutter-plugins
+.flutter-plugins-dependencies
+
+
+# ============================================================
+# FLUTTER - GENERATED
+# ============================================================
+
+**/generated_plugin_registrant.dart
+
+ios/Flutter/Generated.xcconfig
+ios/Flutter/ephemeral/
+
+macos/Flutter/ephemeral/
+
+windows/flutter/ephemeral/
+
+linux/flutter/ephemeral/
+
+
+# ============================================================
+# ANDROID
+# ============================================================
+
+android/.gradle/
+android/local.properties
+
+*.keystore
+*.jks
+
+
+# ============================================================
+# IOS / MACOS
+# ============================================================
+
+ios/Pods/
+macos/Pods/
+
+ios/.symlinks/
+macos/.symlinks/
+
+DerivedData/
+
+
+# ============================================================
+# IDE - VS CODE
+# ============================================================
+
+.vscode/
+
+*.code-workspace
+
+
+# ============================================================
+# IDE - INTELLIJ / ANDROID STUDIO
+# ============================================================
+
+.idea/
+
+*.iml
+*.ipr
+*.iws
+
+
+# ============================================================
+# SISTEMA OPERACIONAL
+# ============================================================
+
+.DS_Store
+.AppleDouble
+.LSOverride
+
+Thumbs.db
+Desktop.ini
+
+*~
+
+
+# ============================================================
+# LOGS
+# ============================================================
+
+*.log
+
+logs/
+
+
+# ============================================================
+# TEMPORÁRIOS / CACHE
+# ============================================================
+
+.cache/
+tmp/
+temp/
+
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+
+
+# ============================================================
+# COVERAGE / TESTES
+# ============================================================
+
+coverage/
+
+lcov.info
+
+
+# ============================================================
+# ARQUIVOS DE BANCO LOCAL
+# ============================================================
+
+*.db
+*.sqlite
+*.sqlite3
+
+
+# ============================================================
+# BACKUPS
+# ============================================================
+
+*.backup
+*.dump
+*.sql.gz
+
+
+# ============================================================
+# IMPORTANTE
+#
+# NÃO IGNORAR:
+#
+# pubspec.yaml
+# pubspec.lock
+# package.json
+# package-lock.json
+# supabase/config.toml
+# supabase/migrations/
+# supabase/functions/
+#
+# Esses arquivos fazem parte do projeto e devem ser
+# versionados normalmente.
+# ===========================================================

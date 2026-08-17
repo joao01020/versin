@@ -121,11 +121,8 @@ class ProjectChatService {
   // CONSTRUTOR
   // ==========================================================
 
-  ProjectChatService({
-    SupabaseClient? supabase,
-  }) : _supabase =
-           supabase ??
-           Supabase.instance.client;
+  ProjectChatService({SupabaseClient? supabase})
+    : _supabase = supabase ?? Supabase.instance.client;
 
   // ==========================================================
   // USUÁRIO ATUAL
@@ -134,9 +131,7 @@ class ProjectChatService {
   String? get currentUserId {
     final id = _supabase.auth.currentUser?.id.trim();
 
-    if (id ==
-            null ||
-        id.isEmpty) {
+    if (id == null || id.isEmpty) {
       return null;
     }
 
@@ -150,11 +145,8 @@ class ProjectChatService {
   String requireCurrentUserId() {
     final id = currentUserId;
 
-    if (id ==
-        null) {
-      throw StateError(
-        'Usuário não autenticado.',
-      );
+    if (id == null) {
+      throw StateError('Usuário não autenticado.');
     }
 
     return id;
@@ -183,18 +175,10 @@ class ProjectChatService {
   //
   // ==========================================================
 
-  Stream<
-    List<
-      ProjectMessageModel
-    >
-  >
-  streamMessages({
+  Stream<List<ProjectMessageModel>> streamMessages({
     required String projectId,
   }) {
-    final normalizedProjectId = _required(
-      projectId,
-      'projectId',
-    );
+    final normalizedProjectId = _required(projectId, 'projectId');
 
     // ========================================================
     // AUTH
@@ -203,83 +187,47 @@ class ProjectChatService {
     requireCurrentUserId();
 
     return _supabase
-        .from(
-          _table,
-        )
-        .stream(
-          primaryKey: [
-            'id',
-          ],
-        )
-        .eq(
-          'project_id',
-          normalizedProjectId,
-        )
-        .order(
-          'created_at',
-          ascending: true,
-        )
-        .map(
-          (
-            rows,
-          ) {
-            final messages =
-                <
-                  ProjectMessageModel
-                >[];
+        .from(_table)
+        .stream(primaryKey: ['id'])
+        .eq('project_id', normalizedProjectId)
+        .order('created_at', ascending: true)
+        .map((rows) {
+          final messages = <ProjectMessageModel>[];
 
-            for (final row in rows) {
-              final message = ProjectMessageModel.fromMap(
-                Map<
-                  String,
-                  dynamic
-                >.from(
-                  row,
-                ),
-              );
+          for (final row in rows) {
+            final message = ProjectMessageModel.fromMap(
+              Map<String, dynamic>.from(row),
+            );
 
-              // ==================================================
-              // VALIDAR ID
-              // ==================================================
+            // ==================================================
+            // VALIDAR ID
+            // ==================================================
 
-              if (message.id.isEmpty) {
-                continue;
-              }
-
-              // ==================================================
-              // VALIDAR PROJECT
-              // ==================================================
-
-              if (message.projectId !=
-                  normalizedProjectId) {
-                continue;
-              }
-
-              messages.add(
-                message,
-              );
+            if (message.id.isEmpty) {
+              continue;
             }
 
             // ==================================================
-            // ORDENAR DEFENSIVAMENTE
+            // VALIDAR PROJECT
             // ==================================================
 
-            messages.sort(
-              (
-                first,
-                second,
-              ) => first.createdAt.compareTo(
-                second.createdAt,
-              ),
-            );
+            if (message.projectId != normalizedProjectId) {
+              continue;
+            }
 
-            return List<
-              ProjectMessageModel
-            >.unmodifiable(
-              messages,
-            );
-          },
-        );
+            messages.add(message);
+          }
+
+          // ==================================================
+          // ORDENAR DEFENSIVAMENTE
+          // ==================================================
+
+          messages.sort(
+            (first, second) => first.createdAt.compareTo(second.createdAt),
+          );
+
+          return List<ProjectMessageModel>.unmodifiable(messages);
+        });
   }
 
   // ==========================================================
@@ -299,19 +247,11 @@ class ProjectChatService {
   //
   // ==========================================================
 
-  Future<
-    List<
-      ProjectMessageModel
-    >
-  >
-  getMessages({
+  Future<List<ProjectMessageModel>> getMessages({
     required String projectId,
     int limit = defaultHistoryLimit,
   }) async {
-    final normalizedProjectId = _required(
-      projectId,
-      'projectId',
-    );
+    final normalizedProjectId = _required(projectId, 'projectId');
 
     // ========================================================
     // AUTH
@@ -323,58 +263,32 @@ class ProjectChatService {
     // LIMIT
     // ========================================================
 
-    final normalizedLimit = limit.clamp(
-      1,
-      maxHistoryLimit,
-    );
+    final normalizedLimit = limit.clamp(1, maxHistoryLimit);
 
     try {
       final response = await _supabase
-          .from(
-            _table,
-          )
-          .select(
-            _messageFields,
-          )
-          .eq(
-            'project_id',
-            normalizedProjectId,
-          )
-          .order(
-            'created_at',
-            ascending: false,
-          )
-          .limit(
-            normalizedLimit,
-          );
+          .from(_table)
+          .select(_messageFields)
+          .eq('project_id', normalizedProjectId)
+          .order('created_at', ascending: false)
+          .limit(normalizedLimit);
 
-      final messages =
-          <
-            ProjectMessageModel
-          >[];
+      final messages = <ProjectMessageModel>[];
 
       for (final row in response) {
         final message = ProjectMessageModel.fromMap(
-          Map<
-            String,
-            dynamic
-          >.from(
-            row,
-          ),
+          Map<String, dynamic>.from(row),
         );
 
         if (message.id.isEmpty) {
           continue;
         }
 
-        if (message.projectId !=
-            normalizedProjectId) {
+        if (message.projectId != normalizedProjectId) {
           continue;
         }
 
-        messages.add(
-          message,
-        );
+        messages.add(message);
       }
 
       // ======================================================
@@ -397,18 +311,10 @@ class ProjectChatService {
       //
       // ======================================================
 
-      final ordered = messages.reversed.toList(
-        growable: false,
-      );
+      final ordered = messages.reversed.toList(growable: false);
 
-      return List<
-        ProjectMessageModel
-      >.unmodifiable(
-        ordered,
-      );
-    } on PostgrestException catch (
-      error
-    ) {
+      return List<ProjectMessageModel>.unmodifiable(ordered);
+    } on PostgrestException catch (error) {
       debugPrint(
         '[PROJECT CHAT] '
         'Erro ao carregar mensagens: '
@@ -444,21 +350,13 @@ class ProjectChatService {
   //
   // ==========================================================
 
-  Future<
-    ProjectMessageModel
-  >
-  sendMessage({
+  Future<ProjectMessageModel> sendMessage({
     required String projectId,
     required String content,
   }) async {
-    final normalizedProjectId = _required(
-      projectId,
-      'projectId',
-    );
+    final normalizedProjectId = _required(projectId, 'projectId');
 
-    final normalizedContent = _normalizeMessage(
-      content,
-    );
+    final normalizedContent = _normalizeMessage(content);
 
     final userId = requireCurrentUserId();
 
@@ -468,21 +366,15 @@ class ProjectChatService {
       // ========================================================
 
       final response = await _supabase
-          .from(
-            _table,
-          )
-          .insert(
-            {
-              'project_id': normalizedProjectId,
+          .from(_table)
+          .insert({
+            'project_id': normalizedProjectId,
 
-              'sender_id': userId,
+            'sender_id': userId,
 
-              'content': normalizedContent,
-            },
-          )
-          .select(
-            _messageFields,
-          )
+            'content': normalizedContent,
+          })
+          .select(_messageFields)
           .single();
 
       // ========================================================
@@ -490,12 +382,7 @@ class ProjectChatService {
       // ========================================================
 
       final message = ProjectMessageModel.fromMap(
-        Map<
-          String,
-          dynamic
-        >.from(
-          response,
-        ),
+        Map<String, dynamic>.from(response),
       );
 
       // ========================================================
@@ -503,31 +390,23 @@ class ProjectChatService {
       // ========================================================
 
       if (message.id.isEmpty) {
-        throw StateError(
-          'Mensagem criada sem ID.',
-        );
+        throw StateError('Mensagem criada sem ID.');
       }
 
       // ========================================================
       // VALIDAR PROJECT
       // ========================================================
 
-      if (message.projectId !=
-          normalizedProjectId) {
-        throw StateError(
-          'Mensagem criada em uma Studio Session diferente.',
-        );
+      if (message.projectId != normalizedProjectId) {
+        throw StateError('Mensagem criada em uma Studio Session diferente.');
       }
 
       // ========================================================
       // VALIDAR SENDER
       // ========================================================
 
-      if (message.senderId !=
-          userId) {
-        throw StateError(
-          'Mensagem criada com remetente inesperado.',
-        );
+      if (message.senderId != userId) {
+        throw StateError('Mensagem criada com remetente inesperado.');
       }
 
       debugPrint(
@@ -541,9 +420,7 @@ class ProjectChatService {
       );
 
       return message;
-    } on PostgrestException catch (
-      error
-    ) {
+    } on PostgrestException catch (error) {
       debugPrint(
         '[PROJECT CHAT] '
         'Erro Supabase ao enviar mensagem: '
@@ -564,42 +441,25 @@ class ProjectChatService {
   // ENVIAR MENSAGEM DE ÁUDIO
   // ==========================================================
 
-  Future<
-    ProjectMessageModel
-  >
-  sendAudioMessage({
+  Future<ProjectMessageModel> sendAudioMessage({
     required String projectId,
     required Uint8List audioBytes,
     required int audioDurationMs,
     String extension = 'wav',
     String mimeType = 'audio/wav',
   }) async {
-    final normalizedProjectId = _required(
-      projectId,
-      'projectId',
-    );
+    final normalizedProjectId = _required(projectId, 'projectId');
 
-    final normalizedExtension = _required(
-      extension,
-      'extension',
-    ).toLowerCase();
+    final normalizedExtension = _required(extension, 'extension').toLowerCase();
 
-    final normalizedMimeType = _required(
-      mimeType,
-      'mimeType',
-    ).toLowerCase();
+    final normalizedMimeType = _required(mimeType, 'mimeType').toLowerCase();
 
     if (audioBytes.isEmpty) {
-      throw ArgumentError(
-        'audioBytes não pode ser vazio.',
-      );
+      throw ArgumentError('audioBytes não pode ser vazio.');
     }
 
-    if (audioDurationMs <=
-        0) {
-      throw ArgumentError(
-        'audioDurationMs deve ser maior que zero.',
-      );
+    if (audioDurationMs <= 0) {
+      throw ArgumentError('audioDurationMs deve ser maior que zero.');
     }
 
     final userId = requireCurrentUserId();
@@ -614,9 +474,7 @@ class ProjectChatService {
 
     try {
       await _supabase.storage
-          .from(
-            _audioBucket,
-          )
+          .from(_audioBucket)
           .uploadBinary(
             audioPath,
             audioBytes,
@@ -629,51 +487,32 @@ class ProjectChatService {
       uploaded = true;
 
       final response = await _supabase
-          .from(
-            _table,
-          )
-          .insert(
-            {
-              'project_id': normalizedProjectId,
-              'sender_id': userId,
-              'content': '',
-              'message_type': 'audio',
-              'audio_path': audioPath,
-              'audio_duration_ms': audioDurationMs,
-            },
-          )
-          .select(
-            _messageFields,
-          )
+          .from(_table)
+          .insert({
+            'project_id': normalizedProjectId,
+            'sender_id': userId,
+            'content': '',
+            'message_type': 'audio',
+            'audio_path': audioPath,
+            'audio_duration_ms': audioDurationMs,
+          })
+          .select(_messageFields)
           .single();
 
       final message = ProjectMessageModel.fromMap(
-        Map<
-          String,
-          dynamic
-        >.from(
-          response,
-        ),
+        Map<String, dynamic>.from(response),
       );
 
       if (message.id.isEmpty) {
-        throw StateError(
-          'Mensagem de áudio criada sem ID.',
-        );
+        throw StateError('Mensagem de áudio criada sem ID.');
       }
 
-      if (message.projectId !=
-          normalizedProjectId) {
-        throw StateError(
-          'Mensagem de áudio criada em outra Studio Session.',
-        );
+      if (message.projectId != normalizedProjectId) {
+        throw StateError('Mensagem de áudio criada em outra Studio Session.');
       }
 
-      if (message.senderId !=
-          userId) {
-        throw StateError(
-          'Mensagem de áudio criada com remetente inesperado.',
-        );
+      if (message.senderId != userId) {
+        throw StateError('Mensagem de áudio criada com remetente inesperado.');
       }
 
       debugPrint(
@@ -685,10 +524,7 @@ class ProjectChatService {
       );
 
       return message;
-    } catch (
-      error,
-      stackTrace
-    ) {
+    } catch (error, stackTrace) {
       debugPrint(
         '[PROJECT CHAT] '
         'Erro ao enviar áudio: '
@@ -703,18 +539,8 @@ class ProjectChatService {
 
       if (uploaded) {
         try {
-          await _supabase.storage
-              .from(
-                _audioBucket,
-              )
-              .remove(
-                [
-                  audioPath,
-                ],
-              );
-        } catch (
-          cleanupError
-        ) {
+          await _supabase.storage.from(_audioBucket).remove([audioPath]);
+        } catch (cleanupError) {
           debugPrint(
             '[PROJECT CHAT] '
             'Falha ao remover áudio órfão: '
@@ -741,36 +567,137 @@ class ProjectChatService {
   //
   // ==========================================================
 
-  Future<
-    void
-  >
-  deleteMessage({
-    required String messageId,
-  }) async {
-    final normalizedMessageId = _required(
-      messageId,
-      'messageId',
-    );
+  Future<void> deleteMessage({required String messageId}) async {
+    final normalizedMessageId = _required(messageId, 'messageId');
 
     final userId = requireCurrentUserId();
 
+    // ========================================================
+    // CARREGAR MENSAGEM
+    // ========================================================
+    //
+    // Precisamos conhecer:
+    //
+    // - sender_id;
+    // - created_at;
+    // - message_type;
+    // - audio_path.
+    //
+    // Assim conseguimos aplicar a regra de 24 horas e, quando
+    // for áudio, remover também o arquivo do Storage.
+    //
+    // ========================================================
+
+    final response = await _supabase
+        .from(_table)
+        .select(_messageFields)
+        .eq('id', normalizedMessageId)
+        .maybeSingle();
+
+    if (response == null) {
+      throw StateError('Mensagem não encontrada.');
+    }
+
+    final message = ProjectMessageModel.fromMap(
+      Map<String, dynamic>.from(response),
+    );
+
+    // ========================================================
+    // AUTOR
+    // ========================================================
+
+    if (message.senderId != userId) {
+      throw StateError('Você só pode apagar suas próprias mensagens.');
+    }
+
+    // ========================================================
+    // SISTEMA
+    // ========================================================
+
+    if (message.isSystem) {
+      throw StateError(
+        'Mensagens do sistema não podem ser apagadas por usuários.',
+      );
+    }
+
+    // ========================================================
+    // LIMITE DE 24 HORAS
+    // ========================================================
+
+    if (!message.canDelete) {
+      throw StateError(
+        'O prazo de 24 horas para apagar esta mensagem terminou.',
+      );
+    }
+
+    final audioPath = message.audioPath?.trim();
+
+    final shouldDeleteAudio =
+        message.isAudio && audioPath != null && audioPath.isNotEmpty;
+
     try {
+      // ======================================================
+      // DELETE DA MENSAGEM
+      // ======================================================
+      //
+      // Fazemos primeiro o DELETE no banco.
+      //
+      // A RLS deve repetir a mesma regra de 24 horas para ser
+      // a proteção real contra chamadas externas.
+      //
+      // ======================================================
+
       await _supabase
-          .from(
-            _table,
-          )
+          .from(_table)
           .delete()
-          .eq(
-            'id',
-            normalizedMessageId,
-          )
-          .eq(
-            'sender_id',
-            userId,
+          .eq('id', normalizedMessageId)
+          .eq('sender_id', userId);
+
+      // ======================================================
+      // DELETE DO ÁUDIO
+      // ======================================================
+      //
+      // Se a mensagem era de áudio, removemos também o WAV do
+      // bucket privado.
+      //
+      // ======================================================
+
+      if (shouldDeleteAudio) {
+        try {
+          await _supabase.storage.from(_audioBucket).remove([audioPath]);
+
+          debugPrint(
+            '[PROJECT CHAT] '
+            'Arquivo de áudio removido: '
+            '$audioPath',
           );
-    } on PostgrestException catch (
-      error
-    ) {
+        } catch (storageError, storageStackTrace) {
+          // A mensagem já foi apagada do banco.
+          //
+          // Portanto não voltamos a inserir a linha.
+          // Apenas registramos a falha para diagnóstico.
+
+          debugPrint(
+            '[PROJECT CHAT] '
+            'Mensagem apagada, mas houve erro ao remover '
+            'o arquivo de áudio: '
+            '$storageError',
+          );
+
+          debugPrint(
+            '[PROJECT CHAT] '
+            'Storage StackTrace: '
+            '$storageStackTrace',
+          );
+        }
+      }
+
+      debugPrint(
+        '[PROJECT CHAT] '
+        'Mensagem apagada: '
+        '$normalizedMessageId',
+      );
+    } on PostgrestException catch (error) {
       debugPrint(
         '[PROJECT CHAT] '
         'Erro ao apagar mensagem: '
@@ -791,17 +718,8 @@ class ProjectChatService {
   // EXISTEM MENSAGENS?
   // ==========================================================
 
-  Future<
-    bool
-  >
-  hasMessages({
-    required String projectId,
-  }) async {
-    final messages = await getMessages(
-      projectId: projectId,
-
-      limit: 1,
-    );
+  Future<bool> hasMessages({required String projectId}) async {
+    final messages = await getMessages(projectId: projectId, limit: 1);
 
     return messages.isNotEmpty;
   }
@@ -810,62 +728,35 @@ class ProjectChatService {
   // ÚLTIMA MENSAGEM
   // ==========================================================
 
-  Future<
-    ProjectMessageModel?
-  >
-  getLatestMessage({
+  Future<ProjectMessageModel?> getLatestMessage({
     required String projectId,
   }) async {
-    final normalizedProjectId = _required(
-      projectId,
-      'projectId',
-    );
+    final normalizedProjectId = _required(projectId, 'projectId');
 
     requireCurrentUserId();
 
     try {
       final response = await _supabase
-          .from(
-            _table,
-          )
-          .select(
-            _messageFields,
-          )
-          .eq(
-            'project_id',
-            normalizedProjectId,
-          )
-          .order(
-            'created_at',
-            ascending: false,
-          )
-          .limit(
-            1,
-          );
+          .from(_table)
+          .select(_messageFields)
+          .eq('project_id', normalizedProjectId)
+          .order('created_at', ascending: false)
+          .limit(1);
 
       if (response.isEmpty) {
         return null;
       }
 
       final message = ProjectMessageModel.fromMap(
-        Map<
-          String,
-          dynamic
-        >.from(
-          response.first,
-        ),
+        Map<String, dynamic>.from(response.first),
       );
 
-      if (message.id.isEmpty ||
-          message.projectId !=
-              normalizedProjectId) {
+      if (message.id.isEmpty || message.projectId != normalizedProjectId) {
         return null;
       }
 
       return message;
-    } on PostgrestException catch (
-      error
-    ) {
+    } on PostgrestException catch (error) {
       debugPrint(
         '[PROJECT CHAT] '
         'Erro ao buscar última mensagem: '
@@ -880,40 +771,24 @@ class ProjectChatService {
   // CRIAR URL PARA REPRODUÇÃO DO ÁUDIO
   // ==========================================================
 
-  Future<
-    String
-  >
-  createAudioPlaybackUrl({
+  Future<String> createAudioPlaybackUrl({
     required String audioPath,
     int expiresInSeconds = 3600,
   }) async {
-    final normalizedAudioPath = _required(
-      audioPath,
-      'audioPath',
-    );
+    final normalizedAudioPath = _required(audioPath, 'audioPath');
 
-    final normalizedExpiresIn = expiresInSeconds.clamp(
-      60,
-      86400,
-    );
+    final normalizedExpiresIn = expiresInSeconds.clamp(60, 86400);
 
     requireCurrentUserId();
 
     final url = await _supabase.storage
-        .from(
-          _audioBucket,
-        )
-        .createSignedUrl(
-          normalizedAudioPath,
-          normalizedExpiresIn,
-        );
+        .from(_audioBucket)
+        .createSignedUrl(normalizedAudioPath, normalizedExpiresIn);
 
     final normalizedUrl = url.trim();
 
     if (normalizedUrl.isEmpty) {
-      throw StateError(
-        'O Supabase retornou uma URL de áudio vazia.',
-      );
+      throw StateError('O Supabase retornou uma URL de áudio vazia.');
     }
 
     return normalizedUrl;
@@ -923,19 +798,14 @@ class ProjectChatService {
   // NORMALIZAR MENSAGEM
   // ==========================================================
 
-  String _normalizeMessage(
-    String content,
-  ) {
+  String _normalizeMessage(String content) {
     final normalized = content.trim();
 
     if (normalized.isEmpty) {
-      throw ArgumentError(
-        'A mensagem não pode ser vazia.',
-      );
+      throw ArgumentError('A mensagem não pode ser vazia.');
     }
 
-    if (normalized.length >
-        maxMessageLength) {
+    if (normalized.length > maxMessageLength) {
       throw ArgumentError(
         'A mensagem pode possuir no máximo '
         '$maxMessageLength caracteres.',
@@ -949,16 +819,11 @@ class ProjectChatService {
   // REQUIRED
   // ==========================================================
 
-  String _required(
-    String value,
-    String field,
-  ) {
+  String _required(String value, String field) {
     final normalized = value.trim();
 
     if (normalized.isEmpty) {
-      throw ArgumentError(
-        '$field não pode ser vazio.',
-      );
+      throw ArgumentError('$field não pode ser vazio.');
     }
 
     return normalized;

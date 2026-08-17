@@ -1,25 +1,52 @@
 import 'package:flutter/material.dart';
 
 import '../../data/models/communication_permission_model.dart';
+import '../../data/models/communication_video_invite_state_model.dart';
 
 // ============================================================
 // COMMUNICATION PERMISSION CARD
 // ============================================================
 //
-// Mostra as capacidades liberadas para um participante:
+// Mostra o estado de comunicação entre:
 //
-// Áudio
-// Vídeo
+// usuário atual <-> outro usuário.
 //
-// Pode também oferecer:
+// ÁUDIO
+// ------------------------------------------------------------
 //
-// "Solicitar vídeo"
+// O áudio NÃO faz parte de CommunicationPermissionModel.
+//
+// Ele é informado separadamente através de:
+//
+// audioAllowed
+//
+// VÍDEO
+// ------------------------------------------------------------
+//
+// O vídeo depende de consentimento bilateral:
+//
+// usuário atual <-> outro usuário
+//
+// O estado do convite é fornecido por:
+//
+// CommunicationVideoInviteStateModel
+//
+// Isso permite mostrar:
+//
+// - vídeo liberado;
+// - convite disponível;
+// - cooldown após recusa;
+// - bloqueio após terceira recusa.
 //
 // ============================================================
 
 class CommunicationPermissionCard
     extends
         StatelessWidget {
+  // ==========================================================
+  // COLORS
+  // ==========================================================
+
   static const Color _surface = Color(
     0xFF111116,
   );
@@ -36,24 +63,62 @@ class CommunicationPermissionCard
     0xFFF59E0B,
   );
 
-  final CommunicationPermissionModel permission;
+  static const Color _red = Color(
+    0xFFEF4444,
+  );
+
+  // ==========================================================
+  // PERMISSION
+  // ==========================================================
+
+  final CommunicationPermissionModel? permission;
+
+  // ==========================================================
+  // INVITE STATE
+  // ==========================================================
+
+  final CommunicationVideoInviteStateModel? inviteState;
+
+  // ==========================================================
+  // AUDIO
+  // ==========================================================
+
+  final bool audioAllowed;
+
+  // ==========================================================
+  // IDENTIDADE
+  // ==========================================================
 
   final String? displayName;
 
   final String? username;
 
+  // ==========================================================
+  // REQUEST VIDEO
+  // ==========================================================
+
   final VoidCallback? onRequestVideo;
 
   final bool requestInProgress;
 
+  // ==========================================================
+  // CONSTRUCTOR
+  // ==========================================================
+
   const CommunicationPermissionCard({
     super.key,
-    required this.permission,
+    this.permission,
+    this.inviteState,
+    this.audioAllowed = true,
     this.displayName,
     this.username,
     this.onRequestVideo,
     this.requestInProgress = false,
   });
+
+  // ==========================================================
+  // BUILD
+  // ==========================================================
 
   @override
   Widget build(
@@ -146,6 +211,10 @@ class CommunicationPermissionCard
                         Text(
                           _usernameLabel,
 
+                          maxLines: 1,
+
+                          overflow: TextOverflow.ellipsis,
+
                           style: const TextStyle(
                             color: Colors.white38,
 
@@ -155,6 +224,11 @@ class CommunicationPermissionCard
                     ],
                   ),
                 ),
+
+                // ==========================================
+                // VIDEO STATUS BADGE
+                // ==========================================
+                _buildVideoStatusBadge(),
               ],
             ),
 
@@ -164,7 +238,7 @@ class CommunicationPermissionCard
           ],
 
           // ================================================
-          // ACCESS
+          // ACCESS TITLE
           // ================================================
           const Text(
             'COMUNICAÇÃO',
@@ -184,40 +258,57 @@ class CommunicationPermissionCard
             height: 10,
           ),
 
+          // ================================================
+          // AUDIO
+          // ================================================
           _buildPermissionRow(
             icon: Icons.call_rounded,
 
             title: 'Áudio',
 
-            description: permission.audioAllowed
+            description: audioAllowed
                 ? 'Chamadas de voz liberadas'
                 : 'Áudio indisponível',
 
-            allowed: permission.audioAllowed,
+            allowed: audioAllowed,
           ),
 
           const SizedBox(
             height: 8,
           ),
 
+          // ================================================
+          // VIDEO
+          // ================================================
           _buildPermissionRow(
             icon: Icons.videocam_rounded,
 
             title: 'Vídeo',
 
-            description: permission.videoAllowed
-                ? 'Vídeo liberado por consentimento'
-                : 'Requer consentimento',
+            description: _videoDescription,
 
-            allowed: permission.videoAllowed,
+            allowed: _videoAllowed,
+
+            blocked: _videoBlocked,
           ),
+
+          // ================================================
+          // INVITE INFORMATION
+          // ================================================
+          if (!_videoAllowed &&
+              inviteState !=
+                  null) ...[
+            const SizedBox(
+              height: 12,
+            ),
+
+            _buildInviteInformation(),
+          ],
 
           // ================================================
           // REQUEST VIDEO
           // ================================================
-          if (!permission.videoAllowed &&
-              onRequestVideo !=
-                  null) ...[
+          if (_showRequestButton) ...[
             const SizedBox(
               height: 15,
             ),
@@ -249,7 +340,7 @@ class CommunicationPermissionCard
                 label: Text(
                   requestInProgress
                       ? 'Enviando...'
-                      : 'Solicitar vídeo',
+                      : _requestButtonLabel,
                 ),
 
                 style: OutlinedButton.styleFrom(
@@ -276,13 +367,35 @@ class CommunicationPermissionCard
               ),
             ),
           ],
+
+          // ================================================
+          // COOLDOWN
+          // ================================================
+          if (_showCooldownMessage) ...[
+            const SizedBox(
+              height: 15,
+            ),
+
+            _buildCooldownMessage(),
+          ],
+
+          // ================================================
+          // BLOCKED
+          // ================================================
+          if (_videoBlocked) ...[
+            const SizedBox(
+              height: 15,
+            ),
+
+            _buildBlockedMessage(),
+          ],
         ],
       ),
     );
   }
 
   // ==========================================================
-  // ROW
+  // PERMISSION ROW
   // ==========================================================
 
   Widget _buildPermissionRow({
@@ -290,10 +403,17 @@ class CommunicationPermissionCard
     required String title,
     required String description,
     required bool allowed,
+    bool blocked = false,
   }) {
-    final color = allowed
-        ? _green
-        : _orange;
+    final Color color;
+
+    if (allowed) {
+      color = _green;
+    } else if (blocked) {
+      color = _red;
+    } else {
+      color = _orange;
+    }
 
     return Container(
       padding: const EdgeInsets.all(
@@ -377,6 +497,8 @@ class CommunicationPermissionCard
           Icon(
             allowed
                 ? Icons.check_circle_rounded
+                : blocked
+                ? Icons.block_rounded
                 : Icons.lock_rounded,
 
             color: color,
@@ -386,6 +508,466 @@ class CommunicationPermissionCard
         ],
       ),
     );
+  }
+
+  // ==========================================================
+  // VIDEO STATUS BADGE
+  // ==========================================================
+
+  Widget _buildVideoStatusBadge() {
+    final Color color;
+
+    final String label;
+
+    final IconData icon;
+
+    if (_videoAllowed) {
+      color = _green;
+
+      label = 'VÍDEO';
+
+      icon = Icons.videocam_rounded;
+    } else if (_videoBlocked) {
+      color = _red;
+
+      label = 'BLOQUEADO';
+
+      icon = Icons.block_rounded;
+    } else if (_hasCooldown) {
+      color = _orange;
+
+      label = 'AGUARDANDO';
+
+      icon = Icons.schedule_rounded;
+    } else {
+      color = _purple;
+
+      label = 'ÁUDIO';
+
+      icon = Icons.call_rounded;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 8,
+        vertical: 5,
+      ),
+
+      decoration: BoxDecoration(
+        color: color.withValues(
+          alpha: 0.08,
+        ),
+
+        borderRadius: BorderRadius.circular(
+          20,
+        ),
+
+        border: Border.all(
+          color: color.withValues(
+            alpha: 0.18,
+          ),
+        ),
+      ),
+
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+
+        children: [
+          Icon(
+            icon,
+
+            color: color,
+
+            size: 11,
+          ),
+
+          const SizedBox(
+            width: 5,
+          ),
+
+          Text(
+            label,
+
+            style: TextStyle(
+              color: color,
+
+              fontSize: 7,
+
+              fontWeight: FontWeight.w800,
+
+              letterSpacing: 0.6,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ==========================================================
+  // INVITE INFORMATION
+  // ==========================================================
+
+  Widget _buildInviteInformation() {
+    final state = inviteState;
+
+    if (state ==
+        null) {
+      return const SizedBox.shrink();
+    }
+
+    return Row(
+      children: [
+        Icon(
+          Icons.history_rounded,
+
+          color: Colors.white.withValues(
+            alpha: 0.28,
+          ),
+
+          size: 14,
+        ),
+
+        const SizedBox(
+          width: 7,
+        ),
+
+        Expanded(
+          child: Text(
+            _inviteInformationText,
+
+            style: const TextStyle(
+              color: Colors.white38,
+
+              fontSize: 9,
+
+              height: 1.35,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ==========================================================
+  // COOLDOWN MESSAGE
+  // ==========================================================
+
+  Widget _buildCooldownMessage() {
+    return Container(
+      width: double.infinity,
+
+      padding: const EdgeInsets.all(
+        11,
+      ),
+
+      decoration: BoxDecoration(
+        color: _orange.withValues(
+          alpha: 0.055,
+        ),
+
+        borderRadius: BorderRadius.circular(
+          13,
+        ),
+
+        border: Border.all(
+          color: _orange.withValues(
+            alpha: 0.12,
+          ),
+        ),
+      ),
+
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+
+        children: [
+          const Icon(
+            Icons.schedule_rounded,
+
+            color: _orange,
+
+            size: 16,
+          ),
+
+          const SizedBox(
+            width: 8,
+          ),
+
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+
+              children: [
+                const Text(
+                  'Novo convite indisponível',
+
+                  style: TextStyle(
+                    color: Colors.white70,
+
+                    fontSize: 10,
+
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+
+                const SizedBox(
+                  height: 3,
+                ),
+
+                Text(
+                  'Você poderá convidar novamente em '
+                  '${inviteState?.cooldownLabel ?? ''}.',
+
+                  style: const TextStyle(
+                    color: Colors.white38,
+
+                    fontSize: 9,
+
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ==========================================================
+  // BLOCKED MESSAGE
+  // ==========================================================
+
+  Widget _buildBlockedMessage() {
+    return Container(
+      width: double.infinity,
+
+      padding: const EdgeInsets.all(
+        11,
+      ),
+
+      decoration: BoxDecoration(
+        color: _red.withValues(
+          alpha: 0.055,
+        ),
+
+        borderRadius: BorderRadius.circular(
+          13,
+        ),
+
+        border: Border.all(
+          color: _red.withValues(
+            alpha: 0.12,
+          ),
+        ),
+      ),
+
+      child: const Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+
+        children: [
+          Icon(
+            Icons.block_rounded,
+
+            color: _red,
+
+            size: 16,
+          ),
+
+          SizedBox(
+            width: 8,
+          ),
+
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+
+              children: [
+                Text(
+                  'Convites de vídeo bloqueados',
+
+                  style: TextStyle(
+                    color: Colors.white70,
+
+                    fontSize: 10,
+
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+
+                SizedBox(
+                  height: 3,
+                ),
+
+                Text(
+                  'O limite de recusas foi atingido. '
+                  'Somente este usuário pode liberar uma nova tentativa.',
+
+                  style: TextStyle(
+                    color: Colors.white38,
+
+                    fontSize: 9,
+
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ==========================================================
+  // VIDEO ALLOWED
+  // ==========================================================
+
+  bool get _videoAllowed =>
+      permission?.videoAllowed ??
+      false;
+
+  // ==========================================================
+  // VIDEO BLOCKED
+  // ==========================================================
+
+  bool get _videoBlocked =>
+      !_videoAllowed &&
+      (inviteState?.blockedAfterLimit ??
+          false);
+
+  // ==========================================================
+  // COOLDOWN
+  // ==========================================================
+
+  bool get _hasCooldown =>
+      !_videoAllowed &&
+      (inviteState?.hasCooldown ??
+          false);
+
+  // ==========================================================
+  // SHOW REQUEST BUTTON
+  // ==========================================================
+
+  bool get _showRequestButton {
+    if (_videoAllowed) {
+      return false;
+    }
+
+    if (onRequestVideo ==
+        null) {
+      return false;
+    }
+
+    final state = inviteState;
+
+    // Nunca houve convite.
+    if (state ==
+        null) {
+      return true;
+    }
+
+    return state.canRequestVideo;
+  }
+
+  // ==========================================================
+  // SHOW COOLDOWN
+  // ==========================================================
+
+  bool get _showCooldownMessage {
+    if (_videoAllowed) {
+      return false;
+    }
+
+    return inviteState?.hasCooldown ??
+        false;
+  }
+
+  // ==========================================================
+  // VIDEO DESCRIPTION
+  // ==========================================================
+
+  String get _videoDescription {
+    if (_videoAllowed) {
+      return 'Vídeo liberado por consentimento';
+    }
+
+    if (_videoBlocked) {
+      return 'Limite de convites atingido';
+    }
+
+    if (_hasCooldown) {
+      final label = inviteState?.cooldownLabel;
+
+      if (label !=
+              null &&
+          label.isNotEmpty) {
+        return 'Novo convite em $label';
+      }
+
+      return 'Aguardando novo convite';
+    }
+
+    final state = inviteState;
+
+    if (state ==
+            null ||
+        state.rejectionCount ==
+            0) {
+      return 'Requer consentimento';
+    }
+
+    return 'Pode solicitar novamente';
+  }
+
+  // ==========================================================
+  // REQUEST BUTTON LABEL
+  // ==========================================================
+
+  String get _requestButtonLabel {
+    final state = inviteState;
+
+    if (state ==
+            null ||
+        state.rejectionCount ==
+            0) {
+      return 'Solicitar vídeo';
+    }
+
+    return 'Enviar convite ${state.nextAttempt}/3';
+  }
+
+  // ==========================================================
+  // INVITE INFORMATION TEXT
+  // ==========================================================
+
+  String get _inviteInformationText {
+    final state = inviteState;
+
+    if (state ==
+        null) {
+      return '';
+    }
+
+    if (state.blockedAfterLimit) {
+      return '3 recusas registradas.';
+    }
+
+    if (state.rejectionCount ==
+        0) {
+      return 'Nenhuma recusa registrada.';
+    }
+
+    if (state.rejectionCount ==
+        1) {
+      return '1ª solicitação recusada.';
+    }
+
+    if (state.rejectionCount ==
+        2) {
+      return '2 solicitações recusadas.';
+    }
+
+    return '3 solicitações recusadas.';
   }
 
   // ==========================================================

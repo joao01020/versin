@@ -43,7 +43,9 @@ import '../types/call_media_type.dart';
 //
 // ============================================================
 
-class ProjectCallController with ChangeNotifier {
+class ProjectCallController
+    with
+        ChangeNotifier {
   // ==========================================================
   // PROJECT
   // ==========================================================
@@ -60,15 +62,35 @@ class ProjectCallController with ChangeNotifier {
   // SUBSCRIPTIONS
   // ==========================================================
 
-  StreamSubscription<List<ProjectCallModel>>? _projectCallsSubscription;
+  StreamSubscription<
+    List<
+      ProjectCallModel
+    >
+  >?
+  _projectCallsSubscription;
 
-  StreamSubscription<ProjectCallModel?>? _activeCallSubscription;
+  StreamSubscription<
+    ProjectCallModel?
+  >?
+  _activeCallSubscription;
+
+  Timer? _clockTimer;
+
+  static const Duration ringingTimeout = Duration(
+    seconds: 30,
+  );
 
   // ==========================================================
   // STATE
   // ==========================================================
 
-  List<ProjectCallModel> _calls = const <ProjectCallModel>[];
+  List<
+    ProjectCallModel
+  >
+  _calls =
+      const <
+        ProjectCallModel
+      >[];
 
   ProjectCallModel? _activeCall;
 
@@ -80,6 +102,14 @@ class ProjectCallController with ChangeNotifier {
 
   String? _errorMessage;
 
+  DateTime? _callStartedAt;
+
+  DateTime? _ringingStartedAt;
+
+  bool _ringingTimeoutInProgress = false;
+
+  String? _currentParticipantName;
+
   // ==========================================================
   // CONSTRUCTOR
   // ==========================================================
@@ -87,14 +117,21 @@ class ProjectCallController with ChangeNotifier {
   ProjectCallController({
     required String projectId,
     ProjectCallRepository? repository,
-  }) : projectId = _requiredProjectId(projectId),
-       _repository = repository ?? ProjectCallRepositoryImpl();
+  }) : projectId = _requiredProjectId(
+         projectId,
+       ),
+       _repository =
+           repository ??
+           ProjectCallRepositoryImpl();
 
   // ==========================================================
   // GETTERS
   // ==========================================================
 
-  List<ProjectCallModel> get calls => _calls;
+  List<
+    ProjectCallModel
+  >
+  get calls => _calls;
 
   ProjectCallModel? get activeCall => _activeCall;
 
@@ -102,21 +139,254 @@ class ProjectCallController with ChangeNotifier {
 
   bool get isProcessing => _isProcessing;
 
-  bool get hasError => _errorMessage != null;
+  bool get hasError =>
+      _errorMessage !=
+      null;
 
   String? get errorMessage => _errorMessage;
 
-  bool get hasActiveCall => _activeCall != null && !_activeCall!.isFinished;
+  bool get hasActiveCall =>
+      _activeCall !=
+          null &&
+      !_activeCall!.isFinished;
 
-  bool get isRinging => _activeCall?.isRinging ?? false;
+  bool get isRinging =>
+      _activeCall?.isRinging ??
+      false;
 
-  bool get isInCall => _activeCall?.isActive ?? false;
+  bool get isInCall =>
+      _activeCall?.isActive ??
+      false;
+
+  // ==========================================================
+  // GLOBAL CALL STATE
+  // ==========================================================
+
+  bool get isCalling {
+    final call = _activeCall;
+
+    if (call ==
+        null) {
+      return false;
+    }
+
+    return call.isRinging &&
+        _repository.currentUserId ==
+            call.createdBy;
+  }
+
+  bool get isIncomingCall {
+    final call = _activeCall;
+
+    if (call ==
+        null) {
+      return false;
+    }
+
+    return call.isRinging &&
+        _repository.currentUserId !=
+            call.createdBy;
+  }
+
+  bool get isEndingCall =>
+      _isProcessing &&
+      _activeCall !=
+          null &&
+      _activeCall!.canEnd;
+
+  String? get currentParticipantName => _currentParticipantName;
+
+  Duration get currentCallDuration {
+    final startedAt = _callStartedAt;
+
+    if (startedAt ==
+            null ||
+        !isInCall) {
+      return Duration.zero;
+    }
+
+    return DateTime.now().difference(
+      startedAt,
+    );
+  }
+
+  Duration get currentRingingDuration {
+    final startedAt = _ringingStartedAt;
+
+    if (startedAt ==
+            null ||
+        !isRinging) {
+      return Duration.zero;
+    }
+
+    final elapsed = DateTime.now().difference(
+      startedAt,
+    );
+
+    return elapsed.isNegative
+        ? Duration.zero
+        : elapsed;
+  }
+
+  Duration get remainingRingingDuration {
+    final remaining =
+        ringingTimeout -
+        currentRingingDuration;
+
+    return remaining.isNegative
+        ? Duration.zero
+        : remaining;
+  }
+
+  bool get hasRingingTimedOut =>
+      isRinging &&
+      currentRingingDuration >=
+          ringingTimeout;
+
+  String get currentCallParticipantId {
+    final call = _activeCall;
+
+    if (call ==
+        null) {
+      return '';
+    }
+
+    final currentUserId = _repository.currentUserId;
+
+    if (call.createdBy ==
+        currentUserId) {
+      return call.targetUserId?.trim() ??
+          '';
+    }
+
+    return call.createdBy.trim();
+  }
+
+  void setCurrentParticipantName(
+    String? value,
+  ) {
+    final normalized = value?.trim();
+
+    _currentParticipantName =
+        normalized ==
+                null ||
+            normalized.isEmpty
+        ? null
+        : normalized;
+
+    _safeNotify();
+  }
+
+  // ==========================================================
+  // SYNC CALL CLOCK
+  // ==========================================================
+
+  void _syncCallClock(
+    ProjectCallModel? call,
+  ) {
+    if (call ==
+            null ||
+        call.isFinished) {
+      _callStartedAt = null;
+      _ringingStartedAt = null;
+      _stopClockTimer();
+      return;
+    }
+
+    if (call.isRinging) {
+      _callStartedAt = null;
+      _ringingStartedAt ??= DateTime.now();
+      _ensureClockTimer();
+      return;
+    }
+
+    if (call.isActive) {
+      _ringingStartedAt = null;
+      _callStartedAt ??= DateTime.now();
+      _ensureClockTimer();
+      return;
+    }
+
+    _callStartedAt = null;
+    _ringingStartedAt = null;
+    _stopClockTimer();
+  }
+
+  // ==========================================================
+  // CLOCK TIMER
+  // ==========================================================
+
+  void _ensureClockTimer() {
+    if (_disposed ||
+        _clockTimer !=
+            null) {
+      return;
+    }
+
+    _clockTimer = Timer.periodic(
+      const Duration(
+        seconds: 1,
+      ),
+      (
+        _,
+      ) {
+        if (_disposed) {
+          return;
+        }
+
+        if (!isRinging &&
+            !isInCall) {
+          _stopClockTimer();
+          return;
+        }
+
+        _safeNotify();
+
+        if (hasRingingTimedOut) {
+          unawaited(
+            _handleRingingTimeout(),
+          );
+        }
+      },
+    );
+  }
+
+  void _stopClockTimer() {
+    _clockTimer?.cancel();
+    _clockTimer = null;
+  }
+
+  // ==========================================================
+  // RINGING TIMEOUT
+  // ==========================================================
+
+  Future<
+    void
+  >
+  _handleRingingTimeout() async {
+    if (_disposed ||
+        _ringingTimeoutInProgress ||
+        !isRinging) {
+      return;
+    }
+
+    _ringingTimeoutInProgress = true;
+
+    try {
+      await endCall();
+    } finally {
+      _ringingTimeoutInProgress = false;
+    }
+  }
 
   // ==========================================================
   // INIT
   // ==========================================================
 
-  Future<void> init() async {
+  Future<
+    void
+  >
+  init() async {
     if (_disposed) {
       return;
     }
@@ -135,14 +405,21 @@ class ProjectCallController with ChangeNotifier {
       // ======================================================
 
       _projectCallsSubscription = _repository
-          .streamProjectCalls(projectId: projectId)
-          .listen(_handleProjectCalls, onError: _handleProjectCallsError);
+          .streamProjectCalls(
+            projectId: projectId,
+          )
+          .listen(
+            _handleProjectCalls,
+            onError: _handleProjectCallsError,
+          );
 
       // ======================================================
       // INITIAL ACTIVE CALL
       // ======================================================
 
-      final currentCall = await _repository.getActiveCall(projectId: projectId);
+      final currentCall = await _repository.getActiveCall(
+        projectId: projectId,
+      );
 
       if (_disposed) {
         return;
@@ -150,14 +427,24 @@ class ProjectCallController with ChangeNotifier {
 
       _activeCall = currentCall;
 
-      if (currentCall != null) {
-        _listenToActiveCall(currentCall.id);
+      _syncCallClock(
+        currentCall,
+      );
+
+      if (currentCall !=
+          null) {
+        _listenToActiveCall(
+          currentCall.id,
+        );
       }
 
       _isLoading = false;
 
       _safeNotify();
-    } catch (error, stackTrace) {
+    } catch (
+      error,
+      stackTrace
+    ) {
       debugPrint(
         '[PROJECT CALL CONTROLLER] '
         'Erro no init: '
@@ -186,12 +473,22 @@ class ProjectCallController with ChangeNotifier {
   // HANDLE PROJECT CALLS
   // ==========================================================
 
-  void _handleProjectCalls(List<ProjectCallModel> calls) {
+  void _handleProjectCalls(
+    List<
+      ProjectCallModel
+    >
+    calls,
+  ) {
     if (_disposed) {
       return;
     }
 
-    _calls = List<ProjectCallModel>.unmodifiable(calls);
+    _calls =
+        List<
+          ProjectCallModel
+        >.unmodifiable(
+          calls,
+        );
 
     // ========================================================
     // DESCOBRIR CHAMADA ATIVA PELO STREAM
@@ -200,7 +497,8 @@ class ProjectCallController with ChangeNotifier {
     ProjectCallModel? discoveredActiveCall;
 
     for (final call in calls) {
-      if (call.isRinging || call.isActive) {
+      if (call.isRinging ||
+          call.isActive) {
         discoveredActiveCall = call;
 
         break;
@@ -211,18 +509,33 @@ class ProjectCallController with ChangeNotifier {
 
     final discoveredId = discoveredActiveCall?.id;
 
-    if (currentId != discoveredId) {
+    if (currentId !=
+        discoveredId) {
       _activeCall = discoveredActiveCall;
 
-      unawaited(_activeCallSubscription?.cancel());
+      _syncCallClock(
+        discoveredActiveCall,
+      );
+
+      unawaited(
+        _activeCallSubscription?.cancel(),
+      );
 
       _activeCallSubscription = null;
 
-      if (discoveredActiveCall != null) {
-        _listenToActiveCall(discoveredActiveCall.id);
+      if (discoveredActiveCall !=
+          null) {
+        _listenToActiveCall(
+          discoveredActiveCall.id,
+        );
       }
-    } else if (discoveredActiveCall != null) {
+    } else if (discoveredActiveCall !=
+        null) {
       _activeCall = discoveredActiveCall;
+
+      _syncCallClock(
+        discoveredActiveCall,
+      );
     }
 
     _isLoading = false;
@@ -234,14 +547,19 @@ class ProjectCallController with ChangeNotifier {
   // PROJECT CALL STREAM ERROR
   // ==========================================================
 
-  void _handleProjectCallsError(Object error, StackTrace stackTrace) {
+  void _handleProjectCallsError(
+    Object error,
+    StackTrace stackTrace,
+  ) {
     debugPrint(
       '[PROJECT CALL CONTROLLER] '
       'Erro Realtime das chamadas: '
       '$error',
     );
 
-    debugPrint('$stackTrace');
+    debugPrint(
+      '$stackTrace',
+    );
 
     if (_disposed) {
       return;
@@ -256,31 +574,50 @@ class ProjectCallController with ChangeNotifier {
   // LISTEN ACTIVE CALL
   // ==========================================================
 
-  void _listenToActiveCall(String callId) {
+  void _listenToActiveCall(
+    String callId,
+  ) {
     if (_disposed) {
       return;
     }
 
-    unawaited(_activeCallSubscription?.cancel());
+    unawaited(
+      _activeCallSubscription?.cancel(),
+    );
 
     _activeCallSubscription = _repository
-        .streamCall(callId: callId)
-        .listen(_handleActiveCall, onError: _handleActiveCallError);
+        .streamCall(
+          callId: callId,
+        )
+        .listen(
+          _handleActiveCall,
+          onError: _handleActiveCallError,
+        );
   }
 
   // ==========================================================
   // ACTIVE CALL UPDATED
   // ==========================================================
 
-  void _handleActiveCall(ProjectCallModel? call) {
+  void _handleActiveCall(
+    ProjectCallModel? call,
+  ) {
     if (_disposed) {
       return;
     }
 
     _activeCall = call;
 
-    if (call == null || call.isFinished) {
-      unawaited(_activeCallSubscription?.cancel());
+    _syncCallClock(
+      call,
+    );
+
+    if (call ==
+            null ||
+        call.isFinished) {
+      unawaited(
+        _activeCallSubscription?.cancel(),
+      );
 
       _activeCallSubscription = null;
     }
@@ -292,14 +629,19 @@ class ProjectCallController with ChangeNotifier {
   // ACTIVE CALL ERROR
   // ==========================================================
 
-  void _handleActiveCallError(Object error, StackTrace stackTrace) {
+  void _handleActiveCallError(
+    Object error,
+    StackTrace stackTrace,
+  ) {
     debugPrint(
       '[PROJECT CALL CONTROLLER] '
       'Erro Realtime chamada ativa: '
       '$error',
     );
 
-    debugPrint('$stackTrace');
+    debugPrint(
+      '$stackTrace',
+    );
 
     if (_disposed) {
       return;
@@ -314,7 +656,12 @@ class ProjectCallController with ChangeNotifier {
   // START AUDIO CALL
   // ==========================================================
 
-  Future<ProjectCallModel?> startAudioCall({String? targetUserId}) {
+  Future<
+    ProjectCallModel?
+  >
+  startAudioCall({
+    String? targetUserId,
+  }) {
     return startCall(
       mediaType: CallMediaType.audio,
 
@@ -326,7 +673,12 @@ class ProjectCallController with ChangeNotifier {
   // START VIDEO CALL
   // ==========================================================
 
-  Future<ProjectCallModel?> startVideoCall({String? targetUserId}) {
+  Future<
+    ProjectCallModel?
+  >
+  startVideoCall({
+    String? targetUserId,
+  }) {
     return startCall(
       mediaType: CallMediaType.video,
 
@@ -338,21 +690,29 @@ class ProjectCallController with ChangeNotifier {
   // START CALL
   // ==========================================================
 
-  Future<ProjectCallModel?> startCall({
+  Future<
+    ProjectCallModel?
+  >
+  startCall({
     required CallMediaType mediaType,
     String? targetUserId,
   }) async {
-    if (_disposed || _isProcessing) {
+    if (_disposed ||
+        _isProcessing) {
       return null;
     }
 
     if (hasActiveCall) {
-      _setError('Já existe uma chamada ativa nesta sessão.');
+      _setError(
+        'Já existe uma chamada ativa nesta sessão.',
+      );
 
       return null;
     }
 
-    final normalizedTarget = _nullable(targetUserId);
+    final normalizedTarget = _nullable(
+      targetUserId,
+    );
 
     _isProcessing = true;
 
@@ -375,19 +735,30 @@ class ProjectCallController with ChangeNotifier {
 
       _activeCall = call;
 
-      _listenToActiveCall(call.id);
+      _syncCallClock(
+        call,
+      );
+
+      _listenToActiveCall(
+        call.id,
+      );
 
       _safeNotify();
 
       return call;
-    } catch (error, stackTrace) {
+    } catch (
+      error,
+      stackTrace
+    ) {
       debugPrint(
         '[PROJECT CALL CONTROLLER] '
         'Erro ao iniciar chamada: '
         '$error',
       );
 
-      debugPrint('$stackTrace');
+      debugPrint(
+        '$stackTrace',
+      );
 
       _errorMessage = mediaType.isVideo
           ? 'Não foi possível iniciar a chamada de vídeo.'
@@ -407,21 +778,34 @@ class ProjectCallController with ChangeNotifier {
   // ACCEPT CALL
   // ==========================================================
 
-  Future<bool> acceptCall({ProjectCallModel? call}) async {
-    if (_disposed || _isProcessing) {
+  Future<
+    bool
+  >
+  acceptCall({
+    ProjectCallModel? call,
+  }) async {
+    if (_disposed ||
+        _isProcessing) {
       return false;
     }
 
-    final targetCall = call ?? _activeCall;
+    final targetCall =
+        call ??
+        _activeCall;
 
-    if (targetCall == null) {
-      _setError('Nenhuma chamada para aceitar.');
+    if (targetCall ==
+        null) {
+      _setError(
+        'Nenhuma chamada para aceitar.',
+      );
 
       return false;
     }
 
     if (!targetCall.canAccept) {
-      _setError('Essa chamada não pode mais ser aceita.');
+      _setError(
+        'Essa chamada não pode mais ser aceita.',
+      );
 
       return false;
     }
@@ -433,7 +817,9 @@ class ProjectCallController with ChangeNotifier {
     _safeNotify();
 
     try {
-      final updatedCall = await _repository.acceptCall(callId: targetCall.id);
+      final updatedCall = await _repository.acceptCall(
+        callId: targetCall.id,
+      );
 
       if (_disposed) {
         return true;
@@ -441,17 +827,28 @@ class ProjectCallController with ChangeNotifier {
 
       _activeCall = updatedCall;
 
-      _listenToActiveCall(updatedCall.id);
+      _syncCallClock(
+        updatedCall,
+      );
+
+      _listenToActiveCall(
+        updatedCall.id,
+      );
 
       return true;
-    } catch (error, stackTrace) {
+    } catch (
+      error,
+      stackTrace
+    ) {
       debugPrint(
         '[PROJECT CALL CONTROLLER] '
         'Erro ao aceitar chamada: '
         '$error',
       );
 
-      debugPrint('$stackTrace');
+      debugPrint(
+        '$stackTrace',
+      );
 
       _errorMessage = 'Não foi possível aceitar a chamada.';
 
@@ -469,21 +866,34 @@ class ProjectCallController with ChangeNotifier {
   // REJECT CALL
   // ==========================================================
 
-  Future<bool> rejectCall({ProjectCallModel? call}) async {
-    if (_disposed || _isProcessing) {
+  Future<
+    bool
+  >
+  rejectCall({
+    ProjectCallModel? call,
+  }) async {
+    if (_disposed ||
+        _isProcessing) {
       return false;
     }
 
-    final targetCall = call ?? _activeCall;
+    final targetCall =
+        call ??
+        _activeCall;
 
-    if (targetCall == null) {
-      _setError('Nenhuma chamada para recusar.');
+    if (targetCall ==
+        null) {
+      _setError(
+        'Nenhuma chamada para recusar.',
+      );
 
       return false;
     }
 
     if (!targetCall.canReject) {
-      _setError('Essa chamada não pode mais ser recusada.');
+      _setError(
+        'Essa chamada não pode mais ser recusada.',
+      );
 
       return false;
     }
@@ -495,23 +905,34 @@ class ProjectCallController with ChangeNotifier {
     _safeNotify();
 
     try {
-      final updatedCall = await _repository.rejectCall(callId: targetCall.id);
+      final updatedCall = await _repository.rejectCall(
+        callId: targetCall.id,
+      );
 
       if (!_disposed) {
         _activeCall = updatedCall;
+
+        _syncCallClock(
+          updatedCall,
+        );
 
         _safeNotify();
       }
 
       return true;
-    } catch (error, stackTrace) {
+    } catch (
+      error,
+      stackTrace
+    ) {
       debugPrint(
         '[PROJECT CALL CONTROLLER] '
         'Erro ao recusar chamada: '
         '$error',
       );
 
-      debugPrint('$stackTrace');
+      debugPrint(
+        '$stackTrace',
+      );
 
       _errorMessage = 'Não foi possível recusar a chamada.';
 
@@ -529,14 +950,19 @@ class ProjectCallController with ChangeNotifier {
   // END CALL
   // ==========================================================
 
-  Future<bool> endCall() async {
-    if (_disposed || _isProcessing) {
+  Future<
+    bool
+  >
+  endCall() async {
+    if (_disposed ||
+        _isProcessing) {
       return false;
     }
 
     final call = _activeCall;
 
-    if (call == null) {
+    if (call ==
+        null) {
       return true;
     }
 
@@ -555,13 +981,19 @@ class ProjectCallController with ChangeNotifier {
     _safeNotify();
 
     try {
-      final endedCall = await _repository.endCall(callId: call.id);
+      final endedCall = await _repository.endCall(
+        callId: call.id,
+      );
 
       if (_disposed) {
         return true;
       }
 
       _activeCall = endedCall;
+
+      _syncCallClock(
+        endedCall,
+      );
 
       await _activeCallSubscription?.cancel();
 
@@ -570,14 +1002,19 @@ class ProjectCallController with ChangeNotifier {
       _safeNotify();
 
       return true;
-    } catch (error, stackTrace) {
+    } catch (
+      error,
+      stackTrace
+    ) {
       debugPrint(
         '[PROJECT CALL CONTROLLER] '
         'Erro ao encerrar chamada: '
         '$error',
       );
 
-      debugPrint('$stackTrace');
+      debugPrint(
+        '$stackTrace',
+      );
 
       _errorMessage = 'Não foi possível encerrar a chamada.';
 
@@ -595,41 +1032,67 @@ class ProjectCallController with ChangeNotifier {
   // REFRESH
   // ==========================================================
 
-  Future<void> refresh() async {
+  Future<
+    void
+  >
+  refresh() async {
     if (_disposed) {
       return;
     }
 
     try {
-      final calls = await _repository.getProjectCalls(projectId: projectId);
+      final calls = await _repository.getProjectCalls(
+        projectId: projectId,
+      );
 
-      final activeCall = await _repository.getActiveCall(projectId: projectId);
+      final activeCall = await _repository.getActiveCall(
+        projectId: projectId,
+      );
 
       if (_disposed) {
         return;
       }
 
-      _calls = List<ProjectCallModel>.unmodifiable(calls);
+      _calls =
+          List<
+            ProjectCallModel
+          >.unmodifiable(
+            calls,
+          );
 
       _activeCall = activeCall;
 
-      if (activeCall != null) {
-        _listenToActiveCall(activeCall.id);
+      _syncCallClock(
+        activeCall,
+      );
+
+      if (activeCall !=
+          null) {
+        _listenToActiveCall(
+          activeCall.id,
+        );
       }
 
       _errorMessage = null;
 
       _safeNotify();
-    } catch (error, stackTrace) {
+    } catch (
+      error,
+      stackTrace
+    ) {
       debugPrint(
         '[PROJECT CALL CONTROLLER] '
         'Erro no refresh: '
         '$error',
       );
 
-      debugPrint('$stackTrace');
+      debugPrint(
+        '$stackTrace',
+      );
 
-      _setError('Não foi possível atualizar as chamadas.');
+      _setError(
+        'Não foi possível atualizar as chamadas.',
+      );
     }
   }
 
@@ -637,7 +1100,9 @@ class ProjectCallController with ChangeNotifier {
   // CALL BY ID
   // ==========================================================
 
-  ProjectCallModel? callById(String callId) {
+  ProjectCallModel? callById(
+    String callId,
+  ) {
     final normalized = callId.trim();
 
     if (normalized.isEmpty) {
@@ -645,7 +1110,8 @@ class ProjectCallController with ChangeNotifier {
     }
 
     for (final call in _calls) {
-      if (call.id == normalized) {
+      if (call.id ==
+          normalized) {
         return call;
       }
     }
@@ -658,7 +1124,9 @@ class ProjectCallController with ChangeNotifier {
   // ==========================================================
 
   void clearError() {
-    if (_disposed || _errorMessage == null) {
+    if (_disposed ||
+        _errorMessage ==
+            null) {
       return;
     }
 
@@ -671,7 +1139,9 @@ class ProjectCallController with ChangeNotifier {
   // SET ERROR
   // ==========================================================
 
-  void _setError(String message) {
+  void _setError(
+    String message,
+  ) {
     if (_disposed) {
       return;
     }
@@ -685,10 +1155,14 @@ class ProjectCallController with ChangeNotifier {
   // NULLABLE
   // ==========================================================
 
-  String? _nullable(String? value) {
+  String? _nullable(
+    String? value,
+  ) {
     final normalized = value?.trim();
 
-    if (normalized == null || normalized.isEmpty) {
+    if (normalized ==
+            null ||
+        normalized.isEmpty) {
       return null;
     }
 
@@ -699,7 +1173,12 @@ class ProjectCallController with ChangeNotifier {
   // STOP SUBSCRIPTIONS
   // ==========================================================
 
-  Future<void> _stopSubscriptions() async {
+  Future<
+    void
+  >
+  _stopSubscriptions() async {
+    _stopClockTimer();
+
     await _projectCallsSubscription?.cancel();
 
     await _activeCallSubscription?.cancel();
@@ -714,7 +1193,8 @@ class ProjectCallController with ChangeNotifier {
   // ==========================================================
 
   void _safeNotify() {
-    if (_disposed || !hasListeners) {
+    if (_disposed ||
+        !hasListeners) {
       return;
     }
 
@@ -725,11 +1205,15 @@ class ProjectCallController with ChangeNotifier {
   // PROJECT ID
   // ==========================================================
 
-  static String _requiredProjectId(String value) {
+  static String _requiredProjectId(
+    String value,
+  ) {
     final normalized = value.trim();
 
     if (normalized.isEmpty) {
-      throw ArgumentError('projectId não pode ser vazio.');
+      throw ArgumentError(
+        'projectId não pode ser vazio.',
+      );
     }
 
     return normalized;
@@ -747,7 +1231,11 @@ class ProjectCallController with ChangeNotifier {
 
     _disposed = true;
 
-    unawaited(_stopSubscriptions());
+    _stopClockTimer();
+
+    unawaited(
+      _stopSubscriptions(),
+    );
 
     super.dispose();
   }

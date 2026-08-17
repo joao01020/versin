@@ -15,31 +15,36 @@ import '../models/project_call_model.dart';
 //
 // Responsável por:
 //
-// - criar registro de chamada;
-// - consultar chamadas;
-// - acompanhar chamadas via Realtime;
-// - aceitar;
-// - recusar;
-// - encerrar;
-// - persistir estado da chamada.
+// - criar chamada;
+// - consultar chamada;
+// - consultar chamadas do projeto;
+// - acompanhar chamadas em Realtime;
+// - aceitar chamada;
+// - recusar chamada;
+// - encerrar chamada;
+// - consultar chamada ativa.
 //
 // NÃO é responsabilidade deste repository:
 //
 // - câmera;
 // - microfone;
 // - WebRTC;
-// - SDP offer;
-// - SDP answer;
-// - ICE candidates.
+// - SDP;
+// - ICE;
+// - consentimento de vídeo;
+// - cooldown de convite.
 //
-// Essas responsabilidades ficam nos services:
+// Essas responsabilidades ficam em:
 //
+// CommunicationPermissionRepository
 // CallSignalingService
 // WebRtcCallService
 //
 // ============================================================
 
-class ProjectCallRepositoryImpl implements ProjectCallRepository {
+class ProjectCallRepositoryImpl
+    implements
+        ProjectCallRepository {
   // ==========================================================
   // TABLE
   // ==========================================================
@@ -47,7 +52,7 @@ class ProjectCallRepositoryImpl implements ProjectCallRepository {
   static const String _table = 'project_calls';
 
   // ==========================================================
-  // RPC
+  // RPCs
   // ==========================================================
 
   static const String _createCallRpc = 'create_project_call';
@@ -66,8 +71,11 @@ class ProjectCallRepositoryImpl implements ProjectCallRepository {
   // CONSTRUCTOR
   // ==========================================================
 
-  ProjectCallRepositoryImpl({SupabaseClient? supabase})
-    : _supabase = supabase ?? Supabase.instance.client;
+  ProjectCallRepositoryImpl({
+    SupabaseClient? supabase,
+  }) : _supabase =
+           supabase ??
+           Supabase.instance.client;
 
   // ==========================================================
   // CURRENT USER
@@ -77,32 +85,57 @@ class ProjectCallRepositoryImpl implements ProjectCallRepository {
   String get currentUserId {
     final userId = _supabase.auth.currentUser?.id.trim();
 
-    if (userId == null || userId.isEmpty) {
-      throw StateError('Usuário não autenticado.');
+    if (userId ==
+            null ||
+        userId.isEmpty) {
+      throw StateError(
+        'Usuário não autenticado.',
+      );
     }
 
     return userId;
   }
 
   // ==========================================================
-  // GET CALL
+  // GET CALL BY ID
   // ==========================================================
 
   @override
-  Future<ProjectCallModel?> getCallById({required String callId}) async {
-    final normalizedCallId = _required(callId, 'callId');
+  Future<
+    ProjectCallModel?
+  >
+  getCallById({
+    required String callId,
+  }) async {
+    final normalizedCallId = _required(
+      callId,
+      'callId',
+    );
 
     final response = await _supabase
-        .from(_table)
+        .from(
+          _table,
+        )
         .select()
-        .eq('id', normalizedCallId)
+        .eq(
+          'id',
+          normalizedCallId,
+        )
         .maybeSingle();
 
-    if (response == null) {
+    if (response ==
+        null) {
       return null;
     }
 
-    return ProjectCallModel.fromMap(Map<String, dynamic>.from(response));
+    return ProjectCallModel.fromMap(
+      Map<
+        String,
+        dynamic
+      >.from(
+        response,
+      ),
+    );
   }
 
   // ==========================================================
@@ -110,18 +143,36 @@ class ProjectCallRepositoryImpl implements ProjectCallRepository {
   // ==========================================================
 
   @override
-  Future<List<ProjectCallModel>> getProjectCalls({
+  Future<
+    List<
+      ProjectCallModel
+    >
+  >
+  getProjectCalls({
     required String projectId,
   }) async {
-    final normalizedProjectId = _required(projectId, 'projectId');
+    final normalizedProjectId = _required(
+      projectId,
+      'projectId',
+    );
 
     final response = await _supabase
-        .from(_table)
+        .from(
+          _table,
+        )
         .select()
-        .eq('project_id', normalizedProjectId)
-        .order('created_at', ascending: false);
+        .eq(
+          'project_id',
+          normalizedProjectId,
+        )
+        .order(
+          'created_at',
+          ascending: false,
+        );
 
-    return _mapCalls(response);
+    return _mapCalls(
+      response,
+    );
   }
 
   // ==========================================================
@@ -129,23 +180,55 @@ class ProjectCallRepositoryImpl implements ProjectCallRepository {
   // ==========================================================
 
   @override
-  Future<ProjectCallModel?> getActiveCall({required String projectId}) async {
-    final normalizedProjectId = _required(projectId, 'projectId');
+  Future<
+    ProjectCallModel?
+  >
+  getActiveCall({
+    required String projectId,
+  }) async {
+    final normalizedProjectId = _required(
+      projectId,
+      'projectId',
+    );
 
     final response = await _supabase
-        .from(_table)
+        .from(
+          _table,
+        )
         .select()
-        .eq('project_id', normalizedProjectId)
-        .inFilter('status', ['ringing', 'active'])
-        .order('created_at', ascending: false)
-        .limit(1)
+        .eq(
+          'project_id',
+          normalizedProjectId,
+        )
+        .inFilter(
+          'status',
+          [
+            'ringing',
+            'active',
+          ],
+        )
+        .order(
+          'created_at',
+          ascending: false,
+        )
+        .limit(
+          1,
+        )
         .maybeSingle();
 
-    if (response == null) {
+    if (response ==
+        null) {
       return null;
     }
 
-    return ProjectCallModel.fromMap(Map<String, dynamic>.from(response));
+    return ProjectCallModel.fromMap(
+      Map<
+        String,
+        dynamic
+      >.from(
+        response,
+      ),
+    );
   }
 
   // ==========================================================
@@ -153,23 +236,57 @@ class ProjectCallRepositoryImpl implements ProjectCallRepository {
   // ==========================================================
 
   @override
-  Stream<List<ProjectCallModel>> streamProjectCalls({
+  Stream<
+    List<
+      ProjectCallModel
+    >
+  >
+  streamProjectCalls({
     required String projectId,
   }) {
-    final normalizedProjectId = _required(projectId, 'projectId');
+    final normalizedProjectId = _required(
+      projectId,
+      'projectId',
+    );
 
     return _supabase
-        .from(_table)
-        .stream(primaryKey: ['id'])
-        .eq('project_id', normalizedProjectId)
-        .order('created_at', ascending: false)
+        .from(
+          _table,
+        )
+        .stream(
+          primaryKey: [
+            'id',
+          ],
+        )
+        .eq(
+          'project_id',
+          normalizedProjectId,
+        )
+        .order(
+          'created_at',
+          ascending: false,
+        )
         .map(
-          (rows) => rows
-              .map(
-                (row) =>
-                    ProjectCallModel.fromMap(Map<String, dynamic>.from(row)),
-              )
-              .toList(growable: false),
+          (
+            rows,
+          ) {
+            return rows
+                .map(
+                  (
+                    row,
+                  ) => ProjectCallModel.fromMap(
+                    Map<
+                      String,
+                      dynamic
+                    >.from(
+                      row,
+                    ),
+                  ),
+                )
+                .toList(
+                  growable: false,
+                );
+          },
         );
   }
 
@@ -178,22 +295,48 @@ class ProjectCallRepositoryImpl implements ProjectCallRepository {
   // ==========================================================
 
   @override
-  Stream<ProjectCallModel?> streamCall({required String callId}) {
-    final normalizedCallId = _required(callId, 'callId');
+  Stream<
+    ProjectCallModel?
+  >
+  streamCall({
+    required String callId,
+  }) {
+    final normalizedCallId = _required(
+      callId,
+      'callId',
+    );
 
     return _supabase
-        .from(_table)
-        .stream(primaryKey: ['id'])
-        .eq('id', normalizedCallId)
-        .map((rows) {
-          if (rows.isEmpty) {
-            return null;
-          }
+        .from(
+          _table,
+        )
+        .stream(
+          primaryKey: [
+            'id',
+          ],
+        )
+        .eq(
+          'id',
+          normalizedCallId,
+        )
+        .map(
+          (
+            rows,
+          ) {
+            if (rows.isEmpty) {
+              return null;
+            }
 
-          return ProjectCallModel.fromMap(
-            Map<String, dynamic>.from(rows.first),
-          );
-        });
+            return ProjectCallModel.fromMap(
+              Map<
+                String,
+                dynamic
+              >.from(
+                rows.first,
+              ),
+            );
+          },
+        );
   }
 
   // ==========================================================
@@ -201,27 +344,47 @@ class ProjectCallRepositoryImpl implements ProjectCallRepository {
   // ==========================================================
 
   @override
-  Future<ProjectCallModel> createCall({
+  Future<
+    ProjectCallModel
+  >
+  createCall({
     required String projectId,
     required CallMediaType mediaType,
     String? targetUserId,
   }) async {
-    final normalizedProjectId = _required(projectId, 'projectId');
+    final normalizedProjectId = _required(
+      projectId,
+      'projectId',
+    );
 
-    final normalizedTargetUserId = _nullable(targetUserId);
+    final normalizedTargetUserId = _nullable(
+      targetUserId,
+    );
 
     final userId = currentUserId;
 
     // ========================================================
-    // NÃO LIGAR PARA SI MESMO
+    // SELF
     // ========================================================
 
-    if (normalizedTargetUserId == userId) {
-      throw ArgumentError('Não é possível iniciar uma chamada para si mesmo.');
+    if (normalizedTargetUserId ==
+        userId) {
+      throw ArgumentError(
+        'Não é possível iniciar uma chamada para si mesmo.',
+      );
     }
 
     // ========================================================
     // RPC
+    // ========================================================
+    //
+    // A RPC valida:
+    //
+    // - membership;
+    // - chamada já existente;
+    // - target;
+    // - permissão bilateral para chamada direta de vídeo.
+    //
     // ========================================================
 
     final response = await _supabase.rpc(
@@ -237,7 +400,11 @@ class ProjectCallRepositoryImpl implements ProjectCallRepository {
     );
 
     return ProjectCallModel.fromMap(
-      _extractSingleMap(response, operation: 'criar chamada'),
+      _extractSingleMap(
+        response,
+
+        operation: 'criar chamada',
+      ),
     );
   }
 
@@ -246,8 +413,17 @@ class ProjectCallRepositoryImpl implements ProjectCallRepository {
   // ==========================================================
 
   @override
-  Future<ProjectCallModel> acceptCall({required String callId}) {
-    return _respondCall(callId: callId, accepted: true);
+  Future<
+    ProjectCallModel
+  >
+  acceptCall({
+    required String callId,
+  }) {
+    return _respondCall(
+      callId: callId,
+
+      accepted: true,
+    );
   }
 
   // ==========================================================
@@ -255,31 +431,52 @@ class ProjectCallRepositoryImpl implements ProjectCallRepository {
   // ==========================================================
 
   @override
-  Future<ProjectCallModel> rejectCall({required String callId}) {
-    return _respondCall(callId: callId, accepted: false);
+  Future<
+    ProjectCallModel
+  >
+  rejectCall({
+    required String callId,
+  }) {
+    return _respondCall(
+      callId: callId,
+
+      accepted: false,
+    );
   }
 
   // ==========================================================
   // RESPOND CALL
   // ==========================================================
 
-  Future<ProjectCallModel> _respondCall({
+  Future<
+    ProjectCallModel
+  >
+  _respondCall({
     required String callId,
     required bool accepted,
   }) async {
-    final normalizedCallId = _required(callId, 'callId');
+    final normalizedCallId = _required(
+      callId,
+      'callId',
+    );
 
     final response = await _supabase.rpc(
       _respondCallRpc,
 
-      params: {'p_call_id': normalizedCallId, 'p_accept': accepted},
+      params: {
+        'p_call_id': normalizedCallId,
+
+        'p_accept': accepted,
+      },
     );
 
     return ProjectCallModel.fromMap(
       _extractSingleMap(
         response,
 
-        operation: accepted ? 'aceitar chamada' : 'recusar chamada',
+        operation: accepted
+            ? 'aceitar chamada'
+            : 'recusar chamada',
       ),
     );
   }
@@ -289,17 +486,31 @@ class ProjectCallRepositoryImpl implements ProjectCallRepository {
   // ==========================================================
 
   @override
-  Future<ProjectCallModel> endCall({required String callId}) async {
-    final normalizedCallId = _required(callId, 'callId');
+  Future<
+    ProjectCallModel
+  >
+  endCall({
+    required String callId,
+  }) async {
+    final normalizedCallId = _required(
+      callId,
+      'callId',
+    );
 
     final response = await _supabase.rpc(
       _endCallRpc,
 
-      params: {'p_call_id': normalizedCallId},
+      params: {
+        'p_call_id': normalizedCallId,
+      },
     );
 
     return ProjectCallModel.fromMap(
-      _extractSingleMap(response, operation: 'encerrar chamada'),
+      _extractSingleMap(
+        response,
+
+        operation: 'encerrar chamada',
+      ),
     );
   }
 
@@ -308,65 +519,117 @@ class ProjectCallRepositoryImpl implements ProjectCallRepository {
   // ==========================================================
 
   @override
-  Future<bool> hasActiveCall({required String projectId}) async {
-    final call = await getActiveCall(projectId: projectId);
+  Future<
+    bool
+  >
+  hasActiveCall({
+    required String projectId,
+  }) async {
+    final call = await getActiveCall(
+      projectId: projectId,
+    );
 
-    return call != null;
+    return call !=
+        null;
   }
 
   // ==========================================================
   // MAP CALLS
   // ==========================================================
 
-  List<ProjectCallModel> _mapCalls(List<dynamic> response) {
+  List<
+    ProjectCallModel
+  >
+  _mapCalls(
+    List<
+      dynamic
+    >
+    response,
+  ) {
     return response
         .map(
-          (item) =>
-              ProjectCallModel.fromMap(Map<String, dynamic>.from(item as Map)),
+          (
+            item,
+          ) => ProjectCallModel.fromMap(
+            Map<
+              String,
+              dynamic
+            >.from(
+              item
+                  as Map,
+            ),
+          ),
         )
-        .toList(growable: false);
+        .toList(
+          growable: false,
+        );
   }
 
   // ==========================================================
   // EXTRACT RPC RESPONSE
   // ==========================================================
 
-  Map<String, dynamic> _extractSingleMap(
+  Map<
+    String,
+    dynamic
+  >
+  _extractSingleMap(
     dynamic response, {
     required String operation,
   }) {
     // ========================================================
-    // MAP DIRETO
+    // MAP
     // ========================================================
 
-    if (response is Map) {
-      return Map<String, dynamic>.from(response);
+    if (response
+        is Map) {
+      return Map<
+        String,
+        dynamic
+      >.from(
+        response,
+      );
     }
 
     // ========================================================
-    // LISTA
+    // LIST
     // ========================================================
 
-    if (response is List && response.isNotEmpty) {
+    if (response
+            is List &&
+        response.isNotEmpty) {
       final first = response.first;
 
-      if (first is Map) {
-        return Map<String, dynamic>.from(first);
+      if (first
+          is Map) {
+        return Map<
+          String,
+          dynamic
+        >.from(
+          first,
+        );
       }
     }
 
-    throw StateError('Resposta inválida do Supabase ao $operation.');
+    throw StateError(
+      'Resposta inválida do Supabase ao $operation.',
+    );
   }
 
   // ==========================================================
   // REQUIRED
   // ==========================================================
 
-  String _required(String value, String field) {
+  String _required(
+    String value,
+    String field,
+  ) {
     final normalized = value.trim();
 
     if (normalized.isEmpty) {
-      throw ArgumentError('$field não pode ser vazio.');
+      throw ArgumentError(
+        '$field não pode ser vazio.',
+      );
     }
 
     return normalized;
@@ -376,10 +639,14 @@ class ProjectCallRepositoryImpl implements ProjectCallRepository {
   // NULLABLE
   // ==========================================================
 
-  String? _nullable(String? value) {
+  String? _nullable(
+    String? value,
+  ) {
     final normalized = value?.trim();
 
-    if (normalized == null || normalized.isEmpty) {
+    if (normalized ==
+            null ||
+        normalized.isEmpty) {
       return null;
     }
 

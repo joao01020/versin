@@ -2,18 +2,27 @@
 // COMMUNICATION PERMISSION MODEL
 // ============================================================
 //
-// Representa as permissões de comunicação de um membro
-// dentro de um projeto.
+// Representa a permissão BILATERAL de vídeo entre dois
+// usuários dentro de um projeto.
 //
-// Áudio e vídeo são independentes.
+// IMPORTANTE:
+//
+// A permissão é específica para o PAR:
+//
+// userA <-> userB
 //
 // Exemplo:
 //
-// audioAllowed = true
+// João <-> Artista
+// videoAllowed = true
+//
+// João <-> Beatmaker
 // videoAllowed = false
 //
-// O usuário pode participar por áudio,
-// mas ainda não possui autorização para vídeo.
+// Isso significa que aceitar vídeo com um usuário NÃO libera
+// automaticamente vídeo com todos os outros membros.
+//
+// Áudio continua independente e não depende desse model.
 //
 // ============================================================
 
@@ -26,13 +35,33 @@ class CommunicationPermissionModel {
 
   final String projectId;
 
-  final String userId;
+  // ==========================================================
+  // PAR DE USUÁRIOS
+  // ==========================================================
+  //
+  // O banco mantém o par em ordem canônica:
+  //
+  // userAId < userBId
+  //
+  // Assim:
+  //
+  // A <-> B
+  //
+  // e
+  //
+  // B <-> A
+  //
+  // representam exatamente a mesma permissão.
+  //
+  // ==========================================================
+
+  final String userAId;
+
+  final String userBId;
 
   // ==========================================================
-  // PERMISSÕES
+  // PERMISSÃO DE VÍDEO
   // ==========================================================
-
-  final bool audioAllowed;
 
   final bool videoAllowed;
 
@@ -40,9 +69,11 @@ class CommunicationPermissionModel {
   // AUDITORIA
   // ==========================================================
 
-  final String? videoApprovedBy;
+  final DateTime? videoAllowedAt;
 
-  final DateTime? videoApprovedAt;
+  final DateTime? videoRevokedAt;
+
+  final String? videoRevokedBy;
 
   final DateTime? createdAt;
 
@@ -55,11 +86,12 @@ class CommunicationPermissionModel {
   const CommunicationPermissionModel({
     required this.id,
     required this.projectId,
-    required this.userId,
-    this.audioAllowed = true,
+    required this.userAId,
+    required this.userBId,
     this.videoAllowed = false,
-    this.videoApprovedBy,
-    this.videoApprovedAt,
+    this.videoAllowedAt,
+    this.videoRevokedAt,
+    this.videoRevokedBy,
     this.createdAt,
     this.updatedAt,
   });
@@ -82,21 +114,23 @@ class CommunicationPermissionModel {
       projectId: _readString(
         map['project_id'],
       ),
-      userId: _readString(
-        map['user_id'],
+      userAId: _readString(
+        map['user_a_id'],
       ),
-      audioAllowed: _readBool(
-        map['audio_allowed'],
-        fallback: true,
+      userBId: _readString(
+        map['user_b_id'],
       ),
       videoAllowed: _readBool(
         map['video_allowed'],
       ),
-      videoApprovedBy: _readNullableString(
-        map['video_approved_by'],
+      videoAllowedAt: _readDateTime(
+        map['video_allowed_at'],
       ),
-      videoApprovedAt: _readDateTime(
-        map['video_approved_at'],
+      videoRevokedAt: _readDateTime(
+        map['video_revoked_at'],
+      ),
+      videoRevokedBy: _readNullableString(
+        map['video_revoked_by'],
       ),
       createdAt: _readDateTime(
         map['created_at'],
@@ -119,11 +153,12 @@ class CommunicationPermissionModel {
     return {
       'id': id,
       'project_id': projectId,
-      'user_id': userId,
-      'audio_allowed': audioAllowed,
+      'user_a_id': userAId,
+      'user_b_id': userBId,
       'video_allowed': videoAllowed,
-      'video_approved_by': videoApprovedBy,
-      'video_approved_at': videoApprovedAt?.toIso8601String(),
+      'video_allowed_at': videoAllowedAt?.toIso8601String(),
+      'video_revoked_at': videoRevokedAt?.toIso8601String(),
+      'video_revoked_by': videoRevokedBy,
       'created_at': createdAt?.toIso8601String(),
       'updated_at': updatedAt?.toIso8601String(),
     };
@@ -136,11 +171,12 @@ class CommunicationPermissionModel {
   CommunicationPermissionModel copyWith({
     String? id,
     String? projectId,
-    String? userId,
-    bool? audioAllowed,
+    String? userAId,
+    String? userBId,
     bool? videoAllowed,
-    String? videoApprovedBy,
-    DateTime? videoApprovedAt,
+    DateTime? videoAllowedAt,
+    DateTime? videoRevokedAt,
+    String? videoRevokedBy,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -151,21 +187,24 @@ class CommunicationPermissionModel {
       projectId:
           projectId ??
           this.projectId,
-      userId:
-          userId ??
-          this.userId,
-      audioAllowed:
-          audioAllowed ??
-          this.audioAllowed,
+      userAId:
+          userAId ??
+          this.userAId,
+      userBId:
+          userBId ??
+          this.userBId,
       videoAllowed:
           videoAllowed ??
           this.videoAllowed,
-      videoApprovedBy:
-          videoApprovedBy ??
-          this.videoApprovedBy,
-      videoApprovedAt:
-          videoApprovedAt ??
-          this.videoApprovedAt,
+      videoAllowedAt:
+          videoAllowedAt ??
+          this.videoAllowedAt,
+      videoRevokedAt:
+          videoRevokedAt ??
+          this.videoRevokedAt,
+      videoRevokedBy:
+          videoRevokedBy ??
+          this.videoRevokedBy,
       createdAt:
           createdAt ??
           this.createdAt,
@@ -176,16 +215,156 @@ class CommunicationPermissionModel {
   }
 
   // ==========================================================
-  // HELPERS
+  // VIDEO
   // ==========================================================
 
-  bool get canJoinAudio => audioAllowed;
-
-  bool get canJoinVideo =>
-      audioAllowed &&
-      videoAllowed;
+  bool get canUseVideo => videoAllowed;
 
   bool get requiresVideoPermission => !videoAllowed;
+
+  bool get wasRevoked =>
+      videoRevokedAt !=
+      null;
+
+  // ==========================================================
+  // RELATIONSHIP
+  // ==========================================================
+
+  bool containsUser(
+    String userId,
+  ) {
+    final normalized = userId.trim();
+
+    if (normalized.isEmpty) {
+      return false;
+    }
+
+    return userAId ==
+            normalized ||
+        userBId ==
+            normalized;
+  }
+
+  // ==========================================================
+  // OTHER USER
+  // ==========================================================
+  //
+  // Se o usuário atual for A:
+  //
+  // retorna B.
+  //
+  // Se for B:
+  //
+  // retorna A.
+  //
+  // Caso o usuário não faça parte da relação:
+  //
+  // retorna null.
+  //
+  // ==========================================================
+
+  String? otherUserId(
+    String currentUserId,
+  ) {
+    final normalized = currentUserId.trim();
+
+    if (normalized.isEmpty) {
+      return null;
+    }
+
+    if (userAId ==
+        normalized) {
+      return userBId;
+    }
+
+    if (userBId ==
+        normalized) {
+      return userAId;
+    }
+
+    return null;
+  }
+
+  // ==========================================================
+  // MATCHES PAIR
+  // ==========================================================
+  //
+  // A ordem não importa.
+  //
+  // matchesPair(A, B)
+  //
+  // ==
+  //
+  // matchesPair(B, A)
+  //
+  // ==========================================================
+
+  bool matchesPair({
+    required String firstUserId,
+    required String secondUserId,
+  }) {
+    final first = firstUserId.trim();
+
+    final second = secondUserId.trim();
+
+    if (first.isEmpty ||
+        second.isEmpty ||
+        first ==
+            second) {
+      return false;
+    }
+
+    return (userAId ==
+                first &&
+            userBId ==
+                second) ||
+        (userAId ==
+                second &&
+            userBId ==
+                first);
+  }
+
+  // ==========================================================
+  // WAS REVOKED BY
+  // ==========================================================
+
+  bool wasRevokedBy(
+    String userId,
+  ) {
+    final revokedBy = videoRevokedBy?.trim();
+
+    final normalized = userId.trim();
+
+    if (revokedBy ==
+            null ||
+        revokedBy.isEmpty ||
+        normalized.isEmpty) {
+      return false;
+    }
+
+    return revokedBy ==
+        normalized;
+  }
+
+  // ==========================================================
+  // IS VALID
+  // ==========================================================
+
+  bool get isValid {
+    if (id.isEmpty ||
+        projectId.isEmpty ||
+        userAId.isEmpty ||
+        userBId.isEmpty) {
+      return false;
+    }
+
+    if (userAId ==
+        userBId) {
+      return false;
+    }
+
+    return true;
+  }
 
   // ==========================================================
   // PARSERS
@@ -269,9 +448,60 @@ class CommunicationPermissionModel {
   String toString() {
     return 'CommunicationPermissionModel('
         'projectId: $projectId, '
-        'userId: $userId, '
-        'audioAllowed: $audioAllowed, '
+        'userAId: $userAId, '
+        'userBId: $userBId, '
         'videoAllowed: $videoAllowed'
         ')';
   }
+
+  // ==========================================================
+  // EQUALITY
+  // ==========================================================
+
+  @override
+  bool operator ==(
+    Object other,
+  ) {
+    if (identical(
+      this,
+      other,
+    )) {
+      return true;
+    }
+
+    return other
+            is CommunicationPermissionModel &&
+        other.id ==
+            id &&
+        other.projectId ==
+            projectId &&
+        other.userAId ==
+            userAId &&
+        other.userBId ==
+            userBId &&
+        other.videoAllowed ==
+            videoAllowed &&
+        other.videoAllowedAt ==
+            videoAllowedAt &&
+        other.videoRevokedAt ==
+            videoRevokedAt &&
+        other.videoRevokedBy ==
+            videoRevokedBy;
+  }
+
+  // ==========================================================
+  // HASH CODE
+  // ==========================================================
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    projectId,
+    userAId,
+    userBId,
+    videoAllowed,
+    videoAllowedAt,
+    videoRevokedAt,
+    videoRevokedBy,
+  );
 }

@@ -10,10 +10,40 @@ import '../../types/communication_request_type.dart';
 // Exemplos:
 //
 // video_unlock
-// → desbloquear permanentemente o vídeo no projeto.
+// ------------------------------------------------------------
+// Solicitação para liberar vídeo entre dois membros.
 //
 // video_upgrade
-// → durante uma chamada de áudio, solicitar mudança para vídeo.
+// ------------------------------------------------------------
+// Durante uma chamada de áudio, solicita habilitação de vídeo.
+//
+// NOVO FLUXO:
+//
+// 1ª tentativa
+// -> attemptNumber = 1
+//
+// recusou
+// -> cooldown 2 dias
+//
+// 2ª tentativa
+// -> attemptNumber = 2
+//
+// recusou
+// -> cooldown 4 dias
+//
+// 3ª tentativa
+// -> attemptNumber = 3
+//
+// recusou
+// -> bloqueio até o target liberar nova tentativa.
+//
+// IMPORTANTE:
+//
+// O estado de cooldown/bloqueio NÃO fica neste model.
+//
+// Ele fica em:
+//
+// CommunicationVideoInviteStateModel
 //
 // ============================================================
 
@@ -26,11 +56,34 @@ class CommunicationRequestModel {
 
   final String projectId;
 
+  // ==========================================================
+  // USERS
+  // ==========================================================
+
   final String senderId;
 
   final String targetUserId;
 
+  // ==========================================================
+  // CALL
+  // ==========================================================
+
   final String? callId;
+
+  // ==========================================================
+  // VIDEO PERMISSION RELATION
+  // ==========================================================
+  //
+  // Referência para:
+  //
+  // communication_video_permissions.id
+  //
+  // Dessa forma o request sabe exatamente qual relação
+  // bilateral será liberada caso seja aceito.
+  //
+  // ==========================================================
+
+  final String? videoPermissionId;
 
   // ==========================================================
   // REQUEST
@@ -39,6 +92,12 @@ class CommunicationRequestModel {
   final CommunicationRequestType type;
 
   final CommunicationRequestStatus status;
+
+  // ==========================================================
+  // TENTATIVA
+  // ==========================================================
+
+  final int attemptNumber;
 
   // ==========================================================
   // DATAS
@@ -62,6 +121,8 @@ class CommunicationRequestModel {
     required this.type,
     required this.status,
     this.callId,
+    this.videoPermissionId,
+    this.attemptNumber = 1,
     this.createdAt,
     this.respondedAt,
     this.expiresAt,
@@ -99,6 +160,10 @@ class CommunicationRequestModel {
         map['call_id'],
       ),
 
+      videoPermissionId: _readNullableString(
+        map['video_permission_id'],
+      ),
+
       type: CommunicationRequestType.fromString(
         _readString(
           map['type'],
@@ -109,6 +174,11 @@ class CommunicationRequestModel {
         _readString(
           map['status'],
         ),
+      ),
+
+      attemptNumber: _readInt(
+        map['attempt_number'],
+        fallback: 1,
       ),
 
       createdAt: _readDateTime(
@@ -145,9 +215,13 @@ class CommunicationRequestModel {
 
       'call_id': callId,
 
+      'video_permission_id': videoPermissionId,
+
       'type': type.value,
 
       'status': status.value,
+
+      'attempt_number': attemptNumber,
 
       'created_at': createdAt?.toUtc().toIso8601String(),
 
@@ -167,8 +241,10 @@ class CommunicationRequestModel {
     String? senderId,
     String? targetUserId,
     String? callId,
+    String? videoPermissionId,
     CommunicationRequestType? type,
     CommunicationRequestStatus? status,
+    int? attemptNumber,
     DateTime? createdAt,
     DateTime? respondedAt,
     DateTime? expiresAt,
@@ -194,6 +270,10 @@ class CommunicationRequestModel {
           callId ??
           this.callId,
 
+      videoPermissionId:
+          videoPermissionId ??
+          this.videoPermissionId,
+
       type:
           type ??
           this.type,
@@ -201,6 +281,10 @@ class CommunicationRequestModel {
       status:
           status ??
           this.status,
+
+      attemptNumber:
+          attemptNumber ??
+          this.attemptNumber,
 
       createdAt:
           createdAt ??
@@ -233,7 +317,7 @@ class CommunicationRequestModel {
   bool get isFinal => status.isFinal;
 
   // ==========================================================
-  // EXPIRAÇÃO REAL
+  // EXPIRAÇÃO
   // ==========================================================
 
   bool get hasExpired {
@@ -250,7 +334,7 @@ class CommunicationRequestModel {
   }
 
   // ==========================================================
-  // PODE RESPONDER?
+  // CAN RESPOND
   // ==========================================================
 
   bool get canRespond {
@@ -273,20 +357,24 @@ class CommunicationRequestModel {
 
   bool get isVideoUpgradeRequest => type.isVideoUpgrade;
 
+  bool get isVideoRequest =>
+      isVideoUnlockRequest ||
+      isVideoUpgradeRequest;
+
   // ==========================================================
-  // PRECISA DE CALL ID?
+  // CALL REQUIREMENT
   // ==========================================================
 
   bool get requiresCall => type.requiresCall;
 
   // ==========================================================
-  // ALTERA PERMISSÃO PERMANENTE?
+  // PERSISTENT PERMISSION
   // ==========================================================
 
   bool get changesPersistentPermission => type.changesPersistentPermission;
 
   // ==========================================================
-  // VALIDAR CALL ID
+  // VALID CALL REFERENCE
   // ==========================================================
 
   bool get hasValidCallReference {
@@ -299,6 +387,63 @@ class CommunicationRequestModel {
     return value !=
             null &&
         value.isNotEmpty;
+  }
+
+  // ==========================================================
+  // VIDEO PERMISSION REFERENCE
+  // ==========================================================
+
+  bool get hasVideoPermissionReference {
+    final value = videoPermissionId?.trim();
+
+    return value !=
+            null &&
+        value.isNotEmpty;
+  }
+
+  // ==========================================================
+  // ATTEMPT
+  // ==========================================================
+
+  bool get isFirstAttempt =>
+      attemptNumber ==
+      1;
+
+  bool get isSecondAttempt =>
+      attemptNumber ==
+      2;
+
+  bool get isThirdAttempt =>
+      attemptNumber >=
+      3;
+
+  bool get isLastAutomaticAttempt => isThirdAttempt;
+
+  int get remainingAttempts {
+    final remaining =
+        3 -
+        attemptNumber;
+
+    if (remaining <
+        0) {
+      return 0;
+    }
+
+    return remaining;
+  }
+
+  String get attemptLabel {
+    if (attemptNumber <=
+        1) {
+      return '1ª tentativa';
+    }
+
+    if (attemptNumber ==
+        2) {
+      return '2ª tentativa';
+    }
+
+    return '3ª tentativa';
   }
 
   // ==========================================================
@@ -332,7 +477,7 @@ class CommunicationRequestModel {
   }
 
   // ==========================================================
-  // ENVOLVE USUÁRIO?
+  // INVOLVES USER
   // ==========================================================
 
   bool involvesUser(
@@ -351,7 +496,7 @@ class CommunicationRequestModel {
   }
 
   // ==========================================================
-  // OUTRO USUÁRIO
+  // OTHER USER
   // ==========================================================
 
   String? otherUserId(
@@ -377,7 +522,7 @@ class CommunicationRequestModel {
   }
 
   // ==========================================================
-  // É RECEBIDO?
+  // RECEIVED
   // ==========================================================
 
   bool isReceivedBy(
@@ -389,7 +534,7 @@ class CommunicationRequestModel {
   }
 
   // ==========================================================
-  // É ENVIADO?
+  // SENT
   // ==========================================================
 
   bool isSentBy(
@@ -399,6 +544,16 @@ class CommunicationRequestModel {
       userId,
     );
   }
+
+  // ==========================================================
+  // VALID ATTEMPT
+  // ==========================================================
+
+  bool get hasValidAttemptNumber =>
+      attemptNumber >=
+          1 &&
+      attemptNumber <=
+          3;
 
   // ==========================================================
   // VALID
@@ -430,6 +585,10 @@ class CommunicationRequestModel {
       return false;
     }
 
+    if (!hasValidAttemptNumber) {
+      return false;
+    }
+
     return true;
   }
 
@@ -456,6 +615,31 @@ class CommunicationRequestModel {
     }
 
     return normalized;
+  }
+
+  static int _readInt(
+    dynamic value, {
+    int fallback = 0,
+  }) {
+    if (value
+        is int) {
+      return value;
+    }
+
+    if (value
+        is num) {
+      return value.toInt();
+    }
+
+    if (value
+        is String) {
+      return int.tryParse(
+            value.trim(),
+          ) ??
+          fallback;
+    }
+
+    return fallback;
   }
 
   static DateTime? _readDateTime(
@@ -499,6 +683,10 @@ class CommunicationRequestModel {
             id;
   }
 
+  // ==========================================================
+  // HASH CODE
+  // ==========================================================
+
   @override
   int get hashCode => id.hashCode;
 
@@ -514,8 +702,10 @@ class CommunicationRequestModel {
         'senderId: $senderId, '
         'targetUserId: $targetUserId, '
         'callId: $callId, '
+        'videoPermissionId: $videoPermissionId, '
         'type: ${type.value}, '
-        'status: ${status.value}'
+        'status: ${status.value}, '
+        'attemptNumber: $attemptNumber'
         ')';
   }
 }

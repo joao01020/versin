@@ -1,54 +1,288 @@
-# Miscellaneous
+# ============================================================
+# VERSIN - .gitignore
+# Flutter + Dart + Python/FastAPI + Node.js + Supabase
+# ============================================================
+
+
+# ============================================================
+# SECRETS / VARIÁVEIS DE AMBIENTE
+# ============================================================
+
+.env
+.env.*
+.env.local
+.env.*.local
+
+# dotenvx
+.env.keys
+
+# Modelo de configuração pode ser versionado
+!.env.example
+!.env.*.example
+
+
+# ============================================================
+# CREDENCIAIS / CHAVES / CERTIFICADOS
+# ============================================================
+
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+
+credentials.json
+service-account.json
+service_account.json
+
+secrets.json
+secrets.yaml
+secrets.yml
+
+
+# ============================================================
+# MISCELLANEOUS
+# ============================================================
+
 *.class
 *.log
 *.pyc
 *.swp
+*.swo
+*.tmp
+*.temp
+*.bak
+
 .DS_Store
+
 .atom/
 .build/
 .buildlog/
 .history
 .svn/
 .swiftpm/
+
 migrate_working_dir/
 
-# IntelliJ related
+.cache/
+tmp/
+temp/
+
+
+# ============================================================
+# INTELLIJ / ANDROID STUDIO
+# ============================================================
+
 *.iml
 *.ipr
 *.iws
+
 .idea/
 
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
-#.vscode/
 
-# Flutter/Dart/Pub related
+# ============================================================
+# VS CODE
+# ============================================================
+#
+# Mantido versionável por padrão.
+#
+# Caso queira ignorar configurações locais do VS Code,
+# descomente:
+#
+# .vscode/
+#
+# ============================================================
+
+
+# ============================================================
+# FLUTTER / DART / PUB
+# ============================================================
+
 **/doc/api/
 **/ios/Flutter/.last_build_id
+
 .dart_tool/
+
+.flutter-plugins
 .flutter-plugins-dependencies
+
+.packages
+
 .pub-cache/
 .pub/
-/build/
-/coverage/
 
-# Symbolication related
+build/
+/build/
+
+coverage/
+
+flutter_export_environment.sh
+
+
+# ============================================================
+# FLUTTER - ARQUIVOS GERADOS
+# ============================================================
+
+**/generated_plugin_registrant.dart
+
+ios/Flutter/Generated.xcconfig
+ios/Flutter/ephemeral/
+
+macos/Flutter/ephemeral/
+
+windows/flutter/ephemeral/
+
+linux/flutter/ephemeral/
+
+
+# ============================================================
+# SYMBOLICATION
+# ============================================================
+
 app.*.symbols
 
-# Obfuscation related
+
+# ============================================================
+# OBFUSCATION
+# ============================================================
+
 app.*.map.json
 
-# Android Studio will place build artifacts here
+
+# ============================================================
+# ANDROID
+# ============================================================
+
+android/.gradle/
+android/local.properties
+
 /android/app/debug
 /android/app/profile
 /android/app/release
 
-# --- Python / FastAPI (Versin API) ---
+
+# ============================================================
+# IOS / MACOS
+# ============================================================
+
+ios/Pods/
+macos/Pods/
+
+ios/.symlinks/
+macos/.symlinks/
+
+DerivedData/
+
+
+# ============================================================
+# PYTHON / FASTAPI - VERSIN API
+# ============================================================
+
 venv/
 .venv/
 env/
+ENV/
+
 __pycache__/
-*.pyc
-.env
+
+*.py[cod]
+*$py.class
+
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+.coverage
+.coverage.*
+
+htmlcov/
+
+pip-wheel-metadata/
+
+*.egg
+*.egg-info/
+
+dist/
+sdist/
+
+
+# ============================================================
+# NODE.JS
+# ============================================================
+
+node_modules/
+**/node_modules/
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+.npm/
+.pnpm-store/
+
+.yarn/cache/
+.yarn/unplugged/
+
+
+# ============================================================
+# SUPABASE
+# ============================================================
+
+.supabase/
+
+.branches
+.temp
+
+supabase/.branches/
+supabase/.temp/
+
+# Secrets locais do Supabase
+supabase/.env
+supabase/.env.*
+supabase/functions/.env
+supabase/functions/.env.*
+
+
+# ============================================================
+# BANCOS LOCAIS
+# ============================================================
+
+*.db
+*.sqlite
+*.sqlite3
+
+
+# ============================================================
+# BACKUPS
+# ============================================================
+
+*.backup
+*.dump
+*.sql.gz
+
+
+# ============================================================
+# NÃO IGNORAR
+# ============================================================
+#
+# Estes arquivos fazem parte do projeto e DEVEM normalmente
+# continuar no Git:
+#
+# pubspec.yaml
+# pubspec.lock
+#
+# package.json
+# package-lock.json
+#
+# supabase/config.toml
+# supabase/migrations/
+# supabase/functions/
+#
+# requirements.txt
+# pyproject.toml
+#
+# .env.example
+#
+# ============================================================

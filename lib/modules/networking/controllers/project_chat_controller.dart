@@ -306,7 +306,6 @@ class ProjectChatController
           )
           .listen(
             _onMessagesReceived,
-
             onError: _onRealtimeError,
           );
     } catch (
@@ -898,6 +897,36 @@ class ProjectChatController
       return false;
     }
 
+    // ========================================================
+    // LIMITE DE 24 HORAS
+    // ========================================================
+    //
+    // O model calcula o prazo usando createdAt + 24 horas.
+    //
+    // Depois desse período, o Controller nem tenta chamar
+    // o Service.
+    //
+    // A RLS do Supabase também deve aplicar a mesma regra,
+    // porque ela é a proteção real contra chamadas externas.
+    //
+    // ========================================================
+
+    if (message.isSystem) {
+      _errorMessage = 'Mensagens do sistema não podem ser apagadas por usuários.';
+
+      _safeNotify();
+
+      return false;
+    }
+
+    if (!message.canDelete) {
+      _errorMessage = 'O prazo de 24 horas para apagar esta mensagem terminou.';
+
+      _safeNotify();
+
+      return false;
+    }
+
     try {
       await _service.deleteMessage(
         messageId: normalizedMessageId,
@@ -1006,6 +1035,52 @@ class ProjectChatController
             message.senderId.trim() ==
             normalized,
       ),
+    );
+  }
+
+  // ==========================================================
+  // PODE APAGAR?
+  // ==========================================================
+  //
+  // Centraliza a regra usada pela interface.
+  //
+  // Para apagar:
+  //
+  // - precisa ser o autor;
+  // - precisa estar dentro das primeiras 24 horas.
+  //
+  // ==========================================================
+
+  bool canDeleteMessage(
+    ProjectMessageModel message,
+  ) {
+    if (_disposed) {
+      return false;
+    }
+
+    if (!isMyMessage(
+      message,
+    )) {
+      return false;
+    }
+
+    return message.canDelete;
+  }
+
+  bool canDeleteMessageById(
+    String messageId,
+  ) {
+    final message = getMessageById(
+      messageId,
+    );
+
+    if (message ==
+        null) {
+      return false;
+    }
+
+    return canDeleteMessage(
+      message,
     );
   }
 

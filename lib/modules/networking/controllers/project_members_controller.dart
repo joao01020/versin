@@ -129,6 +129,12 @@ class ProjectMembersController
 
   int get memberCount => _members.length;
 
+  int get onlineMemberCount => onlineMembers.length;
+
+  int get otherMemberCount => otherMembers.length;
+
+  int get otherOnlineMemberCount => otherOnlineMembers.length;
+
   // ==========================================================
   // CURRENT USER
   // ==========================================================
@@ -277,11 +283,53 @@ class ProjectMembersController
       // RESULTADO
       // ======================================================
 
+      final sortedMembers =
+          uniqueMembers.values.toList(
+            growable: false,
+          )..sort(
+            (
+              first,
+              second,
+            ) {
+              final currentUserId = this.currentUserId;
+
+              final firstIsCurrent =
+                  currentUserId !=
+                      null &&
+                  first.userId ==
+                      currentUserId;
+
+              final secondIsCurrent =
+                  currentUserId !=
+                      null &&
+                  second.userId ==
+                      currentUserId;
+
+              if (firstIsCurrent !=
+                  secondIsCurrent) {
+                return firstIsCurrent
+                    ? -1
+                    : 1;
+              }
+
+              if (first.isOnline !=
+                  second.isOnline) {
+                return first.isOnline
+                    ? -1
+                    : 1;
+              }
+
+              return first.displayName.toLowerCase().compareTo(
+                second.displayName.toLowerCase(),
+              );
+            },
+          );
+
       _members =
           List<
             ProjectMemberModel
           >.unmodifiable(
-            uniqueMembers.values,
+            sortedMembers,
           );
 
       _isLoading = false;
@@ -508,6 +556,36 @@ class ProjectMembersController
         .toList(
           growable: false,
         );
+  }
+
+  // ==========================================================
+  // MEMBER COUNT LABEL
+  // ==========================================================
+
+  String get memberCountLabel {
+    final count = memberCount;
+
+    if (count ==
+        1) {
+      return '1 membro';
+    }
+
+    return '$count membros';
+  }
+
+  // ==========================================================
+  // ONLINE COUNT LABEL
+  // ==========================================================
+
+  String get onlineCountLabel {
+    final count = onlineMemberCount;
+
+    if (count ==
+        1) {
+      return '1 online';
+    }
+
+    return '$count online';
   }
 
   // ==========================================================

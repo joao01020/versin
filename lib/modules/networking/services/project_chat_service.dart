@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -15,17 +17,55 @@ import '../data/models/project_message_model.dart';
 //    ↓
 // Supabase Realtime
 //
+// MODELO DO CHAT:
+//
+// O chat pertence à Studio Session.
+//
+// Portanto:
+//
+// project_id
+//
+// identifica a conversa.
+//
+// NÃO existe:
+//
+// receiver_id
+//
+// Isso permite:
+//
+// João + Maria
+//      ↓
+// project_id = X
+//
+// Pedro entra depois
+//      ↓
+// project_id = X
+//
+// João + Maria + Pedro
+//      ↓
+// continuam usando o mesmo histórico.
+//
 // Este service:
 //
 // - identifica o usuário autenticado;
-// - busca mensagens;
-// - envia mensagens;
-// - abre stream realtime;
+// - busca mensagens da Studio Session;
+// - envia mensagens para a Studio Session;
+// - abre stream Realtime;
+// - aceita mensagens de vários sender_id;
 // - valida conteúdo;
-// - mantém cada conversa isolada pelo projectId.
+// - mantém cada conversa isolada pelo projectId;
+// - permite apagar somente mensagens do usuário autenticado.
 //
-// A autorização real continua protegida pelas políticas RLS
+// IMPORTANTE:
+//
+// A autorização REAL continua protegida pelas políticas RLS
 // configuradas no Supabase.
+//
+// A RLS deve garantir que:
+//
+// - somente membros do projeto leiam mensagens;
+// - somente membros do projeto enviem mensagens;
+// - somente o autor apague sua própria mensagem.
 //
 // ============================================================
 
@@ -36,11 +76,40 @@ class ProjectChatService {
 
   static const String _table = 'project_messages';
 
+  static const String _audioBucket = 'chat-audio';
+
   // ==========================================================
   // LIMITES
   // ==========================================================
 
   static const int maxMessageLength = 4000;
+
+  static const int defaultHistoryLimit = 200;
+
+  static const int maxHistoryLimit = 500;
+
+  // ==========================================================
+  // CAMPOS
+  // ==========================================================
+  //
+  // Mantemos centralizado para evitar divergência entre:
+  //
+  // - SELECT;
+  // - INSERT RETURNING;
+  // - carregamento manual.
+  //
+  // ==========================================================
+
+  static const String _messageFields = '''
+    id,
+    project_id,
+    sender_id,
+    content,
+    message_type,
+    audio_path,
+    audio_duration_ms,
+    created_at
+  ''';
 
   // ==========================================================
   // SUPABASE
@@ -99,7 +168,18 @@ class ProjectChatService {
   //
   // 1. recebe o estado inicial;
   // 2. continua ouvindo inserts / updates / deletes;
-  // 3. entrega somente mensagens do projectId informado.
+  // 3. entrega somente mensagens do projectId informado;
+  // 4. aceita qualquer sender_id autorizado pela RLS.
+  //
+  // Exemplo:
+  //
+  // project_id = X
+  //
+  // sender_id = João
+  // sender_id = Maria
+  // sender_id = Pedro
+  //
+  // Todos aparecem no MESMO stream.
   //
   // ==========================================================
 
@@ -115,6 +195,12 @@ class ProjectChatService {
       projectId,
       'projectId',
     );
+
+    // ========================================================
+    // AUTH
+    // ========================================================
+
+    requireCurrentUserId();
 
     return _supabase
         .from(
@@ -137,30 +223,61 @@ class ProjectChatService {
           (
             rows,
           ) {
-            return rows
-                .map(
-                  (
-                    row,
-                  ) => ProjectMessageModel.fromMap(
-                    Map<
-                      String,
-                      dynamic
-                    >.from(
-                      row,
-                    ),
-                  ),
-                )
-                .where(
-                  (
-                    message,
-                  ) =>
-                      message.id.isNotEmpty &&
-                      message.projectId ==
-                          normalizedProjectId,
-                )
-                .toList(
-                  growable: false,
-                );
+            final messages =
+                <
+                  ProjectMessageModel
+                >[];
+
+            for (final row in rows) {
+              final message = ProjectMessageModel.fromMap(
+                Map<
+                  String,
+                  dynamic
+                >.from(
+                  row,
+                ),
+              );
+
+              // ==================================================
+              // VALIDAR ID
+              // ==================================================
+
+              if (message.id.isEmpty) {
+                continue;
+              }
+
+              // ==================================================
+              // VALIDAR PROJECT
+              // ==================================================
+
+              if (message.projectId !=
+                  normalizedProjectId) {
+                continue;
+              }
+
+              messages.add(
+                message,
+              );
+            }
+
+            // ==================================================
+            // ORDENAR DEFENSIVAMENTE
+            // ==================================================
+
+            messages.sort(
+              (
+                first,
+                second,
+              ) => first.createdAt.compareTo(
+                second.createdAt,
+              ),
+            );
+
+            return List<
+              ProjectMessageModel
+            >.unmodifiable(
+              messages,
+            );
           },
         );
   }
@@ -177,7 +294,8 @@ class ProjectChatService {
   // - paginação futura;
   // - histórico;
   // - carregamento manual;
-  // - testes.
+  // - testes;
+  // - recuperação após reconexão.
   //
   // ==========================================================
 
@@ -188,16 +306,26 @@ class ProjectChatService {
   >
   getMessages({
     required String projectId,
-    int limit = 200,
+    int limit = defaultHistoryLimit,
   }) async {
     final normalizedProjectId = _required(
       projectId,
       'projectId',
     );
 
+    // ========================================================
+    // AUTH
+    // ========================================================
+
+    requireCurrentUserId();
+
+    // ========================================================
+    // LIMIT
+    // ========================================================
+
     final normalizedLimit = limit.clamp(
       1,
-      500,
+      maxHistoryLimit,
     );
 
     try {
@@ -206,13 +334,7 @@ class ProjectChatService {
             _table,
           )
           .select(
-            '''
-                id,
-                project_id,
-                sender_id,
-                content,
-                created_at
-                ''',
+            _messageFields,
           )
           .eq(
             'project_id',
@@ -226,32 +348,63 @@ class ProjectChatService {
             normalizedLimit,
           );
 
-      final messages = response
-          .map(
-            (
-              row,
-            ) => ProjectMessageModel.fromMap(
-              Map<
-                String,
-                dynamic
-              >.from(
-                row,
-              ),
-            ),
-          )
-          .toList();
+      final messages =
+          <
+            ProjectMessageModel
+          >[];
 
-      // A consulta busca do mais recente para o mais antigo
-      // para permitir LIMIT eficiente.
-      //
-      // Invertemos para a UI:
-      //
-      // antigo
-      //   ↓
-      // novo
+      for (final row in response) {
+        final message = ProjectMessageModel.fromMap(
+          Map<
+            String,
+            dynamic
+          >.from(
+            row,
+          ),
+        );
 
-      return messages.reversed.toList(
+        if (message.id.isEmpty) {
+          continue;
+        }
+
+        if (message.projectId !=
+            normalizedProjectId) {
+          continue;
+        }
+
+        messages.add(
+          message,
+        );
+      }
+
+      // ======================================================
+      // ORDEM PARA UI
+      // ======================================================
+      //
+      // A consulta busca:
+      //
+      // mais recente
+      // ↓
+      // mais antigo
+      //
+      // por eficiência com LIMIT.
+      //
+      // A UI precisa:
+      //
+      // mais antigo
+      // ↓
+      // mais recente
+      //
+      // ======================================================
+
+      final ordered = messages.reversed.toList(
         growable: false,
+      );
+
+      return List<
+        ProjectMessageModel
+      >.unmodifiable(
+        ordered,
       );
     } on PostgrestException catch (
       error
@@ -262,12 +415,33 @@ class ProjectChatService {
         '${error.message}',
       );
 
+      debugPrint(
+        '[PROJECT CHAT] '
+        'Código: '
+        '${error.code}',
+      );
+
       rethrow;
     }
   }
 
   // ==========================================================
   // ENVIAR MENSAGEM
+  // ==========================================================
+  //
+  // IMPORTANTE:
+  //
+  // Não existe targetUserId.
+  //
+  // A mensagem é enviada para:
+  //
+  // projectId
+  //
+  // O senderId identifica somente QUEM falou.
+  //
+  // Todos os membros autorizados pela RLS e conectados ao
+  // mesmo projectId recebem a mensagem.
+  //
   // ==========================================================
 
   Future<
@@ -307,13 +481,7 @@ class ProjectChatService {
             },
           )
           .select(
-            '''
-                id,
-                project_id,
-                sender_id,
-                content,
-                created_at
-                ''',
+            _messageFields,
           )
           .single();
 
@@ -330,16 +498,46 @@ class ProjectChatService {
         ),
       );
 
+      // ========================================================
+      // VALIDAR ID
+      // ========================================================
+
       if (message.id.isEmpty) {
         throw StateError(
           'Mensagem criada sem ID.',
         );
       }
 
+      // ========================================================
+      // VALIDAR PROJECT
+      // ========================================================
+
+      if (message.projectId !=
+          normalizedProjectId) {
+        throw StateError(
+          'Mensagem criada em uma Studio Session diferente.',
+        );
+      }
+
+      // ========================================================
+      // VALIDAR SENDER
+      // ========================================================
+
+      if (message.senderId !=
+          userId) {
+        throw StateError(
+          'Mensagem criada com remetente inesperado.',
+        );
+      }
+
       debugPrint(
         '[PROJECT CHAT] '
         'Mensagem enviada: '
-        '${message.id}',
+        '${message.id} '
+        '| project: '
+        '$normalizedProjectId '
+        '| sender: '
+        '$userId',
       );
 
       return message;
@@ -363,11 +561,183 @@ class ProjectChatService {
   }
 
   // ==========================================================
+  // ENVIAR MENSAGEM DE ÁUDIO
+  // ==========================================================
+
+  Future<
+    ProjectMessageModel
+  >
+  sendAudioMessage({
+    required String projectId,
+    required Uint8List audioBytes,
+    required int audioDurationMs,
+    String extension = 'wav',
+    String mimeType = 'audio/wav',
+  }) async {
+    final normalizedProjectId = _required(
+      projectId,
+      'projectId',
+    );
+
+    final normalizedExtension = _required(
+      extension,
+      'extension',
+    ).toLowerCase();
+
+    final normalizedMimeType = _required(
+      mimeType,
+      'mimeType',
+    ).toLowerCase();
+
+    if (audioBytes.isEmpty) {
+      throw ArgumentError(
+        'audioBytes não pode ser vazio.',
+      );
+    }
+
+    if (audioDurationMs <=
+        0) {
+      throw ArgumentError(
+        'audioDurationMs deve ser maior que zero.',
+      );
+    }
+
+    final userId = requireCurrentUserId();
+
+    final now = DateTime.now().toUtc();
+
+    final fileName = '${now.microsecondsSinceEpoch}.$normalizedExtension';
+
+    final audioPath = '$normalizedProjectId/$userId/$fileName';
+
+    var uploaded = false;
+
+    try {
+      await _supabase.storage
+          .from(
+            _audioBucket,
+          )
+          .uploadBinary(
+            audioPath,
+            audioBytes,
+            fileOptions: FileOptions(
+              contentType: normalizedMimeType,
+              upsert: false,
+            ),
+          );
+
+      uploaded = true;
+
+      final response = await _supabase
+          .from(
+            _table,
+          )
+          .insert(
+            {
+              'project_id': normalizedProjectId,
+              'sender_id': userId,
+              'content': '',
+              'message_type': 'audio',
+              'audio_path': audioPath,
+              'audio_duration_ms': audioDurationMs,
+            },
+          )
+          .select(
+            _messageFields,
+          )
+          .single();
+
+      final message = ProjectMessageModel.fromMap(
+        Map<
+          String,
+          dynamic
+        >.from(
+          response,
+        ),
+      );
+
+      if (message.id.isEmpty) {
+        throw StateError(
+          'Mensagem de áudio criada sem ID.',
+        );
+      }
+
+      if (message.projectId !=
+          normalizedProjectId) {
+        throw StateError(
+          'Mensagem de áudio criada em outra Studio Session.',
+        );
+      }
+
+      if (message.senderId !=
+          userId) {
+        throw StateError(
+          'Mensagem de áudio criada com remetente inesperado.',
+        );
+      }
+
+      debugPrint(
+        '[PROJECT CHAT] '
+        'Áudio enviado: '
+        '${message.id} '
+        '| duração: '
+        '$audioDurationMs ms',
+      );
+
+      return message;
+    } catch (
+      error,
+      stackTrace
+    ) {
+      debugPrint(
+        '[PROJECT CHAT] '
+        'Erro ao enviar áudio: '
+        '$error',
+      );
+
+      debugPrint(
+        '[PROJECT CHAT] '
+        'StackTrace: '
+        '$stackTrace',
+      );
+
+      if (uploaded) {
+        try {
+          await _supabase.storage
+              .from(
+                _audioBucket,
+              )
+              .remove(
+                [
+                  audioPath,
+                ],
+              );
+        } catch (
+          cleanupError
+        ) {
+          debugPrint(
+            '[PROJECT CHAT] '
+            'Falha ao remover áudio órfão: '
+            '$cleanupError',
+          );
+        }
+      }
+
+      rethrow;
+    }
+  }
+
+  // ==========================================================
   // APAGAR MENSAGEM
   // ==========================================================
   //
-  // A política RLS deve permitir apagar somente mensagens do
-  // próprio sender.
+  // Fazemos a filtragem por:
+  //
+  // id
+  // +
+  // sender_id
+  //
+  // Mesmo assim, a RLS continua sendo a proteção real.
   //
   // ==========================================================
 
@@ -407,8 +777,146 @@ class ProjectChatService {
         '${error.message}',
       );
 
+      debugPrint(
+        '[PROJECT CHAT] '
+        'Código: '
+        '${error.code}',
+      );
+
       rethrow;
     }
+  }
+
+  // ==========================================================
+  // EXISTEM MENSAGENS?
+  // ==========================================================
+
+  Future<
+    bool
+  >
+  hasMessages({
+    required String projectId,
+  }) async {
+    final messages = await getMessages(
+      projectId: projectId,
+
+      limit: 1,
+    );
+
+    return messages.isNotEmpty;
+  }
+
+  // ==========================================================
+  // ÚLTIMA MENSAGEM
+  // ==========================================================
+
+  Future<
+    ProjectMessageModel?
+  >
+  getLatestMessage({
+    required String projectId,
+  }) async {
+    final normalizedProjectId = _required(
+      projectId,
+      'projectId',
+    );
+
+    requireCurrentUserId();
+
+    try {
+      final response = await _supabase
+          .from(
+            _table,
+          )
+          .select(
+            _messageFields,
+          )
+          .eq(
+            'project_id',
+            normalizedProjectId,
+          )
+          .order(
+            'created_at',
+            ascending: false,
+          )
+          .limit(
+            1,
+          );
+
+      if (response.isEmpty) {
+        return null;
+      }
+
+      final message = ProjectMessageModel.fromMap(
+        Map<
+          String,
+          dynamic
+        >.from(
+          response.first,
+        ),
+      );
+
+      if (message.id.isEmpty ||
+          message.projectId !=
+              normalizedProjectId) {
+        return null;
+      }
+
+      return message;
+    } on PostgrestException catch (
+      error
+    ) {
+      debugPrint(
+        '[PROJECT CHAT] '
+        'Erro ao buscar última mensagem: '
+        '${error.message}',
+      );
+
+      rethrow;
+    }
+  }
+
+  // ==========================================================
+  // CRIAR URL PARA REPRODUÇÃO DO ÁUDIO
+  // ==========================================================
+
+  Future<
+    String
+  >
+  createAudioPlaybackUrl({
+    required String audioPath,
+    int expiresInSeconds = 3600,
+  }) async {
+    final normalizedAudioPath = _required(
+      audioPath,
+      'audioPath',
+    );
+
+    final normalizedExpiresIn = expiresInSeconds.clamp(
+      60,
+      86400,
+    );
+
+    requireCurrentUserId();
+
+    final url = await _supabase.storage
+        .from(
+          _audioBucket,
+        )
+        .createSignedUrl(
+          normalizedAudioPath,
+          normalizedExpiresIn,
+        );
+
+    final normalizedUrl = url.trim();
+
+    if (normalizedUrl.isEmpty) {
+      throw StateError(
+        'O Supabase retornou uma URL de áudio vazia.',
+      );
+    }
+
+    return normalizedUrl;
   }
 
   // ==========================================================

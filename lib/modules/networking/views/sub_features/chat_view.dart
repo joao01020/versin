@@ -1,7 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../controllers/project_chat_controller.dart';
 import '../../data/models/project_message_model.dart';
+import '../../services/chat_audio_recorder_service.dart';
+import '../../widgets/chat_audio_player.dart';
 
 class ChatView
     extends
@@ -30,6 +34,20 @@ class _ChatViewState
   // ==========================================================
 
   late final ProjectChatController _controller;
+
+  // ==========================================================
+  // AUDIO RECORDER
+  // ==========================================================
+
+  final ChatAudioRecorderService _audioRecorder = ChatAudioRecorderService();
+
+  Timer? _recordingUiTimer;
+
+  bool _isRecordingAudio = false;
+
+  bool _isAudioPaused = false;
+
+  Duration _recordingDuration = Duration.zero;
 
   // ==========================================================
   // TEXT
@@ -155,6 +173,258 @@ class _ChatViewState
   }
 
   // ==========================================================
+  // INICIAR GRAVAÇÃO DE ÁUDIO
+  // ==========================================================
+
+  Future<
+    void
+  >
+  _startAudioRecording() async {
+    if (_controller.isBusy ||
+        _isRecordingAudio) {
+      return;
+    }
+
+    final started = await _audioRecorder.start();
+
+    if (!mounted) {
+      return;
+    }
+
+    if (!started) {
+      _showError(
+        'Não foi possível iniciar a gravação. Verifique a permissão do microfone.',
+      );
+
+      return;
+    }
+
+    _recordingUiTimer?.cancel();
+
+    _recordingUiTimer = Timer.periodic(
+      const Duration(
+        milliseconds: 250,
+      ),
+      (
+        _,
+      ) {
+        if (!mounted) {
+          return;
+        }
+
+        setState(
+          () {
+            _recordingDuration = _audioRecorder.duration;
+          },
+        );
+      },
+    );
+
+    setState(
+      () {
+        _isRecordingAudio = true;
+        _isAudioPaused = false;
+        _recordingDuration = Duration.zero;
+      },
+    );
+  }
+
+  // ==========================================================
+  // PAUSAR / CONTINUAR
+  // ==========================================================
+
+  Future<
+    void
+  >
+  _toggleAudioPause() async {
+    if (!_isRecordingAudio ||
+        _controller.isSendingAudio) {
+      return;
+    }
+
+    if (_isAudioPaused) {
+      final resumed = await _audioRecorder.resume();
+
+      if (!mounted) {
+        return;
+      }
+
+      if (!resumed) {
+        _showError(
+          'Não foi possível continuar a gravação.',
+        );
+
+        return;
+      }
+
+      setState(
+        () {
+          _isAudioPaused = false;
+        },
+      );
+
+      return;
+    }
+
+    final paused = await _audioRecorder.pause();
+
+    if (!mounted) {
+      return;
+    }
+
+    if (!paused) {
+      _showError(
+        'Não foi possível pausar a gravação.',
+      );
+
+      return;
+    }
+
+    setState(
+      () {
+        _isAudioPaused = true;
+        _recordingDuration = _audioRecorder.duration;
+      },
+    );
+  }
+
+  // ==========================================================
+  // CANCELAR GRAVAÇÃO
+  // ==========================================================
+
+  Future<
+    void
+  >
+  _cancelAudioRecording() async {
+    if (!_isRecordingAudio ||
+        _controller.isSendingAudio) {
+      return;
+    }
+
+    _recordingUiTimer?.cancel();
+    _recordingUiTimer = null;
+
+    await _audioRecorder.cancel();
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(
+      () {
+        _isRecordingAudio = false;
+        _isAudioPaused = false;
+        _recordingDuration = Duration.zero;
+      },
+    );
+  }
+
+  // ==========================================================
+  // FINALIZAR E ENVIAR ÁUDIO
+  // ==========================================================
+
+  Future<
+    void
+  >
+  _sendAudioRecording() async {
+    if (!_isRecordingAudio ||
+        _controller.isSendingAudio) {
+      return;
+    }
+
+    _recordingUiTimer?.cancel();
+    _recordingUiTimer = null;
+
+    final recordedAudio = await _audioRecorder.stop();
+
+    if (!mounted) {
+      return;
+    }
+
+    if (recordedAudio ==
+            null ||
+        recordedAudio.isEmpty ||
+        recordedAudio.durationMs <=
+            0) {
+      setState(
+        () {
+          _isRecordingAudio = false;
+          _isAudioPaused = false;
+          _recordingDuration = Duration.zero;
+        },
+      );
+
+      _showError(
+        'Nenhum áudio válido foi gravado.',
+      );
+
+      return;
+    }
+
+    setState(
+      () {
+        _isRecordingAudio = false;
+        _isAudioPaused = false;
+        _recordingDuration = recordedAudio.duration;
+      },
+    );
+
+    final sent = await _controller.sendAudioMessage(
+      audioBytes: recordedAudio.bytes,
+      durationMs: recordedAudio.durationMs,
+      fileExtension: recordedAudio.extension,
+      mimeType: recordedAudio.mimeType,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(
+      () {
+        _recordingDuration = Duration.zero;
+      },
+    );
+
+    if (sent) {
+      _scrollToBottom();
+
+      return;
+    }
+
+    final error = _controller.errorMessage;
+
+    _showError(
+      error !=
+                  null &&
+              error.isNotEmpty
+          ? error
+          : 'Não foi possível enviar o áudio.',
+    );
+  }
+
+  // ==========================================================
+  // FORMATAR TEMPO DE GRAVAÇÃO
+  // ==========================================================
+
+  String _formatRecordingDuration(
+    Duration duration,
+  ) {
+    final totalSeconds = duration.inSeconds;
+
+    final minutes =
+        totalSeconds ~/
+        60;
+
+    final seconds =
+        totalSeconds %
+        60;
+
+    return '${minutes.toString().padLeft(2, '0')}:'
+        '${seconds.toString().padLeft(2, '0')}';
+  }
+
+  // ==========================================================
   // ERRO
   // ==========================================================
 
@@ -193,11 +463,28 @@ class _ChatViewState
       ),
 
       appBar: AppBar(
-        title: const Text(
-          'Chat de Sessão',
-          style: TextStyle(
-            fontSize: 16,
-          ),
+        title: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Chat da Studio Session',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            SizedBox(
+              height: 2,
+            ),
+            Text(
+              'Conversa compartilhada entre os membros',
+              style: TextStyle(
+                color: Colors.white38,
+                fontSize: 10,
+                fontWeight: FontWeight.w400,
+              ),
+            ),
+          ],
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -215,6 +502,11 @@ class _ChatViewState
               ) {
                 return Column(
                   children: [
+                    // ============================================
+                    // CHAT COMPARTILHADO
+                    // ============================================
+                    _buildSessionChatNotice(),
+
                     // ============================================
                     // CONTEÚDO
                     // ============================================
@@ -237,6 +529,77 @@ class _ChatViewState
                 );
               },
         ),
+      ),
+    );
+  }
+
+  // ==========================================================
+  // AVISO DO CHAT DA SESSÃO
+  // ==========================================================
+
+  Widget _buildSessionChatNotice() {
+    return Container(
+      width: double.infinity,
+
+      margin: const EdgeInsets.fromLTRB(
+        16,
+        8,
+        16,
+        4,
+      ),
+
+      padding: const EdgeInsets.symmetric(
+        horizontal: 12,
+        vertical: 9,
+      ),
+
+      decoration: BoxDecoration(
+        color:
+            const Color(
+              0xFF6D28D9,
+            ).withValues(
+              alpha: 0.08,
+            ),
+
+        borderRadius: BorderRadius.circular(
+          14,
+        ),
+
+        border: Border.all(
+          color:
+              const Color(
+                0xFF6D28D9,
+              ).withValues(
+                alpha: 0.18,
+              ),
+        ),
+      ),
+
+      child: const Row(
+        children: [
+          Icon(
+            Icons.groups_2_outlined,
+            color: Color(
+              0xFFA78BFA,
+            ),
+            size: 17,
+          ),
+
+          SizedBox(
+            width: 9,
+          ),
+
+          Expanded(
+            child: Text(
+              'Este chat pertence à Studio Session e acompanha a equipe conforme novos membros entram.',
+              style: TextStyle(
+                color: Colors.white54,
+                fontSize: 10,
+                height: 1.35,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -296,7 +659,7 @@ class _ChatViewState
             ),
 
             Text(
-              'Envie a primeira mensagem da sessão.',
+              'Comece a conversa. Todos os membros da sessão poderão participar aqui.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: Colors.white.withValues(
@@ -422,16 +785,43 @@ class _ChatViewState
 
             children: [
               // ==============================================
-              // TEXTO
+              // AUTOR
               // ==============================================
-              Text(
-                message.content,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
-                  height: 1.35,
+              if (!isMine) ...[
+                const Text(
+                  'Membro',
+                  style: TextStyle(
+                    color: Color(
+                      0xFFA78BFA,
+                    ),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-              ),
+
+                const SizedBox(
+                  height: 4,
+                ),
+              ],
+
+              // ==============================================
+              // CONTEÚDO: TEXTO / ÁUDIO
+              // ==============================================
+              if (message.isAudio)
+                ChatAudioPlayer(
+                  controller: _controller,
+                  message: message,
+                  isMine: isMine,
+                )
+              else
+                Text(
+                  message.content,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    height: 1.35,
+                  ),
+                ),
 
               const SizedBox(
                 height: 5,
@@ -463,6 +853,10 @@ class _ChatViewState
   // ==========================================================
 
   Widget _buildMessageInput() {
+    if (_isRecordingAudio) {
+      return _buildAudioRecordingInput();
+    }
+
     return Container(
       padding: const EdgeInsets.fromLTRB(
         12,
@@ -494,7 +888,7 @@ class _ChatViewState
             child: TextField(
               controller: _messageController,
 
-              enabled: !_controller.isSending,
+              enabled: !_controller.isBusy,
 
               minLines: 1,
 
@@ -569,17 +963,58 @@ class _ChatViewState
           ),
 
           // ================================================
-          // ENVIAR
+          // MICROFONE
+          // ================================================
+          Material(
+            color: const Color(
+              0xFF252525,
+            ),
+
+            shape: const CircleBorder(),
+
+            child: InkWell(
+              customBorder: const CircleBorder(),
+
+              onTap: _controller.isBusy
+                  ? null
+                  : _startAudioRecording,
+
+              child: SizedBox(
+                width: 46,
+                height: 46,
+                child: Center(
+                  child: Icon(
+                    Icons.mic_rounded,
+                    color: _controller.isBusy
+                        ? Colors.white24
+                        : const Color(
+                            0xFFA78BFA,
+                          ),
+                    size: 21,
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          const SizedBox(
+            width: 8,
+          ),
+
+          // ================================================
+          // ENVIAR TEXTO
           // ================================================
           Material(
             color: const Color(
               0xFF6D28D9,
             ),
+
             shape: const CircleBorder(),
+
             child: InkWell(
               customBorder: const CircleBorder(),
 
-              onTap: _controller.isSending
+              onTap: _controller.isBusy
                   ? null
                   : _sendMessage,
 
@@ -588,6 +1023,211 @@ class _ChatViewState
                 height: 46,
                 child: Center(
                   child: _controller.isSending
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(
+                          Icons.send_rounded,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ==========================================================
+  // INPUT DE GRAVAÇÃO
+  // ==========================================================
+
+  Widget _buildAudioRecordingInput() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(
+        12,
+        10,
+        12,
+        12,
+      ),
+
+      decoration: const BoxDecoration(
+        color: Color(
+          0xFF151515,
+        ),
+        border: Border(
+          top: BorderSide(
+            color: Colors.white10,
+          ),
+        ),
+      ),
+
+      child: Row(
+        children: [
+          // ================================================
+          // CANCELAR
+          // ================================================
+          Material(
+            color: Colors.red.withValues(
+              alpha: 0.12,
+            ),
+            shape: const CircleBorder(),
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: _controller.isSendingAudio
+                  ? null
+                  : _cancelAudioRecording,
+              child: const SizedBox(
+                width: 44,
+                height: 44,
+                child: Icon(
+                  Icons.delete_outline_rounded,
+                  color: Colors.redAccent,
+                  size: 20,
+                ),
+              ),
+            ),
+          ),
+
+          const SizedBox(
+            width: 12,
+          ),
+
+          // ================================================
+          // STATUS / TEMPO
+          // ================================================
+          Expanded(
+            child: Container(
+              height: 44,
+              padding: const EdgeInsets.symmetric(
+                horizontal: 14,
+              ),
+              decoration: BoxDecoration(
+                color: const Color(
+                  0xFF202020,
+                ),
+                borderRadius: BorderRadius.circular(
+                  22,
+                ),
+                border: Border.all(
+                  color: _isAudioPaused
+                      ? Colors.amber.withValues(
+                          alpha: 0.30,
+                        )
+                      : Colors.redAccent.withValues(
+                          alpha: 0.25,
+                        ),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: _isAudioPaused
+                          ? Colors.amber
+                          : Colors.redAccent,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+
+                  const SizedBox(
+                    width: 9,
+                  ),
+
+                  Text(
+                    _isAudioPaused
+                        ? 'Pausado'
+                        : 'Gravando',
+                    style: TextStyle(
+                      color: _isAudioPaused
+                          ? Colors.amber
+                          : Colors.white70,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+
+                  const Spacer(),
+
+                  Text(
+                    _formatRecordingDuration(
+                      _recordingDuration,
+                    ),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(
+            width: 8,
+          ),
+
+          // ================================================
+          // PAUSAR / CONTINUAR
+          // ================================================
+          Material(
+            color: const Color(
+              0xFF252525,
+            ),
+            shape: const CircleBorder(),
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: _controller.isSendingAudio
+                  ? null
+                  : _toggleAudioPause,
+              child: SizedBox(
+                width: 44,
+                height: 44,
+                child: Icon(
+                  _isAudioPaused
+                      ? Icons.play_arrow_rounded
+                      : Icons.pause_rounded,
+                  color: const Color(
+                    0xFFA78BFA,
+                  ),
+                  size: 21,
+                ),
+              ),
+            ),
+          ),
+
+          const SizedBox(
+            width: 8,
+          ),
+
+          // ================================================
+          // ENVIAR ÁUDIO
+          // ================================================
+          Material(
+            color: const Color(
+              0xFF6D28D9,
+            ),
+            shape: const CircleBorder(),
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: _controller.isSendingAudio
+                  ? null
+                  : _sendAudioRecording,
+              child: SizedBox(
+                width: 46,
+                height: 46,
+                child: Center(
+                  child: _controller.isSendingAudio
                       ? const SizedBox(
                           width: 18,
                           height: 18,
@@ -750,6 +1390,14 @@ class _ChatViewState
 
   @override
   void dispose() {
+    _recordingUiTimer?.cancel();
+
+    _recordingUiTimer = null;
+
+    unawaited(
+      _audioRecorder.dispose(),
+    );
+
     _controller.removeListener(
       _handleControllerUpdate,
     );

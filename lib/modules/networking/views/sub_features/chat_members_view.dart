@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'package:versin/core/utils/network_image_url_helper.dart';
+
 import '../../controllers/project_members_controller.dart';
 import '../../data/models/project_member_model.dart';
 
@@ -489,21 +491,18 @@ class _ChatMembersViewState
   Widget _buildAvatar(
     ProjectMemberModel member,
   ) {
-    final avatarUrl = member.avatarUrl?.trim();
+    final avatarUrl = NetworkImageUrlHelper.validUrlOrNull(
+      member.avatarUrl,
+    );
 
     if (avatarUrl !=
-            null &&
-        avatarUrl.isNotEmpty) {
+        null) {
       return ClipOval(
         child: Image.network(
           avatarUrl,
-
           width: 46,
-
           height: 46,
-
           fit: BoxFit.cover,
-
           errorBuilder:
               (
                 _,

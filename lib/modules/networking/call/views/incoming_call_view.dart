@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'package:versin/core/utils/network_image_url_helper.dart';
+
 import '../controllers/project_call_controller.dart';
 import '../data/models/project_call_model.dart';
 
@@ -344,51 +346,45 @@ class _IncomingCallViewState
   // ==========================================================
 
   Widget _buildAvatar() {
-    final url = widget.callerAvatarUrl?.trim();
+    final url = NetworkImageUrlHelper.validUrlOrNull(
+      widget.callerAvatarUrl,
+    );
 
     return Container(
       width: 112,
-
       height: 112,
-
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-
         border: Border.all(
           color: _purple.withValues(
             alpha: 0.35,
           ),
-
           width: 2,
         ),
-
         boxShadow: [
           BoxShadow(
             color: _purple.withValues(
               alpha: 0.14,
             ),
-
             blurRadius: 28,
           ),
         ],
       ),
-
       child: ClipOval(
         child:
             url !=
-                    null &&
-                url.isNotEmpty
+                null
             ? Image.network(
                 url,
-
                 fit: BoxFit.cover,
-
                 errorBuilder:
                     (
                       context,
                       error,
                       stackTrace,
-                    ) => _buildInitial(),
+                    ) {
+                      return _buildInitial();
+                    },
               )
             : _buildInitial(),
       ),

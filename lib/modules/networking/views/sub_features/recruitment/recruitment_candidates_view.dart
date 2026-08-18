@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:versin/app/locator.dart';
+import 'package:versin/core/utils/network_image_url_helper.dart';
 
 import '../../../controllers/project_recruitment_controller.dart';
 import '../../../data/models/project_recruitment_model.dart';
@@ -673,11 +674,16 @@ class _RecruitmentCandidatesViewState
   Widget _buildAvatar(
     ProjectRecruitmentCandidateModel candidate,
   ) {
-    final url = candidate.avatarUrl;
+    final url = NetworkImageUrlHelper.validUrlOrNull(
+      candidate.avatarUrl,
+    );
+
+    // ==========================================================
+    // NETWORK IMAGE
+    // ==========================================================
 
     if (url !=
-            null &&
-        url.isNotEmpty) {
+        null) {
       return CircleAvatar(
         radius: 24,
         backgroundImage: NetworkImage(
@@ -686,7 +692,12 @@ class _RecruitmentCandidatesViewState
       );
     }
 
+    // ==========================================================
+    // FALLBACK
+    // ==========================================================
+
     final name = candidate.displayName.trim();
+
     final initial = name.isEmpty
         ? '?'
         : name

@@ -117,18 +117,13 @@ class ChatAudioRecorderService {
   // STREAM
   // ==========================================================
 
-  StreamSubscription<
-    Uint8List
-  >?
-  _audioSubscription;
+  StreamSubscription<Uint8List>? _audioSubscription;
 
   // ==========================================================
   // BUFFER
   // ==========================================================
 
-  final BytesBuilder _audioBuffer = BytesBuilder(
-    copy: false,
-  );
+  final BytesBuilder _audioBuffer = BytesBuilder(copy: false);
 
   // ==========================================================
   // TIMER
@@ -154,9 +149,7 @@ class ChatAudioRecorderService {
 
   bool get isPaused => _isPaused;
 
-  bool get isActive =>
-      _isRecording ||
-      _isPaused;
+  bool get isActive => _isRecording || _isPaused;
 
   Duration get duration => _stopwatch.elapsed;
 
@@ -164,18 +157,12 @@ class ChatAudioRecorderService {
   // PERMISSÃO
   // ==========================================================
 
-  Future<
-    bool
-  >
-  hasPermission() async {
+  Future<bool> hasPermission() async {
     _ensureNotDisposed();
 
     try {
       return await _recorder.hasPermission();
-    } catch (
-      error,
-      stackTrace
-    ) {
+    } catch (error, stackTrace) {
       debugPrint(
         '[CHAT AUDIO] '
         'Erro ao verificar permissão: '
@@ -196,18 +183,14 @@ class ChatAudioRecorderService {
   // INICIAR GRAVAÇÃO
   // ==========================================================
 
-  Future<
-    bool
-  >
-  start() async {
+  Future<bool> start() async {
     _ensureNotDisposed();
 
     // ========================================================
     // JÁ EXISTE GRAVAÇÃO
     // ========================================================
 
-    if (_isRecording ||
-        _isPaused) {
+    if (_isRecording || _isPaused) {
       return false;
     }
 
@@ -255,9 +238,7 @@ class ChatAudioRecorderService {
       // INICIAR STREAM
       // ======================================================
 
-      final stream = await _recorder.startStream(
-        config,
-      );
+      final stream = await _recorder.startStream(config);
 
       // ======================================================
       // ESTADO
@@ -276,9 +257,7 @@ class ChatAudioRecorderService {
       // ======================================================
 
       _audioSubscription = stream.listen(
-        (
-          Uint8List chunk,
-        ) {
+        (Uint8List chunk) {
           if (_disposed) {
             return;
           }
@@ -295,28 +274,22 @@ class ChatAudioRecorderService {
             return;
           }
 
-          _audioBuffer.add(
-            chunk,
-          );
+          _audioBuffer.add(chunk);
         },
 
-        onError:
-            (
-              Object error,
-              StackTrace stackTrace,
-            ) {
-              debugPrint(
-                '[CHAT AUDIO] '
-                'Erro no stream: '
-                '$error',
-              );
+        onError: (Object error, StackTrace stackTrace) {
+          debugPrint(
+            '[CHAT AUDIO] '
+            'Erro no stream: '
+            '$error',
+          );
 
-              debugPrint(
-                '[CHAT AUDIO] '
-                'StackTrace: '
-                '$stackTrace',
-              );
-            },
+          debugPrint(
+            '[CHAT AUDIO] '
+            'StackTrace: '
+            '$stackTrace',
+          );
+        },
       );
 
       debugPrint(
@@ -325,10 +298,7 @@ class ChatAudioRecorderService {
       );
 
       return true;
-    } catch (
-      error,
-      stackTrace
-    ) {
+    } catch (error, stackTrace) {
       debugPrint(
         '[CHAT AUDIO] '
         'Erro ao iniciar gravação: '
@@ -351,14 +321,10 @@ class ChatAudioRecorderService {
   // PAUSAR
   // ==========================================================
 
-  Future<
-    bool
-  >
-  pause() async {
+  Future<bool> pause() async {
     _ensureNotDisposed();
 
-    if (!_isRecording ||
-        _isPaused) {
+    if (!_isRecording || _isPaused) {
       return false;
     }
 
@@ -375,10 +341,7 @@ class ChatAudioRecorderService {
       );
 
       return true;
-    } catch (
-      error,
-      stackTrace
-    ) {
+    } catch (error, stackTrace) {
       debugPrint(
         '[CHAT AUDIO] '
         'Erro ao pausar gravação: '
@@ -399,14 +362,10 @@ class ChatAudioRecorderService {
   // CONTINUAR
   // ==========================================================
 
-  Future<
-    bool
-  >
-  resume() async {
+  Future<bool> resume() async {
     _ensureNotDisposed();
 
-    if (!_isRecording ||
-        !_isPaused) {
+    if (!_isRecording || !_isPaused) {
       return false;
     }
 
@@ -423,10 +382,7 @@ class ChatAudioRecorderService {
       );
 
       return true;
-    } catch (
-      error,
-      stackTrace
-    ) {
+    } catch (error, stackTrace) {
       debugPrint(
         '[CHAT AUDIO] '
         'Erro ao continuar gravação: '
@@ -447,10 +403,7 @@ class ChatAudioRecorderService {
   // FINALIZAR GRAVAÇÃO
   // ==========================================================
 
-  Future<
-    RecordedChatAudio?
-  >
-  stop() async {
+  Future<RecordedChatAudio?> stop() async {
     _ensureNotDisposed();
 
     if (!_isRecording) {
@@ -509,9 +462,7 @@ class ChatAudioRecorderService {
       // CRIAR WAV
       // ======================================================
 
-      final wavBytes = _createWavFile(
-        pcmBytes,
-      );
+      final wavBytes = _createWavFile(pcmBytes);
 
       // ======================================================
       // RESULTADO
@@ -555,10 +506,7 @@ class ChatAudioRecorderService {
       _stopwatch.reset();
 
       return result;
-    } catch (
-      error,
-      stackTrace
-    ) {
+    } catch (error, stackTrace) {
       debugPrint(
         '[CHAT AUDIO] '
         'Erro ao finalizar gravação: '
@@ -581,16 +529,12 @@ class ChatAudioRecorderService {
   // CANCELAR
   // ==========================================================
 
-  Future<
-    void
-  >
-  cancel() async {
+  Future<void> cancel() async {
     if (_disposed) {
       return;
     }
 
-    if (!_isRecording &&
-        !_isPaused) {
+    if (!_isRecording && !_isPaused) {
       await _resetSession();
 
       return;
@@ -598,9 +542,7 @@ class ChatAudioRecorderService {
 
     try {
       await _recorder.cancel();
-    } catch (
-      error
-    ) {
+    } catch (error) {
       debugPrint(
         '[CHAT AUDIO] '
         'Erro ao cancelar recorder: '
@@ -620,10 +562,7 @@ class ChatAudioRecorderService {
   // RESET SESSION
   // ==========================================================
 
-  Future<
-    void
-  >
-  _resetSession() async {
+  Future<void> _resetSession() async {
     // ========================================================
     // TIMER
     // ========================================================
@@ -672,9 +611,7 @@ class ChatAudioRecorderService {
   //
   // ==========================================================
 
-  Uint8List _createWavFile(
-    Uint8List pcmBytes,
-  ) {
+  Uint8List _createWavFile(Uint8List pcmBytes) {
     // ========================================================
     // TAMANHOS
     // ========================================================
@@ -683,68 +620,41 @@ class ChatAudioRecorderService {
 
     final int dataLength = pcmBytes.lengthInBytes;
 
-    final int totalLength =
-        headerSize +
-        dataLength;
+    final int totalLength = headerSize + dataLength;
 
     // ========================================================
     // BUFFER FINAL
     // ========================================================
 
-    final bytes = Uint8List(
-      totalLength,
-    );
+    final bytes = Uint8List(totalLength);
 
-    final data = ByteData.view(
-      bytes.buffer,
-    );
+    final data = ByteData.view(bytes.buffer);
 
     // ========================================================
     // RIFF
     // ========================================================
 
-    _writeAscii(
-      bytes,
-      0,
-      'RIFF',
-    );
+    _writeAscii(bytes, 0, 'RIFF');
 
-    data.setUint32(
-      4,
-      36 +
-          dataLength,
-      Endian.little,
-    );
+    data.setUint32(4, 36 + dataLength, Endian.little);
 
     // ========================================================
     // WAVE
     // ========================================================
 
-    _writeAscii(
-      bytes,
-      8,
-      'WAVE',
-    );
+    _writeAscii(bytes, 8, 'WAVE');
 
     // ========================================================
     // FMT
     // ========================================================
 
-    _writeAscii(
-      bytes,
-      12,
-      'fmt ',
-    );
+    _writeAscii(bytes, 12, 'fmt ');
 
     // ========================================================
     // FMT CHUNK SIZE
     // ========================================================
 
-    data.setUint32(
-      16,
-      16,
-      Endian.little,
-    );
+    data.setUint32(16, 16, Endian.little);
 
     // ========================================================
     // AUDIO FORMAT
@@ -752,98 +662,55 @@ class ChatAudioRecorderService {
     // 1 = PCM
     // ========================================================
 
-    data.setUint16(
-      20,
-      1,
-      Endian.little,
-    );
+    data.setUint16(20, 1, Endian.little);
 
     // ========================================================
     // CANAIS
     // ========================================================
 
-    data.setUint16(
-      22,
-      numChannels,
-      Endian.little,
-    );
+    data.setUint16(22, numChannels, Endian.little);
 
     // ========================================================
     // SAMPLE RATE
     // ========================================================
 
-    data.setUint32(
-      24,
-      sampleRate,
-      Endian.little,
-    );
+    data.setUint32(24, sampleRate, Endian.little);
 
     // ========================================================
     // BYTE RATE
     // ========================================================
 
-    const int byteRate =
-        sampleRate *
-        numChannels *
-        bitsPerSample ~/
-        8;
+    const int byteRate = sampleRate * numChannels * bitsPerSample ~/ 8;
 
-    data.setUint32(
-      28,
-      byteRate,
-      Endian.little,
-    );
+    data.setUint32(28, byteRate, Endian.little);
 
     // ========================================================
     // BLOCK ALIGN
     // ========================================================
 
-    const int blockAlign =
-        numChannels *
-        bitsPerSample ~/
-        8;
+    const int blockAlign = numChannels * bitsPerSample ~/ 8;
 
-    data.setUint16(
-      32,
-      blockAlign,
-      Endian.little,
-    );
+    data.setUint16(32, blockAlign, Endian.little);
 
     // ========================================================
     // BITS PER SAMPLE
     // ========================================================
 
-    data.setUint16(
-      34,
-      bitsPerSample,
-      Endian.little,
-    );
+    data.setUint16(34, bitsPerSample, Endian.little);
 
     // ========================================================
     // DATA
     // ========================================================
 
-    _writeAscii(
-      bytes,
-      36,
-      'data',
-    );
+    _writeAscii(bytes, 36, 'data');
 
-    data.setUint32(
-      40,
-      dataLength,
-      Endian.little,
-    );
+    data.setUint32(40, dataLength, Endian.little);
 
     // ========================================================
     // PCM
     // ========================================================
 
-    bytes.setRange(
-      headerSize,
-      totalLength,
-      pcmBytes,
-    );
+    bytes.setRange(headerSize, totalLength, pcmBytes);
 
     return bytes;
   }
@@ -852,21 +719,9 @@ class ChatAudioRecorderService {
   // ESCREVER ASCII NO HEADER
   // ==========================================================
 
-  void _writeAscii(
-    Uint8List bytes,
-    int offset,
-    String value,
-  ) {
-    for (
-      int index = 0;
-      index <
-          value.length;
-      index++
-    ) {
-      bytes[offset +
-          index] = value.codeUnitAt(
-        index,
-      );
+  void _writeAscii(Uint8List bytes, int offset, String value) {
+    for (int index = 0; index < value.length; index++) {
+      bytes[offset + index] = value.codeUnitAt(index);
     }
   }
 
@@ -876,9 +731,7 @@ class ChatAudioRecorderService {
 
   void _ensureNotDisposed() {
     if (_disposed) {
-      throw StateError(
-        'ChatAudioRecorderService já foi descartado.',
-      );
+      throw StateError('ChatAudioRecorderService já foi descartado.');
     }
   }
 
@@ -886,10 +739,7 @@ class ChatAudioRecorderService {
   // DISPOSE
   // ==========================================================
 
-  Future<
-    void
-  >
-  dispose() async {
+  Future<void> dispose() async {
     if (_disposed) {
       return;
     }

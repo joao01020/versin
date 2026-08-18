@@ -29,11 +29,8 @@ class ProjectRecruitmentService {
 
   final SupabaseClient _supabase;
 
-  ProjectRecruitmentService({
-    SupabaseClient? supabase,
-  }) : _supabase =
-           supabase ??
-           Supabase.instance.client;
+  ProjectRecruitmentService({SupabaseClient? supabase})
+    : _supabase = supabase ?? Supabase.instance.client;
 
   // ==========================================================
   // CURRENT USER
@@ -42,9 +39,7 @@ class ProjectRecruitmentService {
   String? get currentUserId {
     final id = _supabase.auth.currentUser?.id.trim();
 
-    if (id ==
-            null ||
-        id.isEmpty) {
+    if (id == null || id.isEmpty) {
       return null;
     }
 
@@ -54,11 +49,8 @@ class ProjectRecruitmentService {
   String requireCurrentUserId() {
     final id = currentUserId;
 
-    if (id ==
-        null) {
-      throw StateError(
-        'Usuário não autenticado.',
-      );
+    if (id == null) {
+      throw StateError('Usuário não autenticado.');
     }
 
     return id;
@@ -68,56 +60,38 @@ class ProjectRecruitmentService {
   // CRIAR RECRUTAMENTO
   // ==========================================================
 
-  Future<
-    ProjectRecruitmentModel
-  >
-  createRecruitment({
+  Future<ProjectRecruitmentModel> createRecruitment({
     required String projectId,
     required String role,
     String description = '',
     DateTime? expiresAt,
   }) async {
-    final normalizedProjectId = _required(
-      projectId,
-      'projectId',
-    );
+    final normalizedProjectId = _required(projectId, 'projectId');
 
-    final normalizedRole = _required(
-      role,
-      'role',
-    ).toLowerCase();
+    final normalizedRole = _required(role, 'role').toLowerCase();
 
     final userId = requireCurrentUserId();
 
     final response = await _supabase
-        .from(
-          _recruitmentsTable,
-        )
-        .insert(
-          {
-            'project_id': normalizedProjectId,
+        .from(_recruitmentsTable)
+        .insert({
+          'project_id': normalizedProjectId,
 
-            'created_by': userId,
+          'created_by': userId,
 
-            'role': normalizedRole,
+          'role': normalizedRole,
 
-            'description': description.trim(),
+          'description': description.trim(),
 
-            'status': 'open',
+          'status': 'open',
 
-            'expires_at': expiresAt?.toUtc().toIso8601String(),
-          },
-        )
+          'expires_at': expiresAt?.toUtc().toIso8601String(),
+        })
         .select()
         .single();
 
     final recruitment = ProjectRecruitmentModel.fromMap(
-      Map<
-        String,
-        dynamic
-      >.from(
-        response,
-      ),
+      Map<String, dynamic>.from(response),
     );
 
     debugPrint(
@@ -134,104 +108,47 @@ class ProjectRecruitmentService {
   // LISTAR RECRUTAMENTOS
   // ==========================================================
 
-  Future<
-    List<
-      ProjectRecruitmentModel
-    >
-  >
-  getRecruitments({
+  Future<List<ProjectRecruitmentModel>> getRecruitments({
     required String projectId,
   }) async {
-    final id = _required(
-      projectId,
-      'projectId',
-    );
+    final id = _required(projectId, 'projectId');
 
     final response = await _supabase
-        .from(
-          _recruitmentsTable,
-        )
+        .from(_recruitmentsTable)
         .select()
-        .eq(
-          'project_id',
-          id,
-        )
-        .order(
-          'created_at',
-          ascending: false,
-        );
+        .eq('project_id', id)
+        .order('created_at', ascending: false);
 
     return response
         .map(
-          (
-            row,
-          ) => ProjectRecruitmentModel.fromMap(
-            Map<
-              String,
-              dynamic
-            >.from(
-              row,
-            ),
-          ),
+          (row) =>
+              ProjectRecruitmentModel.fromMap(Map<String, dynamic>.from(row)),
         )
-        .toList(
-          growable: false,
-        );
+        .toList(growable: false);
   }
 
   // ==========================================================
   // STREAM
   // ==========================================================
 
-  Stream<
-    List<
-      ProjectRecruitmentModel
-    >
-  >
-  streamRecruitments({
+  Stream<List<ProjectRecruitmentModel>> streamRecruitments({
     required String projectId,
   }) {
-    final id = _required(
-      projectId,
-      'projectId',
-    );
+    final id = _required(projectId, 'projectId');
 
     return _supabase
-        .from(
-          _recruitmentsTable,
-        )
-        .stream(
-          primaryKey: [
-            'id',
-          ],
-        )
-        .eq(
-          'project_id',
-          id,
-        )
-        .order(
-          'created_at',
-          ascending: false,
-        )
+        .from(_recruitmentsTable)
+        .stream(primaryKey: ['id'])
+        .eq('project_id', id)
+        .order('created_at', ascending: false)
         .map(
-          (
-            rows,
-          ) => rows
+          (rows) => rows
               .map(
-                (
-                  row,
-                ) => ProjectRecruitmentModel.fromMap(
-                  Map<
-                    String,
-                    dynamic
-                  >.from(
-                    row,
-                  ),
+                (row) => ProjectRecruitmentModel.fromMap(
+                  Map<String, dynamic>.from(row),
                 ),
               )
-              .toList(
-                growable: false,
-              ),
+              .toList(growable: false),
         );
   }
 
@@ -239,12 +156,7 @@ class ProjectRecruitmentService {
   // CANDIDATOS
   // ==========================================================
 
-  Future<
-    List<
-      ProjectRecruitmentCandidateModel
-    >
-  >
-  getCandidates({
+  Future<List<ProjectRecruitmentCandidateModel>> getCandidates({
     required ProjectRecruitmentModel recruitment,
   }) async {
     // ========================================================
@@ -252,32 +164,20 @@ class ProjectRecruitmentService {
     // ========================================================
 
     final project = await _supabase
-        .from(
-          _projectsTable,
-        )
-        .select(
-          'members',
-        )
-        .eq(
-          'id',
-          recruitment.projectId,
-        )
+        .from(_projectsTable)
+        .select('members')
+        .eq('id', recruitment.projectId)
         .single();
 
-    final memberIds = _readIds(
-      project['members'],
-    );
+    final memberIds = _readIds(project['members']);
 
     // ========================================================
     // PROFILES COMPATÍVEIS
     // ========================================================
 
     final profiles = await _supabase
-        .from(
-          _profilesTable,
-        )
-        .select(
-          '''
+        .from(_profilesTable)
+        .select('''
               id,
               username,
               name,
@@ -286,61 +186,31 @@ class ProjectRecruitmentService {
               roles,
               avatar_url,
               is_online
-              ''',
-        )
-        .contains(
-          'roles',
-          [
-            recruitment.role,
-          ],
-        )
-        .limit(
-          100,
-        );
+              ''')
+        .contains('roles', [recruitment.role])
+        .limit(100);
 
     // ========================================================
     // STATUS JÁ REGISTRADOS
     // ========================================================
 
     final candidateRows = await _supabase
-        .from(
-          _candidatesTable,
-        )
-        .select(
-          '''
+        .from(_candidatesTable)
+        .select('''
               id,
               user_id,
               status
-              ''',
-        )
-        .eq(
-          'recruitment_id',
-          recruitment.id,
-        );
+              ''')
+        .eq('recruitment_id', recruitment.id);
 
-    final candidateByUser =
-        <
-          String,
-          Map<
-            String,
-            dynamic
-          >
-        >{};
+    final candidateByUser = <String, Map<String, dynamic>>{};
 
     for (final row in candidateRows) {
-      final map =
-          Map<
-            String,
-            dynamic
-          >.from(
-            row,
-          );
+      final map = Map<String, dynamic>.from(row);
 
       final userId = map['user_id']?.toString().trim();
 
-      if (userId !=
-              null &&
-          userId.isNotEmpty) {
+      if (userId != null && userId.isNotEmpty) {
         candidateByUser[userId] = map;
       }
     }
@@ -349,32 +219,19 @@ class ProjectRecruitmentService {
     // CONVERTER
     // ========================================================
 
-    final candidates =
-        <
-          ProjectRecruitmentCandidateModel
-        >[];
+    final candidates = <ProjectRecruitmentCandidateModel>[];
 
     for (final row in profiles) {
-      final map =
-          Map<
-            String,
-            dynamic
-          >.from(
-            row,
-          );
+      final map = Map<String, dynamic>.from(row);
 
       final userId = map['id']?.toString().trim();
 
-      if (userId ==
-              null ||
-          userId.isEmpty) {
+      if (userId == null || userId.isEmpty) {
         continue;
       }
 
       // Já faz parte da Studio Session.
-      if (memberIds.contains(
-        userId,
-      )) {
+      if (memberIds.contains(userId)) {
         continue;
       }
 
@@ -391,23 +248,15 @@ class ProjectRecruitmentService {
       );
     }
 
-    candidates.sort(
-      (
-        first,
-        second,
-      ) {
-        if (first.isOnline !=
-            second.isOnline) {
-          return first.isOnline
-              ? -1
-              : 1;
-        }
+    candidates.sort((first, second) {
+      if (first.isOnline != second.isOnline) {
+        return first.isOnline ? -1 : 1;
+      }
 
-        return first.displayName.toLowerCase().compareTo(
-          second.displayName.toLowerCase(),
-        );
-      },
-    );
+      return first.displayName.toLowerCase().compareTo(
+        second.displayName.toLowerCase(),
+      );
+    });
 
     return candidates;
   }
@@ -416,72 +265,41 @@ class ProjectRecruitmentService {
   // CONVIDAR
   // ==========================================================
 
-  Future<
-    void
-  >
-  inviteCandidate({
+  Future<void> inviteCandidate({
     required String recruitmentId,
     required String userId,
   }) async {
     final currentUserId = requireCurrentUserId();
 
-    await _supabase
-        .from(
-          _candidatesTable,
-        )
-        .upsert(
-          {
-            'recruitment_id': _required(
-              recruitmentId,
-              'recruitmentId',
-            ),
+    await _supabase.from(_candidatesTable).upsert({
+      'recruitment_id': _required(recruitmentId, 'recruitmentId'),
 
-            'user_id': _required(
-              userId,
-              'userId',
-            ),
+      'user_id': _required(userId, 'userId'),
 
-            'status': 'invited',
+      'status': 'invited',
 
-            'invited_by': currentUserId,
+      'invited_by': currentUserId,
 
-            'updated_at': DateTime.now().toUtc().toIso8601String(),
-          },
-          onConflict: 'recruitment_id,user_id',
-        );
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }, onConflict: 'recruitment_id,user_id');
   }
 
   // ==========================================================
   // REGISTRAR INTERESSE
   // ==========================================================
 
-  Future<
-    void
-  >
-  registerInterest({
-    required String recruitmentId,
-  }) async {
+  Future<void> registerInterest({required String recruitmentId}) async {
     final userId = requireCurrentUserId();
 
-    await _supabase
-        .from(
-          _candidatesTable,
-        )
-        .upsert(
-          {
-            'recruitment_id': _required(
-              recruitmentId,
-              'recruitmentId',
-            ),
+    await _supabase.from(_candidatesTable).upsert({
+      'recruitment_id': _required(recruitmentId, 'recruitmentId'),
 
-            'user_id': userId,
+      'user_id': userId,
 
-            'status': 'interested',
+      'status': 'interested',
 
-            'updated_at': DateTime.now().toUtc().toIso8601String(),
-          },
-          onConflict: 'recruitment_id,user_id',
-        );
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }, onConflict: 'recruitment_id,user_id');
   }
 
   // ==========================================================
@@ -512,22 +330,13 @@ class ProjectRecruitmentService {
   //
   // ==========================================================
 
-  Future<
-    void
-  >
-  approveCandidate({
+  Future<void> approveCandidate({
     required ProjectRecruitmentModel recruitment,
     required String userId,
   }) async {
-    final recruitmentId = _required(
-      recruitment.id,
-      'recruitmentId',
-    );
+    final recruitmentId = _required(recruitment.id, 'recruitmentId');
 
-    final candidateUserId = _required(
-      userId,
-      'userId',
-    );
+    final candidateUserId = _required(userId, 'userId');
 
     // ========================================================
     // AUTH
@@ -553,9 +362,7 @@ class ProjectRecruitmentService {
         'Candidato aprovado: '
         '$candidateUserId',
       );
-    } on PostgrestException catch (
-      error
-    ) {
+    } on PostgrestException catch (error) {
       debugPrint(
         '[PROJECT RECRUITMENT] '
         'Erro ao aprovar candidato: '
@@ -569,10 +376,7 @@ class ProjectRecruitmentService {
       );
 
       rethrow;
-    } catch (
-      error,
-      stackTrace
-    ) {
+    } catch (error, stackTrace) {
       debugPrint(
         '[PROJECT RECRUITMENT] '
         'Erro inesperado ao aprovar candidato: '
@@ -593,58 +397,25 @@ class ProjectRecruitmentService {
   // FECHAR RECRUTAMENTO
   // ==========================================================
 
-  Future<
-    void
-  >
-  closeRecruitment({
-    required String recruitmentId,
-  }) async {
+  Future<void> closeRecruitment({required String recruitmentId}) async {
     await _supabase
-        .from(
-          _recruitmentsTable,
-        )
-        .update(
-          {
-            'status': 'closed',
-          },
-        )
-        .eq(
-          'id',
-          _required(
-            recruitmentId,
-            'recruitmentId',
-          ),
-        );
+        .from(_recruitmentsTable)
+        .update({'status': 'closed'})
+        .eq('id', _required(recruitmentId, 'recruitmentId'));
   }
 
   // ==========================================================
   // IDS
   // ==========================================================
 
-  List<
-    String
-  >
-  _readIds(
-    dynamic value,
-  ) {
-    if (value
-        is! Iterable) {
-      return <
-        String
-      >[];
+  List<String> _readIds(dynamic value) {
+    if (value is! Iterable) {
+      return <String>[];
     }
 
     return value
-        .map(
-          (
-            item,
-          ) => item.toString().trim(),
-        )
-        .where(
-          (
-            item,
-          ) => item.isNotEmpty,
-        )
+        .map((item) => item.toString().trim())
+        .where((item) => item.isNotEmpty)
         .toSet()
         .toList();
   }
@@ -653,16 +424,11 @@ class ProjectRecruitmentService {
   // REQUIRED
   // ==========================================================
 
-  String _required(
-    String value,
-    String field,
-  ) {
+  String _required(String value, String field) {
     final normalized = value.trim();
 
     if (normalized.isEmpty) {
-      throw ArgumentError(
-        '$field não pode ser vazio.',
-      );
+      throw ArgumentError('$field não pode ser vazio.');
     }
 
     return normalized;

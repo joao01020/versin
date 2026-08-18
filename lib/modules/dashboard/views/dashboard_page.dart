@@ -47,7 +47,6 @@ import 'package:versin/modules/networking/views/sub_features/chat_view.dart';
 // ============================================================
 
 import 'package:versin/modules/networking/invitations/models/project_invitation_model.dart';
-import 'package:versin/modules/networking/invitations/services/project_invitation_service.dart';
 import 'package:versin/modules/networking/invitations/controllers/project_invitation_controller.dart';
 import 'package:versin/modules/networking/invitations/widgets/project_invitation_banner.dart';
 
@@ -124,8 +123,6 @@ class _DashboardPageState
   // PROJECT INVITATIONS
   // ============================================================
 
-  late final ProjectInvitationService _projectInvitationService;
-
   late final ProjectInvitationController _projectInvitationController;
 
   // ============================================================
@@ -179,11 +176,10 @@ class _DashboardPageState
 
     _globalChatController = GlobalChatController()..init();
 
-    _projectInvitationService = ProjectInvitationService();
-
-    _projectInvitationController = ProjectInvitationController(
-      service: _projectInvitationService,
-    );
+    _projectInvitationController =
+        sl<
+          ProjectInvitationController
+        >();
 
     unawaited(
       _projectInvitationController.init(),
@@ -1486,7 +1482,8 @@ class _DashboardPageState
 
     _globalChatController.dispose();
 
-    _projectInvitationController.dispose();
+    // ProjectInvitationController é global (GetIt LazySingleton).
+    // Não deve ser disposed por esta página.
 
     super.dispose();
   }

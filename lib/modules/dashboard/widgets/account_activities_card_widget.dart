@@ -13,7 +13,6 @@ import 'package:versin/modules/match/views/match_projects_view.dart';
 
 import 'package:versin/modules/networking/invitations/controllers/project_invitation_controller.dart';
 import 'package:versin/modules/networking/invitations/models/project_invitation_model.dart';
-import 'package:versin/modules/networking/invitations/services/project_invitation_service.dart';
 import 'package:versin/modules/networking/views/networking_session_view.dart';
 
 import '../controllers/dashboard_controller.dart';
@@ -87,8 +86,6 @@ class _AccountActivitiesCardWidgetState
 
   late final RecentActivityController _activityController;
 
-  late final ProjectInvitationService _projectInvitationService;
-
   late final ProjectInvitationController _projectInvitationController;
 
   // ============================================================
@@ -109,11 +106,10 @@ class _AccountActivitiesCardWidgetState
           RecentActivityController
         >();
 
-    _projectInvitationService = ProjectInvitationService();
-
-    _projectInvitationController = ProjectInvitationController(
-      service: _projectInvitationService,
-    );
+    _projectInvitationController =
+        sl<
+          ProjectInvitationController
+        >();
 
     _projectInvitationController.init();
 
@@ -450,8 +446,8 @@ class _AccountActivitiesCardWidgetState
       message:
           count >
               0
-          ? '$count ${count == 1 ? "convite pendente" : "convites pendentes"}'
-          : 'Convites de projeto',
+          ? 'Convites de projetos • $count'
+          : 'Convites de projetos',
 
       child: GestureDetector(
         onTap: () {
@@ -558,7 +554,9 @@ class _AccountActivitiesCardWidgetState
   _openProjectInvitations(
     BuildContext context,
   ) async {
-    await _projectInvitationController.refresh();
+    if (!_projectInvitationController.initialized) {
+      await _projectInvitationController.init();
+    }
 
     if (!mounted) {
       return;
@@ -635,7 +633,7 @@ class _AccountActivitiesCardWidgetState
                             ),
 
                             Text(
-                              'Convites de projeto',
+                              'Convites de projetos',
 
                               style: TextStyle(
                                 color: Colors.white,
@@ -1188,7 +1186,9 @@ class _AccountActivitiesCardWidgetState
 
   @override
   void dispose() {
-    _projectInvitationController.dispose();
+    // O ProjectInvitationController é global (GetIt LazySingleton).
+    // Não deve ser disposed por este widget, senão o Realtime
+    // deixaria de funcionar ao sair/recriar o Dashboard.
 
     super.dispose();
   }

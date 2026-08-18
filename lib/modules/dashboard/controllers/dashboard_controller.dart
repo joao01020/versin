@@ -168,9 +168,12 @@ class DashboardController
       initialPage: _currentIndex,
     );
 
-    _checkActiveProjects();
-
-    await loadArtistName();
+    await Future.wait(
+      [
+        _checkActiveProjects(),
+        loadArtistName(),
+      ],
+    );
   }
 
   // ============================================================
@@ -314,21 +317,160 @@ class DashboardController
   // PROJETO ATIVO
   // ============================================================
 
-  void _checkActiveProjects() {
+  Future<
+    void
+  >
+  _checkActiveProjects() async {
+    final userId = Supabase.instance.client.auth.currentUser?.id.trim();
+
     // ==========================================================
-    // TEMPORÁRIO
-    // ==========================================================
-    //
-    // Mantido com o comportamento anterior.
-    //
-    // Posteriormente esta informação deve vir do módulo de
-    // projetos / banco de dados.
-    //
+    // SEM USUÁRIO AUTENTICADO
     // ==========================================================
 
-    hasActiveProject = true;
+    if (userId ==
+            null ||
+        userId.isEmpty) {
+      if (hasActiveProject) {
+        hasActiveProject = false;
 
-    notifyListeners();
+        notifyListeners();
+      }
+
+      debugPrint(
+        '[DASHBOARD] '
+        'Projeto ativo: usuário não autenticado.',
+      );
+
+      return;
+    }
+
+    try {
+      // ========================================================
+      // PROJETO DE MATCH ATIVO
+      // ========================================================
+      //
+      // O card do Dashboard só deve aparecer quando existir
+      // realmente uma Studio Session criada pelo Match:
+      //
+      // origin = match
+      // status = active
+      // usuário atual pertence a members
+      //
+      // ========================================================
+
+      final response = await Supabase.instance.client
+          .from(
+            'projects',
+          )
+          .select(
+            'id',
+          )
+          .eq(
+            'origin',
+            'match',
+          )
+          .eq(
+            'status',
+            'active',
+          )
+          .contains(
+            'members',
+            <
+              String
+            >[
+              userId,
+            ],
+          )
+          .limit(
+            1,
+          );
+
+      final rows =
+          List<
+            Map<
+              String,
+              dynamic
+            >
+          >.from(
+            response,
+          );
+
+      final hasProject = rows.isNotEmpty;
+
+      if (hasActiveProject !=
+          hasProject) {
+        hasActiveProject = hasProject;
+
+        notifyListeners();
+      }
+
+      debugPrint(
+        '[DASHBOARD] '
+        'Projeto de Match ativo: $hasActiveProject',
+      );
+    } on PostgrestException catch (
+      error,
+      stackTrace
+    ) {
+      debugPrint(
+        '[DASHBOARD] '
+        'Erro Supabase ao verificar projeto ativo: '
+        '${error.message}',
+      );
+
+      debugPrint(
+        '[DASHBOARD] '
+        'Código: ${error.code}',
+      );
+
+      debugPrint(
+        '$stackTrace',
+      );
+
+      if (hasActiveProject) {
+        hasActiveProject = false;
+
+        notifyListeners();
+      }
+    } catch (
+      error,
+      stackTrace
+    ) {
+      debugPrint(
+        '[DASHBOARD] '
+        'Erro ao verificar projeto ativo: $error',
+      );
+
+      debugPrint(
+        '$stackTrace',
+      );
+
+      if (hasActiveProject) {
+        hasActiveProject = false;
+
+        notifyListeners();
+      }
+    }
+  }
+
+  // ============================================================
+  // RECARREGAR PROJETO ATIVO
+  // ============================================================
+  //
+  // Pode ser chamado quando:
+  //
+  // - um Match criar projeto;
+  // - um convite de projeto for aceito;
+  // - um projeto for encerrado;
+  // - o Dashboard voltar ao foco.
+  //
+  // ============================================================
+
+  Future<
+    void
+  >
+  refreshActiveProject() async {
+    await _checkActiveProjects();
   }
 
   // ============================================================

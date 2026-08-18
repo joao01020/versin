@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:versin/modules/login/data/repositories/auth_repository_impl.dart';
 import 'package:versin/modules/login/domain/repositories/auth_repository.dart';
+import 'package:versin/modules/profile/services/profile_name_cache_service.dart';
 
 import '../data/models/hardware_status_model.dart';
 import '../repositories/dashboard_repository.dart';
@@ -20,6 +22,8 @@ class DashboardController
   final DashboardRepository _repository = DashboardRepository();
 
   final AuthRepository _authRepository = AuthRepositoryImpl();
+
+  final ProfileNameCacheService _profileNameCacheService = ProfileNameCacheService();
 
   // ============================================================
   // PAGE CONTROLLER
@@ -61,7 +65,7 @@ class DashboardController
   // PERFIL / ARTISTA
   // ============================================================
 
-  String _artistName = 'Artista';
+  String _artistName = '';
 
   bool _isLoadingArtistName = false;
 
@@ -186,29 +190,101 @@ class DashboardController
     notifyListeners();
 
     try {
+      final userId = Supabase.instance.client.auth.currentUser?.id.trim();
+
+      // ========================================================
+      // CACHE CENTRAL
+      // ========================================================
+      //
+      // O cache resolve na ordem:
+      //
+      // artist_name
+      // name
+      // @username
+      // Membro
+      //
+      // Isso evita iniciar o Dashboard com o texto fixo
+      // "Artista" e depois trocar o nome na tela.
+      //
+      // ========================================================
+
+      if (userId !=
+              null &&
+          userId.isNotEmpty) {
+        final cachedOrRemoteName = await _profileNameCacheService.getName(
+          userId,
+        );
+
+        final normalizedCachedName = cachedOrRemoteName.trim();
+
+        if (normalizedCachedName.isNotEmpty &&
+            normalizedCachedName !=
+                'Membro') {
+          _artistName = normalizedCachedName;
+
+          debugPrint(
+            '[DASHBOARD] '
+            'Nome carregado pelo cache de perfil: $_artistName',
+          );
+
+          return;
+        }
+      }
+
+      // ========================================================
+      // FALLBACK LEGADO
+      // ========================================================
+      //
+      // Mantém compatibilidade com a implementação anterior.
+      //
+      // Se AuthRepository retornar um nome válido, também
+      // sincronizamos esse valor no cache central.
+      //
+      // ========================================================
+
       final name = await _authRepository.getArtistName();
 
-      if (name !=
-              null &&
-          name.trim().isNotEmpty) {
-        _artistName = name.trim();
+      final normalizedName =
+          name?.trim() ??
+          '';
+
+      if (normalizedName.isNotEmpty) {
+        _artistName = normalizedName;
+
+        if (userId !=
+                null &&
+            userId.isNotEmpty) {
+          await _profileNameCacheService.cacheName(
+            userId: userId,
+            displayName: normalizedName,
+          );
+        }
       } else {
-        _artistName = 'Artista';
+        _artistName = 'Membro';
       }
 
       debugPrint(
         '[DASHBOARD] '
-        'Nome artístico carregado: $_artistName',
+        'Nome carregado: $_artistName',
       );
     } catch (
-      error
+      error,
+      stackTrace
     ) {
       debugPrint(
         '[DASHBOARD] '
-        'Erro ao carregar nome artístico: $error',
+        'Erro ao carregar nome do perfil: $error',
       );
 
-      _artistName = 'Artista';
+      debugPrint(
+        '$stackTrace',
+      );
+
+      // Não volta para "Artista", pois esse texto pode ser
+      // confundido com o nome real do usuário.
+      if (_artistName.trim().isEmpty) {
+        _artistName = 'Membro';
+      }
     } finally {
       _isLoadingArtistName = false;
 
@@ -568,7 +644,7 @@ class DashboardController
   // ============================================================
 
   void resetProfile() {
-    _artistName = 'Artista';
+    _artistName = '';
 
     profileImagePath = null;
 

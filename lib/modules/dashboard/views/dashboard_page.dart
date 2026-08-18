@@ -27,6 +27,7 @@ import 'package:versin/modules/chat/views/chat_page.dart';
 import 'package:versin/modules/hub/views/hub_page.dart';
 import 'package:versin/modules/market/market_page.dart';
 import 'package:versin/modules/match/views/match_page.dart';
+import 'package:versin/modules/profile/services/profile_name_cache_service.dart';
 import 'package:versin/modules/settings/views/settings_page.dart';
 import 'package:versin/modules/storage/views/storage_page.dart';
 import 'package:versin/modules/studio/views/studio_page.dart';
@@ -74,27 +75,44 @@ import 'package:versin/modules/networking/invitations/widgets/project_invitation
 //
 // ============================================================
 
-class DashboardPage extends StatefulWidget {
+class DashboardPage
+    extends
+        StatefulWidget {
   static const String routeName = '/';
 
-  const DashboardPage({super.key});
+  const DashboardPage({
+    super.key,
+  });
 
   @override
-  State<DashboardPage> createState() => _DashboardPageState();
+  State<
+    DashboardPage
+  >
+  createState() => _DashboardPageState();
 }
 
 // ============================================================
 // STATE
 // ============================================================
 
-class _DashboardPageState extends State<DashboardPage> {
+class _DashboardPageState
+    extends
+        State<
+          DashboardPage
+        > {
   // ============================================================
   // CONTROLLERS
   // ============================================================
 
-  final DashboardController _controller = sl<DashboardController>();
+  final DashboardController _controller =
+      sl<
+        DashboardController
+      >();
 
-  final RhymesController _rhymesController = sl<RhymesController>();
+  final RhymesController _rhymesController =
+      sl<
+        RhymesController
+      >();
 
   // ============================================================
   // GLOBAL CHAT
@@ -127,16 +145,10 @@ class _DashboardPageState extends State<DashboardPage> {
   DateTime _globalCallClockNow = DateTime.now();
 
   // ============================================================
-  // CACHE DE NOMES DA CHAMADA
+  // CACHE CENTRAL DE NOMES
   // ============================================================
 
-  final Map<String, String> _callParticipantNameCache = <String, String>{};
-
-  // ============================================================
-  // CACHE DE NOMES DO CHAT
-  // ============================================================
-
-  final Map<String, String> _chatSenderNameCache = <String, String>{};
+  final ProfileNameCacheService _profileNameCacheService = ProfileNameCacheService();
 
   // ============================================================
   // MENUS VISÍVEIS
@@ -173,36 +185,54 @@ class _DashboardPageState extends State<DashboardPage> {
       service: _projectInvitationService,
     );
 
-    unawaited(_projectInvitationController.init());
+    unawaited(
+      _projectInvitationController.init(),
+    );
 
-    _globalCallClockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (!mounted) {
-        return;
-      }
+    _globalCallClockTimer = Timer.periodic(
+      const Duration(
+        seconds: 1,
+      ),
+      (
+        _,
+      ) {
+        if (!mounted) {
+          return;
+        }
 
-      setState(() {
-        _globalCallClockNow = DateTime.now();
-      });
-    });
+        setState(
+          () {
+            _globalCallClockNow = DateTime.now();
+          },
+        );
+      },
+    );
   }
 
   // ============================================================
   // NAVEGAÇÃO
   // ============================================================
 
-  void _onNavigationTap(int visibleIndex) {
+  void _onNavigationTap(
+    int visibleIndex,
+  ) {
     final originalIndex = DashboardNavigation.originalIndexFromVisibleIndex(
       items: DashboardMenuConfig.items,
       visibleIndex: visibleIndex,
     );
 
-    if (originalIndex == null) {
+    if (originalIndex ==
+        null) {
       return;
     }
 
-    setState(() {
-      _controller.navigationTap(originalIndex);
-    });
+    setState(
+      () {
+        _controller.navigationTap(
+          originalIndex,
+        );
+      },
+    );
   }
 
   // ============================================================
@@ -216,16 +246,24 @@ class _DashboardPageState extends State<DashboardPage> {
   //
   // ============================================================
 
-  Future<void> _openCalendarPage() async {
+  Future<
+    void
+  >
+  _openCalendarPage() async {
     if (!mounted) {
       return;
     }
 
-    await Navigator.of(context).push(
+    await Navigator.of(
+      context,
+    ).push(
       MaterialPageRoute(
-        builder: (_) {
-          return const CalendarPage();
-        },
+        builder:
+            (
+              _,
+            ) {
+              return const CalendarPage();
+            },
       ),
     );
 
@@ -233,7 +271,9 @@ class _DashboardPageState extends State<DashboardPage> {
       return;
     }
 
-    setState(() {});
+    setState(
+      () {},
+    );
   }
 
   // ============================================================
@@ -241,32 +281,42 @@ class _DashboardPageState extends State<DashboardPage> {
   // ============================================================
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(
+    BuildContext context,
+  ) {
     return LayoutBuilder(
-      builder: (context, constraints) {
-        final isMobile = constraints.maxWidth < 800;
+      builder:
+          (
+            context,
+            constraints,
+          ) {
+            final isMobile =
+                constraints.maxWidth <
+                800;
 
-        return Scaffold(
-          backgroundColor: Colors.black,
+            return Scaffold(
+              backgroundColor: Colors.black,
 
-          // ====================================================
-          // NAVEGAÇÃO MOBILE
-          // ====================================================
-          bottomNavigationBar: isMobile
-              ? DashboardBottomNavigation(
-                  controller: _controller,
-                  items: _visibleMenuItems,
-                  currentVisibleIndex: _visibleCurrentIndex,
-                  onTap: _onNavigationTap,
-                )
-              : null,
+              // ====================================================
+              // NAVEGAÇÃO MOBILE
+              // ====================================================
+              bottomNavigationBar: isMobile
+                  ? DashboardBottomNavigation(
+                      controller: _controller,
+                      items: _visibleMenuItems,
+                      currentVisibleIndex: _visibleCurrentIndex,
+                      onTap: _onNavigationTap,
+                    )
+                  : null,
 
-          // ====================================================
-          // BODY
-          // ====================================================
-          body: _buildBody(isMobile: isMobile),
-        );
-      },
+              // ====================================================
+              // BODY
+              // ====================================================
+              body: _buildBody(
+                isMobile: isMobile,
+              ),
+            );
+          },
     );
   }
 
@@ -274,13 +324,21 @@ class _DashboardPageState extends State<DashboardPage> {
   // BODY
   // ============================================================
 
-  Widget _buildBody({required bool isMobile}) {
+  Widget _buildBody({
+    required bool isMobile,
+  }) {
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [const Color(0xFF2E1A47), _controller.deepBg, Colors.black],
+          colors: [
+            const Color(
+              0xFF2E1A47,
+            ),
+            _controller.deepBg,
+            Colors.black,
+          ],
         ),
       ),
       child: Row(
@@ -306,9 +364,13 @@ class _DashboardPageState extends State<DashboardPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      DashboardHeaderWidget(controller: _controller),
+                      DashboardHeaderWidget(
+                        controller: _controller,
+                      ),
 
-                      Expanded(child: _buildPageView()),
+                      Expanded(
+                        child: _buildPageView(),
+                      ),
                     ],
                   ),
                 ),
@@ -342,29 +404,38 @@ class _DashboardPageState extends State<DashboardPage> {
     return ListenableBuilder(
       listenable: _projectInvitationController,
 
-      builder: (context, _) {
-        final invitation = _projectInvitationController.currentInvitation;
+      builder:
+          (
+            context,
+            _,
+          ) {
+            final invitation = _projectInvitationController.currentInvitation;
 
-        if (invitation == null) {
-          return const SizedBox.shrink();
-        }
+            if (invitation ==
+                null) {
+              return const SizedBox.shrink();
+            }
 
-        return ProjectInvitationBanner(
-          invitation: invitation,
+            return ProjectInvitationBanner(
+              invitation: invitation,
 
-          isAccepting: _projectInvitationController.isAccepting,
+              isAccepting: _projectInvitationController.isAccepting,
 
-          isRejecting: _projectInvitationController.isRejecting,
+              isRejecting: _projectInvitationController.isRejecting,
 
-          onAccept: () async {
-            await _acceptProjectInvitation(invitation);
+              onAccept: () async {
+                await _acceptProjectInvitation(
+                  invitation,
+                );
+              },
+
+              onReject: () async {
+                await _rejectProjectInvitation(
+                  invitation,
+                );
+              },
+            );
           },
-
-          onReject: () async {
-            await _rejectProjectInvitation(invitation);
-          },
-        );
-      },
     );
   }
 
@@ -372,10 +443,14 @@ class _DashboardPageState extends State<DashboardPage> {
   // ACCEPT PROJECT INVITATION
   // ============================================================
 
-  Future<void> _acceptProjectInvitation(
+  Future<
+    void
+  >
+  _acceptProjectInvitation(
     ProjectInvitationModel invitation,
   ) async {
-    if (!mounted || _projectInvitationController.isBusy) {
+    if (!mounted ||
+        _projectInvitationController.isBusy) {
       return;
     }
 
@@ -387,7 +462,9 @@ class _DashboardPageState extends State<DashboardPage> {
       return;
     }
 
-    if (projectId == null || projectId.trim().isEmpty) {
+    if (projectId ==
+            null ||
+        projectId.trim().isEmpty) {
       _showProjectInvitationError(
         _projectInvitationController.errorMessage ??
             'Não foi possível aceitar o convite.',
@@ -398,26 +475,36 @@ class _DashboardPageState extends State<DashboardPage> {
 
     final normalizedProjectId = projectId.trim();
 
-    ScaffoldMessenger.of(context)
+    ScaffoldMessenger.of(
+        context,
+      )
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
-          content: Text('Você entrou em ${invitation.projectTitle}.'),
+          content: Text(
+            'Você entrou em ${invitation.projectTitle}.',
+          ),
           backgroundColor: Colors.green.shade800,
         ),
       );
 
-    await _openInvitedProject(normalizedProjectId);
+    await _openInvitedProject(
+      normalizedProjectId,
+    );
   }
 
   // ============================================================
   // REJECT PROJECT INVITATION
   // ============================================================
 
-  Future<void> _rejectProjectInvitation(
+  Future<
+    void
+  >
+  _rejectProjectInvitation(
     ProjectInvitationModel invitation,
   ) async {
-    if (!mounted || _projectInvitationController.isBusy) {
+    if (!mounted ||
+        _projectInvitationController.isBusy) {
       return;
     }
 
@@ -438,29 +525,50 @@ class _DashboardPageState extends State<DashboardPage> {
       return;
     }
 
-    ScaffoldMessenger.of(context)
+    ScaffoldMessenger.of(
+        context,
+      )
       ..hideCurrentSnackBar()
-      ..showSnackBar(const SnackBar(content: Text('Convite recusado.')));
+      ..showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Convite recusado.',
+          ),
+        ),
+      );
   }
 
   // ============================================================
   // OPEN INVITED PROJECT
   // ============================================================
 
-  Future<void> _openInvitedProject(String projectId) async {
+  Future<
+    void
+  >
+  _openInvitedProject(
+    String projectId,
+  ) async {
     final normalizedProjectId = projectId.trim();
 
-    if (!mounted || normalizedProjectId.isEmpty) {
+    if (!mounted ||
+        normalizedProjectId.isEmpty) {
       return;
     }
 
     _projectInvitationController.clearAcceptedProject();
 
-    await Navigator.of(context).push(
+    await Navigator.of(
+      context,
+    ).push(
       MaterialPageRoute(
-        builder: (_) {
-          return NetworkingSessionView(projectId: normalizedProjectId);
-        },
+        builder:
+            (
+              _,
+            ) {
+              return NetworkingSessionView(
+                projectId: normalizedProjectId,
+              );
+            },
       ),
     );
   }
@@ -469,15 +577,24 @@ class _DashboardPageState extends State<DashboardPage> {
   // PROJECT INVITATION ERROR
   // ============================================================
 
-  void _showProjectInvitationError(String message) {
+  void _showProjectInvitationError(
+    String message,
+  ) {
     if (!mounted) {
       return;
     }
 
-    ScaffoldMessenger.of(context)
+    ScaffoldMessenger.of(
+        context,
+      )
       ..hideCurrentSnackBar()
       ..showSnackBar(
-        SnackBar(content: Text(message), backgroundColor: Colors.red.shade900),
+        SnackBar(
+          content: Text(
+            message,
+          ),
+          backgroundColor: Colors.red.shade900,
+        ),
       );
   }
 
@@ -489,54 +606,70 @@ class _DashboardPageState extends State<DashboardPage> {
     return ListenableBuilder(
       listenable: _globalChatController,
 
-      builder: (context, _) {
-        if (!_globalChatController.hasNotification) {
-          return const SizedBox.shrink();
-        }
+      builder:
+          (
+            context,
+            _,
+          ) {
+            if (!_globalChatController.hasNotification) {
+              return const SizedBox.shrink();
+            }
 
-        final projectId = _globalChatController.latestProjectId;
+            final projectId = _globalChatController.latestProjectId;
 
-        if (projectId == null || projectId.isEmpty) {
-          return const SizedBox.shrink();
-        }
+            if (projectId ==
+                    null ||
+                projectId.isEmpty) {
+              return const SizedBox.shrink();
+            }
 
-        final latestMessage = _globalChatController.latestMessage;
+            final latestMessage = _globalChatController.latestMessage;
 
-        if (latestMessage == null) {
-          return const SizedBox.shrink();
-        }
+            if (latestMessage ==
+                null) {
+              return const SizedBox.shrink();
+            }
 
-        final senderId = latestMessage.senderId.trim();
+            final senderId = latestMessage.senderId.trim();
 
-        return FutureBuilder<String>(
-          future: _resolveChatSenderName(senderId),
+            return FutureBuilder<
+              String
+            >(
+              future: _resolveChatSenderName(
+                senderId,
+              ),
 
-          builder: (context, snapshot) {
-            final senderName =
-                snapshot.data ??
-                _chatSenderNameCache[senderId] ??
-                _globalChatController.senderName;
+              builder:
+                  (
+                    context,
+                    snapshot,
+                  ) {
+                    final senderName =
+                        snapshot.data ??
+                        _globalChatController.senderName;
 
-            return GlobalChatBanner(
-              type: _globalChatController.latestIsAudio
-                  ? GlobalChatBannerType.audio
-                  : GlobalChatBannerType.message,
+                    return GlobalChatBanner(
+                      type: _globalChatController.latestIsAudio
+                          ? GlobalChatBannerType.audio
+                          : GlobalChatBannerType.message,
 
-              senderName: senderName,
+                      senderName: senderName,
 
-              preview: _globalChatController.preview,
+                      preview: _globalChatController.preview,
 
-              unreadCount: _globalChatController.unreadCount,
+                      unreadCount: _globalChatController.unreadCount,
 
-              onOpen: () {
-                _openGlobalChat(projectId);
-              },
+                      onOpen: () {
+                        _openGlobalChat(
+                          projectId,
+                        );
+                      },
 
-              onDismiss: _globalChatController.dismissBanner,
+                      onDismiss: _globalChatController.dismissBanner,
+                    );
+                  },
             );
           },
-        );
-      },
     );
   }
 
@@ -544,71 +677,54 @@ class _DashboardPageState extends State<DashboardPage> {
   // RESOLVER NOME DO REMETENTE DO CHAT
   // ============================================================
 
-  Future<String> _resolveChatSenderName(String userId) async {
+  Future<
+    String
+  >
+  _resolveChatSenderName(
+    String userId,
+  ) async {
     final normalizedUserId = userId.trim();
 
     if (normalizedUserId.isEmpty) {
-      return _globalChatController.senderName;
-    }
+      final controllerName = _globalChatController.senderName.trim();
 
-    final cached = _chatSenderNameCache[normalizedUserId];
-
-    if (cached != null && cached.isNotEmpty) {
-      return cached;
+      return controllerName.isNotEmpty
+          ? controllerName
+          : 'Membro';
     }
 
     try {
-      final profile = await _supabase
-          .from('profiles')
-          .select('id, artist_name, name, username')
-          .eq('id', normalizedUserId)
-          .maybeSingle();
-
-      if (profile == null) {
-        return _globalChatController.senderName;
-      }
-
-      final artistName = profile['artist_name']?.toString().trim();
-
-      if (artistName != null && artistName.isNotEmpty) {
-        _chatSenderNameCache[normalizedUserId] = artistName;
-
-        return artistName;
-      }
-
-      final name = profile['name']?.toString().trim();
-
-      if (name != null && name.isNotEmpty) {
-        _chatSenderNameCache[normalizedUserId] = name;
-
-        return name;
-      }
-
-      final username = profile['username']?.toString().trim().replaceFirst(
-        RegExp(r'^@+'),
-        '',
+      final resolvedName = await _profileNameCacheService.getName(
+        normalizedUserId,
       );
 
-      if (username != null && username.isNotEmpty) {
-        final usernameLabel = '@$username';
+      final normalizedName = resolvedName.trim();
 
-        _chatSenderNameCache[normalizedUserId] = usernameLabel;
-
-        return usernameLabel;
+      if (normalizedName.isNotEmpty &&
+          normalizedName !=
+              'Membro') {
+        return normalizedName;
       }
-    } catch (error, stackTrace) {
+    } catch (
+      error,
+      stackTrace
+    ) {
       debugPrint(
         '[DASHBOARD] '
-        'Erro ao buscar nome do remetente do chat: '
+        'Erro ao resolver nome do remetente do chat: '
         '$error',
       );
 
-      debugPrint('$stackTrace');
+      debugPrint(
+        '$stackTrace',
+      );
     }
 
     final controllerName = _globalChatController.senderName.trim();
 
-    if (controllerName.isNotEmpty && controllerName != 'Membro') {
+    if (controllerName.isNotEmpty &&
+        controllerName !=
+            'Membro') {
       return controllerName;
     }
 
@@ -619,10 +735,16 @@ class _DashboardPageState extends State<DashboardPage> {
   // OPEN GLOBAL CHAT
   // ============================================================
 
-  Future<void> _openGlobalChat(String projectId) async {
+  Future<
+    void
+  >
+  _openGlobalChat(
+    String projectId,
+  ) async {
     final normalizedProjectId = projectId.trim();
 
-    if (!mounted || normalizedProjectId.isEmpty) {
+    if (!mounted ||
+        normalizedProjectId.isEmpty) {
       return;
     }
 
@@ -630,18 +752,32 @@ class _DashboardPageState extends State<DashboardPage> {
     //
     // Mensagens não lidas de outras Studio Sessions continuam
     // preservadas no controller global.
-    _globalChatController.markProjectAsRead(normalizedProjectId);
+    _globalChatController.markProjectAsRead(
+      normalizedProjectId,
+    );
 
-    _globalChatController.setChatVisible(true, projectId: normalizedProjectId);
+    _globalChatController.setChatVisible(
+      true,
+      projectId: normalizedProjectId,
+    );
 
     try {
-      await Navigator.of(context).push(
+      await Navigator.of(
+        context,
+      ).push(
         MaterialPageRoute(
-          builder: (_) => ChatView(projectId: normalizedProjectId),
+          builder:
+              (
+                _,
+              ) => ChatView(
+                projectId: normalizedProjectId,
+              ),
         ),
       );
     } finally {
-      _globalChatController.setChatVisible(false);
+      _globalChatController.setChatVisible(
+        false,
+      );
     }
   }
 
@@ -652,52 +788,99 @@ class _DashboardPageState extends State<DashboardPage> {
   Widget _buildGlobalCallBanner() {
     final currentUserId = _supabase.auth.currentUser?.id.trim();
 
-    if (currentUserId == null || currentUserId.isEmpty) {
+    if (currentUserId ==
+            null ||
+        currentUserId.isEmpty) {
       return const SizedBox.shrink();
     }
 
-    return StreamBuilder<List<Map<String, dynamic>>>(
+    return StreamBuilder<
+      List<
+        Map<
+          String,
+          dynamic
+        >
+      >
+    >(
       stream: _supabase
-          .from('project_calls')
-          .stream(primaryKey: ['id'])
-          .order('created_at', ascending: false),
+          .from(
+            'project_calls',
+          )
+          .stream(
+            primaryKey: [
+              'id',
+            ],
+          )
+          .order(
+            'created_at',
+            ascending: false,
+          ),
 
-      builder: (context, snapshot) {
-        final rows = snapshot.data ?? const <Map<String, dynamic>>[];
+      builder:
+          (
+            context,
+            snapshot,
+          ) {
+            final rows =
+                snapshot.data ??
+                const <
+                  Map<
+                    String,
+                    dynamic
+                  >
+                >[];
 
-        Map<String, dynamic>? activeRow;
+            Map<
+              String,
+              dynamic
+            >?
+            activeRow;
 
-        for (final row in rows) {
-          final status = row['status']?.toString().trim();
+            for (final row in rows) {
+              final status = row['status']?.toString().trim();
 
-          if (status != 'ringing' && status != 'active') {
-            continue;
-          }
+              if (status !=
+                      'ringing' &&
+                  status !=
+                      'active') {
+                continue;
+              }
 
-          final createdBy = row['created_by']?.toString().trim();
+              final createdBy = row['created_by']?.toString().trim();
 
-          final targetUserId = row['target_user_id']?.toString().trim();
+              final targetUserId = row['target_user_id']?.toString().trim();
 
-          final directlyInvolved =
-              createdBy == currentUserId || targetUserId == currentUserId;
+              final directlyInvolved =
+                  createdBy ==
+                      currentUserId ||
+                  targetUserId ==
+                      currentUserId;
 
-          final groupCall = targetUserId == null || targetUserId.isEmpty;
+              final groupCall =
+                  targetUserId ==
+                      null ||
+                  targetUserId.isEmpty;
 
-          if (!directlyInvolved && !groupCall) {
-            continue;
-          }
+              if (!directlyInvolved &&
+                  !groupCall) {
+                continue;
+              }
 
-          activeRow = row;
+              activeRow = row;
 
-          break;
-        }
+              break;
+            }
 
-        if (activeRow == null) {
-          return const SizedBox.shrink();
-        }
+            if (activeRow ==
+                null) {
+              return const SizedBox.shrink();
+            }
 
-        return _buildGlobalCallBannerFromRow(activeRow, currentUserId);
-      },
+            return _buildGlobalCallBannerFromRow(
+              activeRow,
+              currentUserId,
+            );
+          },
     );
   }
 
@@ -706,40 +889,67 @@ class _DashboardPageState extends State<DashboardPage> {
   // ============================================================
 
   Widget _buildGlobalCallBannerFromRow(
-    Map<String, dynamic> row,
+    Map<
+      String,
+      dynamic
+    >
+    row,
     String currentUserId,
   ) {
-    final callId = row['id']?.toString().trim() ?? '';
+    final callId =
+        row['id']?.toString().trim() ??
+        '';
 
-    final projectId = row['project_id']?.toString().trim() ?? '';
+    final projectId =
+        row['project_id']?.toString().trim() ??
+        '';
 
-    final createdBy = row['created_by']?.toString().trim() ?? '';
+    final createdBy =
+        row['created_by']?.toString().trim() ??
+        '';
 
     final targetUserId = row['target_user_id']?.toString().trim();
 
-    final status = row['status']?.toString().trim() ?? '';
+    final status =
+        row['status']?.toString().trim() ??
+        '';
 
     final mediaTypeValue =
-        row['media_type']?.toString().trim().toLowerCase() ?? 'audio';
+        row['media_type']?.toString().trim().toLowerCase() ??
+        'audio';
 
-    final bannerMediaType = mediaTypeValue == 'video'
+    final bannerMediaType =
+        mediaTypeValue ==
+            'video'
         ? GlobalCallMediaType.video
         : GlobalCallMediaType.audio;
 
     final incoming =
-        status == 'ringing' &&
-        createdBy != currentUserId &&
-        (targetUserId == currentUserId ||
-            targetUserId == null ||
+        status ==
+            'ringing' &&
+        createdBy !=
+            currentUserId &&
+        (targetUserId ==
+                currentUserId ||
+            targetUserId ==
+                null ||
             targetUserId.isEmpty);
 
-    final outgoing = status == 'ringing' && createdBy == currentUserId;
+    final outgoing =
+        status ==
+            'ringing' &&
+        createdBy ==
+            currentUserId;
 
-    final active = status == 'active';
+    final active =
+        status ==
+        'active';
 
     GlobalCallBannerState state = GlobalCallBannerState.hidden;
 
-    if (_isGlobalCallActionProcessing && _globalCallAction == 'end') {
+    if (_isGlobalCallActionProcessing &&
+        _globalCallAction ==
+            'end') {
       state = GlobalCallBannerState.ending;
     } else if (incoming) {
       state = GlobalCallBannerState.incoming;
@@ -749,18 +959,31 @@ class _DashboardPageState extends State<DashboardPage> {
       state = GlobalCallBannerState.active;
     }
 
-    final createdAt = DateTime.tryParse(row['created_at']?.toString() ?? '');
+    final createdAt = DateTime.tryParse(
+      row['created_at']?.toString() ??
+          '',
+    );
 
-    final startedAt = DateTime.tryParse(row['started_at']?.toString() ?? '');
+    final startedAt = DateTime.tryParse(
+      row['started_at']?.toString() ??
+          '',
+    );
 
-    final ringingDuration = createdAt == null || !(incoming || outgoing)
+    final ringingDuration =
+        createdAt ==
+                null ||
+            !(incoming ||
+                outgoing)
         ? null
         : _safeDurationDifference(
             _globalCallClockNow.toUtc(),
             createdAt.toUtc(),
           );
 
-    final duration = startedAt == null || !active
+    final duration =
+        startedAt ==
+                null ||
+            !active
         ? null
         : _safeDurationDifference(
             _globalCallClockNow.toUtc(),
@@ -773,51 +996,74 @@ class _DashboardPageState extends State<DashboardPage> {
       currentUserId: currentUserId,
     );
 
-    return FutureBuilder<String>(
-      future: _resolveCallParticipantName(participantUserId),
+    return FutureBuilder<
+      String
+    >(
+      future: _resolveCallParticipantName(
+        participantUserId,
+      ),
 
-      builder: (context, snapshot) {
-        final participantName =
-            snapshot.data ??
-            _callParticipantNameCache[participantUserId] ??
-            'Membro da sessão';
+      builder:
+          (
+            context,
+            snapshot,
+          ) {
+            final participantName =
+                snapshot.data ??
+                'Membro da sessão';
 
-        return GlobalCallBanner(
-          state: state,
+            return GlobalCallBanner(
+              state: state,
 
-          mediaType: bannerMediaType,
+              mediaType: bannerMediaType,
 
-          participantName: participantName,
+              participantName: participantName,
 
-          ringingDuration: ringingDuration,
+              ringingDuration: ringingDuration,
 
-          duration: duration,
+              duration: duration,
 
-          onOpen: projectId.isEmpty
-              ? null
-              : () {
-                  _openCallPage(projectId);
-                },
+              onOpen: projectId.isEmpty
+                  ? null
+                  : () {
+                      _openCallPage(
+                        projectId,
+                      );
+                    },
 
-          onAccept: incoming && callId.isNotEmpty
-              ? () {
-                  _acceptGlobalCall(callId, projectId);
-                }
-              : null,
+              onAccept:
+                  incoming &&
+                      callId.isNotEmpty
+                  ? () {
+                      _acceptGlobalCall(
+                        callId,
+                        projectId,
+                      );
+                    }
+                  : null,
 
-          onReject: incoming && callId.isNotEmpty
-              ? () {
-                  _rejectGlobalCall(callId);
-                }
-              : null,
+              onReject:
+                  incoming &&
+                      callId.isNotEmpty
+                  ? () {
+                      _rejectGlobalCall(
+                        callId,
+                      );
+                    }
+                  : null,
 
-          onEnd: (outgoing || active) && callId.isNotEmpty
-              ? () {
-                  _endGlobalCall(callId);
-                }
-              : null,
-        );
-      },
+              onEnd:
+                  (outgoing ||
+                          active) &&
+                      callId.isNotEmpty
+                  ? () {
+                      _endGlobalCall(
+                        callId,
+                      );
+                    }
+                  : null,
+            );
+          },
     );
   }
 
@@ -825,8 +1071,13 @@ class _DashboardPageState extends State<DashboardPage> {
   // SAFE DURATION DIFFERENCE
   // ============================================================
 
-  Duration _safeDurationDifference(DateTime now, DateTime startedAt) {
-    final value = now.difference(startedAt);
+  Duration _safeDurationDifference(
+    DateTime now,
+    DateTime startedAt,
+  ) {
+    final value = now.difference(
+      startedAt,
+    );
 
     if (value.isNegative) {
       return Duration.zero;
@@ -852,8 +1103,11 @@ class _DashboardPageState extends State<DashboardPage> {
     // EU CRIEI A CHAMADA
     // ========================================================
 
-    if (normalizedCreatedBy == currentUserId) {
-      if (normalizedTargetUserId != null && normalizedTargetUserId.isNotEmpty) {
+    if (normalizedCreatedBy ==
+        currentUserId) {
+      if (normalizedTargetUserId !=
+              null &&
+          normalizedTargetUserId.isNotEmpty) {
         return normalizedTargetUserId;
       }
 
@@ -880,66 +1134,43 @@ class _DashboardPageState extends State<DashboardPage> {
   //
   // ============================================================
 
-  Future<String> _resolveCallParticipantName(String userId) async {
+  Future<
+    String
+  >
+  _resolveCallParticipantName(
+    String userId,
+  ) async {
     final normalizedUserId = userId.trim();
 
     if (normalizedUserId.isEmpty) {
       return 'Membro da sessão';
     }
 
-    final cached = _callParticipantNameCache[normalizedUserId];
-
-    if (cached != null && cached.isNotEmpty) {
-      return cached;
-    }
-
     try {
-      final profile = await _supabase
-          .from('profiles')
-          .select('id, artist_name, name, username')
-          .eq('id', normalizedUserId)
-          .maybeSingle();
-
-      if (profile == null) {
-        return 'Membro da sessão';
-      }
-
-      final artistName = profile['artist_name']?.toString().trim();
-
-      if (artistName != null && artistName.isNotEmpty) {
-        _callParticipantNameCache[normalizedUserId] = artistName;
-
-        return artistName;
-      }
-
-      final name = profile['name']?.toString().trim();
-
-      if (name != null && name.isNotEmpty) {
-        _callParticipantNameCache[normalizedUserId] = name;
-
-        return name;
-      }
-
-      final username = profile['username']?.toString().trim().replaceFirst(
-        RegExp(r'^@+'),
-        '',
+      final resolvedName = await _profileNameCacheService.getName(
+        normalizedUserId,
       );
 
-      if (username != null && username.isNotEmpty) {
-        final usernameLabel = '@$username';
+      final normalizedName = resolvedName.trim();
 
-        _callParticipantNameCache[normalizedUserId] = usernameLabel;
-
-        return usernameLabel;
+      if (normalizedName.isNotEmpty &&
+          normalizedName !=
+              'Membro') {
+        return normalizedName;
       }
-    } catch (error, stackTrace) {
+    } catch (
+      error,
+      stackTrace
+    ) {
       debugPrint(
         '[DASHBOARD] '
-        'Erro ao buscar nome do participante da chamada: '
+        'Erro ao resolver nome do participante da chamada: '
         '$error',
       );
 
-      debugPrint('$stackTrace');
+      debugPrint(
+        '$stackTrace',
+      );
     }
 
     return 'Membro da sessão';
@@ -949,39 +1180,78 @@ class _DashboardPageState extends State<DashboardPage> {
   // OPEN CALL
   // ============================================================
 
-  Future<void> _openCallPage(String projectId) async {
-    if (!mounted || projectId.trim().isEmpty) {
+  Future<
+    void
+  >
+  _openCallPage(
+    String projectId,
+  ) async {
+    if (!mounted ||
+        projectId.trim().isEmpty) {
       return;
     }
 
     await Navigator.of(
       context,
-    ).push(MaterialPageRoute(builder: (_) => CallView(projectId: projectId)));
+    ).push(
+      MaterialPageRoute(
+        builder:
+            (
+              _,
+            ) => CallView(
+              projectId: projectId,
+            ),
+      ),
+    );
   }
 
   // ============================================================
   // ACCEPT CALL
   // ============================================================
 
-  Future<void> _acceptGlobalCall(String callId, String projectId) async {
+  Future<
+    void
+  >
+  _acceptGlobalCall(
+    String callId,
+    String projectId,
+  ) async {
     if (_isGlobalCallActionProcessing) {
       return;
     }
 
-    _setGlobalCallProcessing(true, 'accept');
+    _setGlobalCallProcessing(
+      true,
+      'accept',
+    );
 
     try {
-      await _callRepository.acceptCall(callId: callId);
+      await _callRepository.acceptCall(
+        callId: callId,
+      );
 
-      if (mounted && projectId.trim().isNotEmpty) {
-        await _openCallPage(projectId);
+      if (mounted &&
+          projectId.trim().isNotEmpty) {
+        await _openCallPage(
+          projectId,
+        );
       }
-    } catch (error, stackTrace) {
-      debugPrint('[DASHBOARD] Erro ao aceitar chamada global: $error');
+    } catch (
+      error,
+      stackTrace
+    ) {
+      debugPrint(
+        '[DASHBOARD] Erro ao aceitar chamada global: $error',
+      );
 
-      debugPrint('$stackTrace');
+      debugPrint(
+        '$stackTrace',
+      );
     } finally {
-      _setGlobalCallProcessing(false, null);
+      _setGlobalCallProcessing(
+        false,
+        null,
+      );
     }
   }
 
@@ -989,21 +1259,41 @@ class _DashboardPageState extends State<DashboardPage> {
   // REJECT CALL
   // ============================================================
 
-  Future<void> _rejectGlobalCall(String callId) async {
+  Future<
+    void
+  >
+  _rejectGlobalCall(
+    String callId,
+  ) async {
     if (_isGlobalCallActionProcessing) {
       return;
     }
 
-    _setGlobalCallProcessing(true, 'reject');
+    _setGlobalCallProcessing(
+      true,
+      'reject',
+    );
 
     try {
-      await _callRepository.rejectCall(callId: callId);
-    } catch (error, stackTrace) {
-      debugPrint('[DASHBOARD] Erro ao recusar chamada global: $error');
+      await _callRepository.rejectCall(
+        callId: callId,
+      );
+    } catch (
+      error,
+      stackTrace
+    ) {
+      debugPrint(
+        '[DASHBOARD] Erro ao recusar chamada global: $error',
+      );
 
-      debugPrint('$stackTrace');
+      debugPrint(
+        '$stackTrace',
+      );
     } finally {
-      _setGlobalCallProcessing(false, null);
+      _setGlobalCallProcessing(
+        false,
+        null,
+      );
     }
   }
 
@@ -1011,21 +1301,41 @@ class _DashboardPageState extends State<DashboardPage> {
   // END CALL
   // ============================================================
 
-  Future<void> _endGlobalCall(String callId) async {
+  Future<
+    void
+  >
+  _endGlobalCall(
+    String callId,
+  ) async {
     if (_isGlobalCallActionProcessing) {
       return;
     }
 
-    _setGlobalCallProcessing(true, 'end');
+    _setGlobalCallProcessing(
+      true,
+      'end',
+    );
 
     try {
-      await _callRepository.endCall(callId: callId);
-    } catch (error, stackTrace) {
-      debugPrint('[DASHBOARD] Erro ao encerrar chamada global: $error');
+      await _callRepository.endCall(
+        callId: callId,
+      );
+    } catch (
+      error,
+      stackTrace
+    ) {
+      debugPrint(
+        '[DASHBOARD] Erro ao encerrar chamada global: $error',
+      );
 
-      debugPrint('$stackTrace');
+      debugPrint(
+        '$stackTrace',
+      );
     } finally {
-      _setGlobalCallProcessing(false, null);
+      _setGlobalCallProcessing(
+        false,
+        null,
+      );
     }
   }
 
@@ -1033,16 +1343,21 @@ class _DashboardPageState extends State<DashboardPage> {
   // PROCESSING
   // ============================================================
 
-  void _setGlobalCallProcessing(bool value, String? action) {
+  void _setGlobalCallProcessing(
+    bool value,
+    String? action,
+  ) {
     if (!mounted) {
       return;
     }
 
-    setState(() {
-      _isGlobalCallActionProcessing = value;
+    setState(
+      () {
+        _isGlobalCallActionProcessing = value;
 
-      _globalCallAction = action;
-    });
+        _globalCallAction = action;
+      },
+    );
   }
 
   // ============================================================
@@ -1075,15 +1390,22 @@ class _DashboardPageState extends State<DashboardPage> {
 
       physics: const NeverScrollableScrollPhysics(),
 
-      onPageChanged: (index) {
-        if (!mounted) {
-          return;
-        }
+      onPageChanged:
+          (
+            index,
+          ) {
+            if (!mounted) {
+              return;
+            }
 
-        setState(() {
-          _controller.handlePageChange(index);
-        });
-      },
+            setState(
+              () {
+                _controller.handlePageChange(
+                  index,
+                );
+              },
+            );
+          },
 
       children: [
         // ======================================================

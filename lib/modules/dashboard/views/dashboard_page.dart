@@ -36,6 +36,9 @@ import 'package:versin/modules/wallet/views/wallet_page.dart';
 import 'package:versin/modules/networking/call/data/repositories/project_call_repository_impl.dart';
 import 'package:versin/modules/networking/call/views/call_view.dart';
 import 'package:versin/modules/networking/call/views/widgets/global_call_banner.dart';
+import 'package:versin/modules/networking/controllers/global_chat_controller.dart';
+import 'package:versin/modules/networking/widgets/global_chat_banner.dart';
+import 'package:versin/modules/networking/views/sub_features/chat_view.dart';
 
 // ============================================================
 // DASHBOARD PAGE
@@ -47,7 +50,8 @@ import 'package:versin/modules/networking/call/views/widgets/global_call_banner.
 // - orquestrar navegação;
 // - montar shell principal;
 // - manter PageView dos módulos;
-// - delegar UI para componentes especializados.
+// - delegar UI para componentes especializados;
+// - manter banners globais de chamada e mensagens.
 //
 // Não contém:
 //
@@ -98,6 +102,12 @@ class _DashboardPageState
       sl<
         RhymesController
       >();
+
+  // ============================================================
+  // GLOBAL CHAT
+  // ============================================================
+
+  late final GlobalChatController _globalChatController;
 
   // ============================================================
   // GLOBAL CALL
@@ -155,6 +165,8 @@ class _DashboardPageState
     super.initState();
 
     _controller.init();
+
+    _globalChatController = GlobalChatController()..init();
 
     _globalCallClockTimer = Timer.periodic(
       const Duration(
@@ -346,7 +358,13 @@ class _DashboardPageState
                   top: 0,
                   left: 0,
                   right: 0,
-                  child: _buildGlobalCallBanner(),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildGlobalCallBanner(),
+                      _buildGlobalChatBanner(),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -354,6 +372,104 @@ class _DashboardPageState
         ],
       ),
     );
+  }
+
+  // ============================================================
+  // GLOBAL CHAT BANNER
+  // ============================================================
+
+  Widget _buildGlobalChatBanner() {
+    return ListenableBuilder(
+      listenable: _globalChatController,
+
+      builder:
+          (
+            context,
+            _,
+          ) {
+            if (!_globalChatController.hasNotification) {
+              return const SizedBox.shrink();
+            }
+
+            final projectId = _globalChatController.latestProjectId;
+
+            if (projectId ==
+                    null ||
+                projectId.isEmpty) {
+              return const SizedBox.shrink();
+            }
+
+            return GlobalChatBanner(
+              type: _globalChatController.latestIsAudio
+                  ? GlobalChatBannerType.audio
+                  : GlobalChatBannerType.message,
+
+              senderName: _globalChatController.senderName,
+
+              preview: _globalChatController.preview,
+
+              unreadCount: _globalChatController.unreadCount,
+
+              onOpen: () {
+                _openGlobalChat(
+                  projectId,
+                );
+              },
+
+              onDismiss: _globalChatController.dismissBanner,
+            );
+          },
+    );
+  }
+
+  // ============================================================
+  // OPEN GLOBAL CHAT
+  // ============================================================
+
+  Future<
+    void
+  >
+  _openGlobalChat(
+    String projectId,
+  ) async {
+    final normalizedProjectId = projectId.trim();
+
+    if (!mounted ||
+        normalizedProjectId.isEmpty) {
+      return;
+    }
+
+    // Marca somente esta Studio Session como lida.
+    //
+    // Mensagens não lidas de outras Studio Sessions continuam
+    // preservadas no controller global.
+    _globalChatController.markProjectAsRead(
+      normalizedProjectId,
+    );
+
+    _globalChatController.setChatVisible(
+      true,
+      projectId: normalizedProjectId,
+    );
+
+    try {
+      await Navigator.of(
+        context,
+      ).push(
+        MaterialPageRoute(
+          builder:
+              (
+                _,
+              ) => ChatView(
+                projectId: normalizedProjectId,
+              ),
+        ),
+      );
+    } finally {
+      _globalChatController.setChatVisible(
+        false,
+      );
+    }
   }
 
   // ============================================================
@@ -1110,6 +1226,8 @@ class _DashboardPageState
     _globalCallClockTimer?.cancel();
 
     _globalCallClockTimer = null;
+
+    _globalChatController.dispose();
 
     super.dispose();
   }

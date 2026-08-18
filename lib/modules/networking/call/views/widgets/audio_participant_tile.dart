@@ -21,32 +21,20 @@ import '../../data/models/call_participant_model.dart';
 //
 // ============================================================
 
-class AudioParticipantTile
-    extends
-        StatelessWidget {
+class AudioParticipantTile extends StatelessWidget {
   // ==========================================================
   // COLORS
   // ==========================================================
 
-  static const Color _surface = Color(
-    0xFF111116,
-  );
+  static const Color _surface = Color(0xFF111116);
 
-  static const Color _surfaceLight = Color(
-    0xFF17171E,
-  );
+  static const Color _surfaceLight = Color(0xFF17171E);
 
-  static const Color _purple = Color(
-    0xFF8B5CF6,
-  );
+  static const Color _purple = Color(0xFF8B5CF6);
 
-  static const Color _green = Color(
-    0xFF34D399,
-  );
+  static const Color _green = Color(0xFF34D399);
 
-  static const Color _red = Color(
-    0xFFEF4444,
-  );
+  static const Color _red = Color(0xFFEF4444);
 
   // ==========================================================
   // DATA
@@ -74,65 +62,39 @@ class AudioParticipantTile
   // ==========================================================
 
   @override
-  Widget build(
-    BuildContext context,
-  ) {
+  Widget build(BuildContext context) {
     return Material(
       color: Colors.transparent,
 
       child: InkWell(
         onTap: onTap,
 
-        borderRadius: BorderRadius.circular(
-          compact
-              ? 16
-              : 20,
-        ),
+        borderRadius: BorderRadius.circular(compact ? 16 : 20),
 
         child: AnimatedContainer(
-          duration: const Duration(
-            milliseconds: 180,
-          ),
+          duration: const Duration(milliseconds: 180),
 
-          padding: EdgeInsets.all(
-            compact
-                ? 12
-                : 16,
-          ),
+          padding: EdgeInsets.all(compact ? 12 : 16),
 
           decoration: BoxDecoration(
             color: _surface,
 
-            borderRadius: BorderRadius.circular(
-              compact
-                  ? 16
-                  : 20,
-            ),
+            borderRadius: BorderRadius.circular(compact ? 16 : 20),
 
             border: Border.all(
               color: participant.isSpeaking
-                  ? _green.withValues(
-                      alpha: 0.65,
-                    )
+                  ? _green.withValues(alpha: 0.65)
                   : participant.isLocalUser
-                  ? _purple.withValues(
-                      alpha: 0.30,
-                    )
-                  : Colors.white.withValues(
-                      alpha: 0.05,
-                    ),
+                  ? _purple.withValues(alpha: 0.30)
+                  : Colors.white.withValues(alpha: 0.05),
 
-              width: participant.isSpeaking
-                  ? 1.4
-                  : 1,
+              width: participant.isSpeaking ? 1.4 : 1,
             ),
 
             boxShadow: participant.isSpeaking
                 ? [
                     BoxShadow(
-                      color: _green.withValues(
-                        alpha: 0.12,
-                      ),
+                      color: _green.withValues(alpha: 0.12),
 
                       blurRadius: 18,
                     ),
@@ -147,11 +109,7 @@ class AudioParticipantTile
               // ==============================================
               _buildAvatar(),
 
-              SizedBox(
-                width: compact
-                    ? 10
-                    : 13,
-              ),
+              SizedBox(width: compact ? 10 : 13),
 
               // ==============================================
               // INFO
@@ -179,9 +137,7 @@ class AudioParticipantTile
                             style: TextStyle(
                               color: Colors.white,
 
-                              fontSize: compact
-                                  ? 12
-                                  : 14,
+                              fontSize: compact ? 12 : 14,
 
                               fontWeight: FontWeight.w700,
                             ),
@@ -189,9 +145,7 @@ class AudioParticipantTile
                         ),
 
                         if (participant.isLocalUser) ...[
-                          const SizedBox(
-                            width: 7,
-                          ),
+                          const SizedBox(width: 7),
 
                           _buildYouBadge(),
                         ],
@@ -202,9 +156,7 @@ class AudioParticipantTile
                     // USERNAME
                     // ========================================
                     if (_usernameLabel.isNotEmpty) ...[
-                      const SizedBox(
-                        height: 2,
-                      ),
+                      const SizedBox(height: 2),
 
                       Text(
                         _usernameLabel,
@@ -221,11 +173,7 @@ class AudioParticipantTile
                       ),
                     ],
 
-                    SizedBox(
-                      height: compact
-                          ? 6
-                          : 8,
-                    ),
+                    SizedBox(height: compact ? 6 : 8),
 
                     // ========================================
                     // STATUS
@@ -249,24 +197,16 @@ class AudioParticipantTile
               // MICROPHONE
               // ==============================================
               Container(
-                width: compact
-                    ? 34
-                    : 38,
+                width: compact ? 34 : 38,
 
-                height: compact
-                    ? 34
-                    : 38,
+                height: compact ? 34 : 38,
 
                 decoration: BoxDecoration(
                   color: participant.microphoneEnabled
                       ? _surfaceLight
-                      : _red.withValues(
-                          alpha: 0.10,
-                        ),
+                      : _red.withValues(alpha: 0.10),
 
-                  borderRadius: BorderRadius.circular(
-                    12,
-                  ),
+                  borderRadius: BorderRadius.circular(12),
                 ),
 
                 child: Icon(
@@ -274,13 +214,9 @@ class AudioParticipantTile
                       ? Icons.mic_rounded
                       : Icons.mic_off_rounded,
 
-                  color: participant.microphoneEnabled
-                      ? Colors.white60
-                      : _red,
+                  color: participant.microphoneEnabled ? Colors.white60 : _red,
 
-                  size: compact
-                      ? 16
-                      : 18,
+                  size: compact ? 16 : 18,
                 ),
               ),
             ],
@@ -297,18 +233,11 @@ class AudioParticipantTile
   String get _usernameLabel {
     final username = participant.username?.trim();
 
-    if (username ==
-            null ||
-        username.isEmpty) {
+    if (username == null || username.isEmpty) {
       return '';
     }
 
-    final normalized = username.replaceFirst(
-      RegExp(
-        r'^@+',
-      ),
-      '',
-    );
+    final normalized = username.replaceFirst(RegExp(r'^@+'), '');
 
     return '@$normalized';
   }
@@ -318,16 +247,12 @@ class AudioParticipantTile
   // ==========================================================
 
   Widget _buildAvatar() {
-    final size = compact
-        ? 44.0
-        : 52.0;
+    final size = compact ? 44.0 : 52.0;
 
     final avatarUrl = participant.avatarUrl?.trim();
 
     return AnimatedContainer(
-      duration: const Duration(
-        milliseconds: 180,
-      ),
+      duration: const Duration(milliseconds: 180),
 
       width: size,
 
@@ -339,34 +264,22 @@ class AudioParticipantTile
         border: Border.all(
           color: participant.isSpeaking
               ? _green
-              : _purple.withValues(
-                  alpha: 0.25,
-                ),
+              : _purple.withValues(alpha: 0.25),
 
-          width: participant.isSpeaking
-              ? 2
-              : 1,
+          width: participant.isSpeaking ? 2 : 1,
         ),
       ),
 
       child: ClipOval(
-        child:
-            avatarUrl !=
-                    null &&
-                avatarUrl.isNotEmpty
+        child: avatarUrl != null && avatarUrl.isNotEmpty
             ? Image.network(
                 avatarUrl,
 
                 fit: BoxFit.cover,
 
-                errorBuilder:
-                    (
-                      context,
-                      error,
-                      stackTrace,
-                    ) {
-                      return _buildInitial();
-                    },
+                errorBuilder: (context, error, stackTrace) {
+                  return _buildInitial();
+                },
               )
             : _buildInitial(),
       ),
@@ -380,19 +293,10 @@ class AudioParticipantTile
   Widget _buildInitial() {
     final name = participant.displayName.trim();
 
-    final initial = name.isEmpty
-        ? '?'
-        : name
-              .substring(
-                0,
-                1,
-              )
-              .toUpperCase();
+    final initial = name.isEmpty ? '?' : name.substring(0, 1).toUpperCase();
 
     return Container(
-      color: _purple.withValues(
-        alpha: 0.12,
-      ),
+      color: _purple.withValues(alpha: 0.12),
 
       alignment: Alignment.center,
 
@@ -402,9 +306,7 @@ class AudioParticipantTile
         style: TextStyle(
           color: _purple,
 
-          fontSize: compact
-              ? 15
-              : 18,
+          fontSize: compact ? 15 : 18,
 
           fontWeight: FontWeight.w800,
         ),
@@ -418,20 +320,12 @@ class AudioParticipantTile
 
   Widget _buildYouBadge() {
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 6,
-
-        vertical: 2,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
 
       decoration: BoxDecoration(
-        color: _purple.withValues(
-          alpha: 0.12,
-        ),
+        color: _purple.withValues(alpha: 0.12),
 
-        borderRadius: BorderRadius.circular(
-          20,
-        ),
+        borderRadius: BorderRadius.circular(20),
       ),
 
       child: const Text(
@@ -467,27 +361,19 @@ class AudioParticipantTile
           height: 6,
 
           decoration: BoxDecoration(
-            color: connected
-                ? _green
-                : Colors.white24,
+            color: connected ? _green : Colors.white24,
 
             shape: BoxShape.circle,
           ),
         ),
 
-        const SizedBox(
-          width: 5,
-        ),
+        const SizedBox(width: 5),
 
         Text(
-          connected
-              ? 'Áudio conectado'
-              : 'Conectando',
+          connected ? 'Áudio conectado' : 'Conectando',
 
           style: TextStyle(
-            color: connected
-                ? _green
-                : Colors.white30,
+            color: connected ? _green : Colors.white30,
 
             fontSize: 8,
 
@@ -507,17 +393,9 @@ class AudioParticipantTile
       mainAxisSize: MainAxisSize.min,
 
       children: [
-        Icon(
-          Icons.graphic_eq_rounded,
+        Icon(Icons.graphic_eq_rounded, color: _green, size: 13),
 
-          color: _green,
-
-          size: 13,
-        ),
-
-        SizedBox(
-          width: 3,
-        ),
+        SizedBox(width: 3),
 
         Text(
           'Falando',

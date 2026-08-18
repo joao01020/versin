@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 // ============================================================
@@ -13,22 +15,13 @@ import 'package:flutter/material.dart';
 //
 // ============================================================
 
-enum GlobalCallBannerState {
-  hidden,
-  calling,
-  incoming,
-  active,
-  ending,
-}
+enum GlobalCallBannerState { hidden, calling, incoming, active, ending }
 
 // ============================================================
 // GLOBAL CALL MEDIA TYPE
 // ============================================================
 
-enum GlobalCallMediaType {
-  audio,
-  video,
-}
+enum GlobalCallMediaType { audio, video }
 
 // ============================================================
 // GLOBAL CALL BANNER
@@ -49,39 +42,27 @@ enum GlobalCallMediaType {
 // -> Ligação de João · 00:12
 //
 // active
-// -> Chamada em andamento
+// -> Chamada em andamento · 01:24
 //
 // ending
 // -> Encerrando chamada...
 //
 // ============================================================
 
-class GlobalCallBanner
-    extends
-        StatelessWidget {
+class GlobalCallBanner extends StatelessWidget {
   // ==========================================================
   // CORES
   // ==========================================================
 
-  static const Color _background = Color(
-    0xFF121217,
-  );
+  static const Color _background = Color(0xFF121217);
 
-  static const Color _green = Color(
-    0xFF34D399,
-  );
+  static const Color _green = Color(0xFF34D399);
 
-  static const Color _red = Color(
-    0xFFEF4444,
-  );
+  static const Color _red = Color(0xFFEF4444);
 
-  static const Color _purple = Color(
-    0xFF8B5CF6,
-  );
+  static const Color _purple = Color(0xFF8B5CF6);
 
-  static const Color _orange = Color(
-    0xFFF59E0B,
-  );
+  static const Color _orange = Color(0xFFF59E0B);
 
   // ==========================================================
   // ESTADO
@@ -145,24 +126,51 @@ class GlobalCallBanner
   // ==========================================================
 
   @override
-  Widget build(
-    BuildContext context,
-  ) {
+  Widget build(BuildContext context) {
     // ========================================================
     // HIDDEN
     // ========================================================
 
-    if (state ==
-        GlobalCallBannerState.hidden) {
+    if (state == GlobalCallBannerState.hidden) {
       return const SizedBox.shrink();
     }
 
-    return SafeArea(
-      minimum: const EdgeInsets.only(
-        top: 8,
-        left: 12,
-        right: 12,
+    // ========================================================
+    // LIVE TIMER
+    // ========================================================
+    //
+    // O banner pode continuar visível mesmo quando a tela
+    // principal da chamada foi minimizada. Por isso ele mantém
+    // seu próprio tick visual de 1 segundo.
+    //
+    // ringingDuration / duration continuam sendo a base real
+    // recebida do controller.
+    //
+    // ========================================================
+
+    return StreamBuilder<int>(
+      stream: Stream<int>.periodic(
+        const Duration(seconds: 1),
+        (tick) => tick + 1,
       ),
+
+      initialData: 0,
+
+      builder: (context, snapshot) {
+        final elapsedSeconds = snapshot.data ?? 0;
+
+        return _buildBanner(Duration(seconds: elapsedSeconds));
+      },
+    );
+  }
+
+  // ==========================================================
+  // BUILD BANNER
+  // ==========================================================
+
+  Widget _buildBanner(Duration elapsedSinceBuild) {
+    return SafeArea(
+      minimum: const EdgeInsets.only(top: 8, left: 12, right: 12),
 
       child: Material(
         color: Colors.transparent,
@@ -170,40 +178,24 @@ class GlobalCallBanner
         child: Container(
           width: double.infinity,
 
-          constraints: const BoxConstraints(
-            minHeight: 62,
-          ),
+          constraints: const BoxConstraints(minHeight: 62),
 
-          padding: const EdgeInsets.symmetric(
-            horizontal: 14,
-            vertical: 10,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
 
           decoration: BoxDecoration(
             color: _background,
 
-            borderRadius: BorderRadius.circular(
-              18,
-            ),
+            borderRadius: BorderRadius.circular(18),
 
-            border: Border.all(
-              color: _stateColor.withValues(
-                alpha: 0.30,
-              ),
-            ),
+            border: Border.all(color: _stateColor.withValues(alpha: 0.30)),
 
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(
-                  alpha: 0.35,
-                ),
+                color: Colors.black.withValues(alpha: 0.35),
 
                 blurRadius: 20,
 
-                offset: const Offset(
-                  0,
-                  8,
-                ),
+                offset: const Offset(0, 8),
               ),
             ],
           ),
@@ -215,20 +207,14 @@ class GlobalCallBanner
               // ==================================================
               _buildIcon(),
 
-              const SizedBox(
-                width: 12,
-              ),
+              const SizedBox(width: 12),
 
               // ==================================================
               // INFORMAÇÕES
               // ==================================================
-              Expanded(
-                child: _buildInformation(),
-              ),
+              Expanded(child: _buildInformation(elapsedSinceBuild)),
 
-              const SizedBox(
-                width: 10,
-              ),
+              const SizedBox(width: 10),
 
               // ==================================================
               // AÇÕES
@@ -252,26 +238,14 @@ class GlobalCallBanner
       height: 40,
 
       decoration: BoxDecoration(
-        color: _stateColor.withValues(
-          alpha: 0.12,
-        ),
+        color: _stateColor.withValues(alpha: 0.12),
 
         shape: BoxShape.circle,
 
-        border: Border.all(
-          color: _stateColor.withValues(
-            alpha: 0.25,
-          ),
-        ),
+        border: Border.all(color: _stateColor.withValues(alpha: 0.25)),
       ),
 
-      child: Icon(
-        _stateIcon,
-
-        color: _stateColor,
-
-        size: 20,
-      ),
+      child: Icon(_stateIcon, color: _stateColor, size: 20),
     );
   }
 
@@ -279,7 +253,7 @@ class GlobalCallBanner
   // INFORMATION
   // ==========================================================
 
-  Widget _buildInformation() {
+  Widget _buildInformation(Duration elapsedSinceBuild) {
     return Column(
       mainAxisSize: MainAxisSize.min,
 
@@ -305,9 +279,7 @@ class GlobalCallBanner
           ),
         ),
 
-        const SizedBox(
-          height: 3,
-        ),
+        const SizedBox(height: 3),
 
         // ======================================================
         // SUBTITLE
@@ -329,23 +301,17 @@ class GlobalCallBanner
               ),
             ),
 
-            const SizedBox(
-              width: 6,
-            ),
+            const SizedBox(width: 6),
 
             Flexible(
               child: Text(
-                _subtitle,
+                _subtitleFor(elapsedSinceBuild),
 
                 maxLines: 1,
 
                 overflow: TextOverflow.ellipsis,
 
-                style: const TextStyle(
-                  color: Colors.white38,
-
-                  fontSize: 9,
-                ),
+                style: const TextStyle(color: Colors.white38, fontSize: 9),
               ),
             ),
           ],
@@ -379,22 +345,16 @@ class GlobalCallBanner
               onPressed: onReject,
             ),
 
-            const SizedBox(
-              width: 8,
-            ),
+            const SizedBox(width: 8),
 
             _buildCircleAction(
-              icon:
-                  mediaType ==
-                      GlobalCallMediaType.video
+              icon: mediaType == GlobalCallMediaType.video
                   ? Icons.videocam_rounded
                   : Icons.call_rounded,
 
               color: _green,
 
-              tooltip:
-                  mediaType ==
-                      GlobalCallMediaType.video
+              tooltip: mediaType == GlobalCallMediaType.video
                   ? 'Atender vídeo'
                   : 'Atender',
 
@@ -412,13 +372,10 @@ class GlobalCallBanner
           mainAxisSize: MainAxisSize.min,
 
           children: [
-            if (onOpen !=
-                null) ...[
+            if (onOpen != null) ...[
               _buildOpenButton(),
 
-              const SizedBox(
-                width: 8,
-              ),
+              const SizedBox(width: 8),
             ],
 
             _buildCircleAction(
@@ -442,13 +399,10 @@ class GlobalCallBanner
           mainAxisSize: MainAxisSize.min,
 
           children: [
-            if (onOpen !=
-                null) ...[
+            if (onOpen != null) ...[
               _buildOpenButton(),
 
-              const SizedBox(
-                width: 8,
-              ),
+              const SizedBox(width: 8),
             ],
 
             _buildCircleAction(
@@ -473,11 +427,7 @@ class GlobalCallBanner
 
           height: 18,
 
-          child: CircularProgressIndicator(
-            strokeWidth: 2,
-
-            color: _orange,
-          ),
+          child: CircularProgressIndicator(strokeWidth: 2, color: _orange),
         );
 
       // ========================================================
@@ -500,20 +450,13 @@ class GlobalCallBanner
       style: TextButton.styleFrom(
         foregroundColor: _purple,
 
-        padding: const EdgeInsets.symmetric(
-          horizontal: 10,
-          vertical: 7,
-        ),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
 
         minimumSize: Size.zero,
 
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
 
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(
-            10,
-          ),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
 
       child: const Text(
@@ -546,9 +489,7 @@ class GlobalCallBanner
       child: InkWell(
         onTap: onPressed,
 
-        borderRadius: BorderRadius.circular(
-          30,
-        ),
+        borderRadius: BorderRadius.circular(30),
 
         child: Container(
           width: 34,
@@ -556,37 +497,19 @@ class GlobalCallBanner
           height: 34,
 
           decoration: BoxDecoration(
-            color: color.withValues(
-              alpha:
-                  onPressed ==
-                      null
-                  ? 0.05
-                  : 0.12,
-            ),
+            color: color.withValues(alpha: onPressed == null ? 0.05 : 0.12),
 
             shape: BoxShape.circle,
 
             border: Border.all(
-              color: color.withValues(
-                alpha:
-                    onPressed ==
-                        null
-                    ? 0.10
-                    : 0.25,
-              ),
+              color: color.withValues(alpha: onPressed == null ? 0.10 : 0.25),
             ),
           ),
 
           child: Icon(
             icon,
 
-            color:
-                onPressed ==
-                    null
-                ? color.withValues(
-                    alpha: 0.30,
-                  )
-                : color,
+            color: onPressed == null ? color.withValues(alpha: 0.30) : color,
 
             size: 17,
           ),
@@ -602,37 +525,24 @@ class GlobalCallBanner
   String get _title {
     final normalizedName = participantName?.trim();
 
-    final name =
-        normalizedName ==
-                null ||
-            normalizedName.isEmpty
+    final name = normalizedName == null || normalizedName.isEmpty
         ? 'Membro da sessão'
         : normalizedName;
 
-    final isVideo =
-        mediaType ==
-        GlobalCallMediaType.video;
+    final isVideo = mediaType == GlobalCallMediaType.video;
 
     switch (state) {
       case GlobalCallBannerState.calling:
-        return isVideo
-            ? 'Chamando $name por vídeo...'
-            : 'Chamando $name...';
+        return isVideo ? 'Chamando $name por vídeo...' : 'Chamando $name...';
 
       case GlobalCallBannerState.incoming:
-        return isVideo
-            ? 'Chamada de vídeo de $name'
-            : 'Ligação de $name';
+        return isVideo ? 'Chamada de vídeo de $name' : 'Ligação de $name';
 
       case GlobalCallBannerState.active:
-        return isVideo
-            ? 'Vídeo com $name'
-            : name;
+        return isVideo ? 'Vídeo com $name' : name;
 
       case GlobalCallBannerState.ending:
-        return isVideo
-            ? 'Encerrando chamada de vídeo'
-            : 'Encerrando chamada';
+        return isVideo ? 'Encerrando chamada de vídeo' : 'Encerrando chamada';
 
       case GlobalCallBannerState.hidden:
         return '';
@@ -643,49 +553,44 @@ class GlobalCallBanner
   // SUBTITLE
   // ==========================================================
 
-  String get _subtitle {
-    final isVideo =
-        mediaType ==
-        GlobalCallMediaType.video;
+  String _subtitleFor(Duration elapsedSinceBuild) {
+    final isVideo = mediaType == GlobalCallMediaType.video;
 
     switch (state) {
       case GlobalCallBannerState.calling:
-        final value = ringingDuration;
+        final value = _liveDuration(ringingDuration, elapsedSinceBuild);
 
         final baseText = isVideo
             ? 'Aguardando atendimento por vídeo'
             : 'Aguardando atendimento';
 
-        if (value ==
-            null) {
+        if (value == null) {
           return baseText;
         }
 
         return '$baseText · ${_formatDuration(value)}';
 
       case GlobalCallBannerState.incoming:
-        final value = ringingDuration;
+        final value = _liveDuration(ringingDuration, elapsedSinceBuild);
 
         final baseText = isVideo
             ? 'Chamada de vídeo recebida'
             : 'Chamada recebida';
 
-        if (value ==
-            null) {
+        if (value == null) {
           return baseText;
         }
 
         return '$baseText · ${_formatDuration(value)}';
 
       case GlobalCallBannerState.active:
-        final value = duration;
+        final value = _liveDuration(duration, elapsedSinceBuild);
 
         final baseText = isVideo
             ? 'Vídeo em andamento'
             : 'Chamada em andamento';
 
-        if (value ==
-            null) {
+        if (value == null) {
           return baseText;
         }
 
@@ -697,6 +602,20 @@ class GlobalCallBanner
       case GlobalCallBannerState.hidden:
         return '';
     }
+  }
+
+  // ==========================================================
+  // LIVE DURATION
+  // ==========================================================
+
+  Duration? _liveDuration(Duration? base, Duration elapsedSinceBuild) {
+    if (base == null) {
+      return null;
+    }
+
+    final safeBase = base.isNegative ? Duration.zero : base;
+
+    return safeBase + elapsedSinceBuild;
   }
 
   // ==========================================================
@@ -727,13 +646,11 @@ class GlobalCallBanner
   // ==========================================================
 
   IconData get _stateIcon {
-    if (state ==
-        GlobalCallBannerState.ending) {
+    if (state == GlobalCallBannerState.ending) {
       return Icons.call_end_rounded;
     }
 
-    if (mediaType ==
-        GlobalCallMediaType.video) {
+    if (mediaType == GlobalCallMediaType.video) {
       switch (state) {
         case GlobalCallBannerState.calling:
           return Icons.videocam_rounded;
@@ -774,26 +691,16 @@ class GlobalCallBanner
   // FORMAT DURATION
   // ==========================================================
 
-  String _formatDuration(
-    Duration value,
-  ) {
-    final totalSeconds = value.inSeconds;
+  String _formatDuration(Duration value) {
+    final totalSeconds = value.inSeconds < 0 ? 0 : value.inSeconds;
 
-    final hours =
-        totalSeconds ~/
-        3600;
+    final hours = totalSeconds ~/ 3600;
 
-    final minutes =
-        (totalSeconds %
-            3600) ~/
-        60;
+    final minutes = (totalSeconds % 3600) ~/ 60;
 
-    final seconds =
-        totalSeconds %
-        60;
+    final seconds = totalSeconds % 60;
 
-    if (hours >
-        0) {
+    if (hours > 0) {
       return '${hours.toString().padLeft(2, '0')}:'
           '${minutes.toString().padLeft(2, '0')}:'
           '${seconds.toString().padLeft(2, '0')}';

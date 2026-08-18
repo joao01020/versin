@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../controllers/project_call_controller.dart';
@@ -190,6 +192,137 @@ class _ActiveCallViewState
   );
 
   // ==========================================================
+  // CALL TIMER
+  // ==========================================================
+
+  Timer? _durationTimer;
+
+  Duration _elapsed = Duration.zero;
+
+  DateTime? _startedAt;
+
+  // ==========================================================
+  // INIT
+  // ==========================================================
+
+  @override
+  void initState() {
+    super.initState();
+
+    _syncCallTimer();
+  }
+
+  @override
+  void didUpdateWidget(
+    covariant ActiveCallView oldWidget,
+  ) {
+    super.didUpdateWidget(
+      oldWidget,
+    );
+
+    if (oldWidget.call.id !=
+            widget.call.id ||
+        oldWidget.call.status !=
+            widget.call.status) {
+      _syncCallTimer();
+    }
+  }
+
+  void _syncCallTimer() {
+    _durationTimer?.cancel();
+
+    if (!widget.call.isActive) {
+      _startedAt = null;
+
+      if (mounted) {
+        setState(
+          () {
+            _elapsed = Duration.zero;
+          },
+        );
+      }
+
+      return;
+    }
+
+    _startedAt ??= DateTime.now();
+
+    _updateElapsed();
+
+    _durationTimer = Timer.periodic(
+      const Duration(
+        seconds: 1,
+      ),
+      (
+        _,
+      ) {
+        _updateElapsed();
+      },
+    );
+  }
+
+  void _updateElapsed() {
+    final startedAt = _startedAt;
+
+    if (!mounted ||
+        startedAt ==
+            null) {
+      return;
+    }
+
+    final elapsed = DateTime.now().difference(
+      startedAt,
+    );
+
+    setState(
+      () {
+        _elapsed = elapsed.isNegative
+            ? Duration.zero
+            : elapsed;
+      },
+    );
+  }
+
+  String get _formattedDuration {
+    final totalSeconds = _elapsed.inSeconds;
+
+    final hours =
+        totalSeconds ~/
+        3600;
+
+    final minutes =
+        (totalSeconds %
+            3600) ~/
+        60;
+
+    final seconds =
+        totalSeconds %
+        60;
+
+    final mm = minutes.toString().padLeft(
+      2,
+      '0',
+    );
+
+    final ss = seconds.toString().padLeft(
+      2,
+      '0',
+    );
+
+    if (hours >
+        0) {
+      final hh = hours.toString().padLeft(
+        2,
+        '0',
+      );
+
+      return '$hh:$mm:$ss';
+    }
+
+    return '$mm:$ss';
+  }
+
+  // ==========================================================
   // END CALL
   // ==========================================================
 
@@ -276,22 +409,18 @@ class _ActiveCallViewState
         18,
         10,
       ),
-
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           // ================================================
           // MINIMIZE
           // ================================================
           IconButton(
             tooltip: 'Minimizar chamada',
-
             onPressed: _minimizeCall,
-
             icon: const Icon(
               Icons.keyboard_arrow_down_rounded,
-
               color: Colors.white70,
-
               size: 26,
             ),
           ),
@@ -306,81 +435,91 @@ class _ActiveCallViewState
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-
+              mainAxisSize: MainAxisSize.min,
               children: [
                 const Text(
                   'Studio Call',
-
                   maxLines: 1,
-
                   overflow: TextOverflow.ellipsis,
-
                   style: TextStyle(
                     color: Colors.white,
-
                     fontSize: 15,
-
                     fontWeight: FontWeight.w700,
                   ),
                 ),
 
+                // ==========================================
+                // DURATION
+                // ==========================================
+                if (widget.call.isActive) ...[
+                  const SizedBox(
+                    height: 4,
+                  ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: const BoxDecoration(
+                          color: _green,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(
+                        width: 6,
+                      ),
+                      Text(
+                        _formattedDuration,
+                        style: const TextStyle(
+                          color: _green,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.4,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+
                 const SizedBox(
-                  height: 3,
+                  height: 4,
                 ),
 
                 Row(
                   children: [
-                    // ========================================
-                    // PROJECT HASH
-                    // ========================================
                     Flexible(
                       child: Text(
                         '#$_projectHash',
-
                         maxLines: 1,
-
                         overflow: TextOverflow.ellipsis,
-
                         style: const TextStyle(
                           color: Colors.white30,
-
                           fontSize: 9,
-
                           fontWeight: FontWeight.w500,
                         ),
                       ),
                     ),
 
-                    // ========================================
-                    // PARTICIPANTS COUNT
-                    // ========================================
                     if (widget.participants.isNotEmpty) ...[
                       const SizedBox(
                         width: 8,
                       ),
-
                       Container(
                         width: 3,
-
                         height: 3,
-
                         decoration: const BoxDecoration(
                           color: Colors.white24,
-
                           shape: BoxShape.circle,
                         ),
                       ),
-
                       const SizedBox(
                         width: 8,
                       ),
-
                       Text(
                         _participantsLabel,
-
                         style: const TextStyle(
                           color: Colors.white30,
-
                           fontSize: 9,
                         ),
                       ),
@@ -824,6 +963,19 @@ class _ActiveCallViewState
     }
 
     return '$count participantes';
+  }
+
+  // ==========================================================
+  // DISPOSE
+  // ==========================================================
+
+  @override
+  void dispose() {
+    _durationTimer?.cancel();
+
+    _durationTimer = null;
+
+    super.dispose();
   }
 }
 

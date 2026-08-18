@@ -1,3 +1,6 @@
+import 'package:flutter/foundation.dart';
+import 'package:versin/modules/profile/services/profile_name_cache_service.dart';
+
 import '../../models/profile_track_model.dart';
 import '../../models/public_profile_model.dart';
 import '../../repositories/public_profile_repository.dart';
@@ -47,15 +50,21 @@ class PublicProfileRepositoryImpl
 
   final PublicProfileRemoteDatasource _remoteDatasource;
 
+  final ProfileNameCacheService _profileNameCacheService;
+
   // ============================================================
   // CONSTRUTOR
   // ============================================================
 
   PublicProfileRepositoryImpl({
     PublicProfileRemoteDatasource? remoteDatasource,
+    ProfileNameCacheService? profileNameCacheService,
   }) : _remoteDatasource =
            remoteDatasource ??
-           PublicProfileRemoteDatasourceImpl();
+           PublicProfileRemoteDatasourceImpl(),
+       _profileNameCacheService =
+           profileNameCacheService ??
+           ProfileNameCacheService();
 
   // ============================================================
   // PERFIL
@@ -83,9 +92,16 @@ class PublicProfileRepositoryImpl
       return null;
     }
 
-    return PublicProfileModel.fromMap(
+    final profile = PublicProfileModel.fromMap(
       data,
     );
+
+    await _syncProfileNameCache(
+      data: data,
+      fallbackUserId: normalizedUserId,
+    );
+
+    return profile;
   }
 
   // ============================================================
@@ -113,9 +129,16 @@ class PublicProfileRepositoryImpl
       data: profile.toUpdateMap(),
     );
 
-    return PublicProfileModel.fromMap(
+    final updatedProfile = PublicProfileModel.fromMap(
       data,
     );
+
+    await _syncProfileNameCache(
+      data: data,
+      fallbackUserId: userId,
+    );
+
+    return updatedProfile;
   }
 
   // ============================================================
@@ -416,6 +439,53 @@ class PublicProfileRepositoryImpl
             );
           },
         );
+  }
+
+  // ============================================================
+  // SYNC PROFILE NAME CACHE
+  // ============================================================
+  //
+  // Sempre que o Repository recebe uma versão atualizada de
+  // public.profiles, sincroniza o nome no cache persistente.
+  //
+  // Isso evita:
+  //
+  // - nome antigo por até 24 horas;
+  // - nova consulta apenas para descobrir o nome;
+  // - efeito visual de nome trocar depois que a tela abre.
+  //
+  // ============================================================
+
+  Future<
+    void
+  >
+  _syncProfileNameCache({
+    required Map<
+      String,
+      dynamic
+    >
+    data,
+    required String fallbackUserId,
+  }) async {
+    try {
+      await _profileNameCacheService.cacheProfileMap(
+        data,
+        fallbackUserId: fallbackUserId,
+      );
+    } catch (
+      error,
+      stackTrace
+    ) {
+      // Cache nunca deve impedir o fluxo principal do perfil.
+      debugPrint(
+        '[PUBLIC PROFILE REPOSITORY] '
+        'Erro ao sincronizar cache de nome: $error',
+      );
+
+      debugPrint(
+        '$stackTrace',
+      );
+    }
   }
 
   // ============================================================

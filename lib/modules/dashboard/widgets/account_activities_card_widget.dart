@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:versin/app/locator.dart';
+import 'package:versin/core/utils/network_image_url_helper.dart';
 import 'package:versin/app/routes/app_routes.dart';
 
 import 'package:versin/modules/activities/controllers/recent_activity_controller.dart';
@@ -193,32 +194,43 @@ class _AccountActivitiesCardWidgetState
                   // ==================================================
                   // AVATAR
                   // ==================================================
-                  GestureDetector(
-                    onTap: widget.controller.pickProfileImage,
-                    child: CircleAvatar(
-                      radius: 36,
-                      backgroundColor: const Color(
-                        0xFFFFCC80,
-                      ),
-                      backgroundImage:
-                          widget.controller.profileImagePath !=
-                              null
-                          ? NetworkImage(
-                              widget.controller.profileImagePath!,
-                            )
-                          : null,
-                      child:
-                          widget.controller.profileImagePath ==
-                              null
-                          ? const Icon(
-                              Icons.person,
-                              color: Color(
-                                0xFF2E1A47,
+                  Builder(
+                    builder:
+                        (
+                          context,
+                        ) {
+                          final validProfileImageUrl = NetworkImageUrlHelper.validUrlOrNull(
+                            widget.controller.profileImagePath,
+                          );
+
+                          return GestureDetector(
+                            onTap: widget.controller.pickProfileImage,
+                            child: CircleAvatar(
+                              radius: 36,
+                              backgroundColor: const Color(
+                                0xFFFFCC80,
                               ),
-                              size: 40,
-                            )
-                          : null,
-                    ),
+                              backgroundImage:
+                                  validProfileImageUrl !=
+                                      null
+                                  ? NetworkImage(
+                                      validProfileImageUrl,
+                                    )
+                                  : null,
+                              child:
+                                  validProfileImageUrl ==
+                                      null
+                                  ? const Icon(
+                                      Icons.person,
+                                      color: Color(
+                                        0xFF2E1A47,
+                                      ),
+                                      size: 40,
+                                    )
+                                  : null,
+                            ),
+                          );
+                        },
                   ),
 
                   const SizedBox(

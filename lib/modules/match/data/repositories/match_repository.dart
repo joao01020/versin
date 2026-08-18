@@ -69,15 +69,7 @@ class MatchRepository {
   // STREAM
   // ============================================================
 
-  StreamSubscription<
-    List<
-      Map<
-        String,
-        dynamic
-      >
-    >
-  >?
-  _profilesSubscription;
+  StreamSubscription<List<Map<String, dynamic>>>? _profilesSubscription;
 
   // ============================================================
   // PESQUISAR USUÁRIOS
@@ -101,12 +93,7 @@ class MatchRepository {
   //
   // ============================================================
 
-  Future<
-    List<
-      MatchUserEntity
-    >
-  >
-  searchUsers({
+  Future<List<MatchUserEntity>> searchUsers({
     required String query,
     String? currentUserId,
   }) async {
@@ -114,9 +101,7 @@ class MatchRepository {
     // NORMALIZAR QUERY
     // ==========================================================
 
-    final normalizedQuery = _normalizeSearchQuery(
-      query,
-    );
+    final normalizedQuery = _normalizeSearchQuery(query);
 
     if (normalizedQuery.isEmpty) {
       return const [];
@@ -132,17 +117,11 @@ class MatchRepository {
     // LOG
     // ==========================================================
 
-    debugPrint(
-      '[MATCH REPOSITORY] ========================================',
-    );
+    debugPrint('[MATCH REPOSITORY] ========================================');
 
-    debugPrint(
-      '[MATCH REPOSITORY] Pesquisando usuários.',
-    );
+    debugPrint('[MATCH REPOSITORY] Pesquisando usuários.');
 
-    debugPrint(
-      '[MATCH REPOSITORY] Query: $normalizedQuery',
-    );
+    debugPrint('[MATCH REPOSITORY] Query: $normalizedQuery');
 
     // ==========================================================
     // BUSCAR
@@ -164,11 +143,8 @@ class MatchRepository {
       // ========================================================
 
       final queryBuilder = _supabase
-          .from(
-            'profiles',
-          )
-          .select(
-            '''
+          .from('profiles')
+          .select('''
                 id,
                 username,
                 artist_name,
@@ -181,12 +157,8 @@ class MatchRepository {
                 showcase_url,
                 showcase_desc,
                 is_online
-                ''',
-          )
-          .eq(
-            'is_online',
-            true,
-          )
+                ''')
+          .eq('is_online', true)
           .or(
             'username.ilike.%$normalizedQuery%,'
             'artist_name.ilike.%$normalizedQuery%,'
@@ -217,97 +189,52 @@ class MatchRepository {
 
       final dynamic response;
 
-      if (normalizedCurrentUserId !=
-              null &&
+      if (normalizedCurrentUserId != null &&
           normalizedCurrentUserId.isNotEmpty) {
         response = await queryBuilder
-            .neq(
-              'id',
-              normalizedCurrentUserId,
-            )
-            .limit(
-              _searchLimit,
-            );
+            .neq('id', normalizedCurrentUserId)
+            .limit(_searchLimit);
       } else {
-        response = await queryBuilder.limit(
-          _searchLimit,
-        );
+        response = await queryBuilder.limit(_searchLimit);
       }
 
       // ========================================================
       // CONVERTER RESPONSE
       // ========================================================
 
-      final rows =
-          List<
-            Map<
-              String,
-              dynamic
-            >
-          >.from(
-            response
-                as List,
-          );
+      final rows = List<Map<String, dynamic>>.from(response as List);
 
       // ========================================================
       // CONVERTER PARA ENTITY
       // ========================================================
 
       final users = rows
-          .where(
-            (
-              row,
-            ) {
-              return row['is_online'] ==
-                  true;
-            },
-          )
-          .map(
-            _mapMapToEntity,
-          )
-          .where(
-            (
-              user,
-            ) {
-              return user.id.isNotEmpty &&
-                  user.isOnline;
-            },
-          )
+          .where((row) {
+            return row['is_online'] == true;
+          })
+          .map(_mapMapToEntity)
+          .where((user) {
+            return user.id.isNotEmpty && user.isOnline;
+          })
           .toList();
 
       // ========================================================
       // ORDENAR RESULTADOS
       // ========================================================
 
-      users.sort(
-        (
-          a,
-          b,
-        ) {
-          final scoreA = _calculateSearchScore(
-            user: a,
-            query: normalizedQuery,
-          );
+      users.sort((a, b) {
+        final scoreA = _calculateSearchScore(user: a, query: normalizedQuery);
 
-          final scoreB = _calculateSearchScore(
-            user: b,
-            query: normalizedQuery,
-          );
+        final scoreB = _calculateSearchScore(user: b, query: normalizedQuery);
 
-          final scoreComparison = scoreB.compareTo(
-            scoreA,
-          );
+        final scoreComparison = scoreB.compareTo(scoreA);
 
-          if (scoreComparison !=
-              0) {
-            return scoreComparison;
-          }
+        if (scoreComparison != 0) {
+          return scoreComparison;
+        }
 
-          return a.name.toLowerCase().compareTo(
-            b.name.toLowerCase(),
-          );
-        },
-      );
+        return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+      });
 
       // ========================================================
       // LOG
@@ -325,21 +252,15 @@ class MatchRepository {
         );
       }
 
-      debugPrint(
-        '[MATCH REPOSITORY] ========================================',
-      );
+      debugPrint('[MATCH REPOSITORY] ========================================');
 
       return users;
-    } on PostgrestException catch (
-      error
-    ) {
+    } on PostgrestException catch (error) {
       // ========================================================
       // ERRO SUPABASE
       // ========================================================
 
-      debugPrint(
-        '[MATCH REPOSITORY] ========================================',
-      );
+      debugPrint('[MATCH REPOSITORY] ========================================');
 
       debugPrint(
         '[MATCH REPOSITORY] '
@@ -361,14 +282,10 @@ class MatchRepository {
         'Detalhes: ${error.details}',
       );
 
-      debugPrint(
-        '[MATCH REPOSITORY] ========================================',
-      );
+      debugPrint('[MATCH REPOSITORY] ========================================');
 
       rethrow;
-    } catch (
-      error
-    ) {
+    } catch (error) {
       // ========================================================
       // ERRO INESPERADO
       // ========================================================
@@ -414,8 +331,7 @@ class MatchRepository {
     // USERNAME EXATO
     // ==========================================================
 
-    if (normalizedUsername ==
-        query) {
+    if (normalizedUsername == query) {
       score += 100;
     }
 
@@ -423,8 +339,7 @@ class MatchRepository {
     // NOME EXATO
     // ==========================================================
 
-    if (normalizedName ==
-        query) {
+    if (normalizedName == query) {
       score += 90;
     }
 
@@ -432,9 +347,7 @@ class MatchRepository {
     // USERNAME COMEÇA COM
     // ==========================================================
 
-    if (normalizedUsername.startsWith(
-      query,
-    )) {
+    if (normalizedUsername.startsWith(query)) {
       score += 50;
     }
 
@@ -442,9 +355,7 @@ class MatchRepository {
     // NOME COMEÇA COM
     // ==========================================================
 
-    if (normalizedName.startsWith(
-      query,
-    )) {
+    if (normalizedName.startsWith(query)) {
       score += 40;
     }
 
@@ -452,9 +363,7 @@ class MatchRepository {
     // USERNAME CONTÉM
     // ==========================================================
 
-    if (normalizedUsername.contains(
-      query,
-    )) {
+    if (normalizedUsername.contains(query)) {
       score += 20;
     }
 
@@ -462,9 +371,7 @@ class MatchRepository {
     // NOME CONTÉM
     // ==========================================================
 
-    if (normalizedName.contains(
-      query,
-    )) {
+    if (normalizedName.contains(query)) {
       score += 10;
     }
 
@@ -483,24 +390,15 @@ class MatchRepository {
   // NORMALIZAR PESQUISA
   // ============================================================
 
-  String _normalizeSearchQuery(
-    String value,
-  ) {
-    return value.trim().toLowerCase().replaceFirst(
-      RegExp(
-        r'^@+',
-      ),
-      '',
-    );
+  String _normalizeSearchQuery(String value) {
+    return value.trim().toLowerCase().replaceFirst(RegExp(r'^@+'), '');
   }
 
   // ============================================================
   // INICIAR STREAM DE MATCH
   // ============================================================
 
-  void streamCrossRoleMatches(
-    MatchController controller,
-  ) {
+  void streamCrossRoleMatches(MatchController controller) {
     // ==========================================================
     // CANCELAR STREAM ANTIGO
     // ==========================================================
@@ -521,17 +419,11 @@ class MatchRepository {
     // LOG
     // ==========================================================
 
-    debugPrint(
-      '[MATCH REPOSITORY] ========================================',
-    );
+    debugPrint('[MATCH REPOSITORY] ========================================');
 
-    debugPrint(
-      '[MATCH REPOSITORY] Iniciando busca.',
-    );
+    debugPrint('[MATCH REPOSITORY] Iniciando busca.');
 
-    debugPrint(
-      '[MATCH REPOSITORY] User ID: $currentUserId',
-    );
+    debugPrint('[MATCH REPOSITORY] User ID: $currentUserId');
 
     debugPrint(
       '[MATCH REPOSITORY] Minhas funções: '
@@ -553,8 +445,7 @@ class MatchRepository {
     // ==========================================================
 
     if (lookingForRoles.isEmpty &&
-        controller.discoveryMode !=
-            MatchDiscoveryMode.global) {
+        controller.discoveryMode != MatchDiscoveryMode.global) {
       debugPrint(
         '[MATCH REPOSITORY] '
         'Nenhuma profissão procurada configurada.',
@@ -562,9 +453,7 @@ class MatchRepository {
 
       controller.clearMatchResults();
 
-      debugPrint(
-        '[MATCH REPOSITORY] ========================================',
-      );
+      debugPrint('[MATCH REPOSITORY] ========================================');
 
       return;
     }
@@ -574,22 +463,11 @@ class MatchRepository {
     // ==========================================================
 
     _profilesSubscription = _supabase
-        .from(
-          'profiles',
-        )
-        .stream(
-          primaryKey: [
-            'id',
-          ],
-        )
-        .eq(
-          'is_online',
-          true,
-        )
+        .from('profiles')
+        .stream(primaryKey: ['id'])
+        .eq('is_online', true)
         .listen(
-          (
-            data,
-          ) {
+          (data) async {
             debugPrint(
               '[MATCH REALTIME] '
               '${data.length} perfil(is) recebido(s).',
@@ -639,22 +517,16 @@ class MatchRepository {
               );
             }
 
-            _processProfiles(
-              controller: controller,
-              data: data,
-            );
+            await _processProfiles(controller: controller, data: data);
           },
-          onError:
-              (
-                error,
-              ) {
-                debugPrint(
-                  '[MATCH REPOSITORY] '
-                  'Erro no pipeline do Match: $error',
-                );
+          onError: (error) {
+            debugPrint(
+              '[MATCH REPOSITORY] '
+              'Erro no pipeline do Match: $error',
+            );
 
-                controller.clearMatchResults();
-              },
+            controller.clearMatchResults();
+          },
         );
   }
 
@@ -662,16 +534,10 @@ class MatchRepository {
   // PROCESSAR PERFIS
   // ============================================================
 
-  void _processProfiles({
+  Future<void> _processProfiles({
     required MatchController controller,
-    required List<
-      Map<
-        String,
-        dynamic
-      >
-    >
-    data,
-  }) {
+    required List<Map<String, dynamic>> data,
+  }) async {
     // ==========================================================
     // ESTADO ATUAL
     // ==========================================================
@@ -683,6 +549,21 @@ class MatchRepository {
     final lookingForRoles = controller.lookingForRoles;
 
     final discoveryMode = controller.discoveryMode;
+
+    // ==========================================================
+    // PERFIS JÁ AVALIADOS
+    // ==========================================================
+    //
+    // Um perfil que já recebeu:
+    //
+    // - LIKE -> favorites
+    // - X    -> match_passes
+    //
+    // não deve voltar para Discovery nem Recomendados.
+    //
+    // ==========================================================
+
+    final excludedUserIds = await _loadExcludedDiscoveryUserIds(currentUserId);
 
     // ==========================================================
     // SEM DADOS
@@ -715,19 +596,13 @@ class MatchRepository {
     //
     // ==========================================================
 
-    Map<
-      String,
-      dynamic
-    >?
-    currentProfile;
+    Map<String, dynamic>? currentProfile;
 
-    if (currentUserId !=
-        null) {
+    if (currentUserId != null) {
       for (final profile in data) {
         final profileId = profile['id']?.toString().trim();
 
-        if (profileId ==
-            currentUserId) {
+        if (profileId == currentUserId) {
           currentProfile = profile;
 
           break;
@@ -739,30 +614,18 @@ class MatchRepository {
     // LOCALIZAÇÃO ATUAL
     // ==========================================================
 
-    final currentLocationEnabled =
-        currentProfile?['location_enabled'] ==
-        true;
+    final currentLocationEnabled = currentProfile?['location_enabled'] == true;
 
-    final currentLatitude = _readNullableDouble(
-      currentProfile?['latitude'],
-    );
+    final currentLatitude = _readNullableDouble(currentProfile?['latitude']);
 
-    final currentLongitude = _readNullableDouble(
-      currentProfile?['longitude'],
-    );
+    final currentLongitude = _readNullableDouble(currentProfile?['longitude']);
 
     final hasCurrentLocation =
         currentLocationEnabled &&
-        currentLatitude !=
-            null &&
-        currentLongitude !=
-            null &&
-        _isValidLatitude(
-          currentLatitude,
-        ) &&
-        _isValidLongitude(
-          currentLongitude,
-        );
+        currentLatitude != null &&
+        currentLongitude != null &&
+        _isValidLatitude(currentLatitude) &&
+        _isValidLongitude(currentLongitude);
 
     // ==========================================================
     // LOG DO MODO
@@ -773,8 +636,7 @@ class MatchRepository {
       'Processando modo: ${discoveryMode.name}',
     );
 
-    if (discoveryMode ==
-        MatchDiscoveryMode.nearby) {
+    if (discoveryMode == MatchDiscoveryMode.nearby) {
       debugPrint(
         '[MATCH NEARBY] '
         'Localização do usuário disponível: '
@@ -812,22 +674,10 @@ class MatchRepository {
     //
     // ==========================================================
 
-    final candidates =
-        <
-          Map<
-            String,
-            dynamic
-          >
-        >[];
+    final candidates = <Map<String, dynamic>>[];
 
     for (final rawProfile in data) {
-      final profile =
-          Map<
-            String,
-            dynamic
-          >.from(
-            rawProfile,
-          );
+      final profile = Map<String, dynamic>.from(rawProfile);
 
       // ========================================================
       // ID
@@ -835,9 +685,7 @@ class MatchRepository {
 
       final profileId = profile['id']?.toString().trim();
 
-      if (profileId ==
-              null ||
-          profileId.isEmpty) {
+      if (profileId == null || profileId.isEmpty) {
         debugPrint(
           '[MATCH REPOSITORY] '
           'Perfil ignorado: ID inválido.',
@@ -850,10 +698,7 @@ class MatchRepository {
       // NÃO MOSTRAR A SI MESMO
       // ========================================================
 
-      if (currentUserId !=
-              null &&
-          profileId ==
-              currentUserId) {
+      if (currentUserId != null && profileId == currentUserId) {
         debugPrint(
           '[MATCH REPOSITORY] '
           'Perfil ignorado: próprio usuário '
@@ -864,11 +709,24 @@ class MatchRepository {
       }
 
       // ========================================================
+      // JÁ AVALIADO
+      // ========================================================
+
+      if (excludedUserIds.contains(profileId)) {
+        debugPrint(
+          '[MATCH REPOSITORY] '
+          'Perfil $profileId ignorado: '
+          'já recebeu like ou X.',
+        );
+
+        continue;
+      }
+
+      // ========================================================
       // SOMENTE ONLINE
       // ========================================================
 
-      if (profile['is_online'] !=
-          true) {
+      if (profile['is_online'] != true) {
         debugPrint(
           '[MATCH REPOSITORY] '
           'Perfil $profileId ignorado: offline.',
@@ -885,11 +743,8 @@ class MatchRepository {
       //
       // ========================================================
 
-      if (discoveryMode ==
-          MatchDiscoveryMode.global) {
-        candidates.add(
-          profile,
-        );
+      if (discoveryMode == MatchDiscoveryMode.global) {
+        candidates.add(profile);
 
         continue;
       }
@@ -898,11 +753,7 @@ class MatchRepository {
       // FUNÇÕES DO CANDIDATO
       // ========================================================
 
-      final candidateRoles = MusicRole.fromKeys(
-        _readList(
-          profile['roles'],
-        ),
-      );
+      final candidateRoles = MusicRole.fromKeys(_readList(profile['roles']));
 
       if (candidateRoles.isEmpty) {
         debugPrint(
@@ -937,11 +788,8 @@ class MatchRepository {
       // COMPATÍVEIS
       // ========================================================
 
-      if (discoveryMode ==
-          MatchDiscoveryMode.compatible) {
-        candidates.add(
-          profile,
-        );
+      if (discoveryMode == MatchDiscoveryMode.compatible) {
+        candidates.add(profile);
 
         continue;
       }
@@ -960,32 +808,19 @@ class MatchRepository {
       //
       // ========================================================
 
-      if (discoveryMode ==
-          MatchDiscoveryMode.nearby) {
-        final candidateLocationEnabled =
-            profile['location_enabled'] ==
-            true;
+      if (discoveryMode == MatchDiscoveryMode.nearby) {
+        final candidateLocationEnabled = profile['location_enabled'] == true;
 
-        final candidateLatitude = _readNullableDouble(
-          profile['latitude'],
-        );
+        final candidateLatitude = _readNullableDouble(profile['latitude']);
 
-        final candidateLongitude = _readNullableDouble(
-          profile['longitude'],
-        );
+        final candidateLongitude = _readNullableDouble(profile['longitude']);
 
         final hasCandidateLocation =
             candidateLocationEnabled &&
-            candidateLatitude !=
-                null &&
-            candidateLongitude !=
-                null &&
-            _isValidLatitude(
-              candidateLatitude,
-            ) &&
-            _isValidLongitude(
-              candidateLongitude,
-            );
+            candidateLatitude != null &&
+            candidateLongitude != null &&
+            _isValidLatitude(candidateLatitude) &&
+            _isValidLongitude(candidateLongitude);
 
         if (!hasCandidateLocation) {
           debugPrint(
@@ -1012,9 +847,7 @@ class MatchRepository {
           '${distanceKm.toStringAsFixed(2)} km.',
         );
 
-        candidates.add(
-          profile,
-        );
+        candidates.add(profile);
       }
     }
 
@@ -1059,28 +892,21 @@ class MatchRepository {
       // ========================================================
 
       case MatchDiscoveryMode.compatible:
-        candidates.sort(
-          (
-            a,
-            b,
-          ) {
-            final scoreA = _calculateCompatibilityScore(
-              profile: a,
-              currentRoles: currentRoles,
-              lookingForRoles: lookingForRoles,
-            );
+        candidates.sort((a, b) {
+          final scoreA = _calculateCompatibilityScore(
+            profile: a,
+            currentRoles: currentRoles,
+            lookingForRoles: lookingForRoles,
+          );
 
-            final scoreB = _calculateCompatibilityScore(
-              profile: b,
-              currentRoles: currentRoles,
-              lookingForRoles: lookingForRoles,
-            );
+          final scoreB = _calculateCompatibilityScore(
+            profile: b,
+            currentRoles: currentRoles,
+            lookingForRoles: lookingForRoles,
+          );
 
-            return scoreB.compareTo(
-              scoreA,
-            );
-          },
-        );
+          return scoreB.compareTo(scoreA);
+        });
 
       // ========================================================
       // NEARBY
@@ -1097,45 +923,31 @@ class MatchRepository {
       // ========================================================
 
       case MatchDiscoveryMode.nearby:
-        candidates.sort(
-          (
-            a,
-            b,
-          ) {
-            final distanceA = _readDouble(
-              a['distance'],
-            );
+        candidates.sort((a, b) {
+          final distanceA = _readDouble(a['distance']);
 
-            final distanceB = _readDouble(
-              b['distance'],
-            );
+          final distanceB = _readDouble(b['distance']);
 
-            final distanceComparison = distanceA.compareTo(
-              distanceB,
-            );
+          final distanceComparison = distanceA.compareTo(distanceB);
 
-            if (distanceComparison !=
-                0) {
-              return distanceComparison;
-            }
+          if (distanceComparison != 0) {
+            return distanceComparison;
+          }
 
-            final scoreA = _calculateCompatibilityScore(
-              profile: a,
-              currentRoles: currentRoles,
-              lookingForRoles: lookingForRoles,
-            );
+          final scoreA = _calculateCompatibilityScore(
+            profile: a,
+            currentRoles: currentRoles,
+            lookingForRoles: lookingForRoles,
+          );
 
-            final scoreB = _calculateCompatibilityScore(
-              profile: b,
-              currentRoles: currentRoles,
-              lookingForRoles: lookingForRoles,
-            );
+          final scoreB = _calculateCompatibilityScore(
+            profile: b,
+            currentRoles: currentRoles,
+            lookingForRoles: lookingForRoles,
+          );
 
-            return scoreB.compareTo(
-              scoreA,
-            );
-          },
-        );
+          return scoreB.compareTo(scoreA);
+        });
 
       // ========================================================
       // GLOBAL
@@ -1149,56 +961,38 @@ class MatchRepository {
       // ========================================================
 
       case MatchDiscoveryMode.global:
-        candidates.sort(
-          (
-            a,
-            b,
-          ) {
-            final scoreA = _calculateCompatibilityScore(
-              profile: a,
-              currentRoles: currentRoles,
-              lookingForRoles: lookingForRoles,
-            );
+        candidates.sort((a, b) {
+          final scoreA = _calculateCompatibilityScore(
+            profile: a,
+            currentRoles: currentRoles,
+            lookingForRoles: lookingForRoles,
+          );
 
-            final scoreB = _calculateCompatibilityScore(
-              profile: b,
-              currentRoles: currentRoles,
-              lookingForRoles: lookingForRoles,
-            );
+          final scoreB = _calculateCompatibilityScore(
+            profile: b,
+            currentRoles: currentRoles,
+            lookingForRoles: lookingForRoles,
+          );
 
-            final scoreComparison = scoreB.compareTo(
-              scoreA,
-            );
+          final scoreComparison = scoreB.compareTo(scoreA);
 
-            if (scoreComparison !=
-                0) {
-              return scoreComparison;
-            }
+          if (scoreComparison != 0) {
+            return scoreComparison;
+          }
 
-            final nameA = _readDisplayName(
-              a,
-            ).toLowerCase();
+          final nameA = _readDisplayName(a).toLowerCase();
 
-            final nameB = _readDisplayName(
-              b,
-            ).toLowerCase();
+          final nameB = _readDisplayName(b).toLowerCase();
 
-            return nameA.compareTo(
-              nameB,
-            );
-          },
-        );
+          return nameA.compareTo(nameB);
+        });
     }
 
     // ==========================================================
     // CONVERTER
     // ==========================================================
 
-    final users = candidates
-        .map(
-          _mapMapToEntity,
-        )
-        .toList();
+    final users = candidates.map(_mapMapToEntity).toList();
 
     if (users.isEmpty) {
       controller.clearMatchResults();
@@ -1210,21 +1004,13 @@ class MatchRepository {
     // DISCOVERY
     // ==========================================================
 
-    controller.setDiscoveryUser(
-      users.first,
-    );
+    controller.setDiscoveryUser(users.first);
 
     // ==========================================================
     // RECOMENDADOS
     // ==========================================================
 
-    controller.updateRecommendedUsers(
-      users
-          .skip(
-            1,
-          )
-          .toList(),
-    );
+    controller.updateRecommendedUsers(users.skip(1).toList());
 
     // ==========================================================
     // LOG FINAL
@@ -1237,9 +1023,7 @@ class MatchRepository {
     );
 
     for (final user in users) {
-      final distanceText =
-          discoveryMode ==
-              MatchDiscoveryMode.nearby
+      final distanceText = discoveryMode == MatchDiscoveryMode.nearby
           ? ' | distância: '
                 '${user.distanceKm.toStringAsFixed(2)} km'
           : '';
@@ -1255,9 +1039,101 @@ class MatchRepository {
       );
     }
 
+    debugPrint('[MATCH REPOSITORY] ========================================');
+  }
+
+  // ============================================================
+  // CARREGAR PERFIS JÁ AVALIADOS
+  // ============================================================
+
+  Future<Set<String>> _loadExcludedDiscoveryUserIds(
+    String? currentUserId,
+  ) async {
+    final normalizedUserId = currentUserId?.trim();
+
+    if (normalizedUserId == null || normalizedUserId.isEmpty) {
+      return <String>{};
+    }
+
+    final excluded = <String>{};
+
+    // ==========================================================
+    // LIKES
+    // ==========================================================
+
+    try {
+      final likes = await _supabase
+          .from('favorites')
+          .select('target_user_id')
+          .eq('sender_id', normalizedUserId);
+
+      for (final row in likes) {
+        final targetId = row['target_user_id']?.toString().trim();
+
+        if (targetId != null && targetId.isNotEmpty) {
+          excluded.add(targetId);
+        }
+      }
+    } on PostgrestException catch (error, stackTrace) {
+      debugPrint(
+        '[MATCH REPOSITORY] '
+        'Erro ao carregar likes já enviados: '
+        '${error.message}',
+      );
+
+      debugPrint('$stackTrace');
+    } catch (error, stackTrace) {
+      debugPrint(
+        '[MATCH REPOSITORY] '
+        'Erro inesperado ao carregar likes: '
+        '$error',
+      );
+
+      debugPrint('$stackTrace');
+    }
+
+    // ==========================================================
+    // PASSES / X
+    // ==========================================================
+
+    try {
+      final passes = await _supabase
+          .from('match_passes')
+          .select('target_user_id')
+          .eq('sender_id', normalizedUserId);
+
+      for (final row in passes) {
+        final targetId = row['target_user_id']?.toString().trim();
+
+        if (targetId != null && targetId.isNotEmpty) {
+          excluded.add(targetId);
+        }
+      }
+    } on PostgrestException catch (error, stackTrace) {
+      debugPrint(
+        '[MATCH REPOSITORY] '
+        'Erro ao carregar passes já enviados: '
+        '${error.message}',
+      );
+
+      debugPrint('$stackTrace');
+    } catch (error, stackTrace) {
+      debugPrint(
+        '[MATCH REPOSITORY] '
+        'Erro inesperado ao carregar passes: '
+        '$error',
+      );
+
+      debugPrint('$stackTrace');
+    }
+
     debugPrint(
-      '[MATCH REPOSITORY] ========================================',
+      '[MATCH REPOSITORY] '
+      'Perfis excluídos da descoberta: '
+      '${excluded.length}.',
     );
+
+    return excluded;
   }
 
   // ============================================================
@@ -1279,118 +1155,63 @@ class MatchRepository {
   }) {
     const earthRadiusKm = 6371.0088;
 
-    final latitudeDelta = _degreesToRadians(
-      latitudeB -
-          latitudeA,
-    );
+    final latitudeDelta = _degreesToRadians(latitudeB - latitudeA);
 
-    final longitudeDelta = _degreesToRadians(
-      longitudeB -
-          longitudeA,
-    );
+    final longitudeDelta = _degreesToRadians(longitudeB - longitudeA);
 
-    final latitudeARadians = _degreesToRadians(
-      latitudeA,
-    );
+    final latitudeARadians = _degreesToRadians(latitudeA);
 
-    final latitudeBRadians = _degreesToRadians(
-      latitudeB,
-    );
+    final latitudeBRadians = _degreesToRadians(latitudeB);
 
     final haversine =
-        math.pow(
-          math.sin(
-            latitudeDelta /
-                2,
-          ),
-          2,
-        ) +
-        math.cos(
-              latitudeARadians,
-            ) *
-            math.cos(
-              latitudeBRadians,
-            ) *
-            math.pow(
-              math.sin(
-                longitudeDelta /
-                    2,
-              ),
-              2,
-            );
+        math.pow(math.sin(latitudeDelta / 2), 2) +
+        math.cos(latitudeARadians) *
+            math.cos(latitudeBRadians) *
+            math.pow(math.sin(longitudeDelta / 2), 2);
 
-    final normalizedHaversine = haversine.toDouble().clamp(
-      0.0,
-      1.0,
-    );
+    final normalizedHaversine = haversine.toDouble().clamp(0.0, 1.0);
 
     final centralAngle =
         2 *
         math.atan2(
-          math.sqrt(
-            normalizedHaversine,
-          ),
-          math.sqrt(
-            1 -
-                normalizedHaversine,
-          ),
+          math.sqrt(normalizedHaversine),
+          math.sqrt(1 - normalizedHaversine),
         );
 
-    return earthRadiusKm *
-        centralAngle;
+    return earthRadiusKm * centralAngle;
   }
 
   // ============================================================
   // GRAUS → RADIANOS
   // ============================================================
 
-  double _degreesToRadians(
-    double degrees,
-  ) {
-    return degrees *
-        math.pi /
-        180.0;
+  double _degreesToRadians(double degrees) {
+    return degrees * math.pi / 180.0;
   }
 
   // ============================================================
   // COORDENADAS VÁLIDAS
   // ============================================================
 
-  bool _isValidLatitude(
-    double value,
-  ) {
-    return value >=
-            -90.0 &&
-        value <=
-            90.0;
+  bool _isValidLatitude(double value) {
+    return value >= -90.0 && value <= 90.0;
   }
 
-  bool _isValidLongitude(
-    double value,
-  ) {
-    return value >=
-            -180.0 &&
-        value <=
-            180.0;
+  bool _isValidLongitude(double value) {
+    return value >= -180.0 && value <= 180.0;
   }
 
   // ============================================================
   // DOUBLE OPCIONAL
   // ============================================================
 
-  double? _readNullableDouble(
-    dynamic value,
-  ) {
-    if (value
-        is num) {
+  double? _readNullableDouble(dynamic value) {
+    if (value is num) {
       return value.toDouble();
     }
 
-    if (value
-        is String) {
-      return double.tryParse(
-        value.trim(),
-      );
+    if (value is String) {
+      return double.tryParse(value.trim());
     }
 
     return null;
@@ -1401,38 +1222,22 @@ class MatchRepository {
   // ============================================================
 
   int _calculateCompatibilityScore({
-    required Map<
-      String,
-      dynamic
-    >
-    profile,
-    required Set<
-      MusicRole
-    >
-    currentRoles,
-    required Set<
-      MusicRole
-    >
-    lookingForRoles,
+    required Map<String, dynamic> profile,
+    required Set<MusicRole> currentRoles,
+    required Set<MusicRole> lookingForRoles,
   }) {
     // ==========================================================
     // FUNÇÕES DO CANDIDATO
     // ==========================================================
 
-    final candidateRoles = MusicRole.fromKeys(
-      _readList(
-        profile['roles'],
-      ),
-    );
+    final candidateRoles = MusicRole.fromKeys(_readList(profile['roles']));
 
     // ==========================================================
     // QUEM ELE PROCURA
     // ==========================================================
 
     final candidateLookingForRoles = MusicRole.fromKeys(
-      _readList(
-        profile['looking_for_roles'],
-      ),
+      _readList(profile['looking_for_roles']),
     );
 
     // ==========================================================
@@ -1450,9 +1255,7 @@ class MatchRepository {
     // ==========================================================
 
     for (final role in candidateRoles) {
-      if (lookingForRoles.contains(
-        role,
-      )) {
+      if (lookingForRoles.contains(role)) {
         score += 10;
       }
     }
@@ -1461,11 +1264,8 @@ class MatchRepository {
     // PRINCIPAL É O QUE EU PROCURO
     // ==========================================================
 
-    if (candidatePrimaryRole !=
-            null &&
-        lookingForRoles.contains(
-          candidatePrimaryRole,
-        )) {
+    if (candidatePrimaryRole != null &&
+        lookingForRoles.contains(candidatePrimaryRole)) {
       score += 5;
     }
 
@@ -1486,8 +1286,7 @@ class MatchRepository {
     // ONLINE
     // ==========================================================
 
-    if (profile['is_online'] ==
-        true) {
+    if (profile['is_online'] == true) {
       score += 1;
     }
 
@@ -1499,21 +1298,13 @@ class MatchRepository {
   // ============================================================
 
   bool _hasIntersection({
-    required Iterable<
-      MusicRole
-    >
-    first,
-    required Iterable<
-      MusicRole
-    >
-    second,
+    required Iterable<MusicRole> first,
+    required Iterable<MusicRole> second,
   }) {
     final secondSet = second.toSet();
 
     for (final role in first) {
-      if (secondSet.contains(
-        role,
-      )) {
+      if (secondSet.contains(role)) {
         return true;
       }
     }
@@ -1525,85 +1316,54 @@ class MatchRepository {
   // MAPEAR SUPABASE → ENTITY
   // ============================================================
 
-  MatchUserEntity _mapMapToEntity(
-    Map<
-      String,
-      dynamic
-    >
-    map,
-  ) {
+  MatchUserEntity _mapMapToEntity(Map<String, dynamic> map) {
     // ==========================================================
     // USERNAME
     // ==========================================================
 
-    final username = _readUsername(
-      map,
-    );
+    final username = _readUsername(map);
 
     // ==========================================================
     // NOME
     // ==========================================================
 
-    final displayName = _readDisplayName(
-      map,
-    );
+    final displayName = _readDisplayName(map);
 
     // ==========================================================
     // FUNÇÃO PRINCIPAL
     // ==========================================================
 
-    final primaryRole = MusicRole.fromKey(
-      map['primary_role']?.toString(),
-    );
+    final primaryRole = MusicRole.fromKey(map['primary_role']?.toString());
 
     // ==========================================================
     // ROLES
     // ==========================================================
 
-    final roles = MusicRole.fromKeys(
-      _readList(
-        map['roles'],
-      ),
-    );
+    final roles = MusicRole.fromKeys(_readList(map['roles']));
 
     // ==========================================================
     // LOOKING FOR
     // ==========================================================
 
     final lookingForRoles = MusicRole.fromKeys(
-      _readList(
-        map['looking_for_roles'],
-      ),
+      _readList(map['looking_for_roles']),
     );
 
     // ==========================================================
     // TAGS
     // ==========================================================
 
-    final tags =
-        _readList(
-              map['tags'],
-            )
-            .map(
-              (
-                item,
-              ) => item.toString().trim(),
-            )
-            .where(
-              (
-                item,
-              ) => item.isNotEmpty,
-            )
-            .toList();
+    final tags = _readList(map['tags'])
+        .map((item) => item.toString().trim())
+        .where((item) => item.isNotEmpty)
+        .toList();
 
     // ==========================================================
     // ENTITY
     // ==========================================================
 
     return MatchUserEntity(
-      id:
-          map['id']?.toString().trim() ??
-          '',
+      id: map['id']?.toString().trim() ?? '',
 
       username: username,
 
@@ -1617,25 +1377,15 @@ class MatchRepository {
 
       tags: tags,
 
-      bio:
-          map['bio']?.toString().trim() ??
-          '',
+      bio: map['bio']?.toString().trim() ?? '',
 
-      showcaseMediaUrl:
-          map['showcase_url']?.toString().trim() ??
-          '',
+      showcaseMediaUrl: map['showcase_url']?.toString().trim() ?? '',
 
-      showcaseDescription:
-          map['showcase_desc']?.toString().trim() ??
-          '',
+      showcaseDescription: map['showcase_desc']?.toString().trim() ?? '',
 
-      distanceKm: _readDouble(
-        map['distance'],
-      ),
+      distanceKm: _readDouble(map['distance']),
 
-      isOnline:
-          map['is_online'] ==
-          true,
+      isOnline: map['is_online'] == true,
     );
   }
 
@@ -1643,49 +1393,28 @@ class MatchRepository {
   // USERNAME
   // ============================================================
 
-  String _readUsername(
-    Map<
-      String,
-      dynamic
-    >
-    map,
-  ) {
+  String _readUsername(Map<String, dynamic> map) {
     final username = map['username']?.toString().trim();
 
-    if (username ==
-            null ||
-        username.isEmpty) {
+    if (username == null || username.isEmpty) {
       return '';
     }
 
-    return username.replaceFirst(
-      RegExp(
-        r'^@+',
-      ),
-      '',
-    );
+    return username.replaceFirst(RegExp(r'^@+'), '');
   }
 
   // ============================================================
   // NOME PARA EXIBIÇÃO
   // ============================================================
 
-  String _readDisplayName(
-    Map<
-      String,
-      dynamic
-    >
-    map,
-  ) {
+  String _readDisplayName(Map<String, dynamic> map) {
     // ==========================================================
     // ARTIST NAME
     // ==========================================================
 
     final artistName = map['artist_name']?.toString().trim();
 
-    if (artistName !=
-            null &&
-        artistName.isNotEmpty) {
+    if (artistName != null && artistName.isNotEmpty) {
       return artistName;
     }
 
@@ -1695,9 +1424,7 @@ class MatchRepository {
 
     final name = map['name']?.toString().trim();
 
-    if (name !=
-            null &&
-        name.isNotEmpty) {
+    if (name != null && name.isNotEmpty) {
       return name;
     }
 
@@ -1705,9 +1432,7 @@ class MatchRepository {
     // USERNAME
     // ==========================================================
 
-    final username = _readUsername(
-      map,
-    );
+    final username = _readUsername(map);
 
     if (username.isNotEmpty) {
       return username;
@@ -1720,19 +1445,12 @@ class MatchRepository {
   // LIST
   // ============================================================
 
-  Iterable<
-    dynamic
-  >
-  _readList(
-    dynamic value,
-  ) {
-    if (value ==
-        null) {
+  Iterable<dynamic> _readList(dynamic value) {
+    if (value == null) {
       return const [];
     }
 
-    if (value
-        is Iterable) {
+    if (value is Iterable) {
       return value;
     }
 
@@ -1743,20 +1461,13 @@ class MatchRepository {
   // DOUBLE
   // ============================================================
 
-  double _readDouble(
-    dynamic value,
-  ) {
-    if (value
-        is num) {
+  double _readDouble(dynamic value) {
+    if (value is num) {
       return value.toDouble();
     }
 
-    if (value
-        is String) {
-      return double.tryParse(
-            value,
-          ) ??
-          0.0;
+    if (value is String) {
+      return double.tryParse(value) ?? 0.0;
     }
 
     return 0.0;
@@ -1766,10 +1477,7 @@ class MatchRepository {
   // PARAR STREAM
   // ============================================================
 
-  Future<
-    void
-  >
-  stopStreaming() async {
+  Future<void> stopStreaming() async {
     await _profilesSubscription?.cancel();
 
     _profilesSubscription = null;
@@ -1779,10 +1487,7 @@ class MatchRepository {
   // DISPOSE
   // ============================================================
 
-  Future<
-    void
-  >
-  dispose() async {
+  Future<void> dispose() async {
     await stopStreaming();
   }
 }

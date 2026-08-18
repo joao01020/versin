@@ -14,118 +14,30 @@ import '../../data/models/project_recruitment_model.dart';
 
 import 'recruitment/create_recruitment_view.dart';
 import 'recruitment/recruitment_candidates_view.dart';
-// ============================================================
-// MEMBERS VIEW
-// ============================================================
-//
-// Responsável por:
-//
-// - listar participantes da Studio Session;
-// - mostrar status dos membros;
-// - selecionar membros;
-// - convidar membros para vídeo;
-// - mostrar consentimento bilateral;
-// - mostrar cooldown;
-// - mostrar bloqueio após recusas;
-// - responder convites recebidos;
-// - permitir nova tentativa após 3 recusas;
-// - abrir busca por novos membros;
-// - listar recrutamentos ativos;
-// - abrir candidatos;
-// - encerrar recrutamentos.
-//
-// FLUXO DE VÍDEO:
-//
-// usuário A
-//      ↓
-// seleciona usuário B
-//      ↓
-// convidar para vídeo
-//      ↓
-// B aceita
-//      ↓
-// A <-> B
-// vídeo liberado
-//
-// RECUSAS:
-//
-// 1ª recusa
-// -> 2 dias
-//
-// 2ª recusa
-// -> 4 dias
-//
-// 3ª recusa
-// -> bloqueado
-//
-// Depois da terceira recusa:
-//
-// somente quem recusou pode permitir
-// uma nova tentativa.
-//
-// ============================================================
 
-class MembersView
-    extends
-        StatefulWidget {
+class MembersView extends StatefulWidget {
   final String projectId;
 
-  const MembersView({
-    super.key,
-    required this.projectId,
-  });
+  const MembersView({super.key, required this.projectId});
 
   @override
-  State<
-    MembersView
-  >
-  createState() => _MembersViewState();
+  State<MembersView> createState() => _MembersViewState();
 }
 
-// ============================================================
-// STATE
-// ============================================================
+class _MembersViewState extends State<MembersView> {
+  static const Color _background = Color(0xFF08080B);
 
-class _MembersViewState
-    extends
-        State<
-          MembersView
-        > {
-  // ==========================================================
-  // CORES
-  // ==========================================================
+  static const Color _surface = Color(0xFF111116);
 
-  static const Color _background = Color(
-    0xFF08080B,
-  );
+  static const Color _surfaceLight = Color(0xFF17171E);
 
-  static const Color _surface = Color(
-    0xFF111116,
-  );
+  static const Color _purple = Color(0xFF8B5CF6);
 
-  static const Color _surfaceLight = Color(
-    0xFF17171E,
-  );
+  static const Color _green = Color(0xFF34D399);
 
-  static const Color _purple = Color(
-    0xFF8B5CF6,
-  );
+  static const Color _orange = Color(0xFFF59E0B);
 
-  static const Color _green = Color(
-    0xFF34D399,
-  );
-
-  static const Color _orange = Color(
-    0xFFF59E0B,
-  );
-
-  static const Color _red = Color(
-    0xFFEF4444,
-  );
-
-  // ==========================================================
-  // CONTROLLERS
-  // ==========================================================
+  static const Color _red = Color(0xFFEF4444);
 
   late final ProjectMembersController _membersController;
 
@@ -133,48 +45,15 @@ class _MembersViewState
 
   late final CommunicationPermissionController _communicationController;
 
-  // ==========================================================
-  // SELECTION
-  // ==========================================================
+  final Set<String> _selectedMemberIds = <String>{};
 
-  final Set<
-    String
-  >
-  _selectedMemberIds =
-      <
-        String
-      >{};
-
-  // ==========================================================
-  // EXPANDED MEMBERS
-  // ==========================================================
-  //
-  // Cada membro controla individualmente se os detalhes de
-  // comunicação estão abertos ou recolhidos.
-  //
-  // Por padrão todos iniciam recolhidos.
-  //
-  // ==========================================================
-
-  final Set<
-    String
-  >
-  _expandedMemberIds =
-      <
-        String
-      >{};
-
-  // ==========================================================
-  // INIT
-  // ==========================================================
+  final Set<String> _expandedMemberIds = <String>{};
 
   @override
   void initState() {
     super.initState();
 
-    _membersController = ProjectMembersController(
-      projectId: widget.projectId,
-    );
+    _membersController = ProjectMembersController(projectId: widget.projectId);
 
     _recruitmentController = ProjectRecruitmentController(
       projectId: widget.projectId,
@@ -187,32 +66,18 @@ class _MembersViewState
     _initialize();
   }
 
-  // ==========================================================
-  // INITIALIZE
-  // ==========================================================
-  //
-  // Os membros precisam ser carregados antes das permissões
-  // individuais de áudio.
-  //
-  // ==========================================================
-
-  Future<
-    void
-  >
-  _initialize() async {
+  Future<void> _initialize() async {
     await _membersController.load();
 
     if (!mounted) {
       return;
     }
 
-    await Future.wait(
-      [
-        _recruitmentController.init(),
+    await Future.wait([
+      _recruitmentController.init(),
 
-        _communicationController.init(),
-      ],
-    );
+      _communicationController.init(),
+    ]);
 
     if (!mounted) {
       return;
@@ -221,51 +86,28 @@ class _MembersViewState
     await _loadMemberAudioStates();
   }
 
-  // ==========================================================
-  // PROJECT HASH
-  // ==========================================================
-
   String get _projectHash {
     final id = widget.projectId.trim();
 
-    if (id.length <=
-        8) {
+    if (id.length <= 8) {
       return id.toUpperCase();
     }
 
-    return id
-        .substring(
-          0,
-          8,
-        )
-        .toUpperCase();
+    return id.substring(0, 8).toUpperCase();
   }
-
-  // ==========================================================
-  // SELECTED COUNT
-  // ==========================================================
 
   int get _selectedCount => _selectedMemberIds.length;
 
   bool get _hasSelection => _selectedMemberIds.isNotEmpty;
 
-  // ==========================================================
-  // RELOAD
-  // ==========================================================
+  Future<void> _reloadAll() async {
+    await Future.wait([
+      _membersController.reload(),
 
-  Future<
-    void
-  >
-  _reloadAll() async {
-    await Future.wait(
-      [
-        _membersController.reload(),
+      _recruitmentController.init(),
 
-        _recruitmentController.init(),
-
-        _communicationController.refresh(),
-      ],
-    );
+      _communicationController.refresh(),
+    ]);
 
     if (!mounted) {
       return;
@@ -274,55 +116,25 @@ class _MembersViewState
     await _loadMemberAudioStates();
   }
 
-  // ==========================================================
-  // LOAD AUDIO
-  // ==========================================================
-
-  Future<
-    void
-  >
-  _loadMemberAudioStates() async {
-    final futures =
-        <
-          Future<
-            bool
-          >
-        >[];
+  Future<void> _loadMemberAudioStates() async {
+    final futures = <Future<bool>>[];
 
     for (final member in _membersController.members) {
-      futures.add(
-        _communicationController.checkAudioAllowedFor(
-          member.userId,
-        ),
-      );
+      futures.add(_communicationController.checkAudioAllowedFor(member.userId));
     }
 
     if (futures.isEmpty) {
       return;
     }
 
-    await Future.wait(
-      futures,
-    );
+    await Future.wait(futures);
   }
 
-  // ==========================================================
-  // ABRIR CRIAÇÃO
-  // ==========================================================
-
-  Future<
-    void
-  >
-  _openCreateRecruitment() async {
+  Future<void> _openCreateRecruitment() async {
     await Navigator.push(
       context,
       MaterialPageRoute(
-        builder:
-            (
-              _,
-            ) => CreateRecruitmentView(
-              projectId: widget.projectId,
-            ),
+        builder: (_) => CreateRecruitmentView(projectId: widget.projectId),
       ),
     );
 
@@ -333,27 +145,15 @@ class _MembersViewState
     await _recruitmentController.init();
   }
 
-  // ==========================================================
-  // ABRIR CANDIDATOS
-  // ==========================================================
-
-  Future<
-    void
-  >
-  _openCandidates(
-    ProjectRecruitmentModel recruitment,
-  ) async {
+  Future<void> _openCandidates(ProjectRecruitmentModel recruitment) async {
     await Navigator.push(
       context,
       MaterialPageRoute(
-        builder:
-            (
-              _,
-            ) => RecruitmentCandidatesView(
-              projectId: widget.projectId,
+        builder: (_) => RecruitmentCandidatesView(
+          projectId: widget.projectId,
 
-              recruitment: recruitment,
-            ),
+          recruitment: recruitment,
+        ),
       ),
     );
 
@@ -364,89 +164,57 @@ class _MembersViewState
     await _reloadAll();
   }
 
-  // ==========================================================
-  // ENCERRAR BUSCA
-  // ==========================================================
+  Future<void> _closeRecruitment(ProjectRecruitmentModel recruitment) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
 
-  Future<
-    void
-  >
-  _closeRecruitment(
-    ProjectRecruitmentModel recruitment,
-  ) async {
-    final confirmed =
-        await showDialog<
-          bool
-        >(
-          context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: _surfaceLight,
 
-          builder:
-              (
-                dialogContext,
-              ) {
-                return AlertDialog(
-                  backgroundColor: _surfaceLight,
+          title: const Text(
+            'Encerrar busca?',
 
-                  title: const Text(
-                    'Encerrar busca?',
+            style: TextStyle(color: Colors.white),
+          ),
 
-                    style: TextStyle(
-                      color: Colors.white,
-                    ),
-                  ),
+          content: Text(
+            'A busca por ${recruitment.roleLabel} '
+            'deixará de aparecer como ativa.',
 
-                  content: Text(
-                    'A busca por ${recruitment.roleLabel} '
-                    'deixará de aparecer como ativa.',
+            style: const TextStyle(color: Colors.white60),
+          ),
 
-                    style: const TextStyle(
-                      color: Colors.white60,
-                    ),
-                  ),
-
-                  actions: [
-                    TextButton(
-                      onPressed: () {
-                        Navigator.pop(
-                          dialogContext,
-                          false,
-                        );
-                      },
-
-                      child: const Text(
-                        'Cancelar',
-                      ),
-                    ),
-
-                    TextButton(
-                      onPressed: () {
-                        Navigator.pop(
-                          dialogContext,
-                          true,
-                        );
-                      },
-
-                      child: const Text(
-                        'Encerrar',
-
-                        style: TextStyle(
-                          color: Colors.redAccent,
-                        ),
-                      ),
-                    ),
-                  ],
-                );
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext, false);
               },
-        );
 
-    if (confirmed !=
-        true) {
+              child: const Text('Cancelar'),
+            ),
+
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext, true);
+              },
+
+              child: const Text(
+                'Encerrar',
+
+                style: TextStyle(color: Colors.redAccent),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) {
       return;
     }
 
-    await _recruitmentController.closeRecruitment(
-      recruitment,
-    );
+    await _recruitmentController.closeRecruitment(recruitment);
 
     if (!mounted) {
       return;
@@ -455,16 +223,8 @@ class _MembersViewState
     await _recruitmentController.init();
   }
 
-  // ==========================================================
-  // TOGGLE MEMBER
-  // ==========================================================
-
-  void _toggleMemberSelection(
-    ProjectMemberModel member,
-  ) {
-    if (_membersController.isCurrentUser(
-      member,
-    )) {
+  void _toggleMemberSelection(ProjectMemberModel member) {
+    if (_membersController.isCurrentUser(member)) {
       return;
     }
 
@@ -474,101 +234,56 @@ class _MembersViewState
       return;
     }
 
-    setState(
-      () {
-        if (_selectedMemberIds.contains(
-          userId,
-        )) {
-          _selectedMemberIds.remove(
-            userId,
-          );
-        } else {
-          _selectedMemberIds.add(
-            userId,
-          );
-        }
-      },
-    );
+    setState(() {
+      if (_selectedMemberIds.contains(userId)) {
+        _selectedMemberIds.remove(userId);
+      } else {
+        _selectedMemberIds.add(userId);
+      }
+    });
   }
 
-  // ==========================================================
-  // MEMBER EXPANDED
-  // ==========================================================
-
-  bool _isMemberExpanded(
-    String userId,
-  ) {
+  bool _isMemberExpanded(String userId) {
     final normalized = userId.trim();
 
     if (normalized.isEmpty) {
       return false;
     }
 
-    return _expandedMemberIds.contains(
-      normalized,
-    );
+    return _expandedMemberIds.contains(normalized);
   }
 
-  // ==========================================================
-  // TOGGLE MEMBER EXPANDED
-  // ==========================================================
-
-  void _toggleMemberExpanded(
-    String userId,
-  ) {
+  void _toggleMemberExpanded(String userId) {
     final normalized = userId.trim();
 
     if (normalized.isEmpty) {
       return;
     }
 
-    setState(
-      () {
-        if (_expandedMemberIds.contains(
-          normalized,
-        )) {
-          _expandedMemberIds.remove(
-            normalized,
-          );
-        } else {
-          _expandedMemberIds.add(
-            normalized,
-          );
-        }
-      },
-    );
+    setState(() {
+      if (_expandedMemberIds.contains(normalized)) {
+        _expandedMemberIds.remove(normalized);
+      } else {
+        _expandedMemberIds.add(normalized);
+      }
+    });
   }
-
-  // ==========================================================
-  // CLEAR SELECTION
-  // ==========================================================
 
   void _clearSelection() {
     if (!_hasSelection) {
       return;
     }
 
-    setState(
-      () {
-        _selectedMemberIds.clear();
-      },
-    );
+    setState(() {
+      _selectedMemberIds.clear();
+    });
   }
 
-  // ==========================================================
-  // SELECT ELIGIBLE
-  // ==========================================================
-
   void _selectEligibleMembers() {
-    final eligible =
-        <
-          String
-        >{};
+    final eligible = <String>{};
 
     for (final member in _membersController.members) {
-      if (_membersController.isCurrentUser(
-        member,
-      )) {
+      if (_membersController.isCurrentUser(member)) {
         continue;
       }
 
@@ -578,41 +293,24 @@ class _MembersViewState
         continue;
       }
 
-      if (_communicationController.canInviteVideo(
-        userId,
-      )) {
-        eligible.add(
-          userId,
-        );
+      if (_communicationController.canInviteVideo(userId)) {
+        eligible.add(userId);
       }
     }
 
-    setState(
-      () {
-        _selectedMemberIds
-          ..clear()
-          ..addAll(
-            eligible,
-          );
-      },
-    );
+    setState(() {
+      _selectedMemberIds
+        ..clear()
+        ..addAll(eligible);
+    });
   }
 
-  // ==========================================================
-  // BULK VIDEO INVITE
-  // ==========================================================
-
-  Future<
-    void
-  >
-  _inviteSelectedMembers() async {
+  Future<void> _inviteSelectedMembers() async {
     if (!_hasSelection) {
       return;
     }
 
-    final selected = _selectedMemberIds.toList(
-      growable: false,
-    );
+    final selected = _selectedMemberIds.toList(growable: false);
 
     final results = await _communicationController.requestVideoBulk(
       targetUserIds: selected,
@@ -622,23 +320,13 @@ class _MembersViewState
       return;
     }
 
-    final successCount = results
-        .where(
-          (
-            result,
-          ) => result.success,
-        )
-        .length;
+    final successCount = results.where((result) => result.success).length;
 
-    final failedCount =
-        results.length -
-        successCount;
+    final failedCount = results.length - successCount;
 
-    setState(
-      () {
-        _selectedMemberIds.clear();
-      },
-    );
+    setState(() {
+      _selectedMemberIds.clear();
+    });
 
     if (results.isEmpty) {
       _showMessage(
@@ -650,11 +338,9 @@ class _MembersViewState
       return;
     }
 
-    if (failedCount ==
-        0) {
+    if (failedCount == 0) {
       _showMessage(
-        successCount ==
-                1
+        successCount == 1
             ? 'Convite de vídeo enviado.'
             : '$successCount convites de vídeo enviados.',
       );
@@ -665,22 +351,11 @@ class _MembersViewState
     _showMessage(
       '$successCount enviados • '
       '$failedCount indisponíveis.',
-      error:
-          successCount ==
-          0,
+      error: successCount == 0,
     );
   }
 
-  // ==========================================================
-  // SINGLE VIDEO INVITE
-  // ==========================================================
-
-  Future<
-    void
-  >
-  _inviteMember(
-    ProjectMemberModel member,
-  ) async {
+  Future<void> _inviteMember(ProjectMemberModel member) async {
     final request = await _communicationController.requestVideo(
       targetUserId: member.userId,
     );
@@ -689,8 +364,7 @@ class _MembersViewState
       return;
     }
 
-    if (request ==
-        null) {
+    if (request == null) {
       _showMessage(
         _communicationController.errorMessage ??
             'Não foi possível enviar o convite.',
@@ -700,33 +374,18 @@ class _MembersViewState
       return;
     }
 
-    _showMessage(
-      'Convite enviado para ${member.displayName}.',
-    );
+    _showMessage('Convite enviado para ${member.displayName}.');
   }
 
-  // ==========================================================
-  // ACCEPT REQUEST
-  // ==========================================================
-
-  Future<
-    void
-  >
-  _acceptRequest(
-    CommunicationRequestModel request,
-  ) async {
-    final success = await _communicationController.acceptRequest(
-      request,
-    );
+  Future<void> _acceptRequest(CommunicationRequestModel request) async {
+    final success = await _communicationController.acceptRequest(request);
 
     if (!mounted) {
       return;
     }
 
     if (success) {
-      _showMessage(
-        'Vídeo liberado por consentimento.',
-      );
+      _showMessage('Vídeo liberado por consentimento.');
 
       return;
     }
@@ -738,119 +397,70 @@ class _MembersViewState
     );
   }
 
-  // ==========================================================
-  // REJECT REQUEST
-  // ==========================================================
+  Future<void> _rejectRequest(CommunicationRequestModel request) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
 
-  Future<
-    void
-  >
-  _rejectRequest(
-    CommunicationRequestModel request,
-  ) async {
-    final confirmed =
-        await showDialog<
-          bool
-        >(
-          context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: _surfaceLight,
 
-          builder:
-              (
-                dialogContext,
-              ) {
-                return AlertDialog(
-                  backgroundColor: _surfaceLight,
+          title: const Text(
+            'Recusar vídeo?',
 
-                  title: const Text(
-                    'Recusar vídeo?',
+            style: TextStyle(color: Colors.white),
+          ),
 
-                    style: TextStyle(
-                      color: Colors.white,
-                    ),
-                  ),
+          content: Text(
+            _rejectionDialogMessage(request),
 
-                  content: Text(
-                    _rejectionDialogMessage(
-                      request,
-                    ),
+            style: const TextStyle(color: Colors.white60, height: 1.45),
+          ),
 
-                    style: const TextStyle(
-                      color: Colors.white60,
-
-                      height: 1.45,
-                    ),
-                  ),
-
-                  actions: [
-                    TextButton(
-                      onPressed: () {
-                        Navigator.pop(
-                          dialogContext,
-                          false,
-                        );
-                      },
-
-                      child: const Text(
-                        'Cancelar',
-                      ),
-                    ),
-
-                    TextButton(
-                      onPressed: () {
-                        Navigator.pop(
-                          dialogContext,
-                          true,
-                        );
-                      },
-
-                      child: const Text(
-                        'Recusar',
-
-                        style: TextStyle(
-                          color: _red,
-                        ),
-                      ),
-                    ),
-                  ],
-                );
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext, false);
               },
-        );
 
-    if (confirmed !=
-        true) {
+              child: const Text('Cancelar'),
+            ),
+
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext, true);
+              },
+
+              child: const Text('Recusar', style: TextStyle(color: _red)),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) {
       return;
     }
 
-    final success = await _communicationController.rejectRequest(
-      request,
-    );
+    final success = await _communicationController.rejectRequest(request);
 
     if (!mounted) {
       return;
     }
 
     if (success) {
-      _showMessage(
-        'Solicitação recusada.',
-      );
+      _showMessage('Solicitação recusada.');
 
       return;
     }
 
     _showMessage(
-      _communicationController.errorMessage ??
-          'Não foi possível recusar.',
+      _communicationController.errorMessage ?? 'Não foi possível recusar.',
       error: true,
     );
   }
 
-  // ==========================================================
-  // REJECTION MESSAGE
-  // ==========================================================
-
-  String _rejectionDialogMessage(
-    CommunicationRequestModel request,
-  ) {
+  String _rejectionDialogMessage(CommunicationRequestModel request) {
     if (request.isFirstAttempt) {
       return 'Esta é a primeira solicitação. '
           'Ao recusar, este usuário precisará '
@@ -869,16 +479,7 @@ class _MembersViewState
         'uma nova tentativa.';
   }
 
-  // ==========================================================
-  // ALLOW NEW INVITE
-  // ==========================================================
-
-  Future<
-    void
-  >
-  _allowNewInviteFrom(
-    ProjectMemberModel member,
-  ) async {
+  Future<void> _allowNewInviteFrom(ProjectMemberModel member) async {
     final success = await _communicationController.allowNewInviteFrom(
       member.userId,
     );
@@ -888,9 +489,7 @@ class _MembersViewState
     }
 
     if (success) {
-      _showMessage(
-        '${member.displayName} poderá enviar um novo convite.',
-      );
+      _showMessage('${member.displayName} poderá enviar um novo convite.');
 
       return;
     }
@@ -902,86 +501,50 @@ class _MembersViewState
     );
   }
 
-  // ==========================================================
-  // REVOKE VIDEO
-  // ==========================================================
+  Future<void> _revokeVideo(ProjectMemberModel member) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
 
-  Future<
-    void
-  >
-  _revokeVideo(
-    ProjectMemberModel member,
-  ) async {
-    final confirmed =
-        await showDialog<
-          bool
-        >(
-          context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: _surfaceLight,
 
-          builder:
-              (
-                dialogContext,
-              ) {
-                return AlertDialog(
-                  backgroundColor: _surfaceLight,
+          title: const Text(
+            'Bloquear vídeo?',
 
-                  title: const Text(
-                    'Bloquear vídeo?',
+            style: TextStyle(color: Colors.white),
+          ),
 
-                    style: TextStyle(
-                      color: Colors.white,
-                    ),
-                  ),
+          content: Text(
+            'O consentimento de vídeo entre você e '
+            '${member.displayName} será removido. '
+            'Áudio continuará disponível.',
 
-                  content: Text(
-                    'O consentimento de vídeo entre você e '
-                    '${member.displayName} será removido. '
-                    'Áudio continuará disponível.',
+            style: const TextStyle(color: Colors.white60, height: 1.45),
+          ),
 
-                    style: const TextStyle(
-                      color: Colors.white60,
-
-                      height: 1.45,
-                    ),
-                  ),
-
-                  actions: [
-                    TextButton(
-                      onPressed: () {
-                        Navigator.pop(
-                          dialogContext,
-                          false,
-                        );
-                      },
-
-                      child: const Text(
-                        'Cancelar',
-                      ),
-                    ),
-
-                    TextButton(
-                      onPressed: () {
-                        Navigator.pop(
-                          dialogContext,
-                          true,
-                        );
-                      },
-
-                      child: const Text(
-                        'Bloquear',
-
-                        style: TextStyle(
-                          color: _red,
-                        ),
-                      ),
-                    ),
-                  ],
-                );
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext, false);
               },
-        );
 
-    if (confirmed !=
-        true) {
+              child: const Text('Cancelar'),
+            ),
+
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext, true);
+              },
+
+              child: const Text('Bloquear', style: TextStyle(color: _red)),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) {
       return;
     }
 
@@ -994,9 +557,7 @@ class _MembersViewState
     }
 
     if (success) {
-      _showMessage(
-        'Permissão de vídeo removida.',
-      );
+      _showMessage('Permissão de vídeo removida.');
 
       return;
     }
@@ -1008,49 +569,27 @@ class _MembersViewState
     );
   }
 
-  // ==========================================================
-  // SHOW MESSAGE
-  // ==========================================================
-
-  void _showMessage(
-    String message, {
-    bool error = false,
-  }) {
-    ScaffoldMessenger.of(
-        context,
-      )
+  void _showMessage(String message, {bool error = false}) {
+    ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
-          content: Text(
-            message,
-          ),
+          content: Text(message),
 
           backgroundColor: error
-              ? const Color(
-                  0xFF3B1218,
-                )
-              : const Color(
-                  0xFF15151D,
-                ),
+              ? const Color(0xFF3B1218)
+              : const Color(0xFF15151D),
 
           behavior: SnackBarBehavior.floating,
         ),
       );
   }
 
-  // ==========================================================
-  // MEMBER BY USER ID
-  // ==========================================================
-
-  ProjectMemberModel? _memberByUserId(
-    String userId,
-  ) {
+  ProjectMemberModel? _memberByUserId(String userId) {
     final normalized = userId.trim();
 
     for (final member in _membersController.members) {
-      if (member.userId ==
-          normalized) {
+      if (member.userId == normalized) {
         return member;
       }
     }
@@ -1058,14 +597,8 @@ class _MembersViewState
     return null;
   }
 
-  // ==========================================================
-  // BUILD
-  // ==========================================================
-
   @override
-  Widget build(
-    BuildContext context,
-  ) {
+  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _background,
 
@@ -1097,11 +630,7 @@ class _MembersViewState
             Text(
               'Studio Session #$_projectHash',
 
-              style: const TextStyle(
-                color: Colors.white38,
-
-                fontSize: 10,
-              ),
+              style: const TextStyle(color: Colors.white38, fontSize: 10),
             ),
           ],
         ),
@@ -1113,11 +642,7 @@ class _MembersViewState
 
               onPressed: _clearSelection,
 
-              icon: const Icon(
-                Icons.close_rounded,
-
-                size: 19,
-              ),
+              icon: const Icon(Icons.close_rounded, size: 19),
             ),
 
           IconButton(
@@ -1125,11 +650,7 @@ class _MembersViewState
 
             onPressed: _reloadAll,
 
-            icon: const Icon(
-              Icons.refresh_rounded,
-
-              size: 19,
-            ),
+            icon: const Icon(Icons.refresh_rounded, size: 19),
           ),
         ],
       ),
@@ -1138,205 +659,118 @@ class _MembersViewState
         top: false,
 
         child: ListenableBuilder(
-          listenable: Listenable.merge(
-            [
-              _membersController,
+          listenable: Listenable.merge([
+            _membersController,
 
-              _recruitmentController,
+            _recruitmentController,
 
-              _communicationController,
-            ],
-          ),
+            _communicationController,
+          ]),
 
-          builder:
-              (
-                context,
-                _,
-              ) {
-                // ================================================
-                // LOADING INICIAL
-                // ================================================
+          builder: (context, _) {
+            if (_membersController.isLoading &&
+                !_membersController.hasMembers) {
+              return const Center(child: CircularProgressIndicator());
+            }
 
-                if (_membersController.isLoading &&
-                    !_membersController.hasMembers) {
-                  return const Center(
-                    child: CircularProgressIndicator(),
-                  );
-                }
+            if (_membersController.hasError && !_membersController.hasMembers) {
+              return _buildError();
+            }
 
-                // ================================================
-                // ERRO DOS MEMBROS
-                // ================================================
+            return RefreshIndicator(
+              onRefresh: _reloadAll,
 
-                if (_membersController.hasError &&
-                    !_membersController.hasMembers) {
-                  return _buildError();
-                }
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
 
-                // ================================================
-                // CONTEÚDO
-                // ================================================
+                padding: const EdgeInsets.fromLTRB(18, 12, 18, 28),
 
-                return RefreshIndicator(
-                  onRefresh: _reloadAll,
+                children: [
+                  _buildHeader(),
 
-                  child: ListView(
-                    physics: const AlwaysScrollableScrollPhysics(),
+                  const SizedBox(height: 16),
 
-                    padding: const EdgeInsets.fromLTRB(
-                      18,
-                      12,
-                      18,
-                      28,
+                  if (_communicationController
+                      .pendingReceivedRequests
+                      .isNotEmpty) ...[
+                    _buildSectionTitle('CONVITES DE VÍDEO'),
+
+                    const SizedBox(height: 10),
+
+                    ..._communicationController.pendingReceivedRequests.map(
+                      _buildIncomingVideoRequest,
                     ),
 
+                    const SizedBox(height: 14),
+                  ],
+
+                  if (_communicationController.hasError) ...[
+                    _buildCommunicationError(),
+
+                    const SizedBox(height: 14),
+                  ],
+
+                  _buildRecruitmentButton(),
+
+                  if (_recruitmentController.activeRecruitments.isNotEmpty) ...[
+                    const SizedBox(height: 24),
+
+                    _buildSectionTitle('BUSCAS ATIVAS'),
+
+                    const SizedBox(height: 10),
+
+                    ..._recruitmentController.activeRecruitments.map(
+                      _buildRecruitmentCard,
+                    ),
+                  ],
+
+                  if (_recruitmentController.hasError) ...[
+                    const SizedBox(height: 14),
+
+                    _buildRecruitmentError(),
+                  ],
+
+                  const SizedBox(height: 24),
+
+                  Row(
                     children: [
-                      // ==========================================
-                      // HEADER
-                      // ==========================================
-                      _buildHeader(),
+                      Expanded(child: _buildSectionTitle('PARTICIPANTES')),
 
-                      const SizedBox(
-                        height: 16,
-                      ),
+                      if (_membersController.memberCount > 1)
+                        TextButton(
+                          onPressed: _selectEligibleMembers,
 
-                      // ==========================================
-                      // VIDEO REQUESTS RECEBIDOS
-                      // ==========================================
-                      if (_communicationController.pendingReceivedRequests.isNotEmpty) ...[
-                        _buildSectionTitle(
-                          'CONVITES DE VÍDEO',
-                        ),
+                          child: const Text(
+                            'Selecionar disponíveis',
 
-                        const SizedBox(
-                          height: 10,
-                        ),
-
-                        ..._communicationController.pendingReceivedRequests.map(
-                          _buildIncomingVideoRequest,
-                        ),
-
-                        const SizedBox(
-                          height: 14,
-                        ),
-                      ],
-
-                      // ==========================================
-                      // COMMUNICATION ERROR
-                      // ==========================================
-                      if (_communicationController.hasError) ...[
-                        _buildCommunicationError(),
-
-                        const SizedBox(
-                          height: 14,
-                        ),
-                      ],
-
-                      // ==========================================
-                      // PROCURAR MEMBRO
-                      // ==========================================
-                      _buildRecruitmentButton(),
-
-                      // ==========================================
-                      // BUSCAS ATIVAS
-                      // ==========================================
-                      if (_recruitmentController.activeRecruitments.isNotEmpty) ...[
-                        const SizedBox(
-                          height: 24,
-                        ),
-
-                        _buildSectionTitle(
-                          'BUSCAS ATIVAS',
-                        ),
-
-                        const SizedBox(
-                          height: 10,
-                        ),
-
-                        ..._recruitmentController.activeRecruitments.map(
-                          _buildRecruitmentCard,
-                        ),
-                      ],
-
-                      // ==========================================
-                      // ERRO RECRUTAMENTO
-                      // ==========================================
-                      if (_recruitmentController.hasError) ...[
-                        const SizedBox(
-                          height: 14,
-                        ),
-
-                        _buildRecruitmentError(),
-                      ],
-
-                      const SizedBox(
-                        height: 24,
-                      ),
-
-                      // ==========================================
-                      // PARTICIPANTES
-                      // ==========================================
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildSectionTitle(
-                              'PARTICIPANTES',
-                            ),
+                            style: TextStyle(fontSize: 9),
                           ),
-
-                          if (_membersController.memberCount >
-                              1)
-                            TextButton(
-                              onPressed: _selectEligibleMembers,
-
-                              child: const Text(
-                                'Selecionar disponíveis',
-
-                                style: TextStyle(
-                                  fontSize: 9,
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-
-                      const SizedBox(
-                        height: 10,
-                      ),
-
-                      // ==========================================
-                      // SELECTION BAR
-                      // ==========================================
-                      if (_hasSelection) ...[
-                        _buildSelectionBar(),
-
-                        const SizedBox(
-                          height: 12,
-                        ),
-                      ],
-
-                      if (_membersController.members.isEmpty)
-                        _buildEmptyMembersInline()
-                      else
-                        ..._membersController.members.map(
-                          _buildMemberCard,
                         ),
                     ],
                   ),
-                );
-              },
+
+                  const SizedBox(height: 10),
+
+                  if (_hasSelection) ...[
+                    _buildSelectionBar(),
+
+                    const SizedBox(height: 12),
+                  ],
+
+                  if (_membersController.members.isEmpty)
+                    _buildEmptyMembersInline()
+                  else
+                    ..._membersController.members.map(_buildMemberCard),
+                ],
+              ),
+            );
+          },
         ),
       ),
     );
   }
 
-  // ==========================================================
-  // SECTION TITLE
-  // ==========================================================
-
-  Widget _buildSectionTitle(
-    String text,
-  ) {
+  Widget _buildSectionTitle(String text) {
     return Text(
       text,
 
@@ -1352,53 +786,29 @@ class _MembersViewState
     );
   }
 
-  // ==========================================================
-  // HEADER
-  // ==========================================================
-
   Widget _buildHeader() {
     final count = _membersController.memberCount;
 
     return Container(
       width: double.infinity,
 
-      padding: const EdgeInsets.all(
-        18,
-      ),
+      padding: const EdgeInsets.all(18),
 
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(
-          22,
-        ),
+        borderRadius: BorderRadius.circular(22),
 
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
 
           end: Alignment.bottomRight,
 
-          colors: [
-            Color(
-              0xFF21113E,
-            ),
-
-            _surface,
-          ],
+          colors: [Color(0xFF21113E), _surface],
         ),
 
-        border: Border.all(
-          color: _purple.withValues(
-            alpha: 0.22,
-          ),
-        ),
+        border: Border.all(color: _purple.withValues(alpha: 0.22)),
 
         boxShadow: [
-          BoxShadow(
-            color: _purple.withValues(
-              alpha: 0.06,
-            ),
-
-            blurRadius: 26,
-          ),
+          BoxShadow(color: _purple.withValues(alpha: 0.06), blurRadius: 26),
         ],
       ),
 
@@ -1410,19 +820,11 @@ class _MembersViewState
             height: 50,
 
             decoration: BoxDecoration(
-              color: _purple.withValues(
-                alpha: 0.12,
-              ),
+              color: _purple.withValues(alpha: 0.12),
 
-              borderRadius: BorderRadius.circular(
-                16,
-              ),
+              borderRadius: BorderRadius.circular(16),
 
-              border: Border.all(
-                color: _purple.withValues(
-                  alpha: 0.22,
-                ),
-              ),
+              border: Border.all(color: _purple.withValues(alpha: 0.22)),
             ),
 
             child: const Icon(
@@ -1434,9 +836,7 @@ class _MembersViewState
             ),
           ),
 
-          const SizedBox(
-            width: 14,
-          ),
+          const SizedBox(width: 14),
 
           Expanded(
             child: Column(
@@ -1456,18 +856,12 @@ class _MembersViewState
                   ),
                 ),
 
-                const SizedBox(
-                  height: 4,
-                ),
+                const SizedBox(height: 4),
 
                 const Text(
                   'Construa conexões com consentimento e liberdade.',
 
-                  style: TextStyle(
-                    color: Colors.white38,
-
-                    fontSize: 11,
-                  ),
+                  style: TextStyle(color: Colors.white38, fontSize: 11),
                 ),
               ],
             ),
@@ -1477,30 +871,16 @@ class _MembersViewState
     );
   }
 
-  // ==========================================================
-  // SELECTION BAR
-  // ==========================================================
-
   Widget _buildSelectionBar() {
     return Container(
-      padding: const EdgeInsets.all(
-        12,
-      ),
+      padding: const EdgeInsets.all(12),
 
       decoration: BoxDecoration(
-        color: _purple.withValues(
-          alpha: 0.07,
-        ),
+        color: _purple.withValues(alpha: 0.07),
 
-        borderRadius: BorderRadius.circular(
-          16,
-        ),
+        borderRadius: BorderRadius.circular(16),
 
-        border: Border.all(
-          color: _purple.withValues(
-            alpha: 0.22,
-          ),
-        ),
+        border: Border.all(color: _purple.withValues(alpha: 0.22)),
       ),
 
       child: Row(
@@ -1513,9 +893,7 @@ class _MembersViewState
             alignment: Alignment.center,
 
             decoration: BoxDecoration(
-              color: _purple.withValues(
-                alpha: 0.13,
-              ),
+              color: _purple.withValues(alpha: 0.13),
 
               shape: BoxShape.circle,
             ),
@@ -1533,14 +911,11 @@ class _MembersViewState
             ),
           ),
 
-          const SizedBox(
-            width: 10,
-          ),
+          const SizedBox(width: 10),
 
           Expanded(
             child: Text(
-              _selectedCount ==
-                      1
+              _selectedCount == 1
                   ? '1 membro selecionado'
                   : '$_selectedCount membros selecionados',
 
@@ -1565,24 +940,14 @@ class _MembersViewState
 
                     height: 13,
 
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                    ),
+                    child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : const Icon(
-                    Icons.videocam_rounded,
-
-                    size: 15,
-                  ),
+                : const Icon(Icons.videocam_rounded, size: 15),
 
             label: const Text(
               'Convidar',
 
-              style: TextStyle(
-                fontSize: 10,
-
-                fontWeight: FontWeight.w700,
-              ),
+              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700),
             ),
 
             style: FilledButton.styleFrom(
@@ -1590,16 +955,10 @@ class _MembersViewState
 
               foregroundColor: Colors.white,
 
-              padding: const EdgeInsets.symmetric(
-                horizontal: 13,
-
-                vertical: 10,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
 
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(
-                  12,
-                ),
+                borderRadius: BorderRadius.circular(12),
               ),
             ),
           ),
@@ -1608,42 +967,22 @@ class _MembersViewState
     );
   }
 
-  // ==========================================================
-  // INCOMING VIDEO REQUEST
-  // ==========================================================
+  Widget _buildIncomingVideoRequest(CommunicationRequestModel request) {
+    final member = _memberByUserId(request.senderId);
 
-  Widget _buildIncomingVideoRequest(
-    CommunicationRequestModel request,
-  ) {
-    final member = _memberByUserId(
-      request.senderId,
-    );
-
-    final name =
-        member?.displayName ??
-        'Membro';
+    final name = member?.displayName ?? 'Membro';
 
     return Container(
-      margin: const EdgeInsets.only(
-        bottom: 9,
-      ),
+      margin: const EdgeInsets.only(bottom: 9),
 
-      padding: const EdgeInsets.all(
-        14,
-      ),
+      padding: const EdgeInsets.all(14),
 
       decoration: BoxDecoration(
         color: _surface,
 
-        borderRadius: BorderRadius.circular(
-          18,
-        ),
+        borderRadius: BorderRadius.circular(18),
 
-        border: Border.all(
-          color: _purple.withValues(
-            alpha: 0.22,
-          ),
-        ),
+        border: Border.all(color: _purple.withValues(alpha: 0.22)),
       ),
 
       child: Column(
@@ -1658,13 +997,9 @@ class _MembersViewState
                 height: 38,
 
                 decoration: BoxDecoration(
-                  color: _purple.withValues(
-                    alpha: 0.12,
-                  ),
+                  color: _purple.withValues(alpha: 0.12),
 
-                  borderRadius: BorderRadius.circular(
-                    12,
-                  ),
+                  borderRadius: BorderRadius.circular(12),
                 ),
 
                 child: const Icon(
@@ -1676,9 +1011,7 @@ class _MembersViewState
                 ),
               ),
 
-              const SizedBox(
-                width: 11,
-              ),
+              const SizedBox(width: 11),
 
               Expanded(
                 child: Column(
@@ -1701,9 +1034,7 @@ class _MembersViewState
                       ),
                     ),
 
-                    const SizedBox(
-                      height: 2,
-                    ),
+                    const SizedBox(height: 2),
 
                     Text(
                       request.attemptLabel,
@@ -1720,14 +1051,10 @@ class _MembersViewState
             ],
           ),
 
-          const SizedBox(
-            height: 12,
-          ),
+          const SizedBox(height: 12),
 
           Text(
-            _incomingRequestDescription(
-              request,
-            ),
+            _incomingRequestDescription(request),
 
             style: const TextStyle(
               color: Colors.white54,
@@ -1738,9 +1065,7 @@ class _MembersViewState
             ),
           ),
 
-          const SizedBox(
-            height: 12,
-          ),
+          const SizedBox(height: 12),
 
           Row(
             children: [
@@ -1749,51 +1074,35 @@ class _MembersViewState
                   onPressed: _communicationController.isProcessing
                       ? null
                       : () {
-                          _rejectRequest(
-                            request,
-                          );
+                          _rejectRequest(request);
                         },
 
                   style: OutlinedButton.styleFrom(
                     foregroundColor: _red,
 
-                    side: BorderSide(
-                      color: _red.withValues(
-                        alpha: 0.30,
-                      ),
-                    ),
+                    side: BorderSide(color: _red.withValues(alpha: 0.30)),
 
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(
-                        12,
-                      ),
+                      borderRadius: BorderRadius.circular(12),
                     ),
                   ),
 
                   child: const Text(
                     'Recusar',
 
-                    style: TextStyle(
-                      fontSize: 10,
-
-                      fontWeight: FontWeight.w700,
-                    ),
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700),
                   ),
                 ),
               ),
 
-              const SizedBox(
-                width: 8,
-              ),
+              const SizedBox(width: 8),
 
               Expanded(
                 child: FilledButton(
                   onPressed: _communicationController.isProcessing
                       ? null
                       : () {
-                          _acceptRequest(
-                            request,
-                          );
+                          _acceptRequest(request);
                         },
 
                   style: FilledButton.styleFrom(
@@ -1802,20 +1111,14 @@ class _MembersViewState
                     foregroundColor: Colors.white,
 
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(
-                        12,
-                      ),
+                      borderRadius: BorderRadius.circular(12),
                     ),
                   ),
 
                   child: const Text(
                     'Aceitar',
 
-                    style: TextStyle(
-                      fontSize: 10,
-
-                      fontWeight: FontWeight.w700,
-                    ),
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700),
                   ),
                 ),
               ),
@@ -1826,13 +1129,7 @@ class _MembersViewState
     );
   }
 
-  // ==========================================================
-  // REQUEST DESCRIPTION
-  // ==========================================================
-
-  String _incomingRequestDescription(
-    CommunicationRequestModel request,
-  ) {
+  String _incomingRequestDescription(CommunicationRequestModel request) {
     if (request.isFirstAttempt) {
       return 'Ao aceitar, o vídeo ficará liberado '
           'entre vocês nesta Studio Session.';
@@ -1848,10 +1145,6 @@ class _MembersViewState
         'ficarão bloqueados até você liberar.';
   }
 
-  // ==========================================================
-  // RECRUITMENT BUTTON
-  // ==========================================================
-
   Widget _buildRecruitmentButton() {
     return Material(
       color: Colors.transparent,
@@ -1859,29 +1152,17 @@ class _MembersViewState
       child: InkWell(
         onTap: _openCreateRecruitment,
 
-        borderRadius: BorderRadius.circular(
-          18,
-        ),
+        borderRadius: BorderRadius.circular(18),
 
         child: Ink(
-          padding: const EdgeInsets.all(
-            15,
-          ),
+          padding: const EdgeInsets.all(15),
 
           decoration: BoxDecoration(
-            color: _purple.withValues(
-              alpha: 0.08,
-            ),
+            color: _purple.withValues(alpha: 0.08),
 
-            borderRadius: BorderRadius.circular(
-              18,
-            ),
+            borderRadius: BorderRadius.circular(18),
 
-            border: Border.all(
-              color: _purple.withValues(
-                alpha: 0.22,
-              ),
-            ),
+            border: Border.all(color: _purple.withValues(alpha: 0.22)),
           ),
 
           child: Row(
@@ -1892,13 +1173,9 @@ class _MembersViewState
                 height: 42,
 
                 decoration: BoxDecoration(
-                  color: _purple.withValues(
-                    alpha: 0.14,
-                  ),
+                  color: _purple.withValues(alpha: 0.14),
 
-                  borderRadius: BorderRadius.circular(
-                    13,
-                  ),
+                  borderRadius: BorderRadius.circular(13),
                 ),
 
                 child: const Icon(
@@ -1910,9 +1187,7 @@ class _MembersViewState
                 ),
               ),
 
-              const SizedBox(
-                width: 12,
-              ),
+              const SizedBox(width: 12),
 
               const Expanded(
                 child: Column(
@@ -1931,30 +1206,18 @@ class _MembersViewState
                       ),
                     ),
 
-                    SizedBox(
-                      height: 3,
-                    ),
+                    SizedBox(height: 3),
 
                     Text(
                       'Abra uma busca por função para expandir a sessão.',
 
-                      style: TextStyle(
-                        color: Colors.white38,
-
-                        fontSize: 10,
-                      ),
+                      style: TextStyle(color: Colors.white38, fontSize: 10),
                     ),
                   ],
                 ),
               ),
 
-              const Icon(
-                Icons.add_rounded,
-
-                color: _purple,
-
-                size: 22,
-              ),
+              const Icon(Icons.add_rounded, color: _purple, size: 22),
             ],
           ),
         ),
@@ -1962,34 +1225,18 @@ class _MembersViewState
     );
   }
 
-  // ==========================================================
-  // RECRUITMENT CARD
-  // ==========================================================
-
-  Widget _buildRecruitmentCard(
-    ProjectRecruitmentModel recruitment,
-  ) {
+  Widget _buildRecruitmentCard(ProjectRecruitmentModel recruitment) {
     return Container(
-      margin: const EdgeInsets.only(
-        bottom: 10,
-      ),
+      margin: const EdgeInsets.only(bottom: 10),
 
-      padding: const EdgeInsets.all(
-        14,
-      ),
+      padding: const EdgeInsets.all(14),
 
       decoration: BoxDecoration(
         color: _surface,
 
-        borderRadius: BorderRadius.circular(
-          18,
-        ),
+        borderRadius: BorderRadius.circular(18),
 
-        border: Border.all(
-          color: _orange.withValues(
-            alpha: 0.16,
-          ),
-        ),
+        border: Border.all(color: _orange.withValues(alpha: 0.16)),
       ),
 
       child: Column(
@@ -2004,13 +1251,9 @@ class _MembersViewState
                 height: 38,
 
                 decoration: BoxDecoration(
-                  color: _orange.withValues(
-                    alpha: 0.10,
-                  ),
+                  color: _orange.withValues(alpha: 0.10),
 
-                  borderRadius: BorderRadius.circular(
-                    12,
-                  ),
+                  borderRadius: BorderRadius.circular(12),
                 ),
 
                 child: const Icon(
@@ -2022,9 +1265,7 @@ class _MembersViewState
                 ),
               ),
 
-              const SizedBox(
-                width: 11,
-              ),
+              const SizedBox(width: 11),
 
               Expanded(
                 child: Column(
@@ -2043,17 +1284,13 @@ class _MembersViewState
                       ),
                     ),
 
-                    const SizedBox(
-                      height: 2,
-                    ),
+                    const SizedBox(height: 2),
 
                     const Row(
                       children: [
                         _RecruitmentStatusDot(),
 
-                        SizedBox(
-                          width: 5,
-                        ),
+                        SizedBox(width: 5),
 
                         Text(
                           'Busca ativa',
@@ -2075,9 +1312,7 @@ class _MembersViewState
           ),
 
           if (recruitment.description.trim().isNotEmpty) ...[
-            const SizedBox(
-              height: 12,
-            ),
+            const SizedBox(height: 12),
 
             Text(
               recruitment.description,
@@ -2092,43 +1327,27 @@ class _MembersViewState
             ),
           ],
 
-          const SizedBox(
-            height: 13,
-          ),
+          const SizedBox(height: 13),
 
           Row(
             children: [
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: () {
-                    _openCandidates(
-                      recruitment,
-                    );
+                    _openCandidates(recruitment);
                   },
 
-                  icon: const Icon(
-                    Icons.people_outline_rounded,
+                  icon: const Icon(Icons.people_outline_rounded, size: 16),
 
-                    size: 16,
-                  ),
-
-                  label: const Text(
-                    'Ver candidatos',
-                  ),
+                  label: const Text('Ver candidatos'),
 
                   style: OutlinedButton.styleFrom(
                     foregroundColor: _purple,
 
-                    side: BorderSide(
-                      color: _purple.withValues(
-                        alpha: 0.40,
-                      ),
-                    ),
+                    side: BorderSide(color: _purple.withValues(alpha: 0.40)),
 
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(
-                        12,
-                      ),
+                      borderRadius: BorderRadius.circular(12),
                     ),
 
                     textStyle: const TextStyle(
@@ -2140,23 +1359,17 @@ class _MembersViewState
                 ),
               ),
 
-              const SizedBox(
-                width: 8,
-              ),
+              const SizedBox(width: 8),
 
               IconButton(
                 tooltip: 'Encerrar busca',
 
                 onPressed: () {
-                  _closeRecruitment(
-                    recruitment,
-                  );
+                  _closeRecruitment(recruitment);
                 },
 
                 style: IconButton.styleFrom(
-                  backgroundColor: Colors.redAccent.withValues(
-                    alpha: 0.07,
-                  ),
+                  backgroundColor: Colors.redAccent.withValues(alpha: 0.07),
                 ),
 
                 icon: const Icon(
@@ -2174,86 +1387,50 @@ class _MembersViewState
     );
   }
 
-  // ==========================================================
-  // MEMBER CARD
-  // ==========================================================
-
-  Widget _buildMemberCard(
-    ProjectMemberModel member,
-  ) {
-    final isCurrentUser = _membersController.isCurrentUser(
-      member,
-    );
+  Widget _buildMemberCard(ProjectMemberModel member) {
+    final isCurrentUser = _membersController.isCurrentUser(member);
 
     final userId = member.userId;
 
-    final selected = _selectedMemberIds.contains(
-      userId,
-    );
+    final selected = _selectedMemberIds.contains(userId);
 
-    final expanded =
-        !isCurrentUser &&
-        _isMemberExpanded(
-          userId,
-        );
+    final expanded = !isCurrentUser && _isMemberExpanded(userId);
 
     final permission = isCurrentUser
         ? null
-        : _communicationController.permissionForUser(
-            userId,
-          );
+        : _communicationController.permissionForUser(userId);
 
     final inviteState = isCurrentUser
         ? null
-        : _communicationController.inviteStateForUser(
-            userId,
-          );
+        : _communicationController.inviteStateForUser(userId);
 
     final incomingState = isCurrentUser
         ? null
-        : _communicationController.incomingInviteStateFrom(
-            userId,
-          );
+        : _communicationController.incomingInviteStateFrom(userId);
 
-    final videoAllowed =
-        permission?.videoAllowed ??
-        false;
+    final videoAllowed = permission?.videoAllowed ?? false;
 
-    final processing = _communicationController.isProcessingUser(
-      userId,
-    );
+    final processing = _communicationController.isProcessingUser(userId);
 
     return Container(
-      margin: const EdgeInsets.only(
-        bottom: 10,
-      ),
+      margin: const EdgeInsets.only(bottom: 10),
 
       decoration: BoxDecoration(
         color: _surface,
 
-        borderRadius: BorderRadius.circular(
-          18,
-        ),
+        borderRadius: BorderRadius.circular(18),
 
         border: Border.all(
           color: selected
-              ? _purple.withValues(
-                  alpha: 0.55,
-                )
+              ? _purple.withValues(alpha: 0.55)
               : isCurrentUser
-              ? _purple.withValues(
-                  alpha: 0.30,
-                )
-              : Colors.white.withValues(
-                  alpha: 0.05,
-                ),
+              ? _purple.withValues(alpha: 0.30)
+              : Colors.white.withValues(alpha: 0.05),
         ),
       ),
 
       child: AnimatedSize(
-        duration: const Duration(
-          milliseconds: 180,
-        ),
+        duration: const Duration(milliseconds: 180),
 
         curve: Curves.easeInOut,
 
@@ -2270,39 +1447,25 @@ class _MembersViewState
                 onTap: isCurrentUser
                     ? null
                     : () {
-                        _toggleMemberSelection(
-                          member,
-                        );
+                        _toggleMemberSelection(member);
                       },
 
-                borderRadius: BorderRadius.circular(
-                  18,
-                ),
+                borderRadius: BorderRadius.circular(18),
 
                 child: Padding(
-                  padding: const EdgeInsets.all(
-                    14,
-                  ),
+                  padding: const EdgeInsets.all(14),
 
                   child: Row(
                     children: [
                       if (!isCurrentUser) ...[
-                        _buildSelectionIndicator(
-                          selected,
-                        ),
+                        _buildSelectionIndicator(selected),
 
-                        const SizedBox(
-                          width: 11,
-                        ),
+                        const SizedBox(width: 11),
                       ],
 
-                      _buildAvatar(
-                        member,
-                      ),
+                      _buildAvatar(member),
 
-                      const SizedBox(
-                        width: 13,
-                      ),
+                      const SizedBox(width: 13),
 
                       Expanded(
                         child: Column(
@@ -2330,9 +1493,7 @@ class _MembersViewState
                                 ),
 
                                 if (isCurrentUser) ...[
-                                  const SizedBox(
-                                    width: 7,
-                                  ),
+                                  const SizedBox(width: 7),
 
                                   _buildYouBadge(),
                                 ],
@@ -2340,9 +1501,7 @@ class _MembersViewState
                             ),
 
                             if (member.usernameLabel.isNotEmpty) ...[
-                              const SizedBox(
-                                height: 2,
-                              ),
+                              const SizedBox(height: 2),
 
                               Text(
                                 member.usernameLabel,
@@ -2355,9 +1514,7 @@ class _MembersViewState
                               ),
                             ],
 
-                            const SizedBox(
-                              height: 8,
-                            ),
+                            const SizedBox(height: 8),
 
                             Wrap(
                               spacing: 7,
@@ -2365,45 +1522,29 @@ class _MembersViewState
                               runSpacing: 6,
 
                               children: [
-                                _buildRoleChip(
-                                  member.roleLabel,
-                                ),
+                                _buildRoleChip(member.roleLabel),
 
-                                _buildStatusChip(
-                                  member.isOnline,
-                                ),
+                                _buildStatusChip(member.isOnline),
 
-                                if (!isCurrentUser)
-                                  _buildVideoChip(
-                                    userId,
-                                  ),
+                                if (!isCurrentUser) _buildVideoChip(userId),
                               ],
                             ),
                           ],
                         ),
                       ),
 
-                      // ========================================
-                      // EXPAND / COLLAPSE
-                      // ========================================
                       if (!isCurrentUser) ...[
-                        const SizedBox(
-                          width: 8,
-                        ),
+                        const SizedBox(width: 8),
 
                         Tooltip(
-                          message: expanded
-                              ? 'Recolher'
-                              : 'Ver comunicação',
+                          message: expanded ? 'Recolher' : 'Ver comunicação',
 
                           child: Material(
                             color: Colors.transparent,
 
                             child: InkWell(
                               onTap: () {
-                                _toggleMemberExpanded(
-                                  userId,
-                                );
+                                _toggleMemberExpanded(userId);
                               },
 
                               customBorder: const CircleBorder(),
@@ -2417,41 +1558,27 @@ class _MembersViewState
 
                                 decoration: BoxDecoration(
                                   color: expanded
-                                      ? _purple.withValues(
-                                          alpha: 0.12,
-                                        )
-                                      : Colors.white.withValues(
-                                          alpha: 0.035,
-                                        ),
+                                      ? _purple.withValues(alpha: 0.12)
+                                      : Colors.white.withValues(alpha: 0.035),
 
                                   shape: BoxShape.circle,
 
                                   border: Border.all(
                                     color: expanded
-                                        ? _purple.withValues(
-                                            alpha: 0.28,
-                                          )
-                                        : Colors.white.withValues(
-                                            alpha: 0.06,
-                                          ),
+                                        ? _purple.withValues(alpha: 0.28)
+                                        : Colors.white.withValues(alpha: 0.06),
                                   ),
                                 ),
 
                                 child: AnimatedRotation(
-                                  turns: expanded
-                                      ? 0.5
-                                      : 0,
+                                  turns: expanded ? 0.5 : 0,
 
-                                  duration: const Duration(
-                                    milliseconds: 180,
-                                  ),
+                                  duration: const Duration(milliseconds: 180),
 
                                   child: Icon(
                                     Icons.keyboard_arrow_down_rounded,
 
-                                    color: expanded
-                                        ? _purple
-                                        : Colors.white38,
+                                    color: expanded ? _purple : Colors.white38,
 
                                     size: 20,
                                   ),
@@ -2467,37 +1594,17 @@ class _MembersViewState
               ),
             ),
 
-            // ==================================================
-            // COMMUNICATION DETAILS
-            // ==================================================
-            //
-            // Por padrão o card fica recolhido.
-            //
-            // Os detalhes aparecem somente quando o usuário
-            // pressiona o botão de expansão.
-            //
-            // ==================================================
-            if (!isCurrentUser &&
-                expanded) ...[
+            if (!isCurrentUser && expanded) ...[
               Container(
                 height: 1,
 
-                margin: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                ),
+                margin: const EdgeInsets.symmetric(horizontal: 14),
 
-                color: Colors.white.withValues(
-                  alpha: 0.04,
-                ),
+                color: Colors.white.withValues(alpha: 0.04),
               ),
 
               Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  12,
-                  10,
-                  12,
-                  12,
-                ),
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
 
                 child: CommunicationPermissionCard(
                   permission: permission,
@@ -2515,34 +1622,18 @@ class _MembersViewState
                   requestInProgress: processing,
 
                   onRequestVideo:
-                      _communicationController.canInviteVideo(
-                        userId,
-                      )
+                      _communicationController.canInviteVideo(userId)
                       ? () {
-                          _inviteMember(
-                            member,
-                          );
+                          _inviteMember(member);
                         }
                       : null,
                 ),
               ),
 
-              // ================================================
-              // VIDEO ALREADY ALLOWED
-              // ================================================
-              if (videoAllowed)
-                _buildRevokeVideoAction(
-                  member,
-                ),
+              if (videoAllowed) _buildRevokeVideoAction(member),
 
-              // ================================================
-              // USER CAN REOPEN US
-              // ================================================
-              if (incomingState?.blockedAfterLimit ==
-                  true)
-                _buildAllowInviteAction(
-                  member,
-                ),
+              if (incomingState?.blockedAfterLimit == true)
+                _buildAllowInviteAction(member),
             ],
           ],
         ),
@@ -2550,70 +1641,36 @@ class _MembersViewState
     );
   }
 
-  // ==========================================================
-  // SELECTION INDICATOR
-  // ==========================================================
-
-  Widget _buildSelectionIndicator(
-    bool selected,
-  ) {
+  Widget _buildSelectionIndicator(bool selected) {
     return AnimatedContainer(
-      duration: const Duration(
-        milliseconds: 150,
-      ),
+      duration: const Duration(milliseconds: 150),
 
       width: 22,
 
       height: 22,
 
       decoration: BoxDecoration(
-        color: selected
-            ? _purple
-            : Colors.transparent,
+        color: selected ? _purple : Colors.transparent,
 
-        borderRadius: BorderRadius.circular(
-          7,
-        ),
+        borderRadius: BorderRadius.circular(7),
 
-        border: Border.all(
-          color: selected
-              ? _purple
-              : Colors.white24,
-        ),
+        border: Border.all(color: selected ? _purple : Colors.white24),
       ),
 
       child: selected
-          ? const Icon(
-              Icons.check_rounded,
-
-              color: Colors.white,
-
-              size: 14,
-            )
+          ? const Icon(Icons.check_rounded, color: Colors.white, size: 14)
           : null,
     );
   }
 
-  // ==========================================================
-  // YOU BADGE
-  // ==========================================================
-
   Widget _buildYouBadge() {
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 7,
-
-        vertical: 3,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
 
       decoration: BoxDecoration(
-        color: _purple.withValues(
-          alpha: 0.13,
-        ),
+        color: _purple.withValues(alpha: 0.13),
 
-        borderRadius: BorderRadius.circular(
-          20,
-        ),
+        borderRadius: BorderRadius.circular(20),
       ),
 
       child: const Text(
@@ -2632,24 +1689,12 @@ class _MembersViewState
     );
   }
 
-  // ==========================================================
-  // VIDEO CHIP
-  // ==========================================================
+  Widget _buildVideoChip(String userId) {
+    final permission = _communicationController.permissionForUser(userId);
 
-  Widget _buildVideoChip(
-    String userId,
-  ) {
-    final permission = _communicationController.permissionForUser(
-      userId,
-    );
+    final state = _communicationController.inviteStateForUser(userId);
 
-    final state = _communicationController.inviteStateForUser(
-      userId,
-    );
-
-    final pending = _communicationController.hasPendingRequestTo(
-      userId,
-    );
+    final pending = _communicationController.hasPendingRequestTo(userId);
 
     Color color;
 
@@ -2657,8 +1702,7 @@ class _MembersViewState
 
     String text;
 
-    if (permission?.videoAllowed ==
-        true) {
+    if (permission?.videoAllowed == true) {
       color = _green;
 
       icon = Icons.videocam_rounded;
@@ -2670,22 +1714,18 @@ class _MembersViewState
       icon = Icons.schedule_send_rounded;
 
       text = 'Pendente';
-    } else if (state?.blockedAfterLimit ==
-        true) {
+    } else if (state?.blockedAfterLimit == true) {
       color = _red;
 
       icon = Icons.block_rounded;
 
       text = 'Bloqueado';
-    } else if (state?.hasCooldown ==
-        true) {
+    } else if (state?.hasCooldown == true) {
       color = _orange;
 
       icon = Icons.schedule_rounded;
 
-      text = state!.cooldownLabel.isEmpty
-          ? 'Aguardar'
-          : state.cooldownLabel;
+      text = state!.cooldownLabel.isEmpty ? 'Aguardar' : state.cooldownLabel;
     } else {
       color = Colors.white30;
 
@@ -2695,37 +1735,21 @@ class _MembersViewState
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 8,
-
-        vertical: 4,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
 
       decoration: BoxDecoration(
-        color: color.withValues(
-          alpha: 0.07,
-        ),
+        color: color.withValues(alpha: 0.07),
 
-        borderRadius: BorderRadius.circular(
-          20,
-        ),
+        borderRadius: BorderRadius.circular(20),
       ),
 
       child: Row(
         mainAxisSize: MainAxisSize.min,
 
         children: [
-          Icon(
-            icon,
+          Icon(icon, color: color, size: 11),
 
-            color: color,
-
-            size: 11,
-          ),
-
-          const SizedBox(
-            width: 4,
-          ),
+          const SizedBox(width: 4),
 
           Text(
             text,
@@ -2743,20 +1767,9 @@ class _MembersViewState
     );
   }
 
-  // ==========================================================
-  // REVOKE ACTION
-  // ==========================================================
-
-  Widget _buildRevokeVideoAction(
-    ProjectMemberModel member,
-  ) {
+  Widget _buildRevokeVideoAction(ProjectMemberModel member) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        14,
-        0,
-        14,
-        12,
-      ),
+      padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
 
       child: SizedBox(
         width: double.infinity,
@@ -2765,71 +1778,38 @@ class _MembersViewState
           onPressed: _communicationController.isProcessing
               ? null
               : () {
-                  _revokeVideo(
-                    member,
-                  );
+                  _revokeVideo(member);
                 },
 
-          icon: const Icon(
-            Icons.videocam_off_rounded,
-
-            size: 15,
-          ),
+          icon: const Icon(Icons.videocam_off_rounded, size: 15),
 
           label: const Text(
             'Remover consentimento de vídeo',
 
-            style: TextStyle(
-              fontSize: 9,
-
-              fontWeight: FontWeight.w600,
-            ),
+            style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600),
           ),
 
-          style: TextButton.styleFrom(
-            foregroundColor: Colors.white38,
-          ),
+          style: TextButton.styleFrom(foregroundColor: Colors.white38),
         ),
       ),
     );
   }
 
-  // ==========================================================
-  // ALLOW NEW INVITE ACTION
-  // ==========================================================
-
-  Widget _buildAllowInviteAction(
-    ProjectMemberModel member,
-  ) {
+  Widget _buildAllowInviteAction(ProjectMemberModel member) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        14,
-        0,
-        14,
-        12,
-      ),
+      padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
 
       child: Container(
         width: double.infinity,
 
-        padding: const EdgeInsets.all(
-          11,
-        ),
+        padding: const EdgeInsets.all(11),
 
         decoration: BoxDecoration(
-          color: _orange.withValues(
-            alpha: 0.055,
-          ),
+          color: _orange.withValues(alpha: 0.055),
 
-          borderRadius: BorderRadius.circular(
-            13,
-          ),
+          borderRadius: BorderRadius.circular(13),
 
-          border: Border.all(
-            color: _orange.withValues(
-              alpha: 0.12,
-            ),
-          ),
+          border: Border.all(color: _orange.withValues(alpha: 0.12)),
         ),
 
         child: Column(
@@ -2848,9 +1828,7 @@ class _MembersViewState
               ),
             ),
 
-            const SizedBox(
-              height: 3,
-            ),
+            const SizedBox(height: 3),
 
             const Text(
               'Se quiser, você pode permitir que ele '
@@ -2865,48 +1843,30 @@ class _MembersViewState
               ),
             ),
 
-            const SizedBox(
-              height: 8,
-            ),
+            const SizedBox(height: 8),
 
             OutlinedButton.icon(
               onPressed: _communicationController.isProcessing
                   ? null
                   : () {
-                      _allowNewInviteFrom(
-                        member,
-                      );
+                      _allowNewInviteFrom(member);
                     },
 
-              icon: const Icon(
-                Icons.lock_open_rounded,
-
-                size: 14,
-              ),
+              icon: const Icon(Icons.lock_open_rounded, size: 14),
 
               label: const Text(
                 'Permitir novo convite',
 
-                style: TextStyle(
-                  fontSize: 9,
-
-                  fontWeight: FontWeight.w700,
-                ),
+                style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700),
               ),
 
               style: OutlinedButton.styleFrom(
                 foregroundColor: _orange,
 
-                side: BorderSide(
-                  color: _orange.withValues(
-                    alpha: 0.30,
-                  ),
-                ),
+                side: BorderSide(color: _orange.withValues(alpha: 0.30)),
 
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(
-                    11,
-                  ),
+                  borderRadius: BorderRadius.circular(11),
                 ),
               ),
             ),
@@ -2916,18 +1876,10 @@ class _MembersViewState
     );
   }
 
-  // ==========================================================
-  // AVATAR
-  // ==========================================================
-
-  Widget _buildAvatar(
-    ProjectMemberModel member,
-  ) {
+  Widget _buildAvatar(ProjectMemberModel member) {
     final avatarUrl = member.avatarUrl;
 
-    if (avatarUrl !=
-            null &&
-        avatarUrl.isNotEmpty) {
+    if (avatarUrl != null && avatarUrl.isNotEmpty) {
       return Container(
         width: 50,
 
@@ -2936,11 +1888,7 @@ class _MembersViewState
         decoration: BoxDecoration(
           shape: BoxShape.circle,
 
-          border: Border.all(
-            color: _purple.withValues(
-              alpha: 0.18,
-            ),
-          ),
+          border: Border.all(color: _purple.withValues(alpha: 0.18)),
         ),
 
         child: ClipOval(
@@ -2949,43 +1897,21 @@ class _MembersViewState
 
             fit: BoxFit.cover,
 
-            errorBuilder:
-                (
-                  context,
-                  error,
-                  stackTrace,
-                ) {
-                  return _buildInitialAvatar(
-                    member,
-                  );
-                },
+            errorBuilder: (context, error, stackTrace) {
+              return _buildInitialAvatar(member);
+            },
           ),
         ),
       );
     }
 
-    return _buildInitialAvatar(
-      member,
-    );
+    return _buildInitialAvatar(member);
   }
 
-  // ==========================================================
-  // INITIAL AVATAR
-  // ==========================================================
-
-  Widget _buildInitialAvatar(
-    ProjectMemberModel member,
-  ) {
+  Widget _buildInitialAvatar(ProjectMemberModel member) {
     final name = member.displayName.trim();
 
-    final initial = name.isNotEmpty
-        ? name
-              .substring(
-                0,
-                1,
-              )
-              .toUpperCase()
-        : '?';
+    final initial = name.isNotEmpty ? name.substring(0, 1).toUpperCase() : '?';
 
     return Container(
       width: 50,
@@ -2995,17 +1921,11 @@ class _MembersViewState
       alignment: Alignment.center,
 
       decoration: BoxDecoration(
-        color: _purple.withValues(
-          alpha: 0.12,
-        ),
+        color: _purple.withValues(alpha: 0.12),
 
         shape: BoxShape.circle,
 
-        border: Border.all(
-          color: _purple.withValues(
-            alpha: 0.18,
-          ),
-        ),
+        border: Border.all(color: _purple.withValues(alpha: 0.18)),
       ),
 
       child: Text(
@@ -3022,38 +1942,18 @@ class _MembersViewState
     );
   }
 
-  // ==========================================================
-  // ROLE CHIP
-  // ==========================================================
-
-  Widget _buildRoleChip(
-    String role,
-  ) {
-    final formattedRole = _formatRole(
-      role,
-    );
+  Widget _buildRoleChip(String role) {
+    final formattedRole = _formatRole(role);
 
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 8,
-
-        vertical: 4,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
 
       decoration: BoxDecoration(
-        color: _purple.withValues(
-          alpha: 0.08,
-        ),
+        color: _purple.withValues(alpha: 0.08),
 
-        borderRadius: BorderRadius.circular(
-          20,
-        ),
+        borderRadius: BorderRadius.circular(20),
 
-        border: Border.all(
-          color: _purple.withValues(
-            alpha: 0.12,
-          ),
-        ),
+        border: Border.all(color: _purple.withValues(alpha: 0.12)),
       ),
 
       child: Text(
@@ -3070,34 +1970,16 @@ class _MembersViewState
     );
   }
 
-  // ==========================================================
-  // STATUS CHIP
-  // ==========================================================
-
-  Widget _buildStatusChip(
-    bool online,
-  ) {
-    final color = online
-        ? _green
-        : Colors.white24;
+  Widget _buildStatusChip(bool online) {
+    final color = online ? _green : Colors.white24;
 
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 8,
-
-        vertical: 4,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
 
       decoration: BoxDecoration(
-        color: color.withValues(
-          alpha: online
-              ? 0.08
-              : 0.04,
-        ),
+        color: color.withValues(alpha: online ? 0.08 : 0.04),
 
-        borderRadius: BorderRadius.circular(
-          20,
-        ),
+        borderRadius: BorderRadius.circular(20),
       ),
 
       child: Row(
@@ -3117,9 +1999,7 @@ class _MembersViewState
               boxShadow: online
                   ? [
                       BoxShadow(
-                        color: color.withValues(
-                          alpha: 0.35,
-                        ),
+                        color: color.withValues(alpha: 0.35),
 
                         blurRadius: 6,
                       ),
@@ -3128,19 +2008,13 @@ class _MembersViewState
             ),
           ),
 
-          const SizedBox(
-            width: 5,
-          ),
+          const SizedBox(width: 5),
 
           Text(
-            online
-                ? 'Online'
-                : 'Offline',
+            online ? 'Online' : 'Offline',
 
             style: TextStyle(
-              color: online
-                  ? color
-                  : Colors.white30,
+              color: online ? color : Colors.white30,
 
               fontSize: 9,
 
@@ -3152,26 +2026,16 @@ class _MembersViewState
     );
   }
 
-  // ==========================================================
-  // COMMUNICATION ERROR
-  // ==========================================================
-
   Widget _buildCommunicationError() {
     return Container(
       width: double.infinity,
 
-      padding: const EdgeInsets.all(
-        12,
-      ),
+      padding: const EdgeInsets.all(12),
 
       decoration: BoxDecoration(
-        color: Colors.redAccent.withValues(
-          alpha: 0.07,
-        ),
+        color: Colors.redAccent.withValues(alpha: 0.07),
 
-        borderRadius: BorderRadius.circular(
-          14,
-        ),
+        borderRadius: BorderRadius.circular(14),
       ),
 
       child: Row(
@@ -3184,20 +2048,14 @@ class _MembersViewState
             size: 17,
           ),
 
-          const SizedBox(
-            width: 8,
-          ),
+          const SizedBox(width: 8),
 
           Expanded(
             child: Text(
               _communicationController.errorMessage ??
                   'Erro nas permissões de comunicação.',
 
-              style: const TextStyle(
-                color: Colors.redAccent,
-
-                fontSize: 10,
-              ),
+              style: const TextStyle(color: Colors.redAccent, fontSize: 10),
             ),
           ),
 
@@ -3217,26 +2075,16 @@ class _MembersViewState
     );
   }
 
-  // ==========================================================
-  // RECRUITMENT ERROR
-  // ==========================================================
-
   Widget _buildRecruitmentError() {
     return Container(
       width: double.infinity,
 
-      padding: const EdgeInsets.all(
-        12,
-      ),
+      padding: const EdgeInsets.all(12),
 
       decoration: BoxDecoration(
-        color: Colors.redAccent.withValues(
-          alpha: 0.07,
-        ),
+        color: Colors.redAccent.withValues(alpha: 0.07),
 
-        borderRadius: BorderRadius.circular(
-          14,
-        ),
+        borderRadius: BorderRadius.circular(14),
       ),
 
       child: Row(
@@ -3249,20 +2097,13 @@ class _MembersViewState
             size: 17,
           ),
 
-          const SizedBox(
-            width: 8,
-          ),
+          const SizedBox(width: 8),
 
           Expanded(
             child: Text(
-              _recruitmentController.errorMessage ??
-                  'Erro no recrutamento.',
+              _recruitmentController.errorMessage ?? 'Erro no recrutamento.',
 
-              style: const TextStyle(
-                color: Colors.redAccent,
-
-                fontSize: 10,
-              ),
+              style: const TextStyle(color: Colors.redAccent, fontSize: 10),
             ),
           ),
         ],
@@ -3270,13 +2111,7 @@ class _MembersViewState
     );
   }
 
-  // ==========================================================
-  // FORMAT ROLE
-  // ==========================================================
-
-  String _formatRole(
-    String value,
-  ) {
+  String _formatRole(String value) {
     final normalized = value.trim().toLowerCase();
 
     switch (normalized) {
@@ -3313,64 +2148,38 @@ class _MembersViewState
     }
   }
 
-  // ==========================================================
-  // EMPTY MEMBERS
-  // ==========================================================
-
   Widget _buildEmptyMembersInline() {
     return Container(
       width: double.infinity,
 
-      padding: const EdgeInsets.all(
-        22,
-      ),
+      padding: const EdgeInsets.all(22),
 
       decoration: BoxDecoration(
         color: _surface,
 
-        borderRadius: BorderRadius.circular(
-          18,
-        ),
+        borderRadius: BorderRadius.circular(18),
       ),
 
       child: const Column(
         children: [
-          Icon(
-            Icons.group_off_outlined,
+          Icon(Icons.group_off_outlined, color: Colors.white24, size: 30),
 
-            color: Colors.white24,
-
-            size: 30,
-          ),
-
-          SizedBox(
-            height: 10,
-          ),
+          SizedBox(height: 10),
 
           Text(
             'Nenhum membro encontrado',
 
-            style: TextStyle(
-              color: Colors.white54,
-
-              fontSize: 12,
-            ),
+            style: TextStyle(color: Colors.white54, fontSize: 12),
           ),
         ],
       ),
     );
   }
 
-  // ==========================================================
-  // ERROR
-  // ==========================================================
-
   Widget _buildError() {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(
-          24,
-        ),
+        padding: const EdgeInsets.all(24),
 
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -3382,13 +2191,9 @@ class _MembersViewState
               height: 64,
 
               decoration: BoxDecoration(
-                color: Colors.redAccent.withValues(
-                  alpha: 0.08,
-                ),
+                color: Colors.redAccent.withValues(alpha: 0.08),
 
-                borderRadius: BorderRadius.circular(
-                  20,
-                ),
+                borderRadius: BorderRadius.circular(20),
               ),
 
               child: const Icon(
@@ -3400,47 +2205,30 @@ class _MembersViewState
               ),
             ),
 
-            const SizedBox(
-              height: 16,
-            ),
+            const SizedBox(height: 16),
 
             Text(
-              _membersController.errorMessage ??
-                  'Erro ao carregar membros.',
+              _membersController.errorMessage ?? 'Erro ao carregar membros.',
 
               textAlign: TextAlign.center,
 
-              style: const TextStyle(
-                color: Colors.white54,
-
-                fontSize: 12,
-              ),
+              style: const TextStyle(color: Colors.white54, fontSize: 12),
             ),
 
-            const SizedBox(
-              height: 16,
-            ),
+            const SizedBox(height: 16),
 
             TextButton.icon(
               onPressed: _reloadAll,
 
-              icon: const Icon(
-                Icons.refresh_rounded,
-              ),
+              icon: const Icon(Icons.refresh_rounded),
 
-              label: const Text(
-                'Tentar novamente',
-              ),
+              label: const Text('Tentar novamente'),
             ),
           ],
         ),
       ),
     );
   }
-
-  // ==========================================================
-  // DISPOSE
-  // ==========================================================
 
   @override
   void dispose() {
@@ -3458,19 +2246,11 @@ class _MembersViewState
   }
 }
 
-// ============================================================
-// STATUS DOT
-// ============================================================
-
-class _RecruitmentStatusDot
-    extends
-        StatelessWidget {
+class _RecruitmentStatusDot extends StatelessWidget {
   const _RecruitmentStatusDot();
 
   @override
-  Widget build(
-    BuildContext context,
-  ) {
+  Widget build(BuildContext context) {
     return Container(
       width: 6,
 
@@ -3483,9 +2263,7 @@ class _RecruitmentStatusDot
 
         boxShadow: [
           BoxShadow(
-            color: _MembersViewState._orange.withValues(
-              alpha: 0.45,
-            ),
+            color: _MembersViewState._orange.withValues(alpha: 0.45),
 
             blurRadius: 6,
           ),

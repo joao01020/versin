@@ -9,6 +9,15 @@ import '../widgets/global_chat_banner.dart';
 
 import '../controllers/networking_controller.dart';
 
+// ============================================================
+// PROJECT INVITATIONS
+// ============================================================
+
+import '../invitations/controllers/project_invitation_controller.dart';
+import '../invitations/models/project_invitation_model.dart';
+import '../invitations/services/project_invitation_service.dart';
+import '../invitations/widgets/project_invitation_banner.dart';
+
 import 'sub_features/chat_view.dart';
 import 'sub_features/contract_view.dart';
 import 'sub_features/members_view.dart';
@@ -51,20 +60,32 @@ import 'sub_features/tasks_view.dart';
 //
 // ============================================================
 
-class NetworkingSessionView extends StatefulWidget {
+class NetworkingSessionView
+    extends
+        StatefulWidget {
   final String projectId;
 
-  const NetworkingSessionView({super.key, required this.projectId});
+  const NetworkingSessionView({
+    super.key,
+    required this.projectId,
+  });
 
   @override
-  State<NetworkingSessionView> createState() => _NetworkingSessionViewState();
+  State<
+    NetworkingSessionView
+  >
+  createState() => _NetworkingSessionViewState();
 }
 
 // ============================================================
 // STATE
 // ============================================================
 
-class _NetworkingSessionViewState extends State<NetworkingSessionView> {
+class _NetworkingSessionViewState
+    extends
+        State<
+          NetworkingSessionView
+        > {
   // ==========================================================
   // CONTROLLER
   // ==========================================================
@@ -72,6 +93,14 @@ class _NetworkingSessionViewState extends State<NetworkingSessionView> {
   late final NetworkingController _controller;
 
   late final GlobalChatController _globalChatController;
+
+  // ==========================================================
+  // PROJECT INVITATIONS
+  // ==========================================================
+
+  late final ProjectInvitationService _projectInvitationService;
+
+  late final ProjectInvitationController _projectInvitationController;
 
   // ==========================================================
   // SUPABASE
@@ -97,13 +126,29 @@ class _NetworkingSessionViewState extends State<NetworkingSessionView> {
   // PARTICIPANT NAME CACHE
   // ==========================================================
 
-  final Map<String, String> _callParticipantNameCache = <String, String>{};
+  final Map<
+    String,
+    String
+  >
+  _callParticipantNameCache =
+      <
+        String,
+        String
+      >{};
 
   // ==========================================================
   // CHAT SENDER NAME CACHE
   // ==========================================================
 
-  final Map<String, String> _chatSenderNameCache = <String, String>{};
+  final Map<
+    String,
+    String
+  >
+  _chatSenderNameCache =
+      <
+        String,
+        String
+      >{};
 
   // ==========================================================
   // INIT
@@ -113,11 +158,21 @@ class _NetworkingSessionViewState extends State<NetworkingSessionView> {
   void initState() {
     super.initState();
 
-    _controller = NetworkingController(projectId: widget.projectId)
-      ..initSession();
+    _controller = NetworkingController(
+      projectId: widget.projectId,
+    )..initSession();
 
-    _globalChatController = GlobalChatController(projectId: widget.projectId)
-      ..init();
+    _globalChatController = GlobalChatController(
+      projectId: widget.projectId,
+    )..init();
+
+    _projectInvitationService = ProjectInvitationService();
+
+    _projectInvitationController = ProjectInvitationController(
+      service: _projectInvitationService,
+    );
+
+    _projectInvitationController.init();
   }
 
   // ==========================================================
@@ -125,12 +180,21 @@ class _NetworkingSessionViewState extends State<NetworkingSessionView> {
   // ==========================================================
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(
+    BuildContext context,
+  ) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0F0F0F),
+      backgroundColor: const Color(
+        0xFF0F0F0F,
+      ),
 
       appBar: AppBar(
-        title: const Text('Studio Session', style: TextStyle(fontSize: 16)),
+        title: const Text(
+          'Studio Session',
+          style: TextStyle(
+            fontSize: 16,
+          ),
+        ),
 
         backgroundColor: Colors.transparent,
 
@@ -146,115 +210,144 @@ class _NetworkingSessionViewState extends State<NetworkingSessionView> {
             child: ListenableBuilder(
               listenable: _controller,
 
-              builder: (context, _) {
-                if (_controller.isLoading) {
-                  return const Center(child: CircularProgressIndicator());
-                }
+              builder:
+                  (
+                    context,
+                    _,
+                  ) {
+                    if (_controller.isLoading) {
+                      return const Center(
+                        child: CircularProgressIndicator(),
+                      );
+                    }
 
-                final projectHash = widget.projectId.length >= 8
-                    ? widget.projectId.substring(0, 8).toUpperCase()
-                    : widget.projectId.toUpperCase();
+                    final projectHash =
+                        widget.projectId.length >=
+                            8
+                        ? widget.projectId
+                              .substring(
+                                0,
+                                8,
+                              )
+                              .toUpperCase()
+                        : widget.projectId.toUpperCase();
 
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                      ),
 
-                  child: Column(
-                    children: [
-                      _buildHeader(projectHash),
-
-                      const SizedBox(height: 25),
-
-                      Wrap(
-                        spacing: 15,
-
-                        runSpacing: 20,
-
-                        alignment: WrapAlignment.center,
-
+                      child: Column(
                         children: [
-                          _buildSmallAction(
-                            Icons.chat_bubble_rounded,
-
-                            'Chat',
-
-                            Colors.blue,
-
-                            _openChatPage,
+                          _buildHeader(
+                            projectHash,
                           ),
 
-                          _buildSmallAction(
-                            Icons.call_rounded,
-
-                            'Ligar',
-
-                            Colors.green,
-
-                            () => _openCallPage(),
+                          const SizedBox(
+                            height: 25,
                           ),
 
-                          _buildSmallAction(
-                            Icons.edit_document,
+                          Wrap(
+                            spacing: 15,
 
-                            'Doc',
+                            runSpacing: 20,
 
-                            Colors.amber,
+                            alignment: WrapAlignment.center,
 
-                            () => _openPage(
-                              ContractView(projectId: widget.projectId),
-                            ),
-                          ),
+                            children: [
+                              _buildSmallAction(
+                                Icons.chat_bubble_rounded,
 
-                          _buildSmallAction(
-                            Icons.percent_rounded,
+                                'Chat',
 
-                            'Royalties',
+                                Colors.blue,
 
-                            Colors.pink,
+                                _openChatPage,
+                              ),
 
-                            () => _openPage(
-                              RoyaltiesView(projectId: widget.projectId),
-                            ),
-                          ),
+                              _buildSmallAction(
+                                Icons.call_rounded,
 
-                          _buildSmallAction(
-                            Icons.person_add_alt_1_rounded,
+                                'Ligar',
 
-                            'Membros',
+                                Colors.green,
 
-                            Colors.orange,
+                                () => _openCallPage(),
+                              ),
 
-                            () => _openPage(
-                              MembersView(projectId: widget.projectId),
-                            ),
-                          ),
+                              _buildSmallAction(
+                                Icons.edit_document,
 
-                          _buildSmallAction(
-                            Icons.task_alt_rounded,
+                                'Doc',
 
-                            'Tarefas',
+                                Colors.amber,
 
-                            Colors.teal,
+                                () => _openPage(
+                                  ContractView(
+                                    projectId: widget.projectId,
+                                  ),
+                                ),
+                              ),
 
-                            () => _openPage(
-                              TasksView(projectId: widget.projectId),
-                            ),
-                          ),
+                              _buildSmallAction(
+                                Icons.percent_rounded,
 
-                          _buildSmallAction(
-                            Icons.close_rounded,
+                                'Royalties',
 
-                            'Sair',
+                                Colors.pink,
 
-                            Colors.red,
+                                () => _openPage(
+                                  RoyaltiesView(
+                                    projectId: widget.projectId,
+                                  ),
+                                ),
+                              ),
 
-                            () => Navigator.pop(context),
+                              _buildSmallAction(
+                                Icons.person_add_alt_1_rounded,
+
+                                'Membros',
+
+                                Colors.orange,
+
+                                () => _openPage(
+                                  MembersView(
+                                    projectId: widget.projectId,
+                                  ),
+                                ),
+                              ),
+
+                              _buildSmallAction(
+                                Icons.task_alt_rounded,
+
+                                'Tarefas',
+
+                                Colors.teal,
+
+                                () => _openPage(
+                                  TasksView(
+                                    projectId: widget.projectId,
+                                  ),
+                                ),
+                              ),
+
+                              _buildSmallAction(
+                                Icons.close_rounded,
+
+                                'Sair',
+
+                                Colors.red,
+
+                                () => Navigator.pop(
+                                  context,
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
-                    ],
-                  ),
-                );
-              },
+                    );
+                  },
             ),
           ),
 
@@ -278,12 +371,209 @@ class _NetworkingSessionViewState extends State<NetworkingSessionView> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
 
-              children: [_buildGlobalCallBanner(), _buildGlobalChatBanner()],
+              children: [
+                _buildGlobalProjectInvitationBanner(),
+                _buildGlobalCallBanner(),
+                _buildGlobalChatBanner(),
+              ],
             ),
           ),
         ],
       ),
     );
+  }
+
+  // ==========================================================
+  // GLOBAL PROJECT INVITATION BANNER
+  // ==========================================================
+
+  Widget _buildGlobalProjectInvitationBanner() {
+    return ListenableBuilder(
+      listenable: _projectInvitationController,
+
+      builder:
+          (
+            context,
+            _,
+          ) {
+            final invitation = _projectInvitationController.currentInvitation;
+
+            if (invitation ==
+                null) {
+              return const SizedBox.shrink();
+            }
+
+            return ProjectInvitationBanner(
+              invitation: invitation,
+
+              isAccepting: _projectInvitationController.isAccepting,
+
+              isRejecting: _projectInvitationController.isRejecting,
+
+              onAccept: () async {
+                await _acceptProjectInvitation(
+                  invitation,
+                );
+              },
+
+              onReject: () async {
+                await _rejectProjectInvitation(
+                  invitation,
+                );
+              },
+            );
+          },
+    );
+  }
+
+  // ==========================================================
+  // ACCEPT PROJECT INVITATION
+  // ==========================================================
+
+  Future<
+    void
+  >
+  _acceptProjectInvitation(
+    ProjectInvitationModel invitation,
+  ) async {
+    if (!mounted ||
+        _projectInvitationController.isBusy) {
+      return;
+    }
+
+    final projectId = await _projectInvitationController.acceptInvitation(
+      invitation,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    if (projectId ==
+            null ||
+        projectId.trim().isEmpty) {
+      _showProjectInvitationMessage(
+        _projectInvitationController.errorMessage ??
+            'Não foi possível aceitar o convite.',
+        error: true,
+      );
+
+      return;
+    }
+
+    _showProjectInvitationMessage(
+      'Você entrou em ${invitation.projectTitle}.',
+    );
+
+    final normalizedProjectId = projectId.trim();
+
+    // ========================================================
+    // MESMA SESSÃO
+    // ========================================================
+    //
+    // Se por algum motivo o convite aceito for para a sessão
+    // atualmente aberta, basta atualizar o controller atual.
+    //
+    // ========================================================
+
+    if (normalizedProjectId ==
+        widget.projectId.trim()) {
+      _controller.initSession();
+
+      return;
+    }
+
+    // ========================================================
+    // OUTRA STUDIO SESSION
+    // ========================================================
+
+    await Navigator.of(
+      context,
+    ).push(
+      MaterialPageRoute(
+        builder:
+            (
+              _,
+            ) {
+              return NetworkingSessionView(
+                projectId: normalizedProjectId,
+              );
+            },
+      ),
+    );
+  }
+
+  // ==========================================================
+  // REJECT PROJECT INVITATION
+  // ==========================================================
+
+  Future<
+    void
+  >
+  _rejectProjectInvitation(
+    ProjectInvitationModel invitation,
+  ) async {
+    if (!mounted ||
+        _projectInvitationController.isBusy) {
+      return;
+    }
+
+    final rejected = await _projectInvitationController.rejectInvitation(
+      invitation,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    if (!rejected) {
+      _showProjectInvitationMessage(
+        _projectInvitationController.errorMessage ??
+            'Não foi possível recusar o convite.',
+        error: true,
+      );
+
+      return;
+    }
+
+    _showProjectInvitationMessage(
+      'Convite recusado.',
+    );
+  }
+
+  // ==========================================================
+  // PROJECT INVITATION MESSAGE
+  // ==========================================================
+
+  void _showProjectInvitationMessage(
+    String message, {
+    bool error = false,
+  }) {
+    if (!mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(
+        context,
+      )
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            message,
+          ),
+
+          backgroundColor: error
+              ? const Color(
+                  0xFF3B1218,
+                )
+              : const Color(
+                  0xFF15151D,
+                ),
+
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
   }
 
   // ==========================================================
@@ -294,46 +584,59 @@ class _NetworkingSessionViewState extends State<NetworkingSessionView> {
     return ListenableBuilder(
       listenable: _globalChatController,
 
-      builder: (context, _) {
-        if (!_globalChatController.hasNotification) {
-          return const SizedBox.shrink();
-        }
+      builder:
+          (
+            context,
+            _,
+          ) {
+            if (!_globalChatController.hasNotification) {
+              return const SizedBox.shrink();
+            }
 
-        final latestMessage = _globalChatController.latestMessage;
+            final latestMessage = _globalChatController.latestMessage;
 
-        if (latestMessage == null) {
-          return const SizedBox.shrink();
-        }
+            if (latestMessage ==
+                null) {
+              return const SizedBox.shrink();
+            }
 
-        final senderId = latestMessage.senderId.trim();
+            final senderId = latestMessage.senderId.trim();
 
-        return FutureBuilder<String>(
-          future: _resolveChatSenderName(senderId),
+            return FutureBuilder<
+              String
+            >(
+              future: _resolveChatSenderName(
+                senderId,
+              ),
 
-          builder: (context, snapshot) {
-            final resolvedName =
-                snapshot.data ??
-                _chatSenderNameCache[senderId] ??
-                _globalChatController.senderName;
+              builder:
+                  (
+                    context,
+                    snapshot,
+                  ) {
+                    final resolvedName =
+                        snapshot.data ??
+                        _chatSenderNameCache[senderId] ??
+                        _globalChatController.senderName;
 
-            return GlobalChatBanner(
-              type: _globalChatController.latestIsAudio
-                  ? GlobalChatBannerType.audio
-                  : GlobalChatBannerType.message,
+                    return GlobalChatBanner(
+                      type: _globalChatController.latestIsAudio
+                          ? GlobalChatBannerType.audio
+                          : GlobalChatBannerType.message,
 
-              senderName: resolvedName,
+                      senderName: resolvedName,
 
-              preview: _globalChatController.preview,
+                      preview: _globalChatController.preview,
 
-              unreadCount: _globalChatController.unreadCount,
+                      unreadCount: _globalChatController.unreadCount,
 
-              onOpen: _openChatPage,
+                      onOpen: _openChatPage,
 
-              onDismiss: _globalChatController.dismissBanner,
+                      onDismiss: _globalChatController.dismissBanner,
+                    );
+                  },
             );
           },
-        );
-      },
     );
   }
 
@@ -341,7 +644,12 @@ class _NetworkingSessionViewState extends State<NetworkingSessionView> {
   // RESOLVE CHAT SENDER NAME
   // ==========================================================
 
-  Future<String> _resolveChatSenderName(String userId) async {
+  Future<
+    String
+  >
+  _resolveChatSenderName(
+    String userId,
+  ) async {
     final normalizedUserId = userId.trim();
 
     if (normalizedUserId.isEmpty) {
@@ -350,24 +658,36 @@ class _NetworkingSessionViewState extends State<NetworkingSessionView> {
 
     final cached = _chatSenderNameCache[normalizedUserId];
 
-    if (cached != null && cached.isNotEmpty) {
+    if (cached !=
+            null &&
+        cached.isNotEmpty) {
       return cached;
     }
 
     try {
       final profile = await _supabase
-          .from('profiles')
-          .select('id, artist_name, name, username')
-          .eq('id', normalizedUserId)
+          .from(
+            'profiles',
+          )
+          .select(
+            'id, artist_name, name, username',
+          )
+          .eq(
+            'id',
+            normalizedUserId,
+          )
           .maybeSingle();
 
-      if (profile == null) {
+      if (profile ==
+          null) {
         return _globalChatController.senderName;
       }
 
       final artistName = profile['artist_name']?.toString().trim();
 
-      if (artistName != null && artistName.isNotEmpty) {
+      if (artistName !=
+              null &&
+          artistName.isNotEmpty) {
         _chatSenderNameCache[normalizedUserId] = artistName;
 
         return artistName;
@@ -375,37 +695,50 @@ class _NetworkingSessionViewState extends State<NetworkingSessionView> {
 
       final name = profile['name']?.toString().trim();
 
-      if (name != null && name.isNotEmpty) {
+      if (name !=
+              null &&
+          name.isNotEmpty) {
         _chatSenderNameCache[normalizedUserId] = name;
 
         return name;
       }
 
       final username = profile['username']?.toString().trim().replaceFirst(
-        RegExp(r'^@+'),
+        RegExp(
+          r'^@+',
+        ),
         '',
       );
 
-      if (username != null && username.isNotEmpty) {
+      if (username !=
+              null &&
+          username.isNotEmpty) {
         final usernameLabel = '@$username';
 
         _chatSenderNameCache[normalizedUserId] = usernameLabel;
 
         return usernameLabel;
       }
-    } catch (error, stackTrace) {
+    } catch (
+      error,
+      stackTrace
+    ) {
       debugPrint(
         '[NETWORKING SESSION] '
         'Erro ao buscar nome do remetente do chat: '
         '$error',
       );
 
-      debugPrint('$stackTrace');
+      debugPrint(
+        '$stackTrace',
+      );
     }
 
     final controllerName = _globalChatController.senderName.trim();
 
-    if (controllerName.isNotEmpty && controllerName != 'Membro') {
+    if (controllerName.isNotEmpty &&
+        controllerName !=
+            'Membro') {
       return controllerName;
     }
 
@@ -416,19 +749,31 @@ class _NetworkingSessionViewState extends State<NetworkingSessionView> {
   // OPEN CHAT
   // ==========================================================
 
-  Future<void> _openChatPage() async {
+  Future<
+    void
+  >
+  _openChatPage() async {
     if (!mounted) {
       return;
     }
 
     _globalChatController.markAsRead();
 
-    _globalChatController.setChatVisible(true);
+    _globalChatController.setChatVisible(
+      true,
+    );
 
     try {
-      await Navigator.of(context).push(
+      await Navigator.of(
+        context,
+      ).push(
         MaterialPageRoute(
-          builder: (_) => ChatView(projectId: widget.projectId),
+          builder:
+              (
+                _,
+              ) => ChatView(
+                projectId: widget.projectId,
+              ),
         ),
       );
     } finally {
@@ -436,7 +781,9 @@ class _NetworkingSessionViewState extends State<NetworkingSessionView> {
         return;
       }
 
-      _globalChatController.setChatVisible(false);
+      _globalChatController.setChatVisible(
+        false,
+      );
     }
   }
 
@@ -444,16 +791,25 @@ class _NetworkingSessionViewState extends State<NetworkingSessionView> {
   // HEADER
   // ==========================================================
 
-  Widget _buildHeader(String projectHash) {
+  Widget _buildHeader(
+    String projectHash,
+  ) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(
+        16,
+      ),
 
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [Colors.purple.shade900, Colors.black],
+          colors: [
+            Colors.purple.shade900,
+            Colors.black,
+          ],
         ),
 
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(
+          20,
+        ),
       ),
 
       child: Row(
@@ -461,10 +817,15 @@ class _NetworkingSessionViewState extends State<NetworkingSessionView> {
           const CircleAvatar(
             backgroundColor: Colors.white24,
 
-            child: Icon(Icons.music_note, color: Colors.white),
+            child: Icon(
+              Icons.music_note,
+              color: Colors.white,
+            ),
           ),
 
-          const SizedBox(width: 15),
+          const SizedBox(
+            width: 15,
+          ),
 
           Expanded(
             child: Column(
@@ -484,7 +845,10 @@ class _NetworkingSessionViewState extends State<NetworkingSessionView> {
                 Text(
                   'Hash: #$projectHash',
 
-                  style: const TextStyle(color: Colors.white54, fontSize: 12),
+                  style: const TextStyle(
+                    color: Colors.white54,
+                    fontSize: 12,
+                  ),
                 ),
               ],
             ),
@@ -501,70 +865,118 @@ class _NetworkingSessionViewState extends State<NetworkingSessionView> {
   Widget _buildGlobalCallBanner() {
     final currentUserId = _supabase.auth.currentUser?.id.trim();
 
-    if (currentUserId == null || currentUserId.isEmpty) {
+    if (currentUserId ==
+            null ||
+        currentUserId.isEmpty) {
       return const SizedBox.shrink();
     }
 
-    return StreamBuilder<List<Map<String, dynamic>>>(
+    return StreamBuilder<
+      List<
+        Map<
+          String,
+          dynamic
+        >
+      >
+    >(
       stream: _supabase
-          .from('project_calls')
-          .stream(primaryKey: ['id'])
-          .order('created_at', ascending: false),
+          .from(
+            'project_calls',
+          )
+          .stream(
+            primaryKey: [
+              'id',
+            ],
+          )
+          .order(
+            'created_at',
+            ascending: false,
+          ),
 
-      builder: (context, snapshot) {
-        final rows = snapshot.data ?? const <Map<String, dynamic>>[];
+      builder:
+          (
+            context,
+            snapshot,
+          ) {
+            final rows =
+                snapshot.data ??
+                const <
+                  Map<
+                    String,
+                    dynamic
+                  >
+                >[];
 
-        Map<String, dynamic>? activeRow;
+            Map<
+              String,
+              dynamic
+            >?
+            activeRow;
 
-        for (final row in rows) {
-          // ==================================================
-          // MESMO PROJETO
-          // ==================================================
+            for (final row in rows) {
+              // ==================================================
+              // MESMO PROJETO
+              // ==================================================
 
-          final rowProjectId = row['project_id']?.toString().trim();
+              final rowProjectId = row['project_id']?.toString().trim();
 
-          if (rowProjectId != widget.projectId.trim()) {
-            continue;
-          }
+              if (rowProjectId !=
+                  widget.projectId.trim()) {
+                continue;
+              }
 
-          // ==================================================
-          // STATUS
-          // ==================================================
+              // ==================================================
+              // STATUS
+              // ==================================================
 
-          final status = row['status']?.toString().trim();
+              final status = row['status']?.toString().trim();
 
-          if (status != 'ringing' && status != 'active') {
-            continue;
-          }
+              if (status !=
+                      'ringing' &&
+                  status !=
+                      'active') {
+                continue;
+              }
 
-          // ==================================================
-          // PARTICIPANTES
-          // ==================================================
+              // ==================================================
+              // PARTICIPANTES
+              // ==================================================
 
-          final createdBy = row['created_by']?.toString().trim();
+              final createdBy = row['created_by']?.toString().trim();
 
-          final targetUserId = row['target_user_id']?.toString().trim();
+              final targetUserId = row['target_user_id']?.toString().trim();
 
-          final directlyInvolved =
-              createdBy == currentUserId || targetUserId == currentUserId;
+              final directlyInvolved =
+                  createdBy ==
+                      currentUserId ||
+                  targetUserId ==
+                      currentUserId;
 
-          final groupCall = targetUserId == null || targetUserId.isEmpty;
+              final groupCall =
+                  targetUserId ==
+                      null ||
+                  targetUserId.isEmpty;
 
-          if (!directlyInvolved && !groupCall) {
-            continue;
-          }
+              if (!directlyInvolved &&
+                  !groupCall) {
+                continue;
+              }
 
-          activeRow = row;
+              activeRow = row;
 
-          break;
-        }
+              break;
+            }
 
-        if (activeRow == null) {
-          return const SizedBox.shrink();
-        }
+            if (activeRow ==
+                null) {
+              return const SizedBox.shrink();
+            }
 
-        return _buildGlobalCallBannerFromRow(activeRow, currentUserId);
-      },
+            return _buildGlobalCallBannerFromRow(
+              activeRow,
+              currentUserId,
+            );
+          },
     );
   }
 
@@ -573,25 +985,38 @@ class _NetworkingSessionViewState extends State<NetworkingSessionView> {
   // ==========================================================
 
   Widget _buildGlobalCallBannerFromRow(
-    Map<String, dynamic> row,
+    Map<
+      String,
+      dynamic
+    >
+    row,
     String currentUserId,
   ) {
-    final callId = row['id']?.toString().trim() ?? '';
+    final callId =
+        row['id']?.toString().trim() ??
+        '';
 
-    final createdBy = row['created_by']?.toString().trim() ?? '';
+    final createdBy =
+        row['created_by']?.toString().trim() ??
+        '';
 
     final targetUserId = row['target_user_id']?.toString().trim();
 
-    final status = row['status']?.toString().trim() ?? '';
+    final status =
+        row['status']?.toString().trim() ??
+        '';
 
     // ========================================================
     // MEDIA TYPE
     // ========================================================
 
     final mediaTypeValue =
-        row['media_type']?.toString().trim().toLowerCase() ?? 'audio';
+        row['media_type']?.toString().trim().toLowerCase() ??
+        'audio';
 
-    final bannerMediaType = mediaTypeValue == 'video'
+    final bannerMediaType =
+        mediaTypeValue ==
+            'video'
         ? GlobalCallMediaType.video
         : GlobalCallMediaType.audio;
 
@@ -600,15 +1025,25 @@ class _NetworkingSessionViewState extends State<NetworkingSessionView> {
     // ========================================================
 
     final incoming =
-        status == 'ringing' &&
-        createdBy != currentUserId &&
-        (targetUserId == currentUserId ||
-            targetUserId == null ||
+        status ==
+            'ringing' &&
+        createdBy !=
+            currentUserId &&
+        (targetUserId ==
+                currentUserId ||
+            targetUserId ==
+                null ||
             targetUserId.isEmpty);
 
-    final outgoing = status == 'ringing' && createdBy == currentUserId;
+    final outgoing =
+        status ==
+            'ringing' &&
+        createdBy ==
+            currentUserId;
 
-    final active = status == 'active';
+    final active =
+        status ==
+        'active';
 
     // ========================================================
     // BANNER STATE
@@ -616,7 +1051,9 @@ class _NetworkingSessionViewState extends State<NetworkingSessionView> {
 
     GlobalCallBannerState state = GlobalCallBannerState.hidden;
 
-    if (_isGlobalCallActionProcessing && _globalCallAction == 'end') {
+    if (_isGlobalCallActionProcessing &&
+        _globalCallAction ==
+            'end') {
       state = GlobalCallBannerState.ending;
     } else if (incoming) {
       state = GlobalCallBannerState.incoming;
@@ -630,11 +1067,19 @@ class _NetworkingSessionViewState extends State<NetworkingSessionView> {
     // DURATION
     // ========================================================
 
-    final startedAt = DateTime.tryParse(row['started_at']?.toString() ?? '');
+    final startedAt = DateTime.tryParse(
+      row['started_at']?.toString() ??
+          '',
+    );
 
-    final duration = startedAt == null || !active
+    final duration =
+        startedAt ==
+                null ||
+            !active
         ? null
-        : DateTime.now().toUtc().difference(startedAt.toUtc());
+        : DateTime.now().toUtc().difference(
+            startedAt.toUtc(),
+          );
 
     // ========================================================
     // REMOTE PARTICIPANT
@@ -652,59 +1097,83 @@ class _NetworkingSessionViewState extends State<NetworkingSessionView> {
     // NAME
     // ========================================================
 
-    return FutureBuilder<String>(
-      future: _resolveCallParticipantName(participantUserId),
+    return FutureBuilder<
+      String
+    >(
+      future: _resolveCallParticipantName(
+        participantUserId,
+      ),
 
-      builder: (context, snapshot) {
-        final participantName =
-            snapshot.data ??
-            _callParticipantNameCache[participantUserId] ??
-            'Membro da sessão';
+      builder:
+          (
+            context,
+            snapshot,
+          ) {
+            final participantName =
+                snapshot.data ??
+                _callParticipantNameCache[participantUserId] ??
+                'Membro da sessão';
 
-        return GlobalCallBanner(
-          state: state,
+            return GlobalCallBanner(
+              state: state,
 
-          mediaType: bannerMediaType,
+              mediaType: bannerMediaType,
 
-          participantName: participantName,
+              participantName: participantName,
 
-          duration: duration,
+              duration: duration,
 
-          // ================================================
-          // OPEN FULL CALL
-          // ================================================
-          onOpen: () {
-            _openCallPage(participantName: participantName);
+              // ================================================
+              // OPEN FULL CALL
+              // ================================================
+              onOpen: () {
+                _openCallPage(
+                  participantName: participantName,
+                );
+              },
+
+              // ================================================
+              // ACCEPT
+              // ================================================
+              onAccept:
+                  incoming &&
+                      callId.isNotEmpty
+                  ? () {
+                      _acceptGlobalCall(
+                        callId,
+                        participantName,
+                      );
+                    }
+                  : null,
+
+              // ================================================
+              // REJECT
+              // ================================================
+              onReject:
+                  incoming &&
+                      callId.isNotEmpty
+                  ? () {
+                      _rejectGlobalCall(
+                        callId,
+                      );
+                    }
+                  : null,
+
+              // ================================================
+              // END
+              // ================================================
+              onEnd:
+                  (outgoing ||
+                          active) &&
+                      callId.isNotEmpty
+                  ? () {
+                      _endGlobalCall(
+                        callId,
+                      );
+                    }
+                  : null,
+            );
           },
-
-          // ================================================
-          // ACCEPT
-          // ================================================
-          onAccept: incoming && callId.isNotEmpty
-              ? () {
-                  _acceptGlobalCall(callId, participantName);
-                }
-              : null,
-
-          // ================================================
-          // REJECT
-          // ================================================
-          onReject: incoming && callId.isNotEmpty
-              ? () {
-                  _rejectGlobalCall(callId);
-                }
-              : null,
-
-          // ================================================
-          // END
-          // ================================================
-          onEnd: (outgoing || active) && callId.isNotEmpty
-              ? () {
-                  _endGlobalCall(callId);
-                }
-              : null,
-        );
-      },
     );
   }
 
@@ -721,8 +1190,11 @@ class _NetworkingSessionViewState extends State<NetworkingSessionView> {
 
     final normalizedTargetUserId = targetUserId?.trim();
 
-    if (normalizedCreatedBy == currentUserId) {
-      if (normalizedTargetUserId != null && normalizedTargetUserId.isNotEmpty) {
+    if (normalizedCreatedBy ==
+        currentUserId) {
+      if (normalizedTargetUserId !=
+              null &&
+          normalizedTargetUserId.isNotEmpty) {
         return normalizedTargetUserId;
       }
 
@@ -736,7 +1208,12 @@ class _NetworkingSessionViewState extends State<NetworkingSessionView> {
   // RESOLVE PARTICIPANT NAME
   // ==========================================================
 
-  Future<String> _resolveCallParticipantName(String userId) async {
+  Future<
+    String
+  >
+  _resolveCallParticipantName(
+    String userId,
+  ) async {
     final normalizedUserId = userId.trim();
 
     if (normalizedUserId.isEmpty) {
@@ -745,18 +1222,28 @@ class _NetworkingSessionViewState extends State<NetworkingSessionView> {
 
     final cached = _callParticipantNameCache[normalizedUserId];
 
-    if (cached != null && cached.isNotEmpty) {
+    if (cached !=
+            null &&
+        cached.isNotEmpty) {
       return cached;
     }
 
     try {
       final profile = await _supabase
-          .from('profiles')
-          .select('id, artist_name, name, username')
-          .eq('id', normalizedUserId)
+          .from(
+            'profiles',
+          )
+          .select(
+            'id, artist_name, name, username',
+          )
+          .eq(
+            'id',
+            normalizedUserId,
+          )
           .maybeSingle();
 
-      if (profile == null) {
+      if (profile ==
+          null) {
         return 'Membro da sessão';
       }
 
@@ -766,7 +1253,9 @@ class _NetworkingSessionViewState extends State<NetworkingSessionView> {
 
       final artistName = profile['artist_name']?.toString().trim();
 
-      if (artistName != null && artistName.isNotEmpty) {
+      if (artistName !=
+              null &&
+          artistName.isNotEmpty) {
         _callParticipantNameCache[normalizedUserId] = artistName;
 
         return artistName;
@@ -778,7 +1267,9 @@ class _NetworkingSessionViewState extends State<NetworkingSessionView> {
 
       final name = profile['name']?.toString().trim();
 
-      if (name != null && name.isNotEmpty) {
+      if (name !=
+              null &&
+          name.isNotEmpty) {
         _callParticipantNameCache[normalizedUserId] = name;
 
         return name;
@@ -789,25 +1280,34 @@ class _NetworkingSessionViewState extends State<NetworkingSessionView> {
       // ======================================================
 
       final username = profile['username']?.toString().trim().replaceFirst(
-        RegExp(r'^@+'),
+        RegExp(
+          r'^@+',
+        ),
         '',
       );
 
-      if (username != null && username.isNotEmpty) {
+      if (username !=
+              null &&
+          username.isNotEmpty) {
         final usernameLabel = '@$username';
 
         _callParticipantNameCache[normalizedUserId] = usernameLabel;
 
         return usernameLabel;
       }
-    } catch (error, stackTrace) {
+    } catch (
+      error,
+      stackTrace
+    ) {
       debugPrint(
         '[NETWORKING SESSION] '
         'Erro ao buscar nome do participante: '
         '$error',
       );
 
-      debugPrint('$stackTrace');
+      debugPrint(
+        '$stackTrace',
+      );
     }
 
     return 'Membro da sessão';
@@ -817,18 +1317,28 @@ class _NetworkingSessionViewState extends State<NetworkingSessionView> {
   // OPEN CALL
   // ==========================================================
 
-  Future<void> _openCallPage({String? participantName}) async {
+  Future<
+    void
+  >
+  _openCallPage({
+    String? participantName,
+  }) async {
     if (!mounted) {
       return;
     }
 
-    await Navigator.of(context).push(
+    await Navigator.of(
+      context,
+    ).push(
       MaterialPageRoute(
-        builder: (_) => CallView(
-          projectId: widget.projectId,
+        builder:
+            (
+              _,
+            ) => CallView(
+              projectId: widget.projectId,
 
-          participantName: participantName,
-        ),
+              participantName: participantName,
+            ),
       ),
     );
   }
@@ -837,31 +1347,52 @@ class _NetworkingSessionViewState extends State<NetworkingSessionView> {
   // ACCEPT GLOBAL CALL
   // ==========================================================
 
-  Future<void> _acceptGlobalCall(String callId, String participantName) async {
+  Future<
+    void
+  >
+  _acceptGlobalCall(
+    String callId,
+    String participantName,
+  ) async {
     if (_isGlobalCallActionProcessing) {
       return;
     }
 
-    _setGlobalCallProcessing(true, 'accept');
+    _setGlobalCallProcessing(
+      true,
+      'accept',
+    );
 
     try {
-      await _callRepository.acceptCall(callId: callId);
+      await _callRepository.acceptCall(
+        callId: callId,
+      );
 
       if (!mounted) {
         return;
       }
 
-      await _openCallPage(participantName: participantName);
-    } catch (error, stackTrace) {
+      await _openCallPage(
+        participantName: participantName,
+      );
+    } catch (
+      error,
+      stackTrace
+    ) {
       debugPrint(
         '[NETWORKING SESSION] '
         'Erro ao aceitar chamada: '
         '$error',
       );
 
-      debugPrint('$stackTrace');
+      debugPrint(
+        '$stackTrace',
+      );
     } finally {
-      _setGlobalCallProcessing(false, null);
+      _setGlobalCallProcessing(
+        false,
+        null,
+      );
     }
   }
 
@@ -869,25 +1400,43 @@ class _NetworkingSessionViewState extends State<NetworkingSessionView> {
   // REJECT GLOBAL CALL
   // ==========================================================
 
-  Future<void> _rejectGlobalCall(String callId) async {
+  Future<
+    void
+  >
+  _rejectGlobalCall(
+    String callId,
+  ) async {
     if (_isGlobalCallActionProcessing) {
       return;
     }
 
-    _setGlobalCallProcessing(true, 'reject');
+    _setGlobalCallProcessing(
+      true,
+      'reject',
+    );
 
     try {
-      await _callRepository.rejectCall(callId: callId);
-    } catch (error, stackTrace) {
+      await _callRepository.rejectCall(
+        callId: callId,
+      );
+    } catch (
+      error,
+      stackTrace
+    ) {
       debugPrint(
         '[NETWORKING SESSION] '
         'Erro ao recusar chamada: '
         '$error',
       );
 
-      debugPrint('$stackTrace');
+      debugPrint(
+        '$stackTrace',
+      );
     } finally {
-      _setGlobalCallProcessing(false, null);
+      _setGlobalCallProcessing(
+        false,
+        null,
+      );
     }
   }
 
@@ -895,25 +1444,43 @@ class _NetworkingSessionViewState extends State<NetworkingSessionView> {
   // END GLOBAL CALL
   // ==========================================================
 
-  Future<void> _endGlobalCall(String callId) async {
+  Future<
+    void
+  >
+  _endGlobalCall(
+    String callId,
+  ) async {
     if (_isGlobalCallActionProcessing) {
       return;
     }
 
-    _setGlobalCallProcessing(true, 'end');
+    _setGlobalCallProcessing(
+      true,
+      'end',
+    );
 
     try {
-      await _callRepository.endCall(callId: callId);
-    } catch (error, stackTrace) {
+      await _callRepository.endCall(
+        callId: callId,
+      );
+    } catch (
+      error,
+      stackTrace
+    ) {
       debugPrint(
         '[NETWORKING SESSION] '
         'Erro ao encerrar chamada: '
         '$error',
       );
 
-      debugPrint('$stackTrace');
+      debugPrint(
+        '$stackTrace',
+      );
     } finally {
-      _setGlobalCallProcessing(false, null);
+      _setGlobalCallProcessing(
+        false,
+        null,
+      );
     }
   }
 
@@ -921,24 +1488,39 @@ class _NetworkingSessionViewState extends State<NetworkingSessionView> {
   // PROCESSING
   // ==========================================================
 
-  void _setGlobalCallProcessing(bool value, String? action) {
+  void _setGlobalCallProcessing(
+    bool value,
+    String? action,
+  ) {
     if (!mounted) {
       return;
     }
 
-    setState(() {
-      _isGlobalCallActionProcessing = value;
+    setState(
+      () {
+        _isGlobalCallActionProcessing = value;
 
-      _globalCallAction = action;
-    });
+        _globalCallAction = action;
+      },
+    );
   }
 
   // ==========================================================
   // OPEN PAGE
   // ==========================================================
 
-  void _openPage(Widget page) {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => page));
+  void _openPage(
+    Widget page,
+  ) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder:
+            (
+              _,
+            ) => page,
+      ),
+    );
   }
 
   // ==========================================================
@@ -957,25 +1539,42 @@ class _NetworkingSessionViewState extends State<NetworkingSessionView> {
       child: Column(
         children: [
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(
+              12,
+            ),
 
             decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
+              color: color.withValues(
+                alpha: 0.1,
+              ),
 
               shape: BoxShape.circle,
 
-              border: Border.all(color: color.withValues(alpha: 0.3)),
+              border: Border.all(
+                color: color.withValues(
+                  alpha: 0.3,
+                ),
+              ),
             ),
 
-            child: Icon(icon, size: 22, color: color),
+            child: Icon(
+              icon,
+              size: 22,
+              color: color,
+            ),
           ),
 
-          const SizedBox(height: 8),
+          const SizedBox(
+            height: 8,
+          ),
 
           Text(
             label,
 
-            style: const TextStyle(color: Colors.white70, fontSize: 11),
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 11,
+            ),
           ),
         ],
       ),
@@ -988,6 +1587,8 @@ class _NetworkingSessionViewState extends State<NetworkingSessionView> {
 
   @override
   void dispose() {
+    _projectInvitationController.dispose();
+
     _globalChatController.dispose();
 
     _controller.dispose();

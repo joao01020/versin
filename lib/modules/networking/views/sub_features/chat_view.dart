@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../controllers/project_chat_controller.dart';
 import '../../data/models/project_message_model.dart';
@@ -34,6 +35,34 @@ class _ChatViewState
   // ==========================================================
 
   late final ProjectChatController _controller;
+
+  // ==========================================================
+  // SUPABASE
+  // ==========================================================
+
+  final SupabaseClient _supabase = Supabase.instance.client;
+
+  // ==========================================================
+  // CACHE DE NOMES
+  // ==========================================================
+
+  final Map<
+    String,
+    String
+  >
+  _memberNameCache =
+      <
+        String,
+        String
+      >{};
+
+  final Set<
+    String
+  >
+  _memberNameLoading =
+      <
+        String
+      >{};
 
   // ==========================================================
   // AUDIO RECORDER
@@ -84,6 +113,8 @@ class _ChatViewState
     );
 
     _controller.init();
+
+    _resolveVisibleMemberNames();
   }
 
   // ==========================================================
@@ -95,6 +126,8 @@ class _ChatViewState
       return;
     }
 
+    _resolveVisibleMemberNames();
+
     final currentCount = _controller.messages.length;
 
     if (currentCount >
@@ -103,6 +136,191 @@ class _ChatViewState
 
       _scrollToBottom();
     }
+  }
+
+  // ==========================================================
+  // RESOLVER NOMES DOS MEMBROS
+  // ==========================================================
+
+  void _resolveVisibleMemberNames() {
+    for (final message in _controller.messages) {
+      final senderId = message.senderId.trim();
+
+      if (senderId.isEmpty) {
+        continue;
+      }
+
+      if (_memberNameCache.containsKey(
+        senderId,
+      )) {
+        continue;
+      }
+
+      if (_memberNameLoading.contains(
+        senderId,
+      )) {
+        continue;
+      }
+
+      _loadMemberName(
+        senderId,
+      );
+    }
+  }
+
+  // ==========================================================
+  // CARREGAR NOME DO MEMBRO
+  // ==========================================================
+
+  Future<
+    void
+  >
+  _loadMemberName(
+    String userId,
+  ) async {
+    final normalizedUserId = userId.trim();
+
+    if (normalizedUserId.isEmpty) {
+      return;
+    }
+
+    if (_memberNameCache.containsKey(
+      normalizedUserId,
+    )) {
+      return;
+    }
+
+    if (_memberNameLoading.contains(
+      normalizedUserId,
+    )) {
+      return;
+    }
+
+    _memberNameLoading.add(
+      normalizedUserId,
+    );
+
+    try {
+      final profile = await _supabase
+          .from(
+            'profiles',
+          )
+          .select(
+            'id, artist_name, name, username',
+          )
+          .eq(
+            'id',
+            normalizedUserId,
+          )
+          .maybeSingle();
+
+      final resolvedName = _resolveProfileDisplayName(
+        profile,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(
+        () {
+          _memberNameCache[normalizedUserId] = resolvedName;
+        },
+      );
+    } catch (
+      error,
+      stackTrace
+    ) {
+      debugPrint(
+        '[CHAT VIEW] '
+        'Erro ao buscar perfil do membro '
+        '$normalizedUserId: '
+        '$error',
+      );
+
+      debugPrint(
+        '$stackTrace',
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(
+        () {
+          _memberNameCache[normalizedUserId] = 'Membro';
+        },
+      );
+    } finally {
+      _memberNameLoading.remove(
+        normalizedUserId,
+      );
+    }
+  }
+
+  // ==========================================================
+  // NOME DO PERFIL
+  // ==========================================================
+
+  String _resolveProfileDisplayName(
+    Map<
+      String,
+      dynamic
+    >?
+    profile,
+  ) {
+    if (profile ==
+        null) {
+      return 'Membro';
+    }
+
+    final artistName = profile['artist_name']?.toString().trim();
+
+    if (artistName !=
+            null &&
+        artistName.isNotEmpty) {
+      return artistName;
+    }
+
+    final name = profile['name']?.toString().trim();
+
+    if (name !=
+            null &&
+        name.isNotEmpty) {
+      return name;
+    }
+
+    final username = profile['username']?.toString().trim().replaceFirst(
+      RegExp(
+        r'^@+',
+      ),
+      '',
+    );
+
+    if (username !=
+            null &&
+        username.isNotEmpty) {
+      return '@$username';
+    }
+
+    return 'Membro';
+  }
+
+  // ==========================================================
+  // NOME DA MENSAGEM
+  // ==========================================================
+
+  String _getMessageSenderName(
+    ProjectMessageModel message,
+  ) {
+    final senderId = message.senderId.trim();
+
+    if (senderId.isEmpty) {
+      return 'Membro';
+    }
+
+    return _memberNameCache[senderId] ??
+        'Membro';
   }
 
   // ==========================================================
@@ -788,9 +1006,11 @@ class _ChatViewState
               // AUTOR
               // ==============================================
               if (!isMine) ...[
-                const Text(
-                  'Membro',
-                  style: TextStyle(
+                Text(
+                  _getMessageSenderName(
+                    message,
+                  ),
+                  style: const TextStyle(
                     color: Color(
                       0xFFA78BFA,
                     ),

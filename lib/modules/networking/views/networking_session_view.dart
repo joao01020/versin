@@ -4,6 +4,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../call/data/repositories/project_call_repository_impl.dart';
 import '../call/views/call_view.dart';
 import '../call/views/widgets/global_call_banner.dart';
+import '../controllers/global_chat_controller.dart';
+import '../widgets/global_chat_banner.dart';
 
 import '../controllers/networking_controller.dart';
 
@@ -19,8 +21,12 @@ import 'sub_features/tasks_view.dart';
 //
 // Tela principal da Studio Session.
 //
-// Agora também exibe o GlobalCallBanner dentro da própria
-// sessão.
+// Agora também exibe:
+//
+// - GlobalCallBanner;
+// - GlobalChatBanner.
+//
+// dentro da própria sessão.
 //
 // Isso é necessário porque NetworkingSessionView é aberta por
 // Navigator.push().
@@ -77,6 +83,8 @@ class _NetworkingSessionViewState
 
   late final NetworkingController _controller;
 
+  late final GlobalChatController _globalChatController;
+
   // ==========================================================
   // SUPABASE
   // ==========================================================
@@ -122,6 +130,10 @@ class _NetworkingSessionViewState
     _controller = NetworkingController(
       projectId: widget.projectId,
     )..initSession();
+
+    _globalChatController = GlobalChatController(
+      projectId: widget.projectId,
+    )..init();
   }
 
   // ==========================================================
@@ -140,7 +152,6 @@ class _NetworkingSessionViewState
       appBar: AppBar(
         title: const Text(
           'Studio Session',
-
           style: TextStyle(
             fontSize: 16,
           ),
@@ -212,11 +223,7 @@ class _NetworkingSessionViewState
 
                                 Colors.blue,
 
-                                () => _openPage(
-                                  ChatView(
-                                    projectId: widget.projectId,
-                                  ),
-                                ),
+                                _openChatPage,
                               ),
 
                               _buildSmallAction(
@@ -322,11 +329,97 @@ class _NetworkingSessionViewState
 
             right: 0,
 
-            child: _buildGlobalCallBanner(),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+
+              children: [
+                _buildGlobalCallBanner(),
+
+                _buildGlobalChatBanner(),
+              ],
+            ),
           ),
         ],
       ),
     );
+  }
+
+  // ==========================================================
+  // GLOBAL CHAT BANNER
+  // ==========================================================
+
+  Widget _buildGlobalChatBanner() {
+    return ListenableBuilder(
+      listenable: _globalChatController,
+
+      builder:
+          (
+            context,
+            _,
+          ) {
+            if (!_globalChatController.hasNotification) {
+              return const SizedBox.shrink();
+            }
+
+            return GlobalChatBanner(
+              type: _globalChatController.latestIsAudio
+                  ? GlobalChatBannerType.audio
+                  : GlobalChatBannerType.message,
+
+              senderName: _globalChatController.senderName,
+
+              preview: _globalChatController.preview,
+
+              unreadCount: _globalChatController.unreadCount,
+
+              onOpen: _openChatPage,
+
+              onDismiss: _globalChatController.dismissBanner,
+            );
+          },
+    );
+  }
+
+  // ==========================================================
+  // OPEN CHAT
+  // ==========================================================
+
+  Future<
+    void
+  >
+  _openChatPage() async {
+    if (!mounted) {
+      return;
+    }
+
+    _globalChatController.markAsRead();
+
+    _globalChatController.setChatVisible(
+      true,
+    );
+
+    try {
+      await Navigator.of(
+        context,
+      ).push(
+        MaterialPageRoute(
+          builder:
+              (
+                _,
+              ) => ChatView(
+                projectId: widget.projectId,
+              ),
+        ),
+      );
+    } finally {
+      if (!_globalChatController.chatVisible) {
+        return;
+      }
+
+      _globalChatController.setChatVisible(
+        false,
+      );
+    }
   }
 
   // ==========================================================
@@ -345,7 +438,6 @@ class _NetworkingSessionViewState
         gradient: LinearGradient(
           colors: [
             Colors.purple.shade900,
-
             Colors.black,
           ],
         ),
@@ -362,7 +454,6 @@ class _NetworkingSessionViewState
 
             child: Icon(
               Icons.music_note,
-
               color: Colors.white,
             ),
           ),
@@ -391,7 +482,6 @@ class _NetworkingSessionViewState
 
                   style: const TextStyle(
                     color: Colors.white54,
-
                     fontSize: 12,
                   ),
                 ),
@@ -1059,7 +1149,6 @@ class _NetworkingSessionViewState
   ) {
     Navigator.push(
       context,
-
       MaterialPageRoute(
         builder:
             (
@@ -1105,9 +1194,7 @@ class _NetworkingSessionViewState
 
             child: Icon(
               icon,
-
               size: 22,
-
               color: color,
             ),
           ),
@@ -1121,7 +1208,6 @@ class _NetworkingSessionViewState
 
             style: const TextStyle(
               color: Colors.white70,
-
               fontSize: 11,
             ),
           ),
@@ -1136,6 +1222,8 @@ class _NetworkingSessionViewState
 
   @override
   void dispose() {
+    _globalChatController.dispose();
+
     _controller.dispose();
 
     super.dispose();

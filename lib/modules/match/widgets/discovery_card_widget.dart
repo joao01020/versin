@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'package:versin/core/utils/network_image_url_helper.dart';
+
 import '../controllers/match_controllers.dart';
 import '../models/match_user_entity.dart';
 import 'action_button_widget.dart';
@@ -143,6 +145,8 @@ class _DiscoveryCardWidgetState
   bool _isWaitingForNetworking = false;
 
   bool _isOpeningDemo = false;
+
+  static const String _fallbackShowcaseUrl = 'https://images.unsplash.com/photo-1514525253361-bee8718a7439?q=80&w=500';
 
   // ============================================================
   // DID UPDATE WIDGET
@@ -405,32 +409,7 @@ class _DiscoveryCardWidgetState
             // BACKGROUND
             // ==================================================
             Positioned.fill(
-              child: Image.network(
-                widget.user.showcaseMediaUrl.isNotEmpty
-                    ? widget.user.showcaseMediaUrl
-                    : 'https://images.unsplash.com/photo-1514525253361-bee8718a7439?q=80&w=500',
-
-                fit: BoxFit.cover,
-
-                errorBuilder:
-                    (
-                      context,
-                      error,
-                      stackTrace,
-                    ) {
-                      return Container(
-                        color: Colors.black45,
-
-                        child: const Icon(
-                          Icons.music_note,
-
-                          color: Colors.white24,
-
-                          size: 50,
-                        ),
-                      );
-                    },
-              ),
+              child: _buildShowcaseBackground(),
             ),
 
             // ==================================================
@@ -660,6 +639,41 @@ class _DiscoveryCardWidgetState
           ],
         ),
       ),
+    );
+  }
+
+  // ============================================================
+  // SHOWCASE BACKGROUND
+  // ============================================================
+
+  Widget _buildShowcaseBackground() {
+    final showcaseUrl = NetworkImageUrlHelper.validUrlOrNull(
+      widget.user.showcaseMediaUrl,
+    );
+
+    final imageUrl =
+        showcaseUrl ??
+        _fallbackShowcaseUrl;
+
+    return Image.network(
+      imageUrl,
+      fit: BoxFit.cover,
+      errorBuilder:
+          (
+            context,
+            error,
+            stackTrace,
+          ) {
+            return Container(
+              color: Colors.black45,
+              alignment: Alignment.center,
+              child: const Icon(
+                Icons.music_note,
+                color: Colors.white24,
+                size: 50,
+              ),
+            );
+          },
     );
   }
 

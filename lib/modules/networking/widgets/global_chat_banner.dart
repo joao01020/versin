@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 // ============================================================
@@ -13,60 +15,26 @@ enum GlobalChatBannerType {
 // GLOBAL CHAT BANNER
 // ============================================================
 //
-// Banner persistente de novas mensagens.
+// Banner temporário de novas mensagens.
 //
-// Exemplos:
+// Comportamento:
 //
-// TEXTO:
+// - Nova mensagem chega;
+// - banner aparece;
+// - permanece visível por alguns segundos;
+// - desaparece automaticamente;
+// - uma nova mensagem reinicia o tempo;
 //
-// ┌─────────────────────────────────────────────┐
-// │ 💬 Maria                              3     │
-// │ Terminei a base da música                  │
-// │                              ABRIR      ×   │
-// └─────────────────────────────────────────────┘
+// Também continua permitindo:
 //
-// ÁUDIO:
-//
-// ┌─────────────────────────────────────────────┐
-// │ 🎙 Maria                                    │
-// │ Enviou uma mensagem de áudio               │
-// │                              ABRIR      ×   │
-// └─────────────────────────────────────────────┘
-//
-// O widget NÃO conhece:
-//
-// - Supabase;
-// - Realtime;
-// - ProjectChatService;
-// - GlobalChatController.
-//
-// Ele apenas recebe os dados prontos.
+// - ABRIR;
+// - fechar manualmente no X.
 //
 // ============================================================
 
 class GlobalChatBanner
     extends
-        StatelessWidget {
-  // ==========================================================
-  // COLORS
-  // ==========================================================
-
-  static const Color _background = Color(
-    0xFF121217,
-  );
-
-  static const Color _surface = Color(
-    0xFF191920,
-  );
-
-  static const Color _purple = Color(
-    0xFF8B5CF6,
-  );
-
-  static const Color _green = Color(
-    0xFF34D399,
-  );
-
+        StatefulWidget {
   // ==========================================================
   // DATA
   // ==========================================================
@@ -88,6 +56,12 @@ class GlobalChatBanner
   final VoidCallback? onDismiss;
 
   // ==========================================================
+  // AUTO DISMISS
+  // ==========================================================
+
+  final Duration displayDuration;
+
+  // ==========================================================
   // CONSTRUCTOR
   // ==========================================================
 
@@ -99,7 +73,151 @@ class GlobalChatBanner
     this.unreadCount = 1,
     this.onOpen,
     this.onDismiss,
+    this.displayDuration = const Duration(
+      seconds: 5,
+    ),
   });
+
+  @override
+  State<
+    GlobalChatBanner
+  >
+  createState() => _GlobalChatBannerState();
+}
+
+// ============================================================
+// STATE
+// ============================================================
+
+class _GlobalChatBannerState
+    extends
+        State<
+          GlobalChatBanner
+        > {
+  // ==========================================================
+  // COLORS
+  // ==========================================================
+
+  static const Color _background = Color(
+    0xFF121217,
+  );
+
+  static const Color _surface = Color(
+    0xFF191920,
+  );
+
+  static const Color _purple = Color(
+    0xFF8B5CF6,
+  );
+
+  static const Color _green = Color(
+    0xFF34D399,
+  );
+
+  // ==========================================================
+  // TIMER
+  // ==========================================================
+
+  Timer? _dismissTimer;
+
+  // ==========================================================
+  // INIT
+  // ==========================================================
+
+  @override
+  void initState() {
+    super.initState();
+
+    _startDismissTimer();
+  }
+
+  // ==========================================================
+  // NOVA MENSAGEM
+  // ==========================================================
+  //
+  // Caso o mesmo widget seja atualizado com uma nova
+  // mensagem, reinicia o tempo de exibição.
+  //
+  // ==========================================================
+
+  @override
+  void didUpdateWidget(
+    covariant GlobalChatBanner oldWidget,
+  ) {
+    super.didUpdateWidget(
+      oldWidget,
+    );
+
+    final messageChanged =
+        oldWidget.senderName !=
+            widget.senderName ||
+        oldWidget.preview !=
+            widget.preview ||
+        oldWidget.type !=
+            widget.type ||
+        oldWidget.unreadCount !=
+            widget.unreadCount;
+
+    if (messageChanged) {
+      _startDismissTimer();
+    }
+  }
+
+  // ==========================================================
+  // START DISMISS TIMER
+  // ==========================================================
+
+  void _startDismissTimer() {
+    _dismissTimer?.cancel();
+
+    _dismissTimer = Timer(
+      widget.displayDuration,
+      _dismissAutomatically,
+    );
+  }
+
+  // ==========================================================
+  // AUTO DISMISS
+  // ==========================================================
+
+  void _dismissAutomatically() {
+    if (!mounted) {
+      return;
+    }
+
+    widget.onDismiss?.call();
+  }
+
+  // ==========================================================
+  // MANUAL DISMISS
+  // ==========================================================
+
+  void _dismissManually() {
+    _dismissTimer?.cancel();
+
+    widget.onDismiss?.call();
+  }
+
+  // ==========================================================
+  // OPEN
+  // ==========================================================
+
+  void _open() {
+    _dismissTimer?.cancel();
+
+    widget.onOpen?.call();
+  }
+
+  // ==========================================================
+  // DISPOSE
+  // ==========================================================
+
+  @override
+  void dispose() {
+    _dismissTimer?.cancel();
+
+    super.dispose();
+  }
 
   // ==========================================================
   // BUILD
@@ -109,13 +227,13 @@ class GlobalChatBanner
   Widget build(
     BuildContext context,
   ) {
-    final normalizedSender = senderName.trim().isEmpty
+    final normalizedSender = widget.senderName.trim().isEmpty
         ? 'Membro'
-        : senderName.trim();
+        : widget.senderName.trim();
 
-    final normalizedPreview = preview.trim().isEmpty
+    final normalizedPreview = widget.preview.trim().isEmpty
         ? 'Nova mensagem'
-        : preview.trim();
+        : widget.preview.trim();
 
     return SafeArea(
       minimum: const EdgeInsets.only(
@@ -273,7 +391,7 @@ class GlobalChatBanner
               ),
             ),
 
-            if (unreadCount >
+            if (widget.unreadCount >
                 1) ...[
               const SizedBox(
                 width: 7,
@@ -338,10 +456,10 @@ class GlobalChatBanner
 
   Widget _buildUnreadBadge() {
     final label =
-        unreadCount >
+        widget.unreadCount >
             99
         ? '99+'
-        : unreadCount.toString();
+        : widget.unreadCount.toString();
 
     return Container(
       constraints: const BoxConstraints(
@@ -394,19 +512,19 @@ class GlobalChatBanner
       mainAxisSize: MainAxisSize.min,
 
       children: [
-        if (onOpen !=
+        if (widget.onOpen !=
             null)
           _buildOpenButton(),
 
-        if (onOpen !=
+        if (widget.onOpen !=
                 null &&
-            onDismiss !=
+            widget.onDismiss !=
                 null)
           const SizedBox(
             width: 6,
           ),
 
-        if (onDismiss !=
+        if (widget.onDismiss !=
             null)
           _buildDismissButton(),
       ],
@@ -419,7 +537,7 @@ class GlobalChatBanner
 
   Widget _buildOpenButton() {
     return TextButton(
-      onPressed: onOpen,
+      onPressed: _open,
 
       style: TextButton.styleFrom(
         foregroundColor: _purple,
@@ -465,7 +583,7 @@ class GlobalChatBanner
       message: 'Fechar',
 
       child: InkWell(
-        onTap: onDismiss,
+        onTap: _dismissManually,
 
         borderRadius: BorderRadius.circular(
           30,
@@ -507,7 +625,7 @@ class GlobalChatBanner
   // ==========================================================
 
   Color get _accentColor {
-    switch (type) {
+    switch (widget.type) {
       case GlobalChatBannerType.message:
         return _purple;
 
@@ -521,7 +639,7 @@ class GlobalChatBanner
   // ==========================================================
 
   IconData get _icon {
-    switch (type) {
+    switch (widget.type) {
       case GlobalChatBannerType.message:
         return Icons.chat_bubble_rounded;
 

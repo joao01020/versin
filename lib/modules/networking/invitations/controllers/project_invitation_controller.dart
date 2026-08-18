@@ -52,6 +52,12 @@ class ProjectInvitationController
   >?
   _subscription;
 
+  Timer? _realtimeRetryTimer;
+
+  static const Duration _realtimeRetryDelay = Duration(
+    seconds: 3,
+  );
+
   // ============================================================
   // STATE
   // ============================================================
@@ -165,12 +171,10 @@ class ProjectInvitationController
         return;
       }
 
-      _pendingInvitations =
-          List<
-            ProjectInvitationModel
-          >.unmodifiable(
-            initial,
-          );
+      _replacePendingInvitations(
+        initial,
+        source: 'snapshot inicial',
+      );
 
       // ========================================================
       // REALTIME
@@ -181,32 +185,30 @@ class ProjectInvitationController
       error,
       stackTrace
     ) {
-      if (_disposed) {
-        return;
+      if (!_disposed) {
+        _errorMessage = 'Não foi possível carregar os convites.';
+
+        debugPrint(
+          '[PROJECT INVITATION CONTROLLER] '
+          'Erro ao inicializar: '
+          '$error',
+        );
+
+        debugPrint(
+          '$stackTrace',
+        );
+
+        _scheduleRealtimeRetry();
       }
-
-      _errorMessage = 'Não foi possível carregar os convites.';
-
-      debugPrint(
-        '[PROJECT INVITATION CONTROLLER] '
-        'Erro ao inicializar: '
-        '$error',
-      );
-
-      debugPrint(
-        '$stackTrace',
-      );
     } finally {
-      if (_disposed) {
-        return;
+      if (!_disposed) {
+        _setLoading(
+          false,
+          notify: false,
+        );
+
+        _safeNotify();
       }
-
-      _setLoading(
-        false,
-        notify: false,
-      );
-
-      _safeNotify();
     }
   }
 
@@ -218,6 +220,10 @@ class ProjectInvitationController
     void
   >
   _startRealtime() async {
+    _realtimeRetryTimer?.cancel();
+
+    _realtimeRetryTimer = null;
+
     await _subscription?.cancel();
 
     _subscription = null;
@@ -225,6 +231,11 @@ class ProjectInvitationController
     if (_disposed) {
       return;
     }
+
+    debugPrint(
+      '[PROJECT INVITATION CONTROLLER] '
+      'Iniciando realtime.',
+    );
 
     _subscription = _service.watchPendingInvitations().listen(
       (
@@ -234,12 +245,10 @@ class ProjectInvitationController
           return;
         }
 
-        _pendingInvitations =
-            List<
-              ProjectInvitationModel
-            >.unmodifiable(
-              invitations,
-            );
+        _replacePendingInvitations(
+          invitations,
+          source: 'realtime',
+        );
 
         _errorMessage = null;
 
@@ -247,8 +256,8 @@ class ProjectInvitationController
       },
       onError:
           (
-            error,
-            stackTrace,
+            Object error,
+            StackTrace stackTrace,
           ) {
             if (_disposed) {
               return;
@@ -262,15 +271,61 @@ class ProjectInvitationController
               '$error',
             );
 
-            if (stackTrace !=
-                null) {
-              debugPrint(
-                '$stackTrace',
-              );
-            }
+            debugPrint(
+              '$stackTrace',
+            );
 
             _safeNotify();
+
+            _scheduleRealtimeRetry();
           },
+      onDone: () {
+        if (_disposed) {
+          return;
+        }
+
+        debugPrint(
+          '[PROJECT INVITATION CONTROLLER] '
+          'Realtime encerrado.',
+        );
+
+        _scheduleRealtimeRetry();
+      },
+    );
+  }
+
+  // ============================================================
+  // REALTIME RETRY
+  // ============================================================
+
+  void _scheduleRealtimeRetry() {
+    if (_disposed) {
+      return;
+    }
+
+    if (_realtimeRetryTimer?.isActive ==
+        true) {
+      return;
+    }
+
+    _realtimeRetryTimer = Timer(
+      _realtimeRetryDelay,
+      () {
+        _realtimeRetryTimer = null;
+
+        if (_disposed) {
+          return;
+        }
+
+        debugPrint(
+          '[PROJECT INVITATION CONTROLLER] '
+          'Reconectando realtime.',
+        );
+
+        unawaited(
+          _startRealtime(),
+        );
+      },
     );
   }
 
@@ -300,42 +355,36 @@ class ProjectInvitationController
         return;
       }
 
-      _pendingInvitations =
-          List<
-            ProjectInvitationModel
-          >.unmodifiable(
-            invitations,
-          );
+      _replacePendingInvitations(
+        invitations,
+        source: 'refresh manual',
+      );
     } catch (
       error,
       stackTrace
     ) {
-      if (_disposed) {
-        return;
+      if (!_disposed) {
+        _errorMessage = 'Não foi possível atualizar os convites.';
+
+        debugPrint(
+          '[PROJECT INVITATION CONTROLLER] '
+          'Erro ao atualizar: '
+          '$error',
+        );
+
+        debugPrint(
+          '$stackTrace',
+        );
       }
-
-      _errorMessage = 'Não foi possível atualizar os convites.';
-
-      debugPrint(
-        '[PROJECT INVITATION CONTROLLER] '
-        'Erro ao atualizar: '
-        '$error',
-      );
-
-      debugPrint(
-        '$stackTrace',
-      );
     } finally {
-      if (_disposed) {
-        return;
+      if (!_disposed) {
+        _setLoading(
+          false,
+          notify: false,
+        );
+
+        _safeNotify();
       }
-
-      _setLoading(
-        false,
-        notify: false,
-      );
-
-      _safeNotify();
     }
   }
 
@@ -440,13 +489,11 @@ class ProjectInvitationController
 
       return null;
     } finally {
-      if (_disposed) {
-        return null;
+      if (!_disposed) {
+        _isAccepting = false;
+
+        _safeNotify();
       }
-
-      _isAccepting = false;
-
-      _safeNotify();
     }
   }
 
@@ -544,14 +591,49 @@ class ProjectInvitationController
 
       return false;
     } finally {
-      if (_disposed) {
-        return false;
+      if (!_disposed) {
+        _isRejecting = false;
+
+        _safeNotify();
       }
-
-      _isRejecting = false;
-
-      _safeNotify();
     }
+  }
+
+  // ============================================================
+  // REPLACE PENDING INVITATIONS
+  // ============================================================
+  //
+  // Mantém uma única fonte de estado para:
+  //
+  // - badge;
+  // - banner;
+  // - lista de convites.
+  //
+  // ============================================================
+
+  void _replacePendingInvitations(
+    List<
+      ProjectInvitationModel
+    >
+    invitations, {
+    required String source,
+  }) {
+    if (_disposed) {
+      return;
+    }
+
+    _pendingInvitations =
+        List<
+          ProjectInvitationModel
+        >.unmodifiable(
+          invitations,
+        );
+
+    debugPrint(
+      '[PROJECT INVITATION CONTROLLER] '
+      '$source atualizado. '
+      'Pendentes: ${_pendingInvitations.length}',
+    );
   }
 
   // ============================================================
@@ -667,6 +749,10 @@ class ProjectInvitationController
     }
 
     _disposed = true;
+
+    _realtimeRetryTimer?.cancel();
+
+    _realtimeRetryTimer = null;
 
     unawaited(
       _subscription?.cancel(),

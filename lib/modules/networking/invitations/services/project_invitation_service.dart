@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:versin/modules/profile/services/profile_name_cache_service.dart';
+
 import '../models/project_invitation_model.dart';
 
 // ============================================================
@@ -53,16 +55,15 @@ class ProjectInvitationService {
   // ============================================================
   // CACHE
   // ============================================================
+  //
+  // Nomes de perfil usam o cache central da aplicação.
+  //
+  // Títulos de projeto continuam locais porque pertencem
+  // especificamente ao contexto de convites.
+  //
+  // ============================================================
 
-  final Map<
-    String,
-    String
-  >
-  _profileNameCache =
-      <
-        String,
-        String
-      >{};
+  final ProfileNameCacheService _profileNameCacheService;
 
   final Map<
     String,
@@ -80,9 +81,13 @@ class ProjectInvitationService {
 
   ProjectInvitationService({
     SupabaseClient? supabase,
+    ProfileNameCacheService? profileNameCacheService,
   }) : _supabase =
            supabase ??
-           Supabase.instance.client;
+           Supabase.instance.client,
+       _profileNameCacheService =
+           profileNameCacheService ??
+           ProfileNameCacheService();
 
   // ============================================================
   // CURRENT USER
@@ -144,6 +149,33 @@ class ProjectInvitationService {
       );
     }
 
+    debugPrint(
+      '[PROJECT INVITATION] '
+      'Realtime iniciado para: $userId',
+    );
+
+    // ==========================================================
+    // REALTIME
+    // ==========================================================
+    //
+    // O SupabaseStream entrega:
+    //
+    // - snapshot inicial;
+    // - INSERT;
+    // - UPDATE;
+    // - DELETE;
+    //
+    // filtrados pelo usuário convidado.
+    //
+    // O status não é filtrado no servidor porque precisamos
+    // receber também a mudança:
+    //
+    // pending -> accepted/rejected
+    //
+    // para o badge desaparecer imediatamente.
+    //
+    // ==========================================================
+
     return _supabase
         .from(
           'project_invitations',
@@ -161,40 +193,56 @@ class ProjectInvitationService {
           (
             rows,
           ) async {
-            final pendingRows = rows.where(
-              (
-                row,
-              ) {
-                final status = row['status']?.toString().trim().toLowerCase();
+            final pendingRows = rows
+                .where(
+                  (
+                    row,
+                  ) {
+                    final status = row['status']?.toString().trim().toLowerCase();
 
-                return status ==
-                    'pending';
-              },
-            ).toList();
+                    return status ==
+                        'pending';
+                  },
+                )
+                .toList(
+                  growable: false,
+                );
 
-            final invitations =
-                <
-                  ProjectInvitationModel
-                >[];
-
-            for (final row in pendingRows) {
-              final invitation = ProjectInvitationModel.fromMap(
-                Map<
-                  String,
-                  dynamic
-                >.from(
-                  row,
-                ),
-              );
-
-              final enriched = await _enrichInvitation(
-                invitation,
-              );
-
-              invitations.add(
-                enriched,
-              );
+            if (pendingRows.isEmpty) {
+              return const <
+                ProjectInvitationModel
+              >[];
             }
+
+            // ====================================================
+            // ENRIQUECER EM PARALELO
+            // ====================================================
+            //
+            // Evita esperar convite por convite quando vários
+            // chegam juntos.
+            //
+            // ====================================================
+
+            final invitations = await Future.wait(
+              pendingRows.map(
+                (
+                  row,
+                ) async {
+                  final invitation = ProjectInvitationModel.fromMap(
+                    Map<
+                      String,
+                      dynamic
+                    >.from(
+                      row,
+                    ),
+                  );
+
+                  return _enrichInvitation(
+                    invitation,
+                  );
+                },
+              ),
+            );
 
             invitations.sort(
               (
@@ -205,6 +253,12 @@ class ProjectInvitationService {
                   a.createdAt,
                 );
               },
+            );
+
+            debugPrint(
+              '[PROJECT INVITATION] '
+              'Realtime atualizado. '
+              'Pendentes: ${invitations.length}',
             );
 
             return List<
@@ -264,22 +318,32 @@ class ProjectInvitationService {
             response,
           );
 
-      final invitations =
-          <
-            ProjectInvitationModel
-          >[];
+      final invitations = await Future.wait(
+        rows.map(
+          (
+            row,
+          ) async {
+            final invitation = ProjectInvitationModel.fromMap(
+              row,
+            );
 
-      for (final row in rows) {
-        final invitation = ProjectInvitationModel.fromMap(
-          row,
-        );
+            return _enrichInvitation(
+              invitation,
+            );
+          },
+        ),
+      );
 
-        invitations.add(
-          await _enrichInvitation(
-            invitation,
-          ),
-        );
-      }
+      invitations.sort(
+        (
+          a,
+          b,
+        ) {
+          return b.createdAt.compareTo(
+            a.createdAt,
+          );
+        },
+      );
 
       return List<
         ProjectInvitationModel
@@ -904,71 +968,18 @@ class ProjectInvitationService {
       return 'Membro';
     }
 
-    final cached = _profileNameCache[normalizedUserId];
-
-    if (cached !=
-            null &&
-        cached.isNotEmpty) {
-      return cached;
-    }
-
     try {
-      final profile = await _supabase
-          .from(
-            'profiles',
-          )
-          .select(
-            'id, artist_name, name, username',
-          )
-          .eq(
-            'id',
-            normalizedUserId,
-          )
-          .maybeSingle();
+      final resolved = await _profileNameCacheService.getName(
+        normalizedUserId,
+      );
 
-      if (profile ==
-          null) {
+      final normalizedName = resolved.trim();
+
+      if (normalizedName.isEmpty) {
         return 'Membro';
       }
 
-      final artistName = profile['artist_name']?.toString().trim();
-
-      if (artistName !=
-              null &&
-          artistName.isNotEmpty) {
-        _profileNameCache[normalizedUserId] = artistName;
-
-        return artistName;
-      }
-
-      final name = profile['name']?.toString().trim();
-
-      if (name !=
-              null &&
-          name.isNotEmpty) {
-        _profileNameCache[normalizedUserId] = name;
-
-        return name;
-      }
-
-      final username = profile['username']?.toString().trim().replaceFirst(
-        RegExp(
-          r'^@+',
-        ),
-        '',
-      );
-
-      if (username !=
-              null &&
-          username.isNotEmpty) {
-        final label = '@$username';
-
-        _profileNameCache[normalizedUserId] = label;
-
-        return label;
-      }
-
-      return 'Membro';
+      return normalizedName;
     } catch (
       error,
       stackTrace
@@ -1112,8 +1123,6 @@ class ProjectInvitationService {
   // ============================================================
 
   void clearCache() {
-    _profileNameCache.clear();
-
     _projectTitleCache.clear();
   }
 

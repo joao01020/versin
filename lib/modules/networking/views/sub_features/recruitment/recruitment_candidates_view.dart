@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+
+import 'package:versin/app/locator.dart';
+
 import '../../../controllers/project_recruitment_controller.dart';
 import '../../../data/models/project_recruitment_model.dart';
 
@@ -86,7 +89,10 @@ class _RecruitmentCandidatesViewState
       projectId: widget.projectId,
     );
 
-    _invitationService = ProjectInvitationService();
+    _invitationService =
+        sl<
+          ProjectInvitationService
+        >();
 
     _initialize();
   }

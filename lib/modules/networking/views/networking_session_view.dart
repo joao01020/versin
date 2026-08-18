@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:versin/app/locator.dart';
+import 'package:versin/modules/dashboard/controllers/dashboard_controller.dart';
+
 import '../call/data/repositories/project_call_repository_impl.dart';
 import '../call/views/call_view.dart';
 import '../call/views/widgets/global_call_banner.dart';
@@ -15,7 +18,6 @@ import '../controllers/networking_controller.dart';
 
 import '../invitations/controllers/project_invitation_controller.dart';
 import '../invitations/models/project_invitation_model.dart';
-import '../invitations/services/project_invitation_service.dart';
 import '../invitations/widgets/project_invitation_banner.dart';
 
 import 'sub_features/chat_view.dart';
@@ -98,8 +100,6 @@ class _NetworkingSessionViewState
   // PROJECT INVITATIONS
   // ==========================================================
 
-  late final ProjectInvitationService _projectInvitationService;
-
   late final ProjectInvitationController _projectInvitationController;
 
   // ==========================================================
@@ -121,6 +121,12 @@ class _NetworkingSessionViewState
   bool _isGlobalCallActionProcessing = false;
 
   String? _globalCallAction;
+
+  // ==========================================================
+  // LEAVE PROJECT
+  // ==========================================================
+
+  bool _isLeavingProject = false;
 
   // ==========================================================
   // PARTICIPANT NAME CACHE
@@ -166,11 +172,10 @@ class _NetworkingSessionViewState
       projectId: widget.projectId,
     )..init();
 
-    _projectInvitationService = ProjectInvitationService();
-
-    _projectInvitationController = ProjectInvitationController(
-      service: _projectInvitationService,
-    );
+    _projectInvitationController =
+        sl<
+          ProjectInvitationController
+        >();
 
     _projectInvitationController.init();
   }
@@ -332,15 +337,13 @@ class _NetworkingSessionViewState
                               ),
 
                               _buildSmallAction(
-                                Icons.close_rounded,
+                                Icons.logout_rounded,
 
                                 'Sair',
 
                                 Colors.red,
 
-                                () => Navigator.pop(
-                                  context,
-                                ),
+                                _requestLeaveProject,
                               ),
                             ],
                           ),
@@ -783,6 +786,450 @@ class _NetworkingSessionViewState
 
       _globalChatController.setChatVisible(
         false,
+      );
+    }
+  }
+
+  // ==========================================================
+  // REQUEST LEAVE PROJECT
+  // ==========================================================
+  //
+  // Exibe uma confirmação explícita antes de remover o usuário
+  // da Studio Session.
+  //
+  // O botão permanece bloqueado até o usuário marcar o checkbox.
+  //
+  // ==========================================================
+
+  Future<
+    void
+  >
+  _requestLeaveProject() async {
+    if (_isLeavingProject ||
+        !mounted) {
+      return;
+    }
+
+    final shouldLeave =
+        await showDialog<
+          bool
+        >(
+          context: context,
+          barrierDismissible: false,
+          builder:
+              (
+                dialogContext,
+              ) {
+                var confirmed = false;
+
+                return StatefulBuilder(
+                  builder:
+                      (
+                        context,
+                        setDialogState,
+                      ) {
+                        return AlertDialog(
+                          backgroundColor: const Color(
+                            0xFF17171E,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(
+                              20,
+                            ),
+                          ),
+                          title: const Row(
+                            children: [
+                              Icon(
+                                Icons.logout_rounded,
+                                color: Colors.redAccent,
+                                size: 22,
+                              ),
+                              SizedBox(
+                                width: 10,
+                              ),
+                              Expanded(
+                                child: Text(
+                                  'Sair desta Studio Session?',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          content: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Ao continuar, você deixará de fazer parte '
+                                'deste projeto e ele não aparecerá mais entre '
+                                'os seus projetos ativos.',
+                                style: TextStyle(
+                                  color: Colors.white60,
+                                  fontSize: 12,
+                                  height: 1.45,
+                                ),
+                              ),
+                              const SizedBox(
+                                height: 14,
+                              ),
+                              Container(
+                                padding: const EdgeInsets.all(
+                                  12,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.redAccent.withValues(
+                                    alpha: 0.06,
+                                  ),
+                                  borderRadius: BorderRadius.circular(
+                                    14,
+                                  ),
+                                  border: Border.all(
+                                    color: Colors.redAccent.withValues(
+                                      alpha: 0.14,
+                                    ),
+                                  ),
+                                ),
+                                child: const Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Icon(
+                                      Icons.info_outline_rounded,
+                                      color: Colors.redAccent,
+                                      size: 17,
+                                    ),
+                                    SizedBox(
+                                      width: 9,
+                                    ),
+                                    Expanded(
+                                      child: Text(
+                                        'Você perderá o acesso à sessão, '
+                                        'ao chat, às tarefas e aos recursos '
+                                        'compartilhados deste projeto.',
+                                        style: TextStyle(
+                                          color: Colors.white54,
+                                          fontSize: 10,
+                                          height: 1.4,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(
+                                height: 14,
+                              ),
+                              CheckboxListTile(
+                                value: confirmed,
+                                onChanged:
+                                    (
+                                      value,
+                                    ) {
+                                      setDialogState(
+                                        () {
+                                          confirmed =
+                                              value ??
+                                              false;
+                                        },
+                                      );
+                                    },
+                                contentPadding: EdgeInsets.zero,
+                                controlAffinity: ListTileControlAffinity.leading,
+                                activeColor: Colors.redAccent,
+                                title: const Text(
+                                  'Estou ciente e quero sair deste projeto.',
+                                  style: TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () {
+                                Navigator.of(
+                                  dialogContext,
+                                ).pop(
+                                  false,
+                                );
+                              },
+                              child: const Text(
+                                'Cancelar',
+                              ),
+                            ),
+                            FilledButton.icon(
+                              onPressed: confirmed
+                                  ? () {
+                                      Navigator.of(
+                                        dialogContext,
+                                      ).pop(
+                                        true,
+                                      );
+                                    }
+                                  : null,
+                              icon: const Icon(
+                                Icons.logout_rounded,
+                                size: 16,
+                              ),
+                              label: const Text(
+                                'Sair do projeto',
+                              ),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: Colors.redAccent,
+                                foregroundColor: Colors.white,
+                                disabledBackgroundColor: Colors.white12,
+                                disabledForegroundColor: Colors.white24,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(
+                                    12,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                );
+              },
+        );
+
+    if (shouldLeave !=
+            true ||
+        !mounted) {
+      return;
+    }
+
+    await _leaveProject();
+  }
+
+  // ==========================================================
+  // LEAVE PROJECT
+  // ==========================================================
+
+  Future<
+    void
+  >
+  _leaveProject() async {
+    if (_isLeavingProject) {
+      return;
+    }
+
+    final userId = _supabase.auth.currentUser?.id.trim();
+
+    final projectId = widget.projectId.trim();
+
+    if (userId ==
+            null ||
+        userId.isEmpty ||
+        projectId.isEmpty) {
+      _showProjectInvitationMessage(
+        'Não foi possível identificar sua participação '
+        'neste projeto.',
+        error: true,
+      );
+
+      return;
+    }
+
+    setState(
+      () {
+        _isLeavingProject = true;
+      },
+    );
+
+    try {
+      // ========================================================
+      // SAIR DO PROJETO VIA RPC
+      // ========================================================
+      //
+      // A remoção de members / founders é feita no Supabase
+      // pela função:
+      //
+      // public.leave_match_project(uuid)
+      //
+      // Isso evita conflito com as políticas RLS da tabela
+      // projects e centraliza a regra de negócio no banco.
+      //
+      // ========================================================
+
+      await _supabase.rpc(
+        'leave_match_project',
+        params: {
+          'p_project_id': projectId,
+        },
+      );
+
+      debugPrint(
+        '[NETWORKING SESSION] '
+        'Usuário $userId saiu do projeto $projectId.',
+      );
+
+      // ========================================================
+      // ATUALIZAR DASHBOARD
+      // ========================================================
+
+      await _refreshDashboardActiveProject();
+
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(
+          context,
+        )
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Você saiu da Studio Session.',
+            ),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+
+      // ========================================================
+      // FECHAR SESSÃO
+      // ========================================================
+
+      Navigator.of(
+        context,
+      ).pop(
+        true,
+      );
+    } on PostgrestException catch (
+      error,
+      stackTrace
+    ) {
+      debugPrint(
+        '[NETWORKING SESSION] '
+        'Erro Supabase ao sair do projeto: '
+        '${error.message}',
+      );
+
+      debugPrint(
+        '[NETWORKING SESSION] '
+        'Código: ${error.code}',
+      );
+
+      debugPrint(
+        '$stackTrace',
+      );
+
+      if (mounted) {
+        _showProjectInvitationMessage(
+          _leaveProjectErrorMessage(
+            error,
+          ),
+          error: true,
+        );
+      }
+    } catch (
+      error,
+      stackTrace
+    ) {
+      debugPrint(
+        '[NETWORKING SESSION] '
+        'Erro ao sair do projeto: $error',
+      );
+
+      debugPrint(
+        '$stackTrace',
+      );
+
+      if (mounted) {
+        _showProjectInvitationMessage(
+          'Não foi possível sair do projeto. '
+          'Tente novamente.',
+          error: true,
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(
+          () {
+            _isLeavingProject = false;
+          },
+        );
+      }
+    }
+  }
+
+  // ==========================================================
+  // LEAVE PROJECT ERROR MESSAGE
+  // ==========================================================
+
+  String _leaveProjectErrorMessage(
+    PostgrestException error,
+  ) {
+    final message = error.message.trim().toLowerCase();
+
+    if (message.contains(
+          'projeto não encontrado',
+        ) ||
+        message.contains(
+          'projeto nao encontrado',
+        )) {
+      return 'Este projeto não está mais disponível.';
+    }
+
+    if (message.contains(
+          'usuário não pertence',
+        ) ||
+        message.contains(
+          'usuario nao pertence',
+        )) {
+      return 'Você já não faz parte deste projeto.';
+    }
+
+    if (message.contains(
+          'não autenticado',
+        ) ||
+        message.contains(
+          'nao autenticado',
+        )) {
+      return 'Sua sessão expirou. '
+          'Entre novamente para continuar.';
+    }
+
+    return 'Não foi possível sair do projeto. '
+        'Tente novamente.';
+  }
+
+  // ==========================================================
+  // REFRESH DASHBOARD ACTIVE PROJECT
+  // ==========================================================
+
+  Future<
+    void
+  >
+  _refreshDashboardActiveProject() async {
+    try {
+      final dashboardController =
+          sl<
+            DashboardController
+          >();
+
+      await dashboardController.refreshActiveProject();
+    } catch (
+      error,
+      stackTrace
+    ) {
+      // A saída do projeto não deve falhar somente porque o
+      // Dashboard não conseguiu atualizar o card imediatamente.
+      debugPrint(
+        '[NETWORKING SESSION] '
+        'Não foi possível atualizar projeto ativo '
+        'no Dashboard: $error',
+      );
+
+      debugPrint(
+        '$stackTrace',
       );
     }
   }
@@ -1587,7 +2034,8 @@ class _NetworkingSessionViewState
 
   @override
   void dispose() {
-    _projectInvitationController.dispose();
+    // ProjectInvitationController é global (GetIt LazySingleton).
+    // Não deve ser disposed por esta tela.
 
     _globalChatController.dispose();
 

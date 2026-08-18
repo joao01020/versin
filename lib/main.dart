@@ -13,6 +13,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:versin/app/locator.dart';
 import 'package:versin/app/my_app.dart';
 
+import 'package:versin/core/auth/supabase_session_manager.dart';
 import 'package:versin/core/services/sync_manager.dart';
 
 import 'package:versin/modules/dashboard/controllers/dashboard_controller.dart';
@@ -248,6 +249,18 @@ _initializeMainApplication() async {
       authFlowType: AuthFlowType.implicit,
     ),
   );
+
+  // ============================================================
+  // SESSÃO SUPABASE
+  // ============================================================
+  //
+  // A sessão restaurada pelo Supabase pode conter um JWT
+  // expirado. O manager valida/renova a sessão antes de qualquer
+  // serviço da aplicação iniciar listeners Realtime.
+  //
+  // ============================================================
+
+  await SupabaseSessionManager.instance.initialize();
 
   // ============================================================
   // SINCRONIZAÇÃO OFFLINE

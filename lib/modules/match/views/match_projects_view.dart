@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:versin/modules/networking/views/networking_session_view.dart';
+import 'package:versin/modules/profile/services/profile_name_cache_service.dart';
 
 // ============================================================
 // MATCH PROJECTS VIEW
@@ -100,18 +101,10 @@ class _MatchProjectsViewState
       >[];
 
   // ==========================================================
-  // PROFILE CACHE
+  // PROFILE NAME CACHE
   // ==========================================================
 
-  final Map<
-    String,
-    String
-  >
-  _profileNameCache =
-      <
-        String,
-        String
-      >{};
+  late final ProfileNameCacheService _profileNameCacheService;
 
   // ==========================================================
   // INIT
@@ -121,7 +114,26 @@ class _MatchProjectsViewState
   void initState() {
     super.initState();
 
-    _loadProjects();
+    _profileNameCacheService = ProfileNameCacheService();
+
+    _initialize();
+  }
+
+  // ==========================================================
+  // INITIALIZE
+  // ==========================================================
+
+  Future<
+    void
+  >
+  _initialize() async {
+    await _profileNameCacheService.init();
+
+    if (!mounted) {
+      return;
+    }
+
+    await _loadProjects();
   }
 
   // ==========================================================
@@ -178,6 +190,10 @@ class _MatchProjectsViewState
     );
 
     try {
+      // ========================================================
+      // PROJECTS
+      // ========================================================
+
       final response = await _supabase
           .from(
             'projects',
@@ -216,6 +232,41 @@ class _MatchProjectsViewState
             response,
           );
 
+      // ========================================================
+      // TODOS OS MEMBER IDS
+      // ========================================================
+      //
+      // Antes cada projeto fazia uma consulta para cada membro.
+      //
+      // Agora:
+      //
+      // projects
+      //    ↓
+      // reúne todos os IDs
+      //    ↓
+      // ProfileNameCacheService.getNames(...)
+      //    ↓
+      // cache RAM / SharedPreferences / 1 consulta em lote
+      //
+      // ========================================================
+
+      final allMemberIds =
+          <
+            String
+          >{};
+
+      for (final row in rows) {
+        allMemberIds.addAll(
+          _readStringList(
+            row['members'],
+          ),
+        );
+      }
+
+      final namesByUserId = await _profileNameCacheService.getNames(
+        allMemberIds,
+      );
+
       final items =
           <
             _MatchProjectItem
@@ -238,9 +289,17 @@ class _MatchProjectsViewState
           row['founders'],
         );
 
-        final memberNames = await _resolveMemberNames(
-          members,
-        );
+        final memberNames = members
+            .map(
+              (
+                memberId,
+              ) =>
+                  namesByUserId[memberId] ??
+                  'Membro',
+            )
+            .toList(
+              growable: false,
+            );
 
         items.add(
           _MatchProjectItem(
@@ -329,147 +388,6 @@ class _MatchProjectsViewState
         },
       );
     }
-  }
-
-  // ==========================================================
-  // RESOLVE MEMBER NAMES
-  // ==========================================================
-
-  Future<
-    List<
-      String
-    >
-  >
-  _resolveMemberNames(
-    List<
-      String
-    >
-    memberIds,
-  ) async {
-    if (memberIds.isEmpty) {
-      return const <
-        String
-      >[];
-    }
-
-    final names =
-        <
-          String
-        >[];
-
-    for (final userId in memberIds) {
-      final normalizedUserId = userId.trim();
-
-      if (normalizedUserId.isEmpty) {
-        continue;
-      }
-
-      final cached = _profileNameCache[normalizedUserId];
-
-      if (cached !=
-              null &&
-          cached.isNotEmpty) {
-        names.add(
-          cached,
-        );
-        continue;
-      }
-
-      try {
-        final profile = await _supabase
-            .from(
-              'profiles',
-            )
-            .select(
-              'id, artist_name, name, username',
-            )
-            .eq(
-              'id',
-              normalizedUserId,
-            )
-            .maybeSingle();
-
-        final resolvedName = _resolveProfileName(
-          profile,
-        );
-
-        _profileNameCache[normalizedUserId] = resolvedName;
-
-        names.add(
-          resolvedName,
-        );
-      } catch (
-        error,
-        stackTrace
-      ) {
-        debugPrint(
-          '[MATCH PROJECTS] '
-          'Erro ao buscar perfil $normalizedUserId: $error',
-        );
-
-        debugPrint(
-          '$stackTrace',
-        );
-
-        names.add(
-          'Membro',
-        );
-      }
-    }
-
-    return List<
-      String
-    >.unmodifiable(
-      names,
-    );
-  }
-
-  // ==========================================================
-  // PROFILE NAME
-  // ==========================================================
-
-  String _resolveProfileName(
-    Map<
-      String,
-      dynamic
-    >?
-    profile,
-  ) {
-    if (profile ==
-        null) {
-      return 'Membro';
-    }
-
-    final artistName = profile['artist_name']?.toString().trim();
-
-    if (artistName !=
-            null &&
-        artistName.isNotEmpty) {
-      return artistName;
-    }
-
-    final name = profile['name']?.toString().trim();
-
-    if (name !=
-            null &&
-        name.isNotEmpty) {
-      return name;
-    }
-
-    final username = profile['username']?.toString().trim().replaceFirst(
-      RegExp(
-        r'^@+',
-      ),
-      '',
-    );
-
-    if (username !=
-            null &&
-        username.isNotEmpty) {
-      return '@$username';
-    }
-
-    return 'Membro';
   }
 
   // ==========================================================
@@ -1317,8 +1235,6 @@ class _MatchProjectsViewState
 
   @override
   void dispose() {
-    _profileNameCache.clear();
-
     super.dispose();
   }
 }

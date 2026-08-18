@@ -28,6 +28,13 @@ import 'package:versin/modules/notifications/data/repositories/notification_repo
 import 'package:versin/modules/notifications/repositories/notification_repository.dart';
 
 // ============================================================
+// PROJECT INVITATIONS
+// ============================================================
+
+import 'package:versin/modules/networking/invitations/controllers/project_invitation_controller.dart';
+import 'package:versin/modules/networking/invitations/services/project_invitation_service.dart';
+
+// ============================================================
 // BRAIN & RHYMES
 // ============================================================
 
@@ -141,6 +148,37 @@ setupLocator() {
       repository:
           sl<
             NotificationRepository
+          >(),
+    ),
+  );
+
+  // ==========================================================
+  // PROJECT INVITATIONS MODULE
+  // ==========================================================
+  //
+  // Uma única instância é compartilhada por:
+  //
+  // - Dashboard;
+  // - badge de convites;
+  // - banner global;
+  // - lista de convites;
+  // - demais telas que acompanham convites em realtime.
+  //
+  // ==========================================================
+
+  sl.registerLazySingleton<
+    ProjectInvitationService
+  >(
+    () => ProjectInvitationService(),
+  );
+
+  sl.registerLazySingleton<
+    ProjectInvitationController
+  >(
+    () => ProjectInvitationController(
+      service:
+          sl<
+            ProjectInvitationService
           >(),
     ),
   );

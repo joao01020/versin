@@ -38,7 +38,17 @@ import 'package:versin/modules/networking/call/views/call_view.dart';
 import 'package:versin/modules/networking/call/views/widgets/global_call_banner.dart';
 import 'package:versin/modules/networking/controllers/global_chat_controller.dart';
 import 'package:versin/modules/networking/widgets/global_chat_banner.dart';
+import 'package:versin/modules/networking/views/networking_session_view.dart';
 import 'package:versin/modules/networking/views/sub_features/chat_view.dart';
+
+// ============================================================
+// NETWORKING - PROJECT INVITATIONS
+// ============================================================
+
+import 'package:versin/modules/networking/invitations/models/project_invitation_model.dart';
+import 'package:versin/modules/networking/invitations/services/project_invitation_service.dart';
+import 'package:versin/modules/networking/invitations/controllers/project_invitation_controller.dart';
+import 'package:versin/modules/networking/invitations/widgets/project_invitation_banner.dart';
 
 // ============================================================
 // DASHBOARD PAGE
@@ -91,6 +101,14 @@ class _DashboardPageState extends State<DashboardPage> {
   // ============================================================
 
   late final GlobalChatController _globalChatController;
+
+  // ============================================================
+  // PROJECT INVITATIONS
+  // ============================================================
+
+  late final ProjectInvitationService _projectInvitationService;
+
+  late final ProjectInvitationController _projectInvitationController;
 
   // ============================================================
   // GLOBAL CALL
@@ -148,6 +166,14 @@ class _DashboardPageState extends State<DashboardPage> {
     _controller.init();
 
     _globalChatController = GlobalChatController()..init();
+
+    _projectInvitationService = ProjectInvitationService();
+
+    _projectInvitationController = ProjectInvitationController(
+      service: _projectInvitationService,
+    );
+
+    unawaited(_projectInvitationController.init());
 
     _globalCallClockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) {
@@ -294,6 +320,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      _buildGlobalProjectInvitationBanner(),
                       _buildGlobalCallBanner(),
                       _buildGlobalChatBanner(),
                     ],
@@ -305,6 +332,153 @@ class _DashboardPageState extends State<DashboardPage> {
         ],
       ),
     );
+  }
+
+  // ============================================================
+  // GLOBAL PROJECT INVITATION BANNER
+  // ============================================================
+
+  Widget _buildGlobalProjectInvitationBanner() {
+    return ListenableBuilder(
+      listenable: _projectInvitationController,
+
+      builder: (context, _) {
+        final invitation = _projectInvitationController.currentInvitation;
+
+        if (invitation == null) {
+          return const SizedBox.shrink();
+        }
+
+        return ProjectInvitationBanner(
+          invitation: invitation,
+
+          isAccepting: _projectInvitationController.isAccepting,
+
+          isRejecting: _projectInvitationController.isRejecting,
+
+          onAccept: () async {
+            await _acceptProjectInvitation(invitation);
+          },
+
+          onReject: () async {
+            await _rejectProjectInvitation(invitation);
+          },
+        );
+      },
+    );
+  }
+
+  // ============================================================
+  // ACCEPT PROJECT INVITATION
+  // ============================================================
+
+  Future<void> _acceptProjectInvitation(
+    ProjectInvitationModel invitation,
+  ) async {
+    if (!mounted || _projectInvitationController.isBusy) {
+      return;
+    }
+
+    final projectId = await _projectInvitationController.acceptInvitation(
+      invitation,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    if (projectId == null || projectId.trim().isEmpty) {
+      _showProjectInvitationError(
+        _projectInvitationController.errorMessage ??
+            'Não foi possível aceitar o convite.',
+      );
+
+      return;
+    }
+
+    final normalizedProjectId = projectId.trim();
+
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text('Você entrou em ${invitation.projectTitle}.'),
+          backgroundColor: Colors.green.shade800,
+        ),
+      );
+
+    await _openInvitedProject(normalizedProjectId);
+  }
+
+  // ============================================================
+  // REJECT PROJECT INVITATION
+  // ============================================================
+
+  Future<void> _rejectProjectInvitation(
+    ProjectInvitationModel invitation,
+  ) async {
+    if (!mounted || _projectInvitationController.isBusy) {
+      return;
+    }
+
+    final rejected = await _projectInvitationController.rejectInvitation(
+      invitation,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    if (!rejected) {
+      _showProjectInvitationError(
+        _projectInvitationController.errorMessage ??
+            'Não foi possível recusar o convite.',
+      );
+
+      return;
+    }
+
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(const SnackBar(content: Text('Convite recusado.')));
+  }
+
+  // ============================================================
+  // OPEN INVITED PROJECT
+  // ============================================================
+
+  Future<void> _openInvitedProject(String projectId) async {
+    final normalizedProjectId = projectId.trim();
+
+    if (!mounted || normalizedProjectId.isEmpty) {
+      return;
+    }
+
+    _projectInvitationController.clearAcceptedProject();
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) {
+          return NetworkingSessionView(projectId: normalizedProjectId);
+        },
+      ),
+    );
+  }
+
+  // ============================================================
+  // PROJECT INVITATION ERROR
+  // ============================================================
+
+  void _showProjectInvitationError(String message) {
+    if (!mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(content: Text(message), backgroundColor: Colors.red.shade900),
+      );
   }
 
   // ============================================================
@@ -989,6 +1163,8 @@ class _DashboardPageState extends State<DashboardPage> {
     _globalCallClockTimer = null;
 
     _globalChatController.dispose();
+
+    _projectInvitationController.dispose();
 
     super.dispose();
   }

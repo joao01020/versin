@@ -15,11 +15,7 @@
 //
 // ============================================================
 
-enum ProjectMessageType {
-  text,
-  audio,
-  system,
-}
+enum ProjectMessageType { text, audio, system }
 
 // ============================================================
 // PROJECT MESSAGE MODEL
@@ -135,14 +131,8 @@ class ProjectMessageModel {
       senderId: senderId.trim(),
       content: content,
       type: ProjectMessageType.audio,
-      audioPath: _normalizeNullableString(
-        audioPath,
-      ),
-      audioDurationMs:
-          audioDurationMs <
-              0
-          ? 0
-          : audioDurationMs,
+      audioPath: _normalizeNullableString(audioPath),
+      audioDurationMs: audioDurationMs < 0 ? 0 : audioDurationMs,
       createdAt: createdAt,
     );
   }
@@ -174,51 +164,39 @@ class ProjectMessageModel {
   // É MINHA MENSAGEM?
   // ==========================================================
 
-  bool isMine(
-    String currentUserId,
-  ) {
+  bool isMine(String currentUserId) {
     final normalizedCurrentUserId = currentUserId.trim();
 
     if (normalizedCurrentUserId.isEmpty) {
       return false;
     }
 
-    return senderId ==
-        normalizedCurrentUserId;
+    return senderId == normalizedCurrentUserId;
   }
 
   // ==========================================================
   // PERTENCE AO PROJETO?
   // ==========================================================
 
-  bool belongsToProject(
-    String currentProjectId,
-  ) {
+  bool belongsToProject(String currentProjectId) {
     final normalizedProjectId = currentProjectId.trim();
 
     if (normalizedProjectId.isEmpty) {
       return false;
     }
 
-    return projectId ==
-        normalizedProjectId;
+    return projectId == normalizedProjectId;
   }
 
   // ==========================================================
   // TIPO
   // ==========================================================
 
-  bool get isText =>
-      type ==
-      ProjectMessageType.text;
+  bool get isText => type == ProjectMessageType.text;
 
-  bool get isAudio =>
-      type ==
-      ProjectMessageType.audio;
+  bool get isAudio => type == ProjectMessageType.audio;
 
-  bool get isSystem =>
-      type ==
-      ProjectMessageType.system;
+  bool get isSystem => type == ProjectMessageType.system;
 
   // ==========================================================
   // POSSUI REMETENTE?
@@ -243,9 +221,7 @@ class ProjectMessageModel {
 
     final path = audioPath?.trim();
 
-    return path !=
-            null &&
-        path.isNotEmpty;
+    return path != null && path.isNotEmpty;
   }
 
   // ==========================================================
@@ -255,34 +231,23 @@ class ProjectMessageModel {
   Duration get audioDuration {
     final milliseconds = audioDurationMs;
 
-    if (milliseconds ==
-            null ||
-        milliseconds <=
-            0) {
+    if (milliseconds == null || milliseconds <= 0) {
       return Duration.zero;
     }
 
-    return Duration(
-      milliseconds: milliseconds,
-    );
+    return Duration(milliseconds: milliseconds);
   }
 
   // ==========================================================
   // PRAZO PARA APAGAR
   // ==========================================================
 
-  static const Duration deleteWindow = Duration(
-    hours: 24,
-  );
+  static const Duration deleteWindow = Duration(hours: 24);
 
-  DateTime get deleteExpiresAt => createdAt.add(
-    deleteWindow,
-  );
+  DateTime get deleteExpiresAt => createdAt.add(deleteWindow);
 
   Duration get remainingDeleteTime {
-    final remaining = deleteExpiresAt.difference(
-      DateTime.now(),
-    );
+    final remaining = deleteExpiresAt.difference(DateTime.now());
 
     if (remaining.isNegative) {
       return Duration.zero;
@@ -292,39 +257,30 @@ class ProjectMessageModel {
   }
 
   bool get canDelete {
-    return !DateTime.now().isAfter(
-      deleteExpiresAt,
-    );
+    return !DateTime.now().isAfter(deleteExpiresAt);
   }
 
   bool get deleteExpired => !canDelete;
 
-  bool get canDeleteText =>
-      isText &&
-      canDelete;
+  bool get canDeleteText => isText && canDelete;
 
-  bool get canDeleteAudio =>
-      isAudio &&
-      canDelete;
+  bool get canDeleteAudio => isAudio && canDelete;
 
   // ==========================================================
   // É VÁLIDA?
   // ==========================================================
 
   bool get isValid {
-    if (id.isEmpty ||
-        projectId.isEmpty) {
+    if (id.isEmpty || projectId.isEmpty) {
       return false;
     }
 
     switch (type) {
       case ProjectMessageType.text:
-        return senderId.isNotEmpty &&
-            hasContent;
+        return senderId.isNotEmpty && hasContent;
 
       case ProjectMessageType.audio:
-        return senderId.isNotEmpty &&
-            hasAudio;
+        return senderId.isNotEmpty && hasAudio;
 
       case ProjectMessageType.system:
         return hasContent;
@@ -335,45 +291,23 @@ class ProjectMessageModel {
   // FROM MAP
   // ==========================================================
 
-  factory ProjectMessageModel.fromMap(
-    Map<
-      String,
-      dynamic
-    >
-    map,
-  ) {
+  factory ProjectMessageModel.fromMap(Map<String, dynamic> map) {
     return ProjectMessageModel(
-      id: _readString(
-        map['id'],
-      ),
+      id: _readString(map['id']),
 
-      projectId: _readString(
-        map['project_id'],
-      ),
+      projectId: _readString(map['project_id']),
 
-      senderId: _readString(
-        map['sender_id'],
-      ),
+      senderId: _readString(map['sender_id']),
 
-      content: _readContent(
-        map['content'],
-      ),
+      content: _readContent(map['content']),
 
-      type: _readMessageType(
-        map['message_type'],
-      ),
+      type: _readMessageType(map['message_type']),
 
-      audioPath: _readNullableString(
-        map['audio_path'],
-      ),
+      audioPath: _readNullableString(map['audio_path']),
 
-      audioDurationMs: _readNullableInt(
-        map['audio_duration_ms'],
-      ),
+      audioDurationMs: _readNullableInt(map['audio_duration_ms']),
 
-      createdAt: _readDateTime(
-        map['created_at'],
-      ),
+      createdAt: _readDateTime(map['created_at']),
     );
   }
 
@@ -385,11 +319,7 @@ class ProjectMessageModel {
   //
   // ==========================================================
 
-  Map<
-    String,
-    dynamic
-  >
-  toMap() {
+  Map<String, dynamic> toMap() {
     return {
       'id': id,
 
@@ -397,13 +327,9 @@ class ProjectMessageModel {
 
       'sender_id': senderId,
 
-      'content': hasContent
-          ? content
-          : null,
+      'content': hasContent ? content : null,
 
-      'message_type': _messageTypeToDatabase(
-        type,
-      ),
+      'message_type': _messageTypeToDatabase(type),
 
       'audio_path': audioPath,
 
@@ -428,23 +354,15 @@ class ProjectMessageModel {
   //
   // ==========================================================
 
-  Map<
-    String,
-    dynamic
-  >
-  toInsertMap() {
+  Map<String, dynamic> toInsertMap() {
     return {
       'project_id': projectId,
 
       'sender_id': senderId,
 
-      'content': hasContent
-          ? content.trim()
-          : null,
+      'content': hasContent ? content.trim() : null,
 
-      'message_type': _messageTypeToDatabase(
-        type,
-      ),
+      'message_type': _messageTypeToDatabase(type),
 
       'audio_path': audioPath,
 
@@ -469,39 +387,23 @@ class ProjectMessageModel {
     bool clearAudioDuration = false,
   }) {
     return ProjectMessageModel(
-      id:
-          id ??
-          this.id,
+      id: id ?? this.id,
 
-      projectId:
-          projectId ??
-          this.projectId,
+      projectId: projectId ?? this.projectId,
 
-      senderId:
-          senderId ??
-          this.senderId,
+      senderId: senderId ?? this.senderId,
 
-      content:
-          content ??
-          this.content,
+      content: content ?? this.content,
 
-      type:
-          type ??
-          this.type,
+      type: type ?? this.type,
 
-      audioPath: clearAudioPath
-          ? null
-          : audioPath ??
-                this.audioPath,
+      audioPath: clearAudioPath ? null : audioPath ?? this.audioPath,
 
       audioDurationMs: clearAudioDuration
           ? null
-          : audioDurationMs ??
-                this.audioDurationMs,
+          : audioDurationMs ?? this.audioDurationMs,
 
-      createdAt:
-          createdAt ??
-          this.createdAt,
+      createdAt: createdAt ?? this.createdAt,
     );
   }
 
@@ -509,9 +411,7 @@ class ProjectMessageModel {
   // DATABASE TYPE
   // ==========================================================
 
-  static String _messageTypeToDatabase(
-    ProjectMessageType type,
-  ) {
+  static String _messageTypeToDatabase(ProjectMessageType type) {
     switch (type) {
       case ProjectMessageType.text:
         return 'text';
@@ -528,9 +428,7 @@ class ProjectMessageModel {
   // READ MESSAGE TYPE
   // ==========================================================
 
-  static ProjectMessageType _readMessageType(
-    dynamic value,
-  ) {
+  static ProjectMessageType _readMessageType(dynamic value) {
     final normalized = value?.toString().trim().toLowerCase();
 
     switch (normalized) {
@@ -550,25 +448,18 @@ class ProjectMessageModel {
   // READ STRING
   // ==========================================================
 
-  static String _readString(
-    dynamic value,
-  ) {
-    return value?.toString().trim() ??
-        '';
+  static String _readString(dynamic value) {
+    return value?.toString().trim() ?? '';
   }
 
   // ==========================================================
   // READ NULLABLE STRING
   // ==========================================================
 
-  static String? _readNullableString(
-    dynamic value,
-  ) {
+  static String? _readNullableString(dynamic value) {
     final normalized = value?.toString().trim();
 
-    if (normalized ==
-            null ||
-        normalized.isEmpty) {
+    if (normalized == null || normalized.isEmpty) {
       return null;
     }
 
@@ -579,14 +470,10 @@ class ProjectMessageModel {
   // NORMALIZE NULLABLE STRING
   // ==========================================================
 
-  static String? _normalizeNullableString(
-    String? value,
-  ) {
+  static String? _normalizeNullableString(String? value) {
     final normalized = value?.trim();
 
-    if (normalized ==
-            null ||
-        normalized.isEmpty) {
+    if (normalized == null || normalized.isEmpty) {
       return null;
     }
 
@@ -597,81 +484,54 @@ class ProjectMessageModel {
   // READ CONTENT
   // ==========================================================
 
-  static String _readContent(
-    dynamic value,
-  ) {
-    return value?.toString() ??
-        '';
+  static String _readContent(dynamic value) {
+    return value?.toString() ?? '';
   }
 
   // ==========================================================
   // READ NULLABLE INT
   // ==========================================================
 
-  static int? _readNullableInt(
-    dynamic value,
-  ) {
-    if (value ==
-        null) {
+  static int? _readNullableInt(dynamic value) {
+    if (value == null) {
       return null;
     }
 
-    if (value
-        is int) {
-      return value <
-              0
-          ? 0
-          : value;
+    if (value is int) {
+      return value < 0 ? 0 : value;
     }
 
-    if (value
-        is num) {
+    if (value is num) {
       final parsed = value.toInt();
 
-      return parsed <
-              0
-          ? 0
-          : parsed;
+      return parsed < 0 ? 0 : parsed;
     }
 
-    final parsed = int.tryParse(
-      value.toString(),
-    );
+    final parsed = int.tryParse(value.toString());
 
-    if (parsed ==
-        null) {
+    if (parsed == null) {
       return null;
     }
 
-    return parsed <
-            0
-        ? 0
-        : parsed;
+    return parsed < 0 ? 0 : parsed;
   }
 
   // ==========================================================
   // READ DATE
   // ==========================================================
 
-  static DateTime _readDateTime(
-    dynamic value,
-  ) {
-    if (value
-        is DateTime) {
+  static DateTime _readDateTime(dynamic value) {
+    if (value is DateTime) {
       return value.toLocal();
     }
 
-    if (value
-        is String) {
+    if (value is String) {
       final normalized = value.trim();
 
       if (normalized.isNotEmpty) {
-        final parsed = DateTime.tryParse(
-          normalized,
-        );
+        final parsed = DateTime.tryParse(normalized);
 
-        if (parsed !=
-            null) {
+        if (parsed != null) {
           return parsed.toLocal();
         }
       }
@@ -685,20 +545,12 @@ class ProjectMessageModel {
   // ==========================================================
 
   @override
-  bool operator ==(
-    Object other,
-  ) {
-    if (identical(
-      this,
-      other,
-    )) {
+  bool operator ==(Object other) {
+    if (identical(this, other)) {
       return true;
     }
 
-    return other
-            is ProjectMessageModel &&
-        other.id ==
-            id;
+    return other is ProjectMessageModel && other.id == id;
   }
 
   // ==========================================================

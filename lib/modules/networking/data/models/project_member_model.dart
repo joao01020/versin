@@ -58,10 +58,7 @@ class ProjectMemberModel {
 
   final String primaryRole;
 
-  final List<
-    String
-  >
-  roles;
+  final List<String> roles;
 
   final String? avatarUrl;
 
@@ -152,12 +149,7 @@ class ProjectMemberModel {
   // ==========================================================
 
   String get usernameLabel {
-    final normalized = username.trim().replaceFirst(
-      RegExp(
-        r'^@+',
-      ),
-      '',
-    );
+    final normalized = username.trim().replaceFirst(RegExp(r'^@+'), '');
 
     if (normalized.isEmpty) {
       return '';
@@ -179,8 +171,7 @@ class ProjectMemberModel {
   // ==========================================================
 
   bool get hasAvatar {
-    return avatarUrl?.trim().isNotEmpty ==
-        true;
+    return avatarUrl?.trim().isNotEmpty == true;
   }
 
   // ==========================================================
@@ -213,62 +204,37 @@ class ProjectMemberModel {
   // É O USUÁRIO
   // ==========================================================
 
-  bool representsUser(
-    String userId,
-  ) {
+  bool representsUser(String userId) {
     final normalizedUserId = userId.trim();
 
     if (normalizedUserId.isEmpty) {
       return false;
     }
 
-    return id ==
-        normalizedUserId;
+    return id == normalizedUserId;
   }
 
   // ==========================================================
   // FROM MAP
   // ==========================================================
 
-  factory ProjectMemberModel.fromMap(
-    Map<
-      String,
-      dynamic
-    >
-    map,
-  ) {
+  factory ProjectMemberModel.fromMap(Map<String, dynamic> map) {
     return ProjectMemberModel(
-      id:
-          map['id']?.toString().trim() ??
-          '',
+      id: map['id']?.toString().trim() ?? '',
 
-      username:
-          map['username']?.toString().trim() ??
-          '',
+      username: map['username']?.toString().trim() ?? '',
 
-      name:
-          map['name']?.toString().trim() ??
-          '',
+      name: map['name']?.toString().trim() ?? '',
 
-      artistName:
-          map['artist_name']?.toString().trim() ??
-          '',
+      artistName: map['artist_name']?.toString().trim() ?? '',
 
-      primaryRole:
-          map['primary_role']?.toString().trim() ??
-          '',
+      primaryRole: map['primary_role']?.toString().trim() ?? '',
 
-      roles: _readStringList(
-        map['roles'],
-      ),
+      roles: _readStringList(map['roles']),
 
-      avatarUrl: _readNullableString(
-        map['avatar_url'],
-      ),
+      avatarUrl: _readNullableString(map['avatar_url']),
 
-      isOnline: _readBool(
-        map['is_online'],
-      ),
+      isOnline: _readBool(map['is_online']),
     );
   }
 
@@ -276,11 +242,7 @@ class ProjectMemberModel {
   // TO MAP
   // ==========================================================
 
-  Map<
-    String,
-    dynamic
-  >
-  toMap() {
+  Map<String, dynamic> toMap() {
     return {
       'id': id,
 
@@ -310,45 +272,26 @@ class ProjectMemberModel {
     String? name,
     String? artistName,
     String? primaryRole,
-    List<
-      String
-    >?
-    roles,
+    List<String>? roles,
     String? avatarUrl,
     bool? isOnline,
   }) {
     return ProjectMemberModel(
-      id:
-          id ??
-          this.id,
+      id: id ?? this.id,
 
-      username:
-          username ??
-          this.username,
+      username: username ?? this.username,
 
-      name:
-          name ??
-          this.name,
+      name: name ?? this.name,
 
-      artistName:
-          artistName ??
-          this.artistName,
+      artistName: artistName ?? this.artistName,
 
-      primaryRole:
-          primaryRole ??
-          this.primaryRole,
+      primaryRole: primaryRole ?? this.primaryRole,
 
-      roles:
-          roles ??
-          this.roles,
+      roles: roles ?? this.roles,
 
-      avatarUrl:
-          avatarUrl ??
-          this.avatarUrl,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
 
-      isOnline:
-          isOnline ??
-          this.isOnline,
+      isOnline: isOnline ?? this.isOnline,
     );
   }
 
@@ -356,48 +299,26 @@ class ProjectMemberModel {
   // READ STRING LIST
   // ==========================================================
 
-  static List<
-    String
-  >
-  _readStringList(
-    dynamic value,
-  ) {
-    if (value
-        is! Iterable) {
-      return const <
-        String
-      >[];
+  static List<String> _readStringList(dynamic value) {
+    if (value is! Iterable) {
+      return const <String>[];
     }
 
     return value
-        .map(
-          (
-            item,
-          ) => item.toString().trim(),
-        )
-        .where(
-          (
-            item,
-          ) => item.isNotEmpty,
-        )
+        .map((item) => item.toString().trim())
+        .where((item) => item.isNotEmpty)
         .toSet()
-        .toList(
-          growable: false,
-        );
+        .toList(growable: false);
   }
 
   // ==========================================================
   // READ NULLABLE STRING
   // ==========================================================
 
-  static String? _readNullableString(
-    dynamic value,
-  ) {
+  static String? _readNullableString(dynamic value) {
     final normalized = value?.toString().trim();
 
-    if (normalized ==
-            null ||
-        normalized.isEmpty) {
+    if (normalized == null || normalized.isEmpty) {
       return null;
     }
 
@@ -408,23 +329,16 @@ class ProjectMemberModel {
   // READ BOOL
   // ==========================================================
 
-  static bool _readBool(
-    dynamic value, {
-    bool fallback = false,
-  }) {
-    if (value
-        is bool) {
+  static bool _readBool(dynamic value, {bool fallback = false}) {
+    if (value is bool) {
       return value;
     }
 
-    if (value
-        is num) {
-      return value !=
-          0;
+    if (value is num) {
+      return value != 0;
     }
 
-    if (value
-        is String) {
+    if (value is String) {
       switch (value.trim().toLowerCase()) {
         case 'true':
         case '1':
@@ -444,20 +358,12 @@ class ProjectMemberModel {
   // ==========================================================
 
   @override
-  bool operator ==(
-    Object other,
-  ) {
-    if (identical(
-      this,
-      other,
-    )) {
+  bool operator ==(Object other) {
+    if (identical(this, other)) {
       return true;
     }
 
-    return other
-            is ProjectMemberModel &&
-        other.id ==
-            id;
+    return other is ProjectMemberModel && other.id == id;
   }
 
   @override

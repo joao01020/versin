@@ -16,11 +16,7 @@
 //
 // ============================================================
 
-enum ProjectRecruitmentStatus {
-  open,
-  closed,
-  completed,
-}
+enum ProjectRecruitmentStatus { open, closed, completed }
 
 // ============================================================
 // PROJECT RECRUITMENT MODEL
@@ -58,29 +54,20 @@ class ProjectRecruitmentModel {
   // STATUS
   // ==========================================================
 
-  bool get isOpen =>
-      status ==
-      ProjectRecruitmentStatus.open;
+  bool get isOpen => status == ProjectRecruitmentStatus.open;
 
-  bool get isClosed =>
-      status ==
-      ProjectRecruitmentStatus.closed;
+  bool get isClosed => status == ProjectRecruitmentStatus.closed;
 
-  bool get isCompleted =>
-      status ==
-      ProjectRecruitmentStatus.completed;
+  bool get isCompleted => status == ProjectRecruitmentStatus.completed;
 
   bool get isExpired {
     final expiration = expiresAt;
 
-    if (expiration ==
-        null) {
+    if (expiration == null) {
       return false;
     }
 
-    return expiration.isBefore(
-      DateTime.now(),
-    );
+    return expiration.isBefore(DateTime.now());
   }
 
   // ==========================================================
@@ -113,9 +100,7 @@ class ProjectRecruitmentModel {
       default:
         final value = role.trim();
 
-        return value.isEmpty
-            ? 'Membro'
-            : value;
+        return value.isEmpty ? 'Membro' : value;
     }
   }
 
@@ -123,45 +108,23 @@ class ProjectRecruitmentModel {
   // FROM MAP
   // ==========================================================
 
-  factory ProjectRecruitmentModel.fromMap(
-    Map<
-      String,
-      dynamic
-    >
-    map,
-  ) {
+  factory ProjectRecruitmentModel.fromMap(Map<String, dynamic> map) {
     return ProjectRecruitmentModel(
-      id:
-          map['id']?.toString().trim() ??
-          '',
+      id: map['id']?.toString().trim() ?? '',
 
-      projectId:
-          map['project_id']?.toString().trim() ??
-          '',
+      projectId: map['project_id']?.toString().trim() ?? '',
 
-      createdBy:
-          map['created_by']?.toString().trim() ??
-          '',
+      createdBy: map['created_by']?.toString().trim() ?? '',
 
-      role:
-          map['role']?.toString().trim() ??
-          '',
+      role: map['role']?.toString().trim() ?? '',
 
-      description:
-          map['description']?.toString().trim() ??
-          '',
+      description: map['description']?.toString().trim() ?? '',
 
-      status: statusFromString(
-        map['status']?.toString(),
-      ),
+      status: statusFromString(map['status']?.toString()),
 
-      createdAt: _readDate(
-        map['created_at'],
-      ),
+      createdAt: _readDate(map['created_at']),
 
-      expiresAt: _readNullableDate(
-        map['expires_at'],
-      ),
+      expiresAt: _readNullableDate(map['expires_at']),
     );
   }
 
@@ -169,9 +132,7 @@ class ProjectRecruitmentModel {
   // STATUS FROM STRING
   // ==========================================================
 
-  static ProjectRecruitmentStatus statusFromString(
-    String? value,
-  ) {
+  static ProjectRecruitmentStatus statusFromString(String? value) {
     switch (value?.trim().toLowerCase()) {
       case 'closed':
         return ProjectRecruitmentStatus.closed;
@@ -189,9 +150,7 @@ class ProjectRecruitmentModel {
   // STATUS TO STRING
   // ==========================================================
 
-  static String statusToString(
-    ProjectRecruitmentStatus value,
-  ) {
+  static String statusToString(ProjectRecruitmentStatus value) {
     switch (value) {
       case ProjectRecruitmentStatus.open:
         return 'open';
@@ -208,22 +167,15 @@ class ProjectRecruitmentModel {
   // DATE
   // ==========================================================
 
-  static DateTime _readDate(
-    dynamic value,
-  ) {
-    if (value
-        is DateTime) {
+  static DateTime _readDate(dynamic value) {
+    if (value is DateTime) {
       return value.toLocal();
     }
 
-    if (value
-        is String) {
-      final parsed = DateTime.tryParse(
-        value,
-      );
+    if (value is String) {
+      final parsed = DateTime.tryParse(value);
 
-      if (parsed !=
-          null) {
+      if (parsed != null) {
         return parsed.toLocal();
       }
     }
@@ -231,24 +183,17 @@ class ProjectRecruitmentModel {
     return DateTime.now();
   }
 
-  static DateTime? _readNullableDate(
-    dynamic value,
-  ) {
-    if (value ==
-        null) {
+  static DateTime? _readNullableDate(dynamic value) {
+    if (value == null) {
       return null;
     }
 
-    if (value
-        is DateTime) {
+    if (value is DateTime) {
       return value.toLocal();
     }
 
-    if (value
-        is String) {
-      return DateTime.tryParse(
-        value,
-      )?.toLocal();
+    if (value is String) {
+      return DateTime.tryParse(value)?.toLocal();
     }
 
     return null;
@@ -282,10 +227,7 @@ class ProjectRecruitmentCandidateModel {
 
   final String primaryRole;
 
-  final List<
-    String
-  >
-  roles;
+  final List<String> roles;
 
   final String? avatarUrl;
 
@@ -339,12 +281,7 @@ class ProjectRecruitmentCandidateModel {
   // ==========================================================
 
   String get usernameLabel {
-    final normalized = username.trim().replaceFirst(
-      RegExp(
-        r'^@+',
-      ),
-      '',
-    );
+    final normalized = username.trim().replaceFirst(RegExp(r'^@+'), '');
 
     if (normalized.isEmpty) {
       return '';
@@ -357,63 +294,39 @@ class ProjectRecruitmentCandidateModel {
   // STATUS
   // ==========================================================
 
-  bool get isInvited =>
-      status ==
-      ProjectRecruitmentCandidateStatus.invited;
+  bool get isInvited => status == ProjectRecruitmentCandidateStatus.invited;
 
   bool get isInterested =>
-      status ==
-      ProjectRecruitmentCandidateStatus.interested;
+      status == ProjectRecruitmentCandidateStatus.interested;
 
-  bool get isApproved =>
-      status ==
-      ProjectRecruitmentCandidateStatus.approved;
+  bool get isApproved => status == ProjectRecruitmentCandidateStatus.approved;
 
   // ==========================================================
   // FROM PROFILE
   // ==========================================================
 
   factory ProjectRecruitmentCandidateModel.fromProfileMap(
-    Map<
-      String,
-      dynamic
-    >
-    map, {
-    ProjectRecruitmentCandidateStatus status = ProjectRecruitmentCandidateStatus.discovered,
+    Map<String, dynamic> map, {
+    ProjectRecruitmentCandidateStatus status =
+        ProjectRecruitmentCandidateStatus.discovered,
     String? candidateRecordId,
   }) {
     return ProjectRecruitmentCandidateModel(
-      userId:
-          map['id']?.toString().trim() ??
-          '',
+      userId: map['id']?.toString().trim() ?? '',
 
-      username:
-          map['username']?.toString().trim() ??
-          '',
+      username: map['username']?.toString().trim() ?? '',
 
-      name:
-          map['name']?.toString().trim() ??
-          '',
+      name: map['name']?.toString().trim() ?? '',
 
-      artistName:
-          map['artist_name']?.toString().trim() ??
-          '',
+      artistName: map['artist_name']?.toString().trim() ?? '',
 
-      primaryRole:
-          map['primary_role']?.toString().trim() ??
-          '',
+      primaryRole: map['primary_role']?.toString().trim() ?? '',
 
-      roles: _readList(
-        map['roles'],
-      ),
+      roles: _readList(map['roles']),
 
-      avatarUrl: _readNullableString(
-        map['avatar_url'],
-      ),
+      avatarUrl: _readNullableString(map['avatar_url']),
 
-      isOnline:
-          map['is_online'] ==
-          true,
+      isOnline: map['is_online'] == true,
 
       status: status,
 
@@ -425,9 +338,7 @@ class ProjectRecruitmentCandidateModel {
   // STATUS FROM STRING
   // ==========================================================
 
-  static ProjectRecruitmentCandidateStatus statusFromString(
-    String? value,
-  ) {
+  static ProjectRecruitmentCandidateStatus statusFromString(String? value) {
     switch (value?.trim().toLowerCase()) {
       case 'invited':
         return ProjectRecruitmentCandidateStatus.invited;
@@ -451,43 +362,21 @@ class ProjectRecruitmentCandidateModel {
   // LIST
   // ==========================================================
 
-  static List<
-    String
-  >
-  _readList(
-    dynamic value,
-  ) {
-    if (value
-        is! Iterable) {
-      return const <
-        String
-      >[];
+  static List<String> _readList(dynamic value) {
+    if (value is! Iterable) {
+      return const <String>[];
     }
 
     return value
-        .map(
-          (
-            item,
-          ) => item.toString().trim(),
-        )
-        .where(
-          (
-            item,
-          ) => item.isNotEmpty,
-        )
-        .toList(
-          growable: false,
-        );
+        .map((item) => item.toString().trim())
+        .where((item) => item.isNotEmpty)
+        .toList(growable: false);
   }
 
-  static String? _readNullableString(
-    dynamic value,
-  ) {
+  static String? _readNullableString(dynamic value) {
     final normalized = value?.toString().trim();
 
-    if (normalized ==
-            null ||
-        normalized.isEmpty) {
+    if (normalized == null || normalized.isEmpty) {
       return null;
     }
 

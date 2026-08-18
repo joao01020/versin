@@ -78,31 +78,45 @@ import 'package:versin/modules/public_profile/views/public_profile_page.dart';
 //
 // ============================================================
 
-class MatchPage
-    extends
-        StatefulWidget {
+class MatchPage extends StatefulWidget {
   static const String routeName = '/match';
 
-  const MatchPage({
-    super.key,
-  });
+  // ============================================================
+  // EXPANSÃO DE EQUIPE
+  // ============================================================
+  //
+  // null:
+  // -> Match normal;
+  // -> match mútuo cria uma nova Studio Session.
+  //
+  // preenchido:
+  // -> Match aberto a partir de uma Studio Session;
+  // -> objetivo é procurar profissionais para convidar;
+  // -> NÃO deve criar outro projeto automaticamente.
+  //
+  // ============================================================
+
+  final String? targetProjectId;
+
+  final String? targetProjectTitle;
+
+  const MatchPage({super.key, this.targetProjectId, this.targetProjectTitle});
+
+  bool get isTeamExpansionMode {
+    final projectId = targetProjectId?.trim();
+
+    return projectId != null && projectId.isNotEmpty;
+  }
 
   @override
-  State<
-    MatchPage
-  >
-  createState() => _MatchPageState();
+  State<MatchPage> createState() => _MatchPageState();
 }
 
 // ============================================================
 // STATE
 // ============================================================
 
-class _MatchPageState
-    extends
-        State<
-          MatchPage
-        > {
+class _MatchPageState extends State<MatchPage> {
   // ============================================================
   // CONTROLLERS
   // ============================================================
@@ -139,13 +153,8 @@ class _MatchPageState
   // CONFIRMAR MODO POR PROXIMIDADE
   // ============================================================
 
-  Future<
-    void
-  >
-  _confirmNearbyDiscovery() async {
-    if (!mounted ||
-        _isInitializingMatch ||
-        _sessionService.isRestarting) {
+  Future<void> _confirmNearbyDiscovery() async {
+    if (!mounted || _isInitializingMatch || _sessionService.isRestarting) {
       return;
     }
 
@@ -154,7 +163,8 @@ class _MatchPageState
     // ==========================================================
 
     try {
-      final alreadyAccepted = await _locationConsentService.hasAcceptedNearbyLocation();
+      final alreadyAccepted = await _locationConsentService
+          .hasAcceptedNearbyLocation();
 
       if (!mounted) {
         return;
@@ -166,16 +176,11 @@ class _MatchPageState
           'Consentimento de localização já registrado.',
         );
 
-        await _changeDiscoveryMode(
-          MatchDiscoveryMode.nearby,
-        );
+        await _changeDiscoveryMode(MatchDiscoveryMode.nearby);
 
         return;
       }
-    } catch (
-      error,
-      stackTrace
-    ) {
+    } catch (error, stackTrace) {
       debugPrint(
         '[MATCH PAGE] '
         'Erro ao consultar consentimento: $error',
@@ -190,9 +195,7 @@ class _MatchPageState
         return;
       }
 
-      ScaffoldMessenger.of(
-          context,
-        )
+      ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
           const SnackBar(
@@ -216,182 +219,136 @@ class _MatchPageState
       'Exibindo confirmação inicial de localização.',
     );
 
-    final confirmed =
-        await showDialog<
-          bool
-        >(
-          context: context,
-          barrierDismissible: false,
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
 
-          builder:
-              (
-                dialogContext,
-              ) {
-                return StatefulBuilder(
-                  builder:
-                      (
-                        context,
-                        setDialogState,
-                      ) {
-                        return AlertDialog(
-                          backgroundColor: const Color(
-                            0xFF17132D,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: const Color(0xFF17132D),
+
+              surfaceTintColor: Colors.transparent,
+
+              title: const Text(
+                'Encontrar profissionais próximos',
+
+                style: TextStyle(
+                  color: Colors.white,
+
+                  fontSize: 16,
+
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+
+                crossAxisAlignment: CrossAxisAlignment.start,
+
+                children: [
+                  const Text(
+                    'Usamos sua localização apenas para '
+                    'encontrar profissionais próximos de você.\n\n'
+                    'Sua posição é usada para calcular a '
+                    'distância entre perfis e melhorar os '
+                    'resultados do modo Próximos.',
+
+                    style: TextStyle(
+                      color: Colors.white60,
+
+                      fontSize: 12,
+
+                      height: 1.5,
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+                  Align(
+                    alignment: Alignment.centerLeft,
+
+                    child: TextButton.icon(
+                      onPressed: () async {
+                        await Navigator.of(dialogContext).push(
+                          MaterialPageRoute(
+                            builder: (_) {
+                              return const LocationPrivacyPage();
+                            },
                           ),
-
-                          surfaceTintColor: Colors.transparent,
-
-                          title: const Text(
-                            'Encontrar profissionais próximos',
-
-                            style: TextStyle(
-                              color: Colors.white,
-
-                              fontSize: 16,
-
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-
-                          content: Column(
-                            mainAxisSize: MainAxisSize.min,
-
-                            crossAxisAlignment: CrossAxisAlignment.start,
-
-                            children: [
-                              const Text(
-                                'Usamos sua localização apenas para '
-                                'encontrar profissionais próximos de você.\n\n'
-                                'Sua posição é usada para calcular a '
-                                'distância entre perfis e melhorar os '
-                                'resultados do modo Próximos.',
-
-                                style: TextStyle(
-                                  color: Colors.white60,
-
-                                  fontSize: 12,
-
-                                  height: 1.5,
-                                ),
-                              ),
-
-                              const SizedBox(
-                                height: 16,
-                              ),
-                              Align(
-                                alignment: Alignment.centerLeft,
-
-                                child: TextButton.icon(
-                                  onPressed: () async {
-                                    await Navigator.of(
-                                      dialogContext,
-                                    ).push(
-                                      MaterialPageRoute(
-                                        builder:
-                                            (
-                                              _,
-                                            ) {
-                                              return const LocationPrivacyPage();
-                                            },
-                                      ),
-                                    );
-                                  },
-
-                                  icon: const Icon(
-                                    Icons.open_in_new_rounded,
-
-                                    size: 15,
-                                  ),
-
-                                  label: const Text(
-                                    'Como usamos sua localização',
-                                  ),
-                                ),
-                              ),
-                              CheckboxListTile(
-                                contentPadding: EdgeInsets.zero,
-
-                                controlAffinity: ListTileControlAffinity.leading,
-
-                                value: accepted,
-
-                                activeColor: _matchController.accentNeon,
-
-                                checkColor: Colors.black,
-
-                                title: const Text(
-                                  'Confirmo que entendi e permito '
-                                  'o uso da minha localização para '
-                                  'encontrar profissionais próximos.',
-
-                                  style: TextStyle(
-                                    color: Colors.white70,
-
-                                    fontSize: 11,
-
-                                    height: 1.4,
-                                  ),
-                                ),
-
-                                onChanged:
-                                    (
-                                      value,
-                                    ) {
-                                      setDialogState(
-                                        () {
-                                          accepted =
-                                              value ??
-                                              false;
-                                        },
-                                      );
-                                    },
-                              ),
-                            ],
-                          ),
-
-                          actions: [
-                            TextButton(
-                              onPressed: () {
-                                Navigator.of(
-                                  dialogContext,
-                                ).pop(
-                                  false,
-                                );
-                              },
-
-                              child: const Text(
-                                'CANCELAR',
-                              ),
-                            ),
-
-                            FilledButton(
-                              onPressed: accepted
-                                  ? () {
-                                      Navigator.of(
-                                        dialogContext,
-                                      ).pop(
-                                        true,
-                                      );
-                                    }
-                                  : null,
-
-                              child: const Text(
-                                'CONTINUAR',
-                              ),
-                            ),
-                          ],
                         );
                       },
-                );
-              },
+
+                      icon: const Icon(Icons.open_in_new_rounded, size: 15),
+
+                      label: const Text('Como usamos sua localização'),
+                    ),
+                  ),
+                  CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+
+                    controlAffinity: ListTileControlAffinity.leading,
+
+                    value: accepted,
+
+                    activeColor: _matchController.accentNeon,
+
+                    checkColor: Colors.black,
+
+                    title: const Text(
+                      'Confirmo que entendi e permito '
+                      'o uso da minha localização para '
+                      'encontrar profissionais próximos.',
+
+                      style: TextStyle(
+                        color: Colors.white70,
+
+                        fontSize: 11,
+
+                        height: 1.4,
+                      ),
+                    ),
+
+                    onChanged: (value) {
+                      setDialogState(() {
+                        accepted = value ?? false;
+                      });
+                    },
+                  ),
+                ],
+              ),
+
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(dialogContext).pop(false);
+                  },
+
+                  child: const Text('CANCELAR'),
+                ),
+
+                FilledButton(
+                  onPressed: accepted
+                      ? () {
+                          Navigator.of(dialogContext).pop(true);
+                        }
+                      : null,
+
+                  child: const Text('CONTINUAR'),
+                ),
+              ],
+            );
+          },
         );
+      },
+    );
 
     // ==========================================================
     // CANCELADO
     // ==========================================================
 
-    if (!mounted ||
-        confirmed !=
-            true) {
+    if (!mounted || confirmed != true) {
       debugPrint(
         '[MATCH PAGE] '
         'Consentimento de localização não confirmado.',
@@ -411,10 +368,7 @@ class _MatchPageState
         '[MATCH PAGE] '
         'Consentimento de localização salvo.',
       );
-    } catch (
-      error,
-      stackTrace
-    ) {
+    } catch (error, stackTrace) {
       debugPrint(
         '[MATCH PAGE] '
         'Erro ao salvar consentimento: $error',
@@ -429,15 +383,11 @@ class _MatchPageState
         return;
       }
 
-      ScaffoldMessenger.of(
-          context,
-        )
+      ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
           const SnackBar(
-            content: Text(
-              'Não foi possível salvar sua confirmação.',
-            ),
+            content: Text('Não foi possível salvar sua confirmação.'),
           ),
         );
 
@@ -452,9 +402,7 @@ class _MatchPageState
     // ENTRAR NO MODO PRÓXIMOS
     // ==========================================================
 
-    await _changeDiscoveryMode(
-      MatchDiscoveryMode.nearby,
-    );
+    await _changeDiscoveryMode(MatchDiscoveryMode.nearby);
   }
 
   // ============================================================
@@ -471,14 +419,39 @@ class _MatchPageState
 
   bool _isLoadingDemo = false;
 
+  bool _isCreatingProjectInvitation = false;
+
   // ============================================================
   // STREAM
   // ============================================================
 
-  StreamSubscription<
-    String
-  >?
-  _matchSubscription;
+  StreamSubscription<String>? _matchSubscription;
+
+  // ============================================================
+  // PAGE MODE
+  // ============================================================
+
+  bool get _isTeamExpansionMode => widget.isTeamExpansionMode;
+
+  String? get _targetProjectId {
+    final value = widget.targetProjectId?.trim();
+
+    if (value == null || value.isEmpty) {
+      return null;
+    }
+
+    return value;
+  }
+
+  String get _targetProjectTitle {
+    final value = widget.targetProjectTitle?.trim();
+
+    if (value != null && value.isNotEmpty) {
+      return value;
+    }
+
+    return 'Studio Session';
+  }
 
   // ============================================================
   // AUTH
@@ -487,9 +460,7 @@ class _MatchPageState
   String? get _authenticatedUserId {
     final id = Supabase.instance.client.auth.currentUser?.id.trim();
 
-    if (id ==
-            null ||
-        id.isEmpty) {
+    if (id == null || id.isEmpty) {
       return null;
     }
 
@@ -508,9 +479,14 @@ class _MatchPageState
 
     _setupListeners();
 
-    unawaited(
-      _initializeMatch(),
+    debugPrint(
+      '[MATCH PAGE] '
+      'Modo: '
+      '${_isTeamExpansionMode ? "expansão de equipe" : "match normal"}'
+      '${_targetProjectId != null ? " | projeto: $_targetProjectId" : ""}',
     );
+
+    unawaited(_initializeMatch());
   }
 
   // ============================================================
@@ -518,20 +494,11 @@ class _MatchPageState
   // ============================================================
 
   void _setupDependencies() {
-    _matchController =
-        sl<
-          MatchController
-        >();
+    _matchController = sl<MatchController>();
 
-    _professionalProfileController =
-        sl<
-          ProfessionalProfileController
-        >();
+    _professionalProfileController = sl<ProfessionalProfileController>();
 
-    _matchRepository =
-        sl<
-          MatchRepository
-        >();
+    _matchRepository = sl<MatchRepository>();
 
     _matchSearchController = MatchSearchController(
       repository: _matchRepository,
@@ -558,34 +525,23 @@ class _MatchPageState
   // ============================================================
 
   void _setupListeners() {
-    _matchController.addListener(
-      _handleStateChange,
-    );
+    _matchController.addListener(_handleStateChange);
 
-    _professionalProfileController.addListener(
-      _handleStateChange,
-    );
+    _professionalProfileController.addListener(_handleStateChange);
 
-    _matchSearchController.addListener(
-      _handleStateChange,
-    );
+    _matchSearchController.addListener(_handleStateChange);
 
-    _publicProfileController.addListener(
-      _handleStateChange,
-    );
+    _publicProfileController.addListener(_handleStateChange);
 
     _matchSubscription = _matchController.matchEventStream.listen(
       _handleMatchEvent,
-      onError:
-          (
-            error,
-          ) {
-            debugPrint(
-              '[MATCH PAGE] '
-              'Erro no stream: '
-              '$error',
-            );
-          },
+      onError: (error) {
+        debugPrint(
+          '[MATCH PAGE] '
+          'Erro no stream: '
+          '$error',
+        );
+      },
     );
   }
 
@@ -598,34 +554,25 @@ class _MatchPageState
       return;
     }
 
-    setState(
-      () {},
-    );
+    setState(() {});
   }
 
   // ============================================================
   // INITIALIZE
   // ============================================================
 
-  Future<
-    void
-  >
-  _initializeMatch() async {
+  Future<void> _initializeMatch() async {
     if (mounted) {
-      setState(
-        () {
-          _isInitializingMatch = true;
-        },
-      );
+      setState(() {
+        _isInitializingMatch = true;
+      });
     }
 
     try {
       await _sessionService.initialize();
 
       await _loadPublicProfile();
-    } catch (
-      error
-    ) {
+    } catch (error) {
       debugPrint(
         '[MATCH PAGE] '
         'Erro ao inicializar: '
@@ -636,11 +583,9 @@ class _MatchPageState
         return;
       }
 
-      setState(
-        () {
-          _isInitializingMatch = false;
-        },
-      );
+      setState(() {
+        _isInitializingMatch = false;
+      });
     }
   }
 
@@ -648,14 +593,10 @@ class _MatchPageState
   // LOAD PUBLIC PROFILE
   // ============================================================
 
-  Future<
-    void
-  >
-  _loadPublicProfile() async {
+  Future<void> _loadPublicProfile() async {
     final userId = _authenticatedUserId;
 
-    if (userId ==
-        null) {
+    if (userId == null) {
       debugPrint(
         '[PUBLIC PROFILE] '
         'Usuário não autenticado.',
@@ -664,14 +605,11 @@ class _MatchPageState
       return;
     }
 
-    await _publicProfileController.load(
-      userId: userId,
-    );
+    await _publicProfileController.load(userId: userId);
 
     final profile = _publicProfileController.profile;
 
-    if (profile ==
-        null) {
+    if (profile == null) {
       debugPrint(
         '[PUBLIC PROFILE] '
         'Perfil não encontrado.',
@@ -691,42 +629,29 @@ class _MatchPageState
   // OPEN PUBLIC PROFILE
   // ============================================================
 
-  Future<
-    void
-  >
-  _openPublicProfile() async {
+  Future<void> _openPublicProfile() async {
     final userId = _authenticatedUserId;
 
-    if (userId ==
-            null ||
-        !mounted) {
+    if (userId == null || !mounted) {
       return;
     }
 
-    if (_publicProfileController.loadedUserId !=
-        userId) {
-      await _publicProfileController.load(
-        userId: userId,
-      );
+    if (_publicProfileController.loadedUserId != userId) {
+      await _publicProfileController.load(userId: userId);
     }
 
     if (!mounted) {
       return;
     }
 
-    await Navigator.of(
-      context,
-    ).push(
+    await Navigator.of(context).push(
       MaterialPageRoute(
-        builder:
-            (
-              _,
-            ) {
-              return PublicProfilePage(
-                userId: userId,
-                controller: _publicProfileController,
-              );
-            },
+        builder: (_) {
+          return PublicProfilePage(
+            userId: userId,
+            controller: _publicProfileController,
+          );
+        },
       ),
     );
 
@@ -759,20 +684,14 @@ class _MatchPageState
   //
   // ============================================================
 
-  Future<
-    void
-  >
-  _openUserDemo(
-    String userId,
-  ) async {
+  Future<void> _openUserDemo(String userId) async {
     final normalizedUserId = userId.trim();
 
     // ==========================================================
     // VALIDATION
     // ==========================================================
 
-    if (normalizedUserId.isEmpty ||
-        !mounted) {
+    if (normalizedUserId.isEmpty || !mounted) {
       return;
     }
 
@@ -797,10 +716,7 @@ class _MatchPageState
     final discoveryUser = _matchController.discoveryUser;
 
     final displayName =
-        discoveryUser !=
-                null &&
-            discoveryUser.id ==
-                normalizedUserId
+        discoveryUser != null && discoveryUser.id == normalizedUserId
         ? discoveryUser.name
         : 'Profissional';
 
@@ -808,11 +724,9 @@ class _MatchPageState
     // LOADING
     // ==========================================================
 
-    setState(
-      () {
-        _isLoadingDemo = true;
-      },
-    );
+    setState(() {
+      _isLoadingDemo = true;
+    });
 
     try {
       debugPrint(
@@ -840,9 +754,8 @@ class _MatchPageState
       //
       // ========================================================
 
-      final playback = await _publicProfileController.getFirstTrackPlaybackForUser(
-        userId: normalizedUserId,
-      );
+      final playback = await _publicProfileController
+          .getFirstTrackPlaybackForUser(userId: normalizedUserId);
 
       if (!mounted) {
         return;
@@ -852,8 +765,7 @@ class _MatchPageState
       // NO TRACK
       // ========================================================
 
-      if (playback ==
-          null) {
+      if (playback == null) {
         debugPrint(
           '[MATCH DEMO] '
           'Usuário sem demo.',
@@ -907,10 +819,7 @@ class _MatchPageState
         displayName: displayName,
         accentColor: _matchController.accentNeon,
       );
-    } catch (
-      error,
-      stackTrace
-    ) {
+    } catch (error, stackTrace) {
       debugPrint(
         '[MATCH DEMO] '
         'Erro ao abrir demo: '
@@ -927,37 +836,248 @@ class _MatchPageState
         return;
       }
 
-      ScaffoldMessenger.of(
-          context,
-        )
+      ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Não foi possível carregar a demo.',
-            ),
-          ),
+          const SnackBar(content: Text('Não foi possível carregar a demo.')),
         );
     } finally {
       if (!mounted) {
         return;
       }
 
-      setState(
-        () {
-          _isLoadingDemo = false;
-        },
-      );
+      setState(() {
+        _isLoadingDemo = false;
+      });
     }
+  }
+
+  // ============================================================
+  // INVITE USER TO PROJECT
+  // ============================================================
+
+  Future<bool> _inviteUserToProject(String userId) async {
+    if (!mounted || !_isTeamExpansionMode || _isCreatingProjectInvitation) {
+      return false;
+    }
+
+    final projectId = _targetProjectId;
+
+    final currentUserId = _authenticatedUserId;
+
+    final normalizedUserId = userId.trim();
+
+    if (projectId == null ||
+        projectId.isEmpty ||
+        currentUserId == null ||
+        currentUserId.isEmpty ||
+        normalizedUserId.isEmpty) {
+      return false;
+    }
+
+    if (normalizedUserId == currentUserId) {
+      return false;
+    }
+
+    setState(() {
+      _isCreatingProjectInvitation = true;
+    });
+
+    try {
+      // ========================================================
+      // VALIDAR PROJETO
+      // ========================================================
+
+      final project = await Supabase.instance.client
+          .from('projects')
+          .select('id, title, members, founders, status')
+          .eq('id', projectId)
+          .maybeSingle();
+
+      if (project == null) {
+        _showInvitationMessage('Equipe não encontrada.', isError: true);
+
+        return false;
+      }
+
+      // ========================================================
+      // VALIDAR FUNDADOR
+      // ========================================================
+
+      final foundersRaw = project['founders'];
+
+      final founders = foundersRaw is Iterable
+          ? foundersRaw
+                .map((value) => value.toString().trim())
+                .where((value) => value.isNotEmpty)
+                .toSet()
+          : <String>{};
+
+      if (!founders.contains(currentUserId)) {
+        _showInvitationMessage(
+          'Somente fundadores podem convidar novos membros.',
+          isError: true,
+        );
+
+        return false;
+      }
+
+      // ========================================================
+      // JÁ É MEMBRO
+      // ========================================================
+
+      final membersRaw = project['members'];
+
+      final members = membersRaw is Iterable
+          ? membersRaw
+                .map((value) => value.toString().trim())
+                .where((value) => value.isNotEmpty)
+                .toSet()
+          : <String>{};
+
+      if (members.contains(normalizedUserId)) {
+        _showInvitationMessage(
+          'Este usuário já faz parte da equipe.',
+          isError: true,
+        );
+
+        return false;
+      }
+
+      // ========================================================
+      // CONVITE PENDENTE EXISTENTE
+      // ========================================================
+
+      final existingInvitation = await Supabase.instance.client
+          .from('project_invitations')
+          .select('id, status')
+          .eq('project_id', projectId)
+          .eq('invited_user_id', normalizedUserId)
+          .eq('status', 'pending')
+          .maybeSingle();
+
+      if (existingInvitation != null) {
+        _showInvitationMessage(
+          'Este usuário já possui um convite pendente.',
+          isError: true,
+        );
+
+        return false;
+      }
+
+      // ========================================================
+      // CRIAR CONVITE
+      // ========================================================
+
+      await Supabase.instance.client.from('project_invitations').insert({
+        'project_id': projectId,
+        'invited_by': currentUserId,
+        'invited_user_id': normalizedUserId,
+        'status': 'pending',
+      });
+
+      if (!mounted) {
+        return true;
+      }
+
+      final discoveryUser = _matchController.discoveryUser;
+
+      final displayName =
+          discoveryUser != null && discoveryUser.id.trim() == normalizedUserId
+          ? discoveryUser.name.trim()
+          : '';
+
+      final resolvedName = displayName.isNotEmpty
+          ? displayName
+          : 'Profissional';
+
+      _showInvitationMessage('Convite enviado para $resolvedName.');
+
+      debugPrint(
+        '[MATCH PAGE] '
+        'Convite criado. '
+        'Projeto: $projectId | '
+        'Convidado: $normalizedUserId | '
+        'Convidado por: $currentUserId',
+      );
+
+      return true;
+    } on PostgrestException catch (error, stackTrace) {
+      debugPrint(
+        '[MATCH PAGE] '
+        'Erro Supabase ao criar convite: '
+        '${error.message}',
+      );
+
+      debugPrint(
+        '[MATCH PAGE] '
+        'Código: '
+        '${error.code}',
+      );
+
+      debugPrint('$stackTrace');
+
+      if (mounted) {
+        _showInvitationMessage(
+          'Não foi possível enviar o convite.',
+          isError: true,
+        );
+      }
+
+      return false;
+    } catch (error, stackTrace) {
+      debugPrint(
+        '[MATCH PAGE] '
+        'Erro ao criar convite: '
+        '$error',
+      );
+
+      debugPrint('$stackTrace');
+
+      if (mounted) {
+        _showInvitationMessage(
+          'Não foi possível enviar o convite.',
+          isError: true,
+        );
+      }
+
+      return false;
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isCreatingProjectInvitation = false;
+        });
+      }
+    }
+  }
+
+  // ============================================================
+  // INVITATION MESSAGE
+  // ============================================================
+
+  void _showInvitationMessage(String message, {bool isError = false}) {
+    if (!mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+
+          backgroundColor: isError
+              ? Colors.red.shade900
+              : const Color(0xFF4C1D95),
+        ),
+      );
   }
 
   // ============================================================
   // MATCH EVENT
   // ============================================================
 
-  void _handleMatchEvent(
-    String projectId,
-  ) {
+  void _handleMatchEvent(String projectId) {
     if (!mounted) {
       return;
     }
@@ -968,6 +1088,30 @@ class _MatchPageState
       return;
     }
 
+    // ==========================================================
+    // MODO EXPANSÃO
+    // ==========================================================
+    //
+    // Enquanto esta página estiver sendo usada para expandir uma
+    // equipe, ela não deve navegar para um projeto criado pelo
+    // fluxo normal do Match.
+    //
+    // A próxima etapa vai substituir o LIKE por CONVIDAR neste
+    // modo, evitando que esse evento seja gerado.
+    //
+    // ==========================================================
+
+    if (_isTeamExpansionMode) {
+      debugPrint(
+        '[MATCH PAGE] '
+        'Evento de Match ignorado no modo de expansão. '
+        'Projeto recebido: '
+        '$normalizedProjectId',
+      );
+
+      return;
+    }
+
     debugPrint(
       '[MATCH PAGE] '
       'Match recebido. '
@@ -975,37 +1119,25 @@ class _MatchPageState
       '$normalizedProjectId',
     );
 
-    _openNetworkingSession(
-      normalizedProjectId,
-    );
+    _openNetworkingSession(normalizedProjectId);
   }
 
   // ============================================================
   // NETWORKING
   // ============================================================
 
-  void _openNetworkingSession(
-    String projectId,
-  ) {
+  void _openNetworkingSession(String projectId) {
     final normalizedProjectId = projectId.trim();
 
-    if (normalizedProjectId.isEmpty ||
-        !mounted) {
+    if (normalizedProjectId.isEmpty || !mounted) {
       return;
     }
 
-    Navigator.of(
-      context,
-    ).push(
+    Navigator.of(context).push(
       MaterialPageRoute(
-        builder:
-            (
-              _,
-            ) {
-              return NetworkingSessionView(
-                projectId: normalizedProjectId,
-              );
-            },
+        builder: (_) {
+          return NetworkingSessionView(projectId: normalizedProjectId);
+        },
       ),
     );
   }
@@ -1015,11 +1147,9 @@ class _MatchPageState
   // ============================================================
 
   void _toggleSearchPanel() {
-    setState(
-      () {
-        _isSearchPanelOpen = !_isSearchPanelOpen;
-      },
-    );
+    setState(() {
+      _isSearchPanelOpen = !_isSearchPanelOpen;
+    });
 
     if (_isSearchPanelOpen) {
       _focusSearchField();
@@ -1035,31 +1165,21 @@ class _MatchPageState
   // ============================================================
 
   void _focusSearchField() {
-    Future.delayed(
-      const Duration(
-        milliseconds: 120,
-      ),
-      () {
-        if (!mounted ||
-            !_isSearchPanelOpen) {
-          return;
-        }
+    Future.delayed(const Duration(milliseconds: 120), () {
+      if (!mounted || !_isSearchPanelOpen) {
+        return;
+      }
 
-        _searchFocusNode.requestFocus();
-      },
-    );
+      _searchFocusNode.requestFocus();
+    });
   }
 
   // ============================================================
   // SEARCH CHANGED
   // ============================================================
 
-  void _handleSearchChanged(
-    String value,
-  ) {
-    _matchSearchController.onQueryChanged(
-      value,
-    );
+  void _handleSearchChanged(String value) {
+    _matchSearchController.onQueryChanged(value);
   }
 
   // ============================================================
@@ -1078,37 +1198,22 @@ class _MatchPageState
   // DISCOVERY MODE
   // ============================================================
 
-  Future<
-    void
-  >
-  _changeDiscoveryMode(
-    MatchDiscoveryMode mode,
-  ) async {
-    if (!mounted ||
-        _isInitializingMatch ||
-        _sessionService.isRestarting) {
+  Future<void> _changeDiscoveryMode(MatchDiscoveryMode mode) async {
+    if (!mounted || _isInitializingMatch || _sessionService.isRestarting) {
       return;
     }
 
-    if (_matchController.discoveryMode ==
-        mode) {
+    if (_matchController.discoveryMode == mode) {
       return;
     }
 
-    setState(
-      () {
-        _isInitializingMatch = true;
-      },
-    );
+    setState(() {
+      _isInitializingMatch = true;
+    });
 
     try {
-      await _sessionService.changeDiscoveryMode(
-        mode,
-      );
-    } catch (
-      error,
-      stackTrace
-    ) {
+      await _sessionService.changeDiscoveryMode(mode);
+    } catch (error, stackTrace) {
       debugPrint(
         '[MATCH PAGE] '
         'Erro ao alterar modo de descoberta: '
@@ -1125,15 +1230,11 @@ class _MatchPageState
         return;
       }
 
-      ScaffoldMessenger.of(
-          context,
-        )
+      ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
           const SnackBar(
-            content: Text(
-              'Não foi possível alterar o modo de descoberta.',
-            ),
+            content: Text('Não foi possível alterar o modo de descoberta.'),
           ),
         );
     } finally {
@@ -1141,11 +1242,9 @@ class _MatchPageState
         return;
       }
 
-      setState(
-        () {
-          _isInitializingMatch = false;
-        },
-      );
+      setState(() {
+        _isInitializingMatch = false;
+      });
     }
   }
 
@@ -1153,47 +1252,32 @@ class _MatchPageState
   // FILTERS
   // ============================================================
 
-  Future<
-    void
-  >
-  _openFilters() async {
+  Future<void> _openFilters() async {
     final result = await MatchFilterSheet.show(
       context: context,
       initialState: _filterState,
       accentColor: _matchController.accentNeon,
     );
 
-    if (!mounted ||
-        result ==
-            null) {
+    if (!mounted || result == null) {
       return;
     }
 
-    setState(
-      () {
-        _filterState = result;
-      },
-    );
+    setState(() {
+      _filterState = result;
+    });
   }
 
   // ============================================================
   // PROFESSIONAL PROFILE
   // ============================================================
 
-  Future<
-    void
-  >
-  _openProfessionalProfileSettings() async {
-    await Navigator.of(
-      context,
-    ).push(
+  Future<void> _openProfessionalProfileSettings() async {
+    await Navigator.of(context).push(
       MaterialPageRoute(
-        builder:
-            (
-              _,
-            ) {
-              return const ProfessionalProfileSettingsPage();
-            },
+        builder: (_) {
+          return const ProfessionalProfileSettingsPage();
+        },
       ),
     );
 
@@ -1201,19 +1285,15 @@ class _MatchPageState
       return;
     }
 
-    setState(
-      () {
-        _isInitializingMatch = true;
-      },
-    );
+    setState(() {
+      _isInitializingMatch = true;
+    });
 
     try {
       await _sessionService.refreshProfileAndRestart();
 
       await _loadPublicProfile();
-    } catch (
-      error
-    ) {
+    } catch (error) {
       debugPrint(
         '[MATCH PAGE] '
         'Erro ao atualizar perfil: '
@@ -1224,11 +1304,9 @@ class _MatchPageState
         return;
       }
 
-      setState(
-        () {
-          _isInitializingMatch = false;
-        },
-      );
+      setState(() {
+        _isInitializingMatch = false;
+      });
     }
   }
 
@@ -1237,45 +1315,41 @@ class _MatchPageState
   // ============================================================
 
   @override
-  Widget build(
-    BuildContext context,
-  ) {
+  Widget build(BuildContext context) {
     final searchState = _matchSearchController.state;
 
     return Scaffold(
-      backgroundColor: const Color(
-        0xFF0D0B1F,
-      ),
+      backgroundColor: const Color(0xFF0D0B1F),
 
       body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(
-          horizontal: 20,
-          vertical: 20,
-        ),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
 
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
 
           children: [
-            const SizedBox(
-              height: 2,
-            ),
+            const SizedBox(height: 2),
+
+            // ==================================================
+            // TEAM EXPANSION CONTEXT
+            // ==================================================
+            if (_isTeamExpansionMode) ...[
+              _buildTeamExpansionNotice(),
+
+              const SizedBox(height: 12),
+            ],
 
             // ==================================================
             // SEARCH
             // ==================================================
             AnimatedSize(
-              duration: const Duration(
-                milliseconds: 180,
-              ),
+              duration: const Duration(milliseconds: 180),
 
               curve: Curves.easeOut,
 
               child: _isSearchPanelOpen
                   ? Padding(
-                      padding: const EdgeInsets.only(
-                        top: 16,
-                      ),
+                      padding: const EdgeInsets.only(top: 16),
 
                       child: MatchSearchPanelWidget(
                         textController: _searchTextController,
@@ -1297,11 +1371,8 @@ class _MatchPageState
             // ==================================================
             // SEARCH RESULTS
             // ==================================================
-            if (_isSearchPanelOpen &&
-                searchState.isActive) ...[
-              const SizedBox(
-                height: 16,
-              ),
+            if (_isSearchPanelOpen && searchState.isActive) ...[
+              const SizedBox(height: 16),
 
               MatchSearchResultsWidget(
                 controller: _matchController,
@@ -1316,9 +1387,7 @@ class _MatchPageState
               ),
             ],
 
-            const SizedBox(
-              height: 12,
-            ),
+            const SizedBox(height: 12),
 
             // ==================================================
             // NOVAS CONEXÕES
@@ -1333,9 +1402,7 @@ class _MatchPageState
             // ==================================================
             _buildDiscoveryHeader(),
 
-            const SizedBox(
-              height: 10,
-            ),
+            const SizedBox(height: 10),
 
             // ==================================================
             // PROFESSIONAL PROFILE
@@ -1350,18 +1417,14 @@ class _MatchPageState
               onEditProfile: _openProfessionalProfileSettings,
             ),
 
-            const SizedBox(
-              height: 10,
-            ),
+            const SizedBox(height: 10),
 
             // ==================================================
             // DISCOVERY MODE
             // ==================================================
             _buildDiscoveryModeSelector(),
 
-            const SizedBox(
-              height: 14,
-            ),
+            const SizedBox(height: 14),
 
             // ==================================================
             // DISCOVERY
@@ -1378,26 +1441,27 @@ class _MatchPageState
                 //
                 // ==================================================
                 AnimatedSwitcher(
-                  duration: const Duration(
-                    milliseconds: 220,
-                  ),
+                  duration: const Duration(milliseconds: 220),
 
                   switchInCurve: Curves.easeOut,
 
                   switchOutCurve: Curves.easeIn,
 
                   child: DiscoverySectionWidget(
-                    key:
-                        ValueKey<
-                          String
-                        >(
-                          _matchController.discoveryUser?.id ??
-                              'discovery-empty',
-                        ),
+                    key: ValueKey<String>(
+                      _matchController.discoveryUser?.id ?? 'discovery-empty',
+                    ),
 
                     controller: _matchController,
 
-                    isInitializingMatch: _isInitializingMatch,
+                    isInitializingMatch:
+                        _isInitializingMatch || _isCreatingProjectInvitation,
+
+                    isTeamExpansionMode: _isTeamExpansionMode,
+
+                    onInviteUser: _isTeamExpansionMode
+                        ? _inviteUserToProject
+                        : null,
 
                     // ============================================
                     // ASYNC CALLBACK
@@ -1414,13 +1478,9 @@ class _MatchPageState
                     child: IgnorePointer(
                       child: Container(
                         decoration: BoxDecoration(
-                          color: Colors.black.withValues(
-                            alpha: 0.30,
-                          ),
+                          color: Colors.black.withValues(alpha: 0.30),
 
-                          borderRadius: BorderRadius.circular(
-                            24,
-                          ),
+                          borderRadius: BorderRadius.circular(24),
                         ),
 
                         alignment: Alignment.center,
@@ -1434,11 +1494,102 @@ class _MatchPageState
               ],
             ),
 
-            const SizedBox(
-              height: 30,
-            ),
+            const SizedBox(height: 30),
           ],
         ),
+      ),
+    );
+  }
+
+  // ============================================================
+  // TEAM EXPANSION NOTICE
+  // ============================================================
+
+  Widget _buildTeamExpansionNotice() {
+    final projectId = _targetProjectId;
+
+    if (projectId == null) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      width: double.infinity,
+
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+
+      decoration: BoxDecoration(
+        color: const Color(0xFF6D28D9).withValues(alpha: 0.10),
+
+        borderRadius: BorderRadius.circular(16),
+
+        border: Border.all(
+          color: const Color(0xFFA78BFA).withValues(alpha: 0.24),
+        ),
+      ),
+
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+
+        children: [
+          Container(
+            width: 38,
+
+            height: 38,
+
+            alignment: Alignment.center,
+
+            decoration: BoxDecoration(
+              color: const Color(0xFF8B5CF6).withValues(alpha: 0.14),
+
+              shape: BoxShape.circle,
+            ),
+
+            child: const Icon(
+              Icons.group_add_rounded,
+
+              color: Color(0xFFA78BFA),
+
+              size: 19,
+            ),
+          ),
+
+          const SizedBox(width: 12),
+
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+
+              children: [
+                Text(
+                  'Expandindo $_targetProjectTitle',
+
+                  style: const TextStyle(
+                    color: Colors.white,
+
+                    fontSize: 12,
+
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+
+                const SizedBox(height: 4),
+
+                const Text(
+                  'Os profissionais escolhidos aqui receberão um convite. '
+                  'Eles só entrarão na equipe depois de aceitar.',
+
+                  style: TextStyle(
+                    color: Colors.white54,
+
+                    fontSize: 10,
+
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1450,31 +1601,19 @@ class _MatchPageState
   Widget _buildDiscoveryModeSelector() {
     final activeMode = _matchController.discoveryMode;
 
-    final disabled =
-        _isInitializingMatch ||
-        _sessionService.isRestarting;
+    final disabled = _isInitializingMatch || _sessionService.isRestarting;
 
     return Container(
       width: double.infinity,
 
-      padding: const EdgeInsets.all(
-        4,
-      ),
+      padding: const EdgeInsets.all(4),
 
       decoration: BoxDecoration(
-        color: Colors.white.withValues(
-          alpha: 0.035,
-        ),
+        color: Colors.white.withValues(alpha: 0.035),
 
-        borderRadius: BorderRadius.circular(
-          14,
-        ),
+        borderRadius: BorderRadius.circular(14),
 
-        border: Border.all(
-          color: Colors.white.withValues(
-            alpha: 0.06,
-          ),
-        ),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
       ),
 
       child: Row(
@@ -1490,17 +1629,13 @@ class _MatchPageState
 
               label: 'COMPATÍVEIS',
 
-              selected:
-                  activeMode ==
-                  MatchDiscoveryMode.compatible,
+              selected: activeMode == MatchDiscoveryMode.compatible,
 
               disabled: disabled,
             ),
           ),
 
-          const SizedBox(
-            width: 6,
-          ),
+          const SizedBox(width: 6),
 
           // ========================================================
           // PROXIMIDADE
@@ -1513,17 +1648,13 @@ class _MatchPageState
 
               label: 'PRÓXIMOS',
 
-              selected:
-                  activeMode ==
-                  MatchDiscoveryMode.nearby,
+              selected: activeMode == MatchDiscoveryMode.nearby,
 
               disabled: disabled,
             ),
           ),
 
-          const SizedBox(
-            width: 6,
-          ),
+          const SizedBox(width: 6),
 
           // ========================================================
           // GLOBAL
@@ -1536,9 +1667,7 @@ class _MatchPageState
 
               label: 'GLOBAL',
 
-              selected:
-                  activeMode ==
-                  MatchDiscoveryMode.global,
+              selected: activeMode == MatchDiscoveryMode.global,
 
               disabled: disabled,
             ),
@@ -1569,53 +1698,35 @@ class _MatchPageState
             ? null
             : () {
                 if (mode.requiresLocationConsent) {
-                  unawaited(
-                    _confirmNearbyDiscovery(),
-                  );
+                  unawaited(_confirmNearbyDiscovery());
 
                   return;
                 }
 
-                unawaited(
-                  _changeDiscoveryMode(
-                    mode,
-                  ),
-                );
+                unawaited(_changeDiscoveryMode(mode));
               },
 
-        borderRadius: BorderRadius.circular(
-          10,
-        ),
+        borderRadius: BorderRadius.circular(10),
 
         child: AnimatedContainer(
-          duration: const Duration(
-            milliseconds: 180,
-          ),
+          duration: const Duration(milliseconds: 180),
 
           curve: Curves.easeOut,
 
           height: 42,
 
-          padding: const EdgeInsets.symmetric(
-            horizontal: 12,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
 
           decoration: BoxDecoration(
             color: selected
-                ? accentColor.withValues(
-                    alpha: 0.16,
-                  )
+                ? accentColor.withValues(alpha: 0.16)
                 : Colors.transparent,
 
-            borderRadius: BorderRadius.circular(
-              10,
-            ),
+            borderRadius: BorderRadius.circular(10),
 
             border: Border.all(
               color: selected
-                  ? accentColor.withValues(
-                      alpha: 0.36,
-                    )
+                  ? accentColor.withValues(alpha: 0.36)
                   : Colors.transparent,
             ),
           ),
@@ -1624,8 +1735,7 @@ class _MatchPageState
             mainAxisAlignment: MainAxisAlignment.center,
 
             children: [
-              if (disabled &&
-                  selected)
+              if (disabled && selected)
                 SizedBox(
                   width: 14,
 
@@ -1643,14 +1753,10 @@ class _MatchPageState
 
                   size: 16,
 
-                  color: selected
-                      ? accentColor
-                      : Colors.white38,
+                  color: selected ? accentColor : Colors.white38,
                 ),
 
-              const SizedBox(
-                width: 7,
-              ),
+              const SizedBox(width: 7),
 
               Flexible(
                 child: Text(
@@ -1661,9 +1767,7 @@ class _MatchPageState
                   overflow: TextOverflow.ellipsis,
 
                   style: TextStyle(
-                    color: selected
-                        ? accentColor
-                        : Colors.white38,
+                    color: selected ? accentColor : Colors.white38,
 
                     fontSize: 9,
 
@@ -1687,19 +1791,17 @@ class _MatchPageState
   Widget _buildDiscoveryHeader() {
     final publicProfile = _publicProfileController.profile;
 
-    final hasPublicProfile =
-        publicProfile !=
-        null;
+    final hasPublicProfile = publicProfile != null;
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
 
       children: [
-        const Expanded(
+        Expanded(
           child: Text(
-            'Novas Conexões',
+            _isTeamExpansionMode ? 'Procurar membro' : 'Novas Conexões',
 
-            style: TextStyle(
+            style: const TextStyle(
               color: Colors.white,
 
               fontSize: 26,
@@ -1711,9 +1813,7 @@ class _MatchPageState
           ),
         ),
 
-        const SizedBox(
-          width: 12,
-        ),
+        const SizedBox(width: 12),
 
         // ======================================================
         // AÇÕES DO CANTO SUPERIOR
@@ -1734,9 +1834,7 @@ class _MatchPageState
                 child: InkWell(
                   onTap: _openPublicProfile,
 
-                  borderRadius: BorderRadius.circular(
-                    14,
-                  ),
+                  borderRadius: BorderRadius.circular(14),
 
                   child: Container(
                     width: 42,
@@ -1747,25 +1845,17 @@ class _MatchPageState
 
                     decoration: BoxDecoration(
                       color: hasPublicProfile
-                          ? _matchController.accentNeon.withValues(
-                              alpha: 0.10,
-                            )
-                          : Colors.white.withValues(
-                              alpha: 0.035,
-                            ),
+                          ? _matchController.accentNeon.withValues(alpha: 0.10)
+                          : Colors.white.withValues(alpha: 0.035),
 
-                      borderRadius: BorderRadius.circular(
-                        14,
-                      ),
+                      borderRadius: BorderRadius.circular(14),
 
                       border: Border.all(
                         color: hasPublicProfile
                             ? _matchController.accentNeon.withValues(
                                 alpha: 0.30,
                               )
-                            : Colors.white.withValues(
-                                alpha: 0.06,
-                              ),
+                            : Colors.white.withValues(alpha: 0.06),
                       ),
                     ),
 
@@ -1783,9 +1873,7 @@ class _MatchPageState
               ),
             ),
 
-            const SizedBox(
-              width: 6,
-            ),
+            const SizedBox(width: 6),
 
             // ==================================================
             // FILTROS
@@ -1800,9 +1888,7 @@ class _MatchPageState
                   child: InkWell(
                     onTap: _openFilters,
 
-                    borderRadius: BorderRadius.circular(
-                      14,
-                    ),
+                    borderRadius: BorderRadius.circular(14),
 
                     child: Container(
                       width: 42,
@@ -1816,22 +1902,16 @@ class _MatchPageState
                             ? _matchController.accentNeon.withValues(
                                 alpha: 0.10,
                               )
-                            : Colors.white.withValues(
-                                alpha: 0.035,
-                              ),
+                            : Colors.white.withValues(alpha: 0.035),
 
-                        borderRadius: BorderRadius.circular(
-                          14,
-                        ),
+                        borderRadius: BorderRadius.circular(14),
 
                         border: Border.all(
                           color: _filterState.hasActiveFilters
                               ? _matchController.accentNeon.withValues(
                                   alpha: 0.30,
                                 )
-                              : Colors.white.withValues(
-                                  alpha: 0.06,
-                                ),
+                              : Colors.white.withValues(alpha: 0.06),
                         ),
                       ),
 
@@ -1861,21 +1941,15 @@ class _MatchPageState
                         minHeight: 17,
                       ),
 
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 4,
-                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
 
                       decoration: BoxDecoration(
                         color: _matchController.accentNeon,
 
-                        borderRadius: BorderRadius.circular(
-                          20,
-                        ),
+                        borderRadius: BorderRadius.circular(20),
 
                         border: Border.all(
-                          color: const Color(
-                            0xFF0D0B1F,
-                          ),
+                          color: const Color(0xFF0D0B1F),
 
                           width: 2,
                         ),
@@ -1910,21 +1984,13 @@ class _MatchPageState
 
   @override
   void dispose() {
-    _matchController.removeListener(
-      _handleStateChange,
-    );
+    _matchController.removeListener(_handleStateChange);
 
-    _professionalProfileController.removeListener(
-      _handleStateChange,
-    );
+    _professionalProfileController.removeListener(_handleStateChange);
 
-    _matchSearchController.removeListener(
-      _handleStateChange,
-    );
+    _matchSearchController.removeListener(_handleStateChange);
 
-    _publicProfileController.removeListener(
-      _handleStateChange,
-    );
+    _publicProfileController.removeListener(_handleStateChange);
 
     _searchTextController.dispose();
 
@@ -1934,15 +2000,11 @@ class _MatchPageState
 
     _publicProfileController.dispose();
 
-    unawaited(
-      _matchSubscription?.cancel(),
-    );
+    unawaited(_matchSubscription?.cancel());
 
     _matchSubscription = null;
 
-    unawaited(
-      _sessionService.dispose(),
-    );
+    unawaited(_sessionService.dispose());
 
     _matchController.dispose();
 

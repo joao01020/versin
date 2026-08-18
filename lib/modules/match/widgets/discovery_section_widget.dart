@@ -25,7 +25,9 @@ import 'discovery_card_widget.dart';
 //
 // MatchController.
 //
-// AÇÕES:
+// MODOS:
+//
+// MATCH NORMAL:
 //
 // X
 // -> ignora usuário atual;
@@ -35,6 +37,19 @@ import 'discovery_card_widget.dart';
 // -> registra like;
 // -> verifica match;
 // -> tenta avançar para o próximo.
+//
+// EXPANSÃO DE EQUIPE:
+//
+// X
+// -> ignora usuário atual;
+// -> tenta avançar para o próximo.
+//
+// Ação positiva
+// -> NÃO registra like;
+// -> NÃO cria projeto;
+// -> chama onInviteUser(userId);
+// -> o nível superior cria project_invitations;
+// -> depois avança para o próximo candidato.
 //
 // IMPORTANTE:
 //
@@ -53,6 +68,7 @@ import 'discovery_card_widget.dart';
 // - acessa Cloudflare R2;
 // - calcula compatibilidade;
 // - cria projeto manualmente;
+// - cria convite diretamente;
 // - navega para Networking;
 // - reproduz demo.
 //
@@ -60,9 +76,7 @@ import 'discovery_card_widget.dart';
 //
 // ============================================================
 
-class DiscoverySectionWidget
-    extends
-        StatelessWidget {
+class DiscoverySectionWidget extends StatelessWidget {
   // ============================================================
   // CONTROLLER
   // ============================================================
@@ -74,6 +88,49 @@ class DiscoverySectionWidget
   // ============================================================
 
   final bool isInitializingMatch;
+
+  // ============================================================
+  // MODO DE EXPANSÃO
+  // ============================================================
+  //
+  // false:
+  // -> fluxo normal de Match.
+  //
+  // true:
+  // -> usuário está procurando alguém para uma equipe existente.
+  //
+  // ============================================================
+
+  final bool isTeamExpansionMode;
+
+  // ============================================================
+  // CONVITE
+  // ============================================================
+  //
+  // Chamado somente no modo de expansão.
+  //
+  // Recebe o ID do profissional mostrado no card.
+  //
+  // O MatchPage será responsável por:
+  //
+  // - conhecer targetProjectId;
+  // - criar project_invitations;
+  // - mostrar sucesso/erro;
+  // - decidir navegação.
+  //
+  // Retorna bool:
+  //
+  // true
+  // -> convite criado com sucesso;
+  // -> avança para o próximo candidato.
+  //
+  // false
+  // -> convite não foi criado;
+  // -> mantém o candidato atual.
+  //
+  // ============================================================
+
+  final Future<bool> Function(String userId)? onInviteUser;
 
   // ============================================================
   // DEMO
@@ -92,13 +149,7 @@ class DiscoverySectionWidget
   //
   // ============================================================
 
-  final Future<
-    void
-  >
-  Function(
-    String userId,
-  )?
-  onListenDemo;
+  final Future<void> Function(String userId)? onListenDemo;
 
   // ============================================================
   // CONSTRUTOR
@@ -108,6 +159,8 @@ class DiscoverySectionWidget
     super.key,
     required this.controller,
     required this.isInitializingMatch,
+    this.isTeamExpansionMode = false,
+    this.onInviteUser,
     this.onListenDemo,
   });
 
@@ -116,9 +169,7 @@ class DiscoverySectionWidget
   // ============================================================
 
   @override
-  Widget build(
-    BuildContext context,
-  ) {
+  Widget build(BuildContext context) {
     // ==========================================================
     // LOADING
     // ==========================================================
@@ -133,8 +184,7 @@ class DiscoverySectionWidget
 
     final discoveryUser = controller.discoveryUser;
 
-    if (discoveryUser !=
-        null) {
+    if (discoveryUser != null) {
       return DiscoveryCardWidget(
         controller: controller,
 
@@ -148,9 +198,60 @@ class DiscoverySectionWidget
         },
 
         // ======================================================
-        // LIKE
+        // AÇÃO POSITIVA
+        // ======================================================
+        //
+        // MATCH NORMAL:
+        //
+        // -> LIKE.
+        //
+        // EXPANSÃO:
+        //
+        // -> CONVITE.
+        //
+        // IMPORTANTE:
+        //
+        // no modo de expansão NÃO chamamos:
+        //
+        // controller.likeCurrentDiscoveryUserAndAdvance()
+        //
+        // porque isso poderia registrar favorite e disparar o
+        // fluxo normal de criação de Studio Session.
+        //
         // ======================================================
         onLike: () async {
+          // ====================================================
+          // EXPANSÃO DE EQUIPE
+          // ====================================================
+
+          if (isTeamExpansionMode) {
+            final inviteCallback = onInviteUser;
+
+            if (inviteCallback == null) {
+              debugPrint(
+                '[DISCOVERY SECTION] '
+                'Modo de expansão ativo, mas '
+                'onInviteUser não foi configurado.',
+              );
+
+              return;
+            }
+
+            final invited = await inviteCallback(discoveryUser.id);
+
+            if (!invited) {
+              return;
+            }
+
+            controller.moveToNextDiscoveryUser();
+
+            return;
+          }
+
+          // ====================================================
+          // MATCH NORMAL
+          // ====================================================
+
           await controller.likeCurrentDiscoveryUserAndAdvance();
         },
 
@@ -171,14 +272,10 @@ class DiscoverySectionWidget
         // onListenDemo(userId)
         //
         // ======================================================
-        onListenDemo:
-            onListenDemo ==
-                null
+        onListenDemo: onListenDemo == null
             ? null
             : () async {
-                await onListenDemo!(
-                  discoveryUser.id,
-                );
+                await onListenDemo!(discoveryUser.id);
               },
       );
     }
@@ -195,8 +292,7 @@ class DiscoverySectionWidget
   // ============================================================
 
   bool get _isLoading {
-    return controller.isLoading ||
-        isInitializingMatch;
+    return controller.isLoading || isInitializingMatch;
   }
 
   // ============================================================
@@ -210,25 +306,15 @@ class DiscoverySectionWidget
       height: 220,
 
       decoration: BoxDecoration(
-        color: Colors.white.withValues(
-          alpha: 0.02,
-        ),
+        color: Colors.white.withValues(alpha: 0.02),
 
-        borderRadius: BorderRadius.circular(
-          24,
-        ),
+        borderRadius: BorderRadius.circular(24),
 
-        border: Border.all(
-          color: Colors.white.withValues(
-            alpha: 0.04,
-          ),
-        ),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.04)),
       ),
 
       child: const Center(
-        child: CircularProgressIndicator(
-          color: Colors.purple,
-        ),
+        child: CircularProgressIndicator(color: Colors.purple),
       ),
     );
   }
@@ -243,27 +329,17 @@ class DiscoverySectionWidget
 
       height: 160,
 
-      padding: const EdgeInsets.symmetric(
-        horizontal: 24,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 24),
 
       decoration: BoxDecoration(
-        color: Colors.white.withValues(
-          alpha: 0.02,
-        ),
+        color: Colors.white.withValues(alpha: 0.02),
 
-        borderRadius: BorderRadius.circular(
-          24,
-        ),
+        borderRadius: BorderRadius.circular(24),
 
-        border: Border.all(
-          color: Colors.white.withValues(
-            alpha: 0.06,
-          ),
-        ),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
       ),
 
-      child: const Column(
+      child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
 
         children: [
@@ -271,26 +347,28 @@ class DiscoverySectionWidget
           // ÍCONE
           // ====================================================
           Icon(
-            Icons.wifi_tethering_rounded,
+            isTeamExpansionMode
+                ? Icons.group_add_rounded
+                : Icons.wifi_tethering_rounded,
 
             color: Colors.white24,
 
             size: 32,
           ),
 
-          SizedBox(
-            height: 12,
-          ),
+          const SizedBox(height: 12),
 
           // ====================================================
           // TÍTULO
           // ====================================================
           Text(
-            'Nenhum profissional compatível encontrado.',
+            isTeamExpansionMode
+                ? 'Nenhum profissional disponível para convidar.'
+                : 'Nenhum profissional compatível encontrado.',
 
             textAlign: TextAlign.center,
 
-            style: TextStyle(
+            style: const TextStyle(
               color: Colors.white38,
 
               fontSize: 13,
@@ -299,20 +377,21 @@ class DiscoverySectionWidget
             ),
           ),
 
-          SizedBox(
-            height: 6,
-          ),
+          const SizedBox(height: 6),
 
           // ====================================================
           // SUBTÍTULO
           // ====================================================
           Text(
-            'Novos profissionais aparecerão aqui '
-            'quando forem encontrados.',
+            isTeamExpansionMode
+                ? 'Novos profissionais aparecerão aqui '
+                      'quando estiverem disponíveis para a equipe.'
+                : 'Novos profissionais aparecerão aqui '
+                      'quando forem encontrados.',
 
             textAlign: TextAlign.center,
 
-            style: TextStyle(
+            style: const TextStyle(
               color: Colors.white24,
 
               fontSize: 10,

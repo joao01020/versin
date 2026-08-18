@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:versin/app/locator.dart';
+import 'package:versin/core/utils/network_image_url_helper.dart';
 import 'package:versin/modules/dashboard/controllers/dashboard_controller.dart';
 
 // ============================================================
@@ -223,7 +224,9 @@ class _AccountInformationPageState
 
       setState(
         () {
-          _avatarUrl = profile?['avatar_url']?.toString().trim();
+          _avatarUrl = NetworkImageUrlHelper.validUrlOrNull(
+            profile?['avatar_url']?.toString(),
+          );
 
           _isLoading = false;
         },
@@ -544,7 +547,9 @@ class _AccountInformationPageState
       // AVATAR
       // ========================================================
 
-      var nextAvatarUrl = _avatarUrl;
+      var nextAvatarUrl = NetworkImageUrlHelper.validUrlOrNull(
+        _avatarUrl,
+      );
 
       final selectedBytes = _selectedAvatarBytes;
 
@@ -1030,16 +1035,19 @@ class _AccountInformationPageState
       );
     }
 
-    if (_avatarUrl !=
-            null &&
-        _avatarUrl!.isNotEmpty) {
+    final validAvatarUrl = NetworkImageUrlHelper.validUrlOrNull(
+      _avatarUrl,
+    );
+
+    if (validAvatarUrl !=
+        null) {
       return CircleAvatar(
         radius: 52,
         backgroundColor: _primaryPurple.withValues(
           alpha: 0.25,
         ),
         backgroundImage: NetworkImage(
-          _avatarUrl!,
+          validAvatarUrl,
         ),
       );
     }

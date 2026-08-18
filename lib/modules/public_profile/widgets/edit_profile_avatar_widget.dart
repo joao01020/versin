@@ -2,6 +2,8 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
+import 'package:versin/core/utils/network_image_url_helper.dart';
+
 // ============================================================
 // EDIT PROFILE AVATAR WIDGET
 // ============================================================
@@ -24,7 +26,9 @@ import 'package:flutter/material.dart';
 //
 // ============================================================
 
-class EditProfileAvatarWidget extends StatelessWidget {
+class EditProfileAvatarWidget
+    extends
+        StatelessWidget {
   final String? avatarUrl;
 
   final Uint8List? previewBytes;
@@ -52,13 +56,21 @@ class EditProfileAvatarWidget extends StatelessWidget {
   // ============================================================
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(
+    BuildContext context,
+  ) {
     return Semantics(
-      button: onTap != null,
+      button:
+          onTap !=
+          null,
       label: 'Alterar foto do perfil',
       child: InkWell(
-        onTap: isLoading ? null : onTap,
-        borderRadius: BorderRadius.circular(size),
+        onTap: isLoading
+            ? null
+            : onTap,
+        borderRadius: BorderRadius.circular(
+          size,
+        ),
         child: Stack(
           clipBehavior: Clip.none,
           children: [
@@ -68,15 +80,24 @@ class EditProfileAvatarWidget extends StatelessWidget {
             Container(
               width: size,
               height: size,
-              padding: const EdgeInsets.all(3),
+              padding: const EdgeInsets.all(
+                3,
+              ),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: const Color(0xFFE100FF).withValues(alpha: 0.45),
+                  color:
+                      const Color(
+                        0xFFE100FF,
+                      ).withValues(
+                        alpha: 0.45,
+                      ),
                   width: 2,
                 ),
               ),
-              child: ClipOval(child: _buildAvatar()),
+              child: ClipOval(
+                child: _buildAvatar(),
+              ),
             ),
 
             // ==================================================
@@ -90,10 +111,14 @@ class EditProfileAvatarWidget extends StatelessWidget {
                   width: 34,
                   height: 34,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFE100FF),
+                    color: const Color(
+                      0xFFE100FF,
+                    ),
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: const Color(0xFF15122C),
+                      color: const Color(
+                        0xFF15122C,
+                      ),
                       width: 3,
                     ),
                   ),
@@ -112,7 +137,9 @@ class EditProfileAvatarWidget extends StatelessWidget {
               Positioned.fill(
                 child: Container(
                   decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.55),
+                    color: Colors.black.withValues(
+                      alpha: 0.55,
+                    ),
                     shape: BoxShape.circle,
                   ),
                   alignment: Alignment.center,
@@ -121,7 +148,9 @@ class EditProfileAvatarWidget extends StatelessWidget {
                     height: 25,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: Color(0xFFE100FF),
+                      color: Color(
+                        0xFFE100FF,
+                      ),
                     ),
                   ),
                 ),
@@ -141,7 +170,9 @@ class EditProfileAvatarWidget extends StatelessWidget {
     // PREVIEW LOCAL
     // ==========================================================
 
-    if (previewBytes != null && previewBytes!.isNotEmpty) {
+    if (previewBytes !=
+            null &&
+        previewBytes!.isNotEmpty) {
       return Image.memory(
         previewBytes!,
         width: size,
@@ -155,18 +186,26 @@ class EditProfileAvatarWidget extends StatelessWidget {
     // URL
     // ==========================================================
 
-    final normalizedUrl = avatarUrl?.trim();
+    final normalizedUrl = NetworkImageUrlHelper.validUrlOrNull(
+      avatarUrl,
+    );
 
-    if (normalizedUrl != null && normalizedUrl.isNotEmpty) {
+    if (normalizedUrl !=
+        null) {
       return Image.network(
         normalizedUrl,
         width: size,
         height: size,
         fit: BoxFit.cover,
         gaplessPlayback: true,
-        errorBuilder: (context, error, stackTrace) {
-          return _buildFallback();
-        },
+        errorBuilder:
+            (
+              context,
+              error,
+              stackTrace,
+            ) {
+              return _buildFallback();
+            },
       );
     }
 
@@ -183,13 +222,17 @@ class EditProfileAvatarWidget extends StatelessWidget {
 
   Widget _buildFallback() {
     return Container(
-      color: const Color(0xFF211A3D),
+      color: const Color(
+        0xFF211A3D,
+      ),
       alignment: Alignment.center,
       child: Text(
         _initials,
         style: TextStyle(
           color: Colors.white,
-          fontSize: size * 0.27,
+          fontSize:
+              size *
+              0.27,
           fontWeight: FontWeight.bold,
         ),
       ),
@@ -201,23 +244,39 @@ class EditProfileAvatarWidget extends StatelessWidget {
   // ============================================================
 
   String get _initials {
-    final name = displayName?.trim() ?? '';
+    final name =
+        displayName?.trim() ??
+        '';
 
     if (name.isEmpty) {
       return '?';
     }
 
     final parts = name
-        .split(RegExp(r'\s+'))
-        .where((part) => part.isNotEmpty)
+        .split(
+          RegExp(
+            r'\s+',
+          ),
+        )
+        .where(
+          (
+            part,
+          ) => part.isNotEmpty,
+        )
         .toList();
 
     if (parts.isEmpty) {
       return '?';
     }
 
-    if (parts.length == 1) {
-      return parts.first.substring(0, 1).toUpperCase();
+    if (parts.length ==
+        1) {
+      return parts.first
+          .substring(
+            0,
+            1,
+          )
+          .toUpperCase();
     }
 
     return '${parts.first[0]}${parts.last[0]}'.toUpperCase();

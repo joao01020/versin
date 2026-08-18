@@ -5,6 +5,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:versin/core/utils/network_image_url_helper.dart';
+
 class ProfilePage
     extends
         StatefulWidget {
@@ -72,7 +74,9 @@ class _ProfilePageState
         () {
           _username = data['username'];
           _walletAddress = data['wallet_address'];
-          _avatarUrl = data['avatar_url'];
+          _avatarUrl = NetworkImageUrlHelper.validUrlOrNull(
+            data['avatar_url']?.toString(),
+          );
 
           final createdAt = data['created_at'];
 
@@ -187,7 +191,9 @@ class _ProfilePageState
 
       setState(
         () {
-          _avatarUrl = publicUrl;
+          _avatarUrl = NetworkImageUrlHelper.validUrlOrNull(
+            publicUrl,
+          );
           _isLoading = false;
         },
       );
@@ -675,11 +681,14 @@ class _ProfilePageState
       _walletAddress!.isNotEmpty;
 
   ImageProvider get _profileImage {
-    if (_avatarUrl !=
-            null &&
-        _avatarUrl!.isNotEmpty) {
+    final avatarUrl = NetworkImageUrlHelper.validUrlOrNull(
+      _avatarUrl,
+    );
+
+    if (avatarUrl !=
+        null) {
       return NetworkImage(
-        _avatarUrl!,
+        avatarUrl,
       );
     }
 

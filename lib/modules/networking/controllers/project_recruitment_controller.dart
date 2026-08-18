@@ -9,29 +9,16 @@ import '../services/project_recruitment_service.dart';
 // PROJECT RECRUITMENT CONTROLLER
 // ============================================================
 
-class ProjectRecruitmentController
-    with
-        ChangeNotifier {
+class ProjectRecruitmentController with ChangeNotifier {
   final String projectId;
 
   final ProjectRecruitmentService _service;
 
-  StreamSubscription<
-    List<
-      ProjectRecruitmentModel
-    >
-  >?
-  _subscription;
+  StreamSubscription<List<ProjectRecruitmentModel>>? _subscription;
 
-  List<
-    ProjectRecruitmentModel
-  >
-  _recruitments = const [];
+  List<ProjectRecruitmentModel> _recruitments = const [];
 
-  List<
-    ProjectRecruitmentCandidateModel
-  >
-  _candidates = const [];
+  List<ProjectRecruitmentCandidateModel> _candidates = const [];
 
   bool _isLoading = false;
 
@@ -46,26 +33,16 @@ class ProjectRecruitmentController
   ProjectRecruitmentController({
     required String projectId,
     ProjectRecruitmentService? service,
-  }) : projectId = _requiredProjectId(
-         projectId,
-       ),
-       _service =
-           service ??
-           ProjectRecruitmentService();
+  }) : projectId = _requiredProjectId(projectId),
+       _service = service ?? ProjectRecruitmentService();
 
   // ==========================================================
   // GETTERS
   // ==========================================================
 
-  List<
-    ProjectRecruitmentModel
-  >
-  get recruitments => _recruitments;
+  List<ProjectRecruitmentModel> get recruitments => _recruitments;
 
-  List<
-    ProjectRecruitmentCandidateModel
-  >
-  get candidates => _candidates;
+  List<ProjectRecruitmentCandidateModel> get candidates => _candidates;
 
   bool get isLoading => _isLoading;
 
@@ -73,35 +50,19 @@ class ProjectRecruitmentController
 
   bool get isLoadingCandidates => _isLoadingCandidates;
 
-  bool get hasError =>
-      _errorMessage !=
-      null;
+  bool get hasError => _errorMessage != null;
 
   String? get errorMessage => _errorMessage;
 
-  List<
-    ProjectRecruitmentModel
-  >
-  get activeRecruitments => _recruitments
-      .where(
-        (
-          item,
-        ) =>
-            item.isOpen &&
-            !item.isExpired,
-      )
-      .toList(
-        growable: false,
-      );
+  List<ProjectRecruitmentModel> get activeRecruitments => _recruitments
+      .where((item) => item.isOpen && !item.isExpired)
+      .toList(growable: false);
 
   // ==========================================================
   // INIT
   // ==========================================================
 
-  Future<
-    void
-  >
-  init() async {
+  Future<void> init() async {
     if (_disposed) {
       return;
     }
@@ -115,23 +76,14 @@ class ProjectRecruitmentController
     await _subscription?.cancel();
 
     _subscription = _service
-        .streamRecruitments(
-          projectId: projectId,
-        )
+        .streamRecruitments(projectId: projectId)
         .listen(
-          (
-            items,
-          ) {
+          (items) {
             if (_disposed) {
               return;
             }
 
-            _recruitments =
-                List<
-                  ProjectRecruitmentModel
-                >.unmodifiable(
-                  items,
-                );
+            _recruitments = List<ProjectRecruitmentModel>.unmodifiable(items);
 
             _isLoading = false;
 
@@ -139,20 +91,17 @@ class ProjectRecruitmentController
 
             _safeNotify();
           },
-          onError:
-              (
-                error,
-              ) {
-                if (_disposed) {
-                  return;
-                }
+          onError: (error) {
+            if (_disposed) {
+              return;
+            }
 
-                _isLoading = false;
+            _isLoading = false;
 
-                _errorMessage = 'Não foi possível carregar as buscas.';
+            _errorMessage = 'Não foi possível carregar as buscas.';
 
-                _safeNotify();
-              },
+            _safeNotify();
+          },
         );
   }
 
@@ -160,16 +109,12 @@ class ProjectRecruitmentController
   // CRIAR
   // ==========================================================
 
-  Future<
-    ProjectRecruitmentModel?
-  >
-  createRecruitment({
+  Future<ProjectRecruitmentModel?> createRecruitment({
     required String role,
     String description = '',
     DateTime? expiresAt,
   }) async {
-    if (_disposed ||
-        _isSaving) {
+    if (_disposed || _isSaving) {
       return null;
     }
 
@@ -189,10 +134,7 @@ class ProjectRecruitmentController
 
         expiresAt: expiresAt,
       );
-    } catch (
-      error,
-      stackTrace
-    ) {
+    } catch (error, stackTrace) {
       debugPrint(
         '[PROJECT RECRUITMENT CONTROLLER] '
         'Erro ao criar busca: '
@@ -220,12 +162,7 @@ class ProjectRecruitmentController
   // CANDIDATOS
   // ==========================================================
 
-  Future<
-    void
-  >
-  loadCandidates(
-    ProjectRecruitmentModel recruitment,
-  ) async {
+  Future<void> loadCandidates(ProjectRecruitmentModel recruitment) async {
     if (_disposed) {
       return;
     }
@@ -237,22 +174,15 @@ class ProjectRecruitmentController
     _safeNotify();
 
     try {
-      _candidates = await _service.getCandidates(
-        recruitment: recruitment,
-      );
-    } catch (
-      error,
-      stackTrace
-    ) {
+      _candidates = await _service.getCandidates(recruitment: recruitment);
+    } catch (error, stackTrace) {
       debugPrint(
         '[PROJECT RECRUITMENT CONTROLLER] '
         'Erro candidatos: '
         '$error',
       );
 
-      debugPrint(
-        '$stackTrace',
-      );
+      debugPrint('$stackTrace');
 
       _candidates = const [];
 
@@ -270,10 +200,7 @@ class ProjectRecruitmentController
   // CONVIDAR
   // ==========================================================
 
-  Future<
-    bool
-  >
-  inviteCandidate({
+  Future<bool> inviteCandidate({
     required ProjectRecruitmentModel recruitment,
     required ProjectRecruitmentCandidateModel candidate,
   }) async {
@@ -284,14 +211,10 @@ class ProjectRecruitmentController
         userId: candidate.userId,
       );
 
-      await loadCandidates(
-        recruitment,
-      );
+      await loadCandidates(recruitment);
 
       return true;
-    } catch (
-      error
-    ) {
+    } catch (error) {
       _errorMessage = 'Não foi possível enviar o convite.';
 
       _safeNotify();
@@ -304,10 +227,7 @@ class ProjectRecruitmentController
   // APROVAR
   // ==========================================================
 
-  Future<
-    bool
-  >
-  approveCandidate({
+  Future<bool> approveCandidate({
     required ProjectRecruitmentModel recruitment,
     required ProjectRecruitmentCandidateModel candidate,
   }) async {
@@ -318,14 +238,10 @@ class ProjectRecruitmentController
         userId: candidate.userId,
       );
 
-      await loadCandidates(
-        recruitment,
-      );
+      await loadCandidates(recruitment);
 
       return true;
-    } catch (
-      error
-    ) {
+    } catch (error) {
       _errorMessage = 'Não foi possível adicionar o membro.';
 
       _safeNotify();
@@ -338,19 +254,10 @@ class ProjectRecruitmentController
   // FECHAR
   // ==========================================================
 
-  Future<
-    void
-  >
-  closeRecruitment(
-    ProjectRecruitmentModel recruitment,
-  ) async {
+  Future<void> closeRecruitment(ProjectRecruitmentModel recruitment) async {
     try {
-      await _service.closeRecruitment(
-        recruitmentId: recruitment.id,
-      );
-    } catch (
-      error
-    ) {
+      await _service.closeRecruitment(recruitmentId: recruitment.id);
+    } catch (error) {
       _errorMessage = 'Não foi possível encerrar a busca.';
 
       _safeNotify();
@@ -362,8 +269,7 @@ class ProjectRecruitmentController
   // ==========================================================
 
   void _safeNotify() {
-    if (_disposed ||
-        !hasListeners) {
+    if (_disposed || !hasListeners) {
       return;
     }
 
@@ -374,15 +280,11 @@ class ProjectRecruitmentController
   // PROJECT ID
   // ==========================================================
 
-  static String _requiredProjectId(
-    String value,
-  ) {
+  static String _requiredProjectId(String value) {
     final normalized = value.trim();
 
     if (normalized.isEmpty) {
-      throw ArgumentError(
-        'projectId não pode ser vazio.',
-      );
+      throw ArgumentError('projectId não pode ser vazio.');
     }
 
     return normalized;
@@ -400,9 +302,7 @@ class ProjectRecruitmentController
 
     _disposed = true;
 
-    unawaited(
-      _subscription?.cancel(),
-    );
+    unawaited(_subscription?.cancel());
 
     _subscription = null;
 

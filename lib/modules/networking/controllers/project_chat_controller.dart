@@ -70,9 +70,7 @@ import '../services/project_chat_service.dart';
 //
 // ============================================================
 
-class ProjectChatController
-    with
-        ChangeNotifier {
+class ProjectChatController with ChangeNotifier {
   // ==========================================================
   // PROJETO
   // ==========================================================
@@ -89,24 +87,13 @@ class ProjectChatController
   // SUBSCRIPTION
   // ==========================================================
 
-  StreamSubscription<
-    List<
-      ProjectMessageModel
-    >
-  >?
-  _messagesSubscription;
+  StreamSubscription<List<ProjectMessageModel>>? _messagesSubscription;
 
   // ==========================================================
   // ESTADO
   // ==========================================================
 
-  List<
-    ProjectMessageModel
-  >
-  _messages =
-      const <
-        ProjectMessageModel
-      >[];
+  List<ProjectMessageModel> _messages = const <ProjectMessageModel>[];
 
   bool _isLoading = true;
 
@@ -125,21 +112,14 @@ class ProjectChatController
   ProjectChatController({
     required String projectId,
     ProjectChatService? service,
-  }) : projectId = _requiredProjectId(
-         projectId,
-       ),
-       _service =
-           service ??
-           ProjectChatService();
+  }) : projectId = _requiredProjectId(projectId),
+       _service = service ?? ProjectChatService();
 
   // ==========================================================
   // GETTERS
   // ==========================================================
 
-  List<
-    ProjectMessageModel
-  >
-  get messages => _messages;
+  List<ProjectMessageModel> get messages => _messages;
 
   bool get isLoading => _isLoading;
 
@@ -147,15 +127,11 @@ class ProjectChatController
 
   bool get isSendingAudio => _isSendingAudio;
 
-  bool get isBusy =>
-      _isSending ||
-      _isSendingAudio;
+  bool get isBusy => _isSending || _isSendingAudio;
 
   bool get hasMessages => _messages.isNotEmpty;
 
-  bool get hasError =>
-      _errorMessage !=
-      null;
+  bool get hasError => _errorMessage != null;
 
   String? get errorMessage => _errorMessage;
 
@@ -178,14 +154,8 @@ class ProjectChatController
   //
   // ==========================================================
 
-  Set<
-    String
-  >
-  get senderUserIds {
-    final result =
-        <
-          String
-        >{};
+  Set<String> get senderUserIds {
+    final result = <String>{};
 
     for (final message in _messages) {
       final senderId = message.senderId.trim();
@@ -194,44 +164,25 @@ class ProjectChatController
         continue;
       }
 
-      result.add(
-        senderId,
-      );
+      result.add(senderId);
     }
 
-    return Set<
-      String
-    >.unmodifiable(
-      result,
-    );
+    return Set<String>.unmodifiable(result);
   }
 
   // ==========================================================
   // OUTROS REMETENTES
   // ==========================================================
 
-  Set<
-    String
-  >
-  get otherSenderUserIds {
+  Set<String> get otherSenderUserIds {
     final userId = currentUserId?.trim();
 
-    if (userId ==
-            null ||
-        userId.isEmpty) {
+    if (userId == null || userId.isEmpty) {
       return senderUserIds;
     }
 
-    return Set<
-      String
-    >.unmodifiable(
-      senderUserIds.where(
-        (
-          senderId,
-        ) =>
-            senderId !=
-            userId,
-      ),
+    return Set<String>.unmodifiable(
+      senderUserIds.where((senderId) => senderId != userId),
     );
   }
 
@@ -239,10 +190,7 @@ class ProjectChatController
   // INIT
   // ==========================================================
 
-  Future<
-    void
-  >
-  init() async {
+  Future<void> init() async {
     if (_disposed) {
       return;
     }
@@ -255,10 +203,7 @@ class ProjectChatController
 
     _errorMessage = null;
 
-    _messages =
-        const <
-          ProjectMessageModel
-        >[];
+    _messages = const <ProjectMessageModel>[];
 
     _safeNotify();
 
@@ -268,9 +213,7 @@ class ProjectChatController
 
     final userId = currentUserId?.trim();
 
-    if (userId ==
-            null ||
-        userId.isEmpty) {
+    if (userId == null || userId.isEmpty) {
       _isLoading = false;
 
       _errorMessage = 'Usuário não autenticado.';
@@ -291,27 +234,16 @@ class ProjectChatController
   // START REALTIME
   // ==========================================================
 
-  Future<
-    void
-  >
-  _startRealtime() async {
+  Future<void> _startRealtime() async {
     await _messagesSubscription?.cancel();
 
     _messagesSubscription = null;
 
     try {
       _messagesSubscription = _service
-          .streamMessages(
-            projectId: projectId,
-          )
-          .listen(
-            _onMessagesReceived,
-            onError: _onRealtimeError,
-          );
-    } catch (
-      error,
-      stackTrace
-    ) {
+          .streamMessages(projectId: projectId)
+          .listen(_onMessagesReceived, onError: _onRealtimeError);
+    } catch (error, stackTrace) {
       debugPrint(
         '[PROJECT CHAT CONTROLLER] '
         'Erro ao iniciar Realtime: '
@@ -340,12 +272,7 @@ class ProjectChatController
   // MENSAGENS RECEBIDAS
   // ==========================================================
 
-  void _onMessagesReceived(
-    List<
-      ProjectMessageModel
-    >
-    messages,
-  ) {
+  void _onMessagesReceived(List<ProjectMessageModel> messages) {
     if (_disposed) {
       return;
     }
@@ -366,16 +293,10 @@ class ProjectChatController
     //
     // ========================================================
 
-    final byId =
-        <
-          String,
-          ProjectMessageModel
-        >{};
+    final byId = <String, ProjectMessageModel>{};
 
     for (final message in _messages) {
-      if (!_belongsToCurrentProject(
-        message,
-      )) {
+      if (!_belongsToCurrentProject(message)) {
         continue;
       }
 
@@ -387,9 +308,7 @@ class ProjectChatController
     }
 
     for (final message in messages) {
-      if (!_belongsToCurrentProject(
-        message,
-      )) {
+      if (!_belongsToCurrentProject(message)) {
         continue;
       }
 
@@ -404,28 +323,14 @@ class ProjectChatController
     // ORDENAR
     // ========================================================
 
-    final sorted =
-        byId.values.toList(
-          growable: false,
-        )..sort(
-          (
-            first,
-            second,
-          ) => first.createdAt.compareTo(
-            second.createdAt,
-          ),
-        );
+    final sorted = byId.values.toList(growable: false)
+      ..sort((first, second) => first.createdAt.compareTo(second.createdAt));
 
     // ========================================================
     // ESTADO
     // ========================================================
 
-    _messages =
-        List<
-          ProjectMessageModel
-        >.unmodifiable(
-          sorted,
-        );
+    _messages = List<ProjectMessageModel>.unmodifiable(sorted);
 
     _isLoading = false;
 
@@ -444,10 +349,7 @@ class ProjectChatController
   // ERRO REALTIME
   // ==========================================================
 
-  void _onRealtimeError(
-    Object error,
-    StackTrace stackTrace,
-  ) {
+  void _onRealtimeError(Object error, StackTrace stackTrace) {
     if (_disposed) {
       return;
     }
@@ -475,14 +377,8 @@ class ProjectChatController
   // ENVIAR
   // ==========================================================
 
-  Future<
-    bool
-  >
-  sendMessage(
-    String content,
-  ) async {
-    if (_disposed ||
-        _isSending) {
+  Future<bool> sendMessage(String content) async {
+    if (_disposed || _isSending) {
       return false;
     }
 
@@ -496,8 +392,7 @@ class ProjectChatController
     // LIMITE
     // ========================================================
 
-    if (normalized.length >
-        ProjectChatService.maxMessageLength) {
+    if (normalized.length > ProjectChatService.maxMessageLength) {
       _errorMessage = 'A mensagem é muito longa.';
 
       _safeNotify();
@@ -511,9 +406,7 @@ class ProjectChatController
 
     final userId = currentUserId?.trim();
 
-    if (userId ==
-            null ||
-        userId.isEmpty) {
+    if (userId == null || userId.isEmpty) {
       _errorMessage = 'Usuário não autenticado.';
 
       _safeNotify();
@@ -569,9 +462,7 @@ class ProjectChatController
       // VALIDAR PROJETO
       // ======================================================
 
-      if (!_belongsToCurrentProject(
-        sentMessage,
-      )) {
+      if (!_belongsToCurrentProject(sentMessage)) {
         _errorMessage = 'A mensagem retornou vinculada a outra sessão.';
 
         return false;
@@ -593,9 +484,7 @@ class ProjectChatController
       //
       // ======================================================
 
-      _addOrReplaceMessage(
-        sentMessage,
-      );
+      _addOrReplaceMessage(sentMessage);
 
       debugPrint(
         '[PROJECT CHAT CONTROLLER] '
@@ -604,10 +493,7 @@ class ProjectChatController
       );
 
       return true;
-    } catch (
-      error,
-      stackTrace
-    ) {
+    } catch (error, stackTrace) {
       debugPrint(
         '[PROJECT CHAT CONTROLLER] '
         'Erro ao enviar: '
@@ -638,17 +524,13 @@ class ProjectChatController
   // ENVIAR ÁUDIO
   // ==========================================================
 
-  Future<
-    bool
-  >
-  sendAudioMessage({
+  Future<bool> sendAudioMessage({
     required Uint8List audioBytes,
     required int durationMs,
     String fileExtension = 'wav',
     String mimeType = 'audio/wav',
   }) async {
-    if (_disposed ||
-        _isSendingAudio) {
+    if (_disposed || _isSendingAudio) {
       return false;
     }
 
@@ -660,8 +542,7 @@ class ProjectChatController
       return false;
     }
 
-    if (durationMs <=
-        0) {
+    if (durationMs <= 0) {
       _errorMessage = 'A duração do áudio é inválida.';
 
       _safeNotify();
@@ -671,9 +552,7 @@ class ProjectChatController
 
     final userId = currentUserId?.trim();
 
-    if (userId ==
-            null ||
-        userId.isEmpty) {
+    if (userId == null || userId.isEmpty) {
       _errorMessage = 'Usuário não autenticado.';
 
       _safeNotify();
@@ -700,17 +579,13 @@ class ProjectChatController
         return true;
       }
 
-      if (!_belongsToCurrentProject(
-        sentMessage,
-      )) {
+      if (!_belongsToCurrentProject(sentMessage)) {
         _errorMessage = 'O áudio retornou vinculado a outra sessão.';
 
         return false;
       }
 
-      _addOrReplaceMessage(
-        sentMessage,
-      );
+      _addOrReplaceMessage(sentMessage);
 
       debugPrint(
         '[PROJECT CHAT CONTROLLER] '
@@ -719,10 +594,7 @@ class ProjectChatController
       );
 
       return true;
-    } catch (
-      error,
-      stackTrace
-    ) {
+    } catch (error, stackTrace) {
       debugPrint(
         '[PROJECT CHAT CONTROLLER] '
         'Erro ao enviar áudio: '
@@ -753,10 +625,7 @@ class ProjectChatController
   // CRIAR URL PARA REPRODUÇÃO DO ÁUDIO
   // ==========================================================
 
-  Future<
-    String
-  >
-  createAudioPlaybackUrl({
+  Future<String> createAudioPlaybackUrl({
     required String audioPath,
     int expiresInSeconds = 3600,
   }) {
@@ -784,28 +653,15 @@ class ProjectChatController
   //
   // ==========================================================
 
-  void _addOrReplaceMessage(
-    ProjectMessageModel message,
-  ) {
-    if (_disposed ||
-        message.id.isEmpty ||
-        !_belongsToCurrentProject(
-          message,
-        )) {
+  void _addOrReplaceMessage(ProjectMessageModel message) {
+    if (_disposed || message.id.isEmpty || !_belongsToCurrentProject(message)) {
       return;
     }
 
-    final byId =
-        <
-          String,
-          ProjectMessageModel
-        >{};
+    final byId = <String, ProjectMessageModel>{};
 
     for (final current in _messages) {
-      if (current.id.isEmpty ||
-          !_belongsToCurrentProject(
-            current,
-          )) {
+      if (current.id.isEmpty || !_belongsToCurrentProject(current)) {
         continue;
       }
 
@@ -814,24 +670,10 @@ class ProjectChatController
 
     byId[message.id] = message;
 
-    final updated =
-        byId.values.toList(
-          growable: false,
-        )..sort(
-          (
-            first,
-            second,
-          ) => first.createdAt.compareTo(
-            second.createdAt,
-          ),
-        );
+    final updated = byId.values.toList(growable: false)
+      ..sort((first, second) => first.createdAt.compareTo(second.createdAt));
 
-    _messages =
-        List<
-          ProjectMessageModel
-        >.unmodifiable(
-          updated,
-        );
+    _messages = List<ProjectMessageModel>.unmodifiable(updated);
 
     _isLoading = false;
 
@@ -844,12 +686,7 @@ class ProjectChatController
   // APAGAR
   // ==========================================================
 
-  Future<
-    bool
-  >
-  deleteMessage(
-    String messageId,
-  ) async {
+  Future<bool> deleteMessage(String messageId) async {
     if (_disposed) {
       return false;
     }
@@ -864,12 +701,9 @@ class ProjectChatController
     // GARANTIR QUE A MENSAGEM ESTÁ NESTA SESSÃO
     // ========================================================
 
-    final message = getMessageById(
-      normalizedMessageId,
-    );
+    final message = getMessageById(normalizedMessageId);
 
-    if (message ==
-        null) {
+    if (message == null) {
       _errorMessage = 'Mensagem não encontrada nesta sessão.';
 
       _safeNotify();
@@ -887,9 +721,7 @@ class ProjectChatController
     //
     // ========================================================
 
-    if (!isMyMessage(
-      message,
-    )) {
+    if (!isMyMessage(message)) {
       _errorMessage = 'Você só pode apagar suas próprias mensagens.';
 
       _safeNotify();
@@ -912,7 +744,8 @@ class ProjectChatController
     // ========================================================
 
     if (message.isSystem) {
-      _errorMessage = 'Mensagens do sistema não podem ser apagadas por usuários.';
+      _errorMessage =
+          'Mensagens do sistema não podem ser apagadas por usuários.';
 
       _safeNotify();
 
@@ -928,9 +761,7 @@ class ProjectChatController
     }
 
     try {
-      await _service.deleteMessage(
-        messageId: normalizedMessageId,
-      );
+      await _service.deleteMessage(messageId: normalizedMessageId);
 
       if (_disposed) {
         return true;
@@ -940,28 +771,16 @@ class ProjectChatController
       // REMOVER LOCALMENTE
       // ======================================================
 
-      _messages =
-          List<
-            ProjectMessageModel
-          >.unmodifiable(
-            _messages.where(
-              (
-                current,
-              ) =>
-                  current.id !=
-                  normalizedMessageId,
-            ),
-          );
+      _messages = List<ProjectMessageModel>.unmodifiable(
+        _messages.where((current) => current.id != normalizedMessageId),
+      );
 
       _errorMessage = null;
 
       _safeNotify();
 
       return true;
-    } catch (
-      error,
-      stackTrace
-    ) {
+    } catch (error, stackTrace) {
       debugPrint(
         '[PROJECT CHAT CONTROLLER] '
         'Erro ao apagar mensagem: '
@@ -988,9 +807,7 @@ class ProjectChatController
   // BUSCAR MENSAGEM
   // ==========================================================
 
-  ProjectMessageModel? getMessageById(
-    String messageId,
-  ) {
+  ProjectMessageModel? getMessageById(String messageId) {
     final normalized = messageId.trim();
 
     if (normalized.isEmpty) {
@@ -998,8 +815,7 @@ class ProjectChatController
     }
 
     for (final message in _messages) {
-      if (message.id ==
-          normalized) {
+      if (message.id == normalized) {
         return message;
       }
     }
@@ -1011,30 +827,15 @@ class ProjectChatController
   // MENSAGENS DE UM MEMBRO
   // ==========================================================
 
-  List<
-    ProjectMessageModel
-  >
-  getMessagesByUserId(
-    String userId,
-  ) {
+  List<ProjectMessageModel> getMessagesByUserId(String userId) {
     final normalized = userId.trim();
 
     if (normalized.isEmpty) {
-      return const <
-        ProjectMessageModel
-      >[];
+      return const <ProjectMessageModel>[];
     }
 
-    return List<
-      ProjectMessageModel
-    >.unmodifiable(
-      _messages.where(
-        (
-          message,
-        ) =>
-            message.senderId.trim() ==
-            normalized,
-      ),
+    return List<ProjectMessageModel>.unmodifiable(
+      _messages.where((message) => message.senderId.trim() == normalized),
     );
   }
 
@@ -1051,68 +852,48 @@ class ProjectChatController
   //
   // ==========================================================
 
-  bool canDeleteMessage(
-    ProjectMessageModel message,
-  ) {
+  bool canDeleteMessage(ProjectMessageModel message) {
     if (_disposed) {
       return false;
     }
 
-    if (!isMyMessage(
-      message,
-    )) {
+    if (!isMyMessage(message)) {
       return false;
     }
 
     return message.canDelete;
   }
 
-  bool canDeleteMessageById(
-    String messageId,
-  ) {
-    final message = getMessageById(
-      messageId,
-    );
+  bool canDeleteMessageById(String messageId) {
+    final message = getMessageById(messageId);
 
-    if (message ==
-        null) {
+    if (message == null) {
       return false;
     }
 
-    return canDeleteMessage(
-      message,
-    );
+    return canDeleteMessage(message);
   }
 
   // ==========================================================
   // É MINHA?
   // ==========================================================
 
-  bool isMyMessage(
-    ProjectMessageModel message,
-  ) {
+  bool isMyMessage(ProjectMessageModel message) {
     final userId = currentUserId?.trim();
 
-    if (userId ==
-            null ||
-        userId.isEmpty) {
+    if (userId == null || userId.isEmpty) {
       return false;
     }
 
-    return message.isMine(
-      userId,
-    );
+    return message.isMine(userId);
   }
 
   // ==========================================================
   // PERTENCE AO PROJETO?
   // ==========================================================
 
-  bool _belongsToCurrentProject(
-    ProjectMessageModel message,
-  ) {
-    return message.projectId.trim() ==
-        projectId;
+  bool _belongsToCurrentProject(ProjectMessageModel message) {
+    return message.projectId.trim() == projectId;
   }
 
   // ==========================================================
@@ -1120,9 +901,7 @@ class ProjectChatController
   // ==========================================================
 
   void clearError() {
-    if (_disposed ||
-        _errorMessage ==
-            null) {
+    if (_disposed || _errorMessage == null) {
       return;
     }
 
@@ -1135,10 +914,7 @@ class ProjectChatController
   // RECARREGAR STREAM
   // ==========================================================
 
-  Future<
-    void
-  >
-  reconnect() async {
+  Future<void> reconnect() async {
     if (_disposed) {
       return;
     }
@@ -1172,15 +948,11 @@ class ProjectChatController
   // PROJECT ID
   // ==========================================================
 
-  static String _requiredProjectId(
-    String value,
-  ) {
+  static String _requiredProjectId(String value) {
     final normalized = value.trim();
 
     if (normalized.isEmpty) {
-      throw ArgumentError(
-        'projectId não pode ser vazio.',
-      );
+      throw ArgumentError('projectId não pode ser vazio.');
     }
 
     return normalized;
@@ -1198,9 +970,7 @@ class ProjectChatController
 
     _disposed = true;
 
-    unawaited(
-      _messagesSubscription?.cancel(),
-    );
+    unawaited(_messagesSubscription?.cancel());
 
     _messagesSubscription = null;
 

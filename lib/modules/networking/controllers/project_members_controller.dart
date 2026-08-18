@@ -42,9 +42,7 @@ import '../services/project_members_service.dart';
 //
 // ============================================================
 
-class ProjectMembersController
-    with
-        ChangeNotifier {
+class ProjectMembersController with ChangeNotifier {
   // ==========================================================
   // PROJETO
   // ==========================================================
@@ -61,13 +59,7 @@ class ProjectMembersController
   // MEMBERS
   // ==========================================================
 
-  List<
-    ProjectMemberModel
-  >
-  _members =
-      const <
-        ProjectMemberModel
-      >[];
+  List<ProjectMemberModel> _members = const <ProjectMemberModel>[];
 
   // ==========================================================
   // STATE
@@ -85,10 +77,7 @@ class ProjectMembersController
   // LOAD CONTROL
   // ==========================================================
 
-  Future<
-    void
-  >?
-  _activeLoad;
+  Future<void>? _activeLoad;
 
   // ==========================================================
   // CONSTRUTOR
@@ -97,21 +86,14 @@ class ProjectMembersController
   ProjectMembersController({
     required String projectId,
     ProjectMembersService? service,
-  }) : projectId = _requiredProjectId(
-         projectId,
-       ),
-       _service =
-           service ??
-           ProjectMembersService();
+  }) : projectId = _requiredProjectId(projectId),
+       _service = service ?? ProjectMembersService();
 
   // ==========================================================
   // GETTERS
   // ==========================================================
 
-  List<
-    ProjectMemberModel
-  >
-  get members => _members;
+  List<ProjectMemberModel> get members => _members;
 
   bool get isLoading => _isLoading;
 
@@ -121,9 +103,7 @@ class ProjectMembersController
 
   bool get isEmpty => _members.isEmpty;
 
-  bool get hasError =>
-      _errorMessage !=
-      null;
+  bool get hasError => _errorMessage != null;
 
   String? get errorMessage => _errorMessage;
 
@@ -142,9 +122,7 @@ class ProjectMembersController
   String? get currentUserId {
     final value = _service.currentUserId?.trim();
 
-    if (value ==
-            null ||
-        value.isEmpty) {
+    if (value == null || value.isEmpty) {
       return null;
     }
 
@@ -158,14 +136,11 @@ class ProjectMembersController
   ProjectMemberModel? get currentUserMember {
     final userId = currentUserId;
 
-    if (userId ==
-        null) {
+    if (userId == null) {
       return null;
     }
 
-    return getMemberByUserId(
-      userId,
-    );
+    return getMemberByUserId(userId);
   }
 
   // ==========================================================
@@ -185,18 +160,14 @@ class ProjectMembersController
   //
   // ==========================================================
 
-  Future<
-    void
-  >
-  load() {
+  Future<void> load() {
     if (_disposed) {
       return Future.value();
     }
 
     final activeLoad = _activeLoad;
 
-    if (activeLoad !=
-        null) {
+    if (activeLoad != null) {
       return activeLoad;
     }
 
@@ -204,26 +175,18 @@ class ProjectMembersController
 
     _activeLoad = future;
 
-    return future.whenComplete(
-      () {
-        if (identical(
-          _activeLoad,
-          future,
-        )) {
-          _activeLoad = null;
-        }
-      },
-    );
+    return future.whenComplete(() {
+      if (identical(_activeLoad, future)) {
+        _activeLoad = null;
+      }
+    });
   }
 
   // ==========================================================
   // PERFORM LOAD
   // ==========================================================
 
-  Future<
-    void
-  >
-  _performLoad() async {
+  Future<void> _performLoad() async {
     if (_disposed) {
       return;
     }
@@ -243,9 +206,7 @@ class ProjectMembersController
       // SERVICE
       // ======================================================
 
-      final result = await _service.getMembers(
-        projectId: projectId,
-      );
+      final result = await _service.getMembers(projectId: projectId);
 
       if (_disposed) {
         return;
@@ -256,24 +217,14 @@ class ProjectMembersController
       // ======================================================
 
       final normalizedMembers = result
-          .where(
-            (
-              member,
-            ) => member.userId.trim().isNotEmpty,
-          )
-          .toList(
-            growable: false,
-          );
+          .where((member) => member.userId.trim().isNotEmpty)
+          .toList(growable: false);
 
       // ======================================================
       // REMOVE DUPLICADOS
       // ======================================================
 
-      final uniqueMembers =
-          <
-            String,
-            ProjectMemberModel
-          >{};
+      final uniqueMembers = <String, ProjectMemberModel>{};
 
       for (final member in normalizedMembers) {
         uniqueMembers[member.userId] = member;
@@ -283,54 +234,30 @@ class ProjectMembersController
       // RESULTADO
       // ======================================================
 
-      final sortedMembers =
-          uniqueMembers.values.toList(
-            growable: false,
-          )..sort(
-            (
-              first,
-              second,
-            ) {
-              final currentUserId = this.currentUserId;
+      final sortedMembers = uniqueMembers.values.toList(growable: false)
+        ..sort((first, second) {
+          final currentUserId = this.currentUserId;
 
-              final firstIsCurrent =
-                  currentUserId !=
-                      null &&
-                  first.userId ==
-                      currentUserId;
+          final firstIsCurrent =
+              currentUserId != null && first.userId == currentUserId;
 
-              final secondIsCurrent =
-                  currentUserId !=
-                      null &&
-                  second.userId ==
-                      currentUserId;
+          final secondIsCurrent =
+              currentUserId != null && second.userId == currentUserId;
 
-              if (firstIsCurrent !=
-                  secondIsCurrent) {
-                return firstIsCurrent
-                    ? -1
-                    : 1;
-              }
+          if (firstIsCurrent != secondIsCurrent) {
+            return firstIsCurrent ? -1 : 1;
+          }
 
-              if (first.isOnline !=
-                  second.isOnline) {
-                return first.isOnline
-                    ? -1
-                    : 1;
-              }
+          if (first.isOnline != second.isOnline) {
+            return first.isOnline ? -1 : 1;
+          }
 
-              return first.displayName.toLowerCase().compareTo(
-                second.displayName.toLowerCase(),
-              );
-            },
+          return first.displayName.toLowerCase().compareTo(
+            second.displayName.toLowerCase(),
           );
+        });
 
-      _members =
-          List<
-            ProjectMemberModel
-          >.unmodifiable(
-            sortedMembers,
-          );
+      _members = List<ProjectMemberModel>.unmodifiable(sortedMembers);
 
       _isLoading = false;
 
@@ -344,10 +271,7 @@ class ProjectMembersController
         '[PROJECT MEMBERS CONTROLLER] '
         '${_members.length} membro(s) disponível(is).',
       );
-    } catch (
-      error,
-      stackTrace
-    ) {
+    } catch (error, stackTrace) {
       debugPrint(
         '[PROJECT MEMBERS CONTROLLER] '
         'Erro ao carregar membros: '
@@ -374,10 +298,7 @@ class ProjectMembersController
       // ======================================================
 
       if (!_hasLoaded) {
-        _members =
-            const <
-              ProjectMemberModel
-            >[];
+        _members = const <ProjectMemberModel>[];
       }
 
       _isLoading = false;
@@ -394,10 +315,7 @@ class ProjectMembersController
   // RELOAD
   // ==========================================================
 
-  Future<
-    void
-  >
-  reload() async {
+  Future<void> reload() async {
     if (_disposed) {
       return;
     }
@@ -409,18 +327,14 @@ class ProjectMembersController
   // É O USUÁRIO ATUAL?
   // ==========================================================
 
-  bool isCurrentUser(
-    ProjectMemberModel member,
-  ) {
+  bool isCurrentUser(ProjectMemberModel member) {
     final userId = currentUserId;
 
-    if (userId ==
-        null) {
+    if (userId == null) {
       return false;
     }
 
-    return member.userId ==
-        userId;
+    return member.userId == userId;
   }
 
   // ==========================================================
@@ -431,21 +345,15 @@ class ProjectMembersController
   //
   // ==========================================================
 
-  ProjectMemberModel? getMemberById(
-    String memberId,
-  ) {
-    return getMemberByUserId(
-      memberId,
-    );
+  ProjectMemberModel? getMemberById(String memberId) {
+    return getMemberByUserId(memberId);
   }
 
   // ==========================================================
   // BUSCAR MEMBRO POR USER ID
   // ==========================================================
 
-  ProjectMemberModel? getMemberByUserId(
-    String userId,
-  ) {
+  ProjectMemberModel? getMemberByUserId(String userId) {
     final normalizedId = userId.trim();
 
     if (normalizedId.isEmpty) {
@@ -453,8 +361,7 @@ class ProjectMembersController
     }
 
     for (final member in _members) {
-      if (member.userId ==
-          normalizedId) {
+      if (member.userId == normalizedId) {
         return member;
       }
     }
@@ -466,13 +373,8 @@ class ProjectMembersController
   // POSSUI MEMBRO
   // ==========================================================
 
-  bool containsUser(
-    String userId,
-  ) {
-    return getMemberByUserId(
-          userId,
-        ) !=
-        null;
+  bool containsUser(String userId) {
+    return getMemberByUserId(userId) != null;
   }
 
   // ==========================================================
@@ -492,70 +394,34 @@ class ProjectMembersController
   //
   // ==========================================================
 
-  List<
-    ProjectMemberModel
-  >
-  get otherMembers {
+  List<ProjectMemberModel> get otherMembers {
     final userId = currentUserId;
 
-    if (userId ==
-        null) {
-      return List<
-        ProjectMemberModel
-      >.unmodifiable(
-        _members,
-      );
+    if (userId == null) {
+      return List<ProjectMemberModel>.unmodifiable(_members);
     }
 
     return _members
-        .where(
-          (
-            member,
-          ) =>
-              member.userId !=
-              userId,
-        )
-        .toList(
-          growable: false,
-        );
+        .where((member) => member.userId != userId)
+        .toList(growable: false);
   }
 
   // ==========================================================
   // ONLINE MEMBERS
   // ==========================================================
 
-  List<
-    ProjectMemberModel
-  >
-  get onlineMembers {
-    return _members
-        .where(
-          (
-            member,
-          ) => member.isOnline,
-        )
-        .toList(
-          growable: false,
-        );
+  List<ProjectMemberModel> get onlineMembers {
+    return _members.where((member) => member.isOnline).toList(growable: false);
   }
 
   // ==========================================================
   // OTHER ONLINE MEMBERS
   // ==========================================================
 
-  List<
-    ProjectMemberModel
-  >
-  get otherOnlineMembers {
+  List<ProjectMemberModel> get otherOnlineMembers {
     return otherMembers
-        .where(
-          (
-            member,
-          ) => member.isOnline,
-        )
-        .toList(
-          growable: false,
-        );
+        .where((member) => member.isOnline)
+        .toList(growable: false);
   }
 
   // ==========================================================
@@ -565,8 +431,7 @@ class ProjectMembersController
   String get memberCountLabel {
     final count = memberCount;
 
-    if (count ==
-        1) {
+    if (count == 1) {
       return '1 membro';
     }
 
@@ -580,8 +445,7 @@ class ProjectMembersController
   String get onlineCountLabel {
     final count = onlineMemberCount;
 
-    if (count ==
-        1) {
+    if (count == 1) {
       return '1 online';
     }
 
@@ -593,9 +457,7 @@ class ProjectMembersController
   // ==========================================================
 
   void clearError() {
-    if (_disposed ||
-        _errorMessage ==
-            null) {
+    if (_disposed || _errorMessage == null) {
       return;
     }
 
@@ -609,8 +471,7 @@ class ProjectMembersController
   // ==========================================================
 
   void _safeNotify() {
-    if (_disposed ||
-        !hasListeners) {
+    if (_disposed || !hasListeners) {
       return;
     }
 
@@ -621,15 +482,11 @@ class ProjectMembersController
   // PROJECT ID
   // ==========================================================
 
-  static String _requiredProjectId(
-    String value,
-  ) {
+  static String _requiredProjectId(String value) {
     final normalized = value.trim();
 
     if (normalized.isEmpty) {
-      throw ArgumentError(
-        'projectId não pode ser vazio.',
-      );
+      throw ArgumentError('projectId não pode ser vazio.');
     }
 
     return normalized;
@@ -647,10 +504,7 @@ class ProjectMembersController
 
     _disposed = true;
 
-    _members =
-        const <
-          ProjectMemberModel
-        >[];
+    _members = const <ProjectMemberModel>[];
 
     _activeLoad = null;
 

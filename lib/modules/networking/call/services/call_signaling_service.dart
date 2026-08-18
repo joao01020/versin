@@ -1,506 +1,900 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../utils/call_channel_name.dart';
+
 // ============================================================
-// CALL CHANNEL NAME
+// CALL SIGNALING SERVICE
 // ============================================================
 //
-// Utilitário responsável por gerar nomes padronizados
-// para canais utilizados pela funcionalidade de chamadas.
+// Responsável SOMENTE pela sinalização WebRTC.
 //
-// Objetivos:
+// Fluxo:
 //
-// - manter nomes consistentes;
-// - evitar concatenação manual espalhada pelo projeto;
-// - separar canais por finalidade;
-// - normalizar IDs;
-// - facilitar debugging;
-// - evitar caracteres problemáticos.
+// WebRtcCallService
+//      ↓
+// offer / answer / ICE
+//      ↓
+// CallSignalingService
+//      ↓
+// Supabase Realtime Broadcast
+//      ↓
+// CallSignalingService remoto
+//      ↓
+// WebRtcCallService remoto
 //
-// Exemplos:
+// NÃO transmite:
 //
-// versin:call:project:<projectId>
+// - áudio;
+// - vídeo;
+// - MediaStream.
 //
-// versin:call:room:<callId>
-//
-// versin:call:signaling:<callId>
-//
-// versin:call:presence:<callId>
-//
-// versin:call:user:<userId>
+// Áudio e vídeo trafegam pelo WebRTC.
 //
 // ============================================================
 
-class CallChannelName {
+class CallSignalingService {
   // ==========================================================
-  // PREFIX
-  // ==========================================================
-
-  static const String _root = 'versin';
-
-  static const String _module = 'call';
-
-  // ==========================================================
-  // PRIVATE CONSTRUCTOR
+  // EVENTOS
   // ==========================================================
 
-  CallChannelName._();
+  static const String offerEvent = 'offer';
+
+  static const String answerEvent = 'answer';
+
+  static const String iceCandidateEvent = 'ice_candidate';
+
+  static const String hangupEvent = 'hangup';
+
+  static const String mediaStateEvent = 'media_state';
 
   // ==========================================================
-  // PROJECT
-  // ==========================================================
-  //
-  // Canal geral relacionado às chamadas de um projeto.
-  //
-  // Uso:
-  //
-  // - criação de chamada;
-  // - término de chamada;
-  // - alterações globais do projeto;
-  // - descoberta de chamada ativa.
-  //
-  // Resultado:
-  //
-  // versin:call:project:<projectId>
-  //
+  // SUPABASE
   // ==========================================================
 
-  static String project(
-    String projectId,
-  ) {
-    return _build(
-      type: 'project',
-      id: _requiredId(
-        projectId,
-        'projectId',
-      ),
-    );
-  }
+  final SupabaseClient _supabase;
 
   // ==========================================================
-  // CALL ROOM
-  // ==========================================================
-  //
-  // Canal principal de uma chamada específica.
-  //
-  // Pode ser usado para eventos de alto nível da sala.
-  //
-  // Resultado:
-  //
-  // versin:call:room:<callId>
-  //
+  // CHANNEL
   // ==========================================================
 
-  static String room(
-    String callId,
-  ) {
-    return _build(
-      type: 'room',
-      id: _requiredId(
-        callId,
-        'callId',
-      ),
-    );
-  }
+  RealtimeChannel? _channel;
 
   // ==========================================================
-  // SIGNALING
-  // ==========================================================
-  //
-  // Canal utilizado pelo signaling WebRTC.
-  //
-  // Eventos futuros:
-  //
-  // - offer;
-  // - answer;
-  // - ICE candidate;
-  // - renegotiation;
-  // - hangup;
-  // - media upgrade.
-  //
-  // Resultado:
-  //
-  // versin:call:signaling:<callId>
-  //
+  // IDENTIFICAÇÃO
   // ==========================================================
 
-  static String signaling(
-    String callId,
-  ) {
-    return _build(
-      type: 'signaling',
-      id: _requiredId(
-        callId,
-        'callId',
-      ),
-    );
-  }
+  String? _callId;
+
+  String? _currentUserId;
 
   // ==========================================================
-  // PRESENCE
-  // ==========================================================
-  //
-  // Canal de presença dos participantes.
-  //
-  // Pode representar:
-  //
-  // - conectado;
-  // - entrou;
-  // - saiu;
-  // - microfone;
-  // - câmera;
-  // - speaking;
-  //
-  // Resultado:
-  //
-  // versin:call:presence:<callId>
-  //
+  // ESTADO
   // ==========================================================
 
-  static String presence(
-    String callId,
-  ) {
-    return _build(
-      type: 'presence',
-      id: _requiredId(
-        callId,
-        'callId',
-      ),
-    );
-  }
+  bool _isSubscribed = false;
+
+  bool _disposed = false;
+
+  Completer<void>? _subscribeCompleter;
 
   // ==========================================================
-  // MEDIA STATE
-  // ==========================================================
-  //
-  // Canal dedicado ao estado de mídia da chamada.
-  //
-  // Útil caso futuramente seja interessante separar
-  // presença de atualizações de mídia.
-  //
-  // Exemplos:
-  //
-  // microphone_enabled
-  // camera_enabled
-  // audio_connected
-  // video_connected
-  //
-  // Resultado:
-  //
-  // versin:call:media:<callId>
-  //
+  // CALLBACKS
   // ==========================================================
 
-  static String media(
-    String callId,
-  ) {
-    return _build(
-      type: 'media',
-      id: _requiredId(
-        callId,
-        'callId',
-      ),
-    );
-  }
+  void Function({required String fromUserId, required String sdp})? onOffer;
+
+  void Function({required String fromUserId, required String sdp})? onAnswer;
+
+  void Function({
+    required String fromUserId,
+    required String candidate,
+    String? sdpMid,
+    int? sdpMLineIndex,
+  })?
+  onIceCandidate;
+
+  void Function({required String fromUserId})? onHangup;
+
+  void Function({
+    required String fromUserId,
+    required bool microphoneEnabled,
+    required bool cameraEnabled,
+  })?
+  onMediaState;
+
+  void Function(RealtimeSubscribeStatus status)? onSubscriptionStatus;
+
+  void Function(Object error)? onError;
 
   // ==========================================================
-  // COMMUNICATION REQUESTS
-  // ==========================================================
-  //
-  // Canal para pedidos relacionados a consentimento.
-  //
-  // Exemplos:
-  //
-  // video_unlock
-  // video_upgrade
-  //
-  // Resultado:
-  //
-  // versin:call:requests:<projectId>
-  //
+  // CONSTRUTOR
   // ==========================================================
 
-  static String requests(
-    String projectId,
-  ) {
-    return _build(
-      type: 'requests',
-      id: _requiredId(
-        projectId,
-        'projectId',
-      ),
-    );
-  }
+  CallSignalingService({SupabaseClient? supabase})
+    : _supabase = supabase ?? Supabase.instance.client;
 
   // ==========================================================
-  // USER
-  // ==========================================================
-  //
-  // Canal pessoal de chamadas de um usuário.
-  //
-  // Pode ser usado futuramente para:
-  //
-  // - chamada recebida;
-  // - convite;
-  // - cancelamento;
-  // - chamada perdida;
-  //
-  // Resultado:
-  //
-  // versin:call:user:<userId>
-  //
+  // GETTERS
   // ==========================================================
 
-  static String user(
-    String userId,
-  ) {
-    return _build(
-      type: 'user',
-      id: _requiredId(
-        userId,
-        'userId',
-      ),
-    );
-  }
+  bool get isSubscribed => _isSubscribed;
+
+  bool get isDisposed => _disposed;
+
+  String? get callId => _callId;
+
+  String? get currentUserId => _currentUserId;
+
+  RealtimeChannel? get channel => _channel;
 
   // ==========================================================
-  // DIRECT PEER
-  // ==========================================================
-  //
-  // Nome determinístico para comunicação entre dois usuários
-  // dentro da mesma chamada.
-  //
-  // IMPORTANTE:
-  //
-  // A ordem dos IDs não altera o resultado.
-  //
-  // Exemplo:
-  //
-  // peer(call, A, B)
-  //
-  // produz o mesmo canal que:
-  //
-  // peer(call, B, A)
-  //
-  // Isso evita criar dois canais diferentes para o mesmo par.
-  //
-  // Resultado:
-  //
-  // versin:call:peer:<callId>:<userA>:<userB>
-  //
+  // START
   // ==========================================================
 
-  static String peer({
+  Future<void> start({
     required String callId,
-    required String userA,
-    required String userB,
-  }) {
-    final normalizedCallId = _requiredId(
-      callId,
-      'callId',
+    required String currentUserId,
+  }) async {
+    _ensureNotDisposed();
+
+    final normalizedCallId = _required(callId, 'callId');
+
+    final normalizedUserId = _required(currentUserId, 'currentUserId');
+
+    // ========================================================
+    // MESMA SESSÃO JÁ ESTÁ ATIVA
+    // ========================================================
+
+    if (_channel != null &&
+        _callId == normalizedCallId &&
+        _currentUserId == normalizedUserId &&
+        _isSubscribed) {
+      return;
+    }
+
+    // ========================================================
+    // LIMPAR CANAL ANTIGO
+    // ========================================================
+
+    await stop();
+
+    _callId = normalizedCallId;
+
+    _currentUserId = normalizedUserId;
+
+    _subscribeCompleter = Completer<void>();
+
+    // ========================================================
+    // NOME DO CANAL
+    // ========================================================
+
+    final channelName = CallChannelName.signaling(normalizedCallId);
+
+    debugPrint(
+      '[CALL SIGNALING] '
+      'Abrindo canal: '
+      '$channelName',
     );
 
-    final normalizedUserA = _requiredId(
-      userA,
-      'userA',
+    // ========================================================
+    // CHANNEL
+    // ========================================================
+    //
+    // Por enquanto deixamos público no nível do Realtime
+    // porque seu projeto ainda não possui policies específicas
+    // para realtime.messages.
+    //
+    // Depois podemos mudar para:
+    //
+    // RealtimeChannelConfig(
+    //   private: true,
+    // )
+    //
+    // + RLS em realtime.messages.
+    //
+    // ========================================================
+
+    final channel = _supabase.channel(channelName);
+
+    _channel = channel;
+
+    // ========================================================
+    // OFFER
+    // ========================================================
+
+    channel.onBroadcast(
+      event: offerEvent,
+
+      callback: (payload) {
+        _handleOffer(payload);
+      },
     );
 
-    final normalizedUserB = _requiredId(
-      userB,
-      'userB',
+    // ========================================================
+    // ANSWER
+    // ========================================================
+
+    channel.onBroadcast(
+      event: answerEvent,
+
+      callback: (payload) {
+        _handleAnswer(payload);
+      },
     );
 
-    if (normalizedUserA ==
-        normalizedUserB) {
-      throw ArgumentError(
-        'userA e userB não podem representar o mesmo usuário.',
+    // ========================================================
+    // ICE
+    // ========================================================
+
+    channel.onBroadcast(
+      event: iceCandidateEvent,
+
+      callback: (payload) {
+        _handleIceCandidate(payload);
+      },
+    );
+
+    // ========================================================
+    // HANGUP
+    // ========================================================
+
+    channel.onBroadcast(
+      event: hangupEvent,
+
+      callback: (payload) {
+        _handleHangup(payload);
+      },
+    );
+
+    // ========================================================
+    // MEDIA STATE
+    // ========================================================
+
+    channel.onBroadcast(
+      event: mediaStateEvent,
+
+      callback: (payload) {
+        _handleMediaState(payload);
+      },
+    );
+
+    // ========================================================
+    // SUBSCRIBE
+    // ========================================================
+
+    channel.subscribe((status, error) {
+      if (_disposed) {
+        return;
+      }
+
+      debugPrint(
+        '[CALL SIGNALING] '
+        'Status: '
+        '$status',
+      );
+
+      onSubscriptionStatus?.call(status);
+
+      switch (status) {
+        case RealtimeSubscribeStatus.subscribed:
+          _isSubscribed = true;
+
+          if (_subscribeCompleter != null &&
+              !_subscribeCompleter!.isCompleted) {
+            _subscribeCompleter!.complete();
+          }
+
+          debugPrint(
+            '[CALL SIGNALING] '
+            'Canal conectado.',
+          );
+
+          break;
+
+        case RealtimeSubscribeStatus.channelError:
+        case RealtimeSubscribeStatus.timedOut:
+          _isSubscribed = false;
+
+          final exception =
+              error ??
+              StateError(
+                'Falha ao conectar ao canal de signaling: '
+                '$status',
+              );
+
+          if (_subscribeCompleter != null &&
+              !_subscribeCompleter!.isCompleted) {
+            _subscribeCompleter!.completeError(exception);
+          }
+
+          onError?.call(exception);
+
+          break;
+
+        case RealtimeSubscribeStatus.closed:
+          _isSubscribed = false;
+
+          break;
+      }
+    });
+
+    // ========================================================
+    // ESPERAR SUBSCRIBE
+    // ========================================================
+
+    try {
+      await _subscribeCompleter!.future.timeout(const Duration(seconds: 12));
+    } on TimeoutException {
+      throw StateError('Timeout ao conectar ao canal de signaling.');
+    }
+  }
+
+  // ==========================================================
+  // SEND OFFER
+  // ==========================================================
+
+  Future<void> sendOffer({
+    required String toUserId,
+    required String sdp,
+  }) async {
+    final payload = _basePayload(toUserId: toUserId);
+
+    payload['sdp'] = _required(sdp, 'sdp');
+
+    await _send(event: offerEvent, payload: payload);
+
+    debugPrint(
+      '[CALL SIGNALING] '
+      'Offer enviada para '
+      '${_short(toUserId)}.',
+    );
+  }
+
+  // ==========================================================
+  // SEND ANSWER
+  // ==========================================================
+
+  Future<void> sendAnswer({
+    required String toUserId,
+    required String sdp,
+  }) async {
+    final payload = _basePayload(toUserId: toUserId);
+
+    payload['sdp'] = _required(sdp, 'sdp');
+
+    await _send(event: answerEvent, payload: payload);
+
+    debugPrint(
+      '[CALL SIGNALING] '
+      'Answer enviada para '
+      '${_short(toUserId)}.',
+    );
+  }
+
+  // ==========================================================
+  // SEND ICE
+  // ==========================================================
+
+  Future<void> sendIceCandidate({
+    required String toUserId,
+    required String candidate,
+    String? sdpMid,
+    int? sdpMLineIndex,
+  }) async {
+    final payload = _basePayload(toUserId: toUserId);
+
+    payload.addAll({
+      'candidate': _required(candidate, 'candidate'),
+
+      'sdp_mid': sdpMid,
+
+      'sdp_m_line_index': sdpMLineIndex,
+    });
+
+    await _send(event: iceCandidateEvent, payload: payload);
+  }
+
+  // ==========================================================
+  // SEND HANGUP
+  // ==========================================================
+
+  Future<void> sendHangup({required String toUserId}) async {
+    await _send(
+      event: hangupEvent,
+
+      payload: _basePayload(toUserId: toUserId),
+    );
+
+    debugPrint(
+      '[CALL SIGNALING] '
+      'Hangup enviado para '
+      '${_short(toUserId)}.',
+    );
+  }
+
+  // ==========================================================
+  // SEND MEDIA STATE
+  // ==========================================================
+
+  Future<void> sendMediaState({
+    required String toUserId,
+    required bool microphoneEnabled,
+    required bool cameraEnabled,
+  }) async {
+    final payload = _basePayload(toUserId: toUserId);
+
+    payload.addAll({
+      'microphone_enabled': microphoneEnabled,
+
+      'camera_enabled': cameraEnabled,
+    });
+
+    await _send(event: mediaStateEvent, payload: payload);
+  }
+
+  // ==========================================================
+  // SEND
+  // ==========================================================
+
+  Future<void> _send({
+    required String event,
+    required Map<String, dynamic> payload,
+  }) async {
+    _ensureNotDisposed();
+
+    final channel = _channel;
+
+    if (channel == null) {
+      throw StateError('Canal de signaling ainda não foi iniciado.');
+    }
+
+    try {
+      await channel.sendBroadcastMessage(event: event, payload: payload);
+    } catch (error, stackTrace) {
+      debugPrint(
+        '[CALL SIGNALING] '
+        'Erro enviando '
+        '$event: '
+        '$error',
+      );
+
+      debugPrint(
+        '[CALL SIGNALING] '
+        'StackTrace: '
+        '$stackTrace',
+      );
+
+      onError?.call(error);
+
+      rethrow;
+    }
+  }
+
+  // ==========================================================
+  // HANDLE OFFER
+  // ==========================================================
+
+  void _handleOffer(Map<String, dynamic> raw) {
+    final payload = _extractPayload(raw);
+
+    if (!_shouldHandle(payload)) {
+      return;
+    }
+
+    final fromUserId = _readRequiredString(payload, 'from_user_id');
+
+    final sdp = _readRequiredString(payload, 'sdp');
+
+    if (fromUserId == null || sdp == null) {
+      return;
+    }
+
+    debugPrint(
+      '[CALL SIGNALING] '
+      'Offer recebida de '
+      '${_short(fromUserId)}.',
+    );
+
+    onOffer?.call(fromUserId: fromUserId, sdp: sdp);
+  }
+
+  // ==========================================================
+  // HANDLE ANSWER
+  // ==========================================================
+
+  void _handleAnswer(Map<String, dynamic> raw) {
+    final payload = _extractPayload(raw);
+
+    if (!_shouldHandle(payload)) {
+      return;
+    }
+
+    final fromUserId = _readRequiredString(payload, 'from_user_id');
+
+    final sdp = _readRequiredString(payload, 'sdp');
+
+    if (fromUserId == null || sdp == null) {
+      return;
+    }
+
+    debugPrint(
+      '[CALL SIGNALING] '
+      'Answer recebida de '
+      '${_short(fromUserId)}.',
+    );
+
+    onAnswer?.call(fromUserId: fromUserId, sdp: sdp);
+  }
+
+  // ==========================================================
+  // HANDLE ICE
+  // ==========================================================
+
+  void _handleIceCandidate(Map<String, dynamic> raw) {
+    final payload = _extractPayload(raw);
+
+    if (!_shouldHandle(payload)) {
+      return;
+    }
+
+    final fromUserId = _readRequiredString(payload, 'from_user_id');
+
+    final candidate = _readRequiredString(payload, 'candidate');
+
+    if (fromUserId == null || candidate == null) {
+      return;
+    }
+
+    final sdpMid = _readNullableString(payload['sdp_mid']);
+
+    final sdpMLineIndex = _readNullableInt(payload['sdp_m_line_index']);
+
+    onIceCandidate?.call(
+      fromUserId: fromUserId,
+
+      candidate: candidate,
+
+      sdpMid: sdpMid,
+
+      sdpMLineIndex: sdpMLineIndex,
+    );
+  }
+
+  // ==========================================================
+  // HANDLE HANGUP
+  // ==========================================================
+
+  void _handleHangup(Map<String, dynamic> raw) {
+    final payload = _extractPayload(raw);
+
+    if (!_shouldHandle(payload)) {
+      return;
+    }
+
+    final fromUserId = _readRequiredString(payload, 'from_user_id');
+
+    if (fromUserId == null) {
+      return;
+    }
+
+    debugPrint(
+      '[CALL SIGNALING] '
+      'Hangup recebido de '
+      '${_short(fromUserId)}.',
+    );
+
+    onHangup?.call(fromUserId: fromUserId);
+  }
+
+  // ==========================================================
+  // HANDLE MEDIA STATE
+  // ==========================================================
+
+  void _handleMediaState(Map<String, dynamic> raw) {
+    final payload = _extractPayload(raw);
+
+    if (!_shouldHandle(payload)) {
+      return;
+    }
+
+    final fromUserId = _readRequiredString(payload, 'from_user_id');
+
+    if (fromUserId == null) {
+      return;
+    }
+
+    final microphoneEnabled = payload['microphone_enabled'] == true;
+
+    final cameraEnabled = payload['camera_enabled'] == true;
+
+    onMediaState?.call(
+      fromUserId: fromUserId,
+
+      microphoneEnabled: microphoneEnabled,
+
+      cameraEnabled: cameraEnabled,
+    );
+  }
+
+  // ==========================================================
+  // DEVE PROCESSAR?
+  // ==========================================================
+  //
+  // Todos usam o mesmo canal da chamada.
+  //
+  // Por isso filtramos o destinatário aqui.
+  //
+  // ==========================================================
+
+  bool _shouldHandle(Map<String, dynamic> payload) {
+    if (_disposed) {
+      return false;
+    }
+
+    final currentUserId = _currentUserId;
+
+    final currentCallId = _callId;
+
+    if (currentUserId == null || currentCallId == null) {
+      return false;
+    }
+
+    final payloadCallId = _readNullableString(payload['call_id']);
+
+    final fromUserId = _readNullableString(payload['from_user_id']);
+
+    final toUserId = _readNullableString(payload['to_user_id']);
+
+    // ========================================================
+    // OUTRA CHAMADA
+    // ========================================================
+
+    if (payloadCallId != currentCallId) {
+      return false;
+    }
+
+    // ========================================================
+    // EVENTO ENVIADO PELO PRÓPRIO CLIENTE
+    // ========================================================
+
+    if (fromUserId == currentUserId) {
+      return false;
+    }
+
+    // ========================================================
+    // NÃO É PARA ESTE USUÁRIO
+    // ========================================================
+
+    if (toUserId != currentUserId) {
+      return false;
+    }
+
+    return true;
+  }
+
+  // ==========================================================
+  // PAYLOAD BASE
+  // ==========================================================
+
+  Map<String, dynamic> _basePayload({required String toUserId}) {
+    final currentCallId = _callId;
+
+    final currentUserId = _currentUserId;
+
+    if (currentCallId == null || currentCallId.isEmpty) {
+      throw StateError('callId ainda não foi configurado.');
+    }
+
+    if (currentUserId == null || currentUserId.isEmpty) {
+      throw StateError('currentUserId ainda não foi configurado.');
+    }
+
+    return {
+      'call_id': currentCallId,
+
+      'from_user_id': currentUserId,
+
+      'to_user_id': _required(toUserId, 'toUserId'),
+
+      'sent_at': DateTime.now().toUtc().toIso8601String(),
+    };
+  }
+
+  // ==========================================================
+  // EXTRAIR PAYLOAD
+  // ==========================================================
+  //
+  // Dependendo da versão do realtime_client, o callback pode
+  // entregar:
+  //
+  // {
+  //   payload: {...}
+  // }
+  //
+  // ou diretamente:
+  //
+  // {...}
+  //
+  // Este método aceita os dois formatos.
+  //
+  // ==========================================================
+
+  Map<String, dynamic> _extractPayload(Map<String, dynamic> raw) {
+    final nested = raw['payload'];
+
+    if (nested is Map) {
+      return Map<String, dynamic>.from(nested);
+    }
+
+    return Map<String, dynamic>.from(raw);
+  }
+
+  // ==========================================================
+  // READ REQUIRED STRING
+  // ==========================================================
+
+  String? _readRequiredString(Map<String, dynamic> payload, String key) {
+    final value = _readNullableString(payload[key]);
+
+    if (value == null) {
+      debugPrint(
+        '[CALL SIGNALING] '
+        'Payload inválido: '
+        '$key ausente.',
       );
     }
 
-    final users = [
-      normalizedUserA,
-      normalizedUserB,
-    ]..sort();
-
-    return [
-      _root,
-      _module,
-      'peer',
-      normalizedCallId,
-      users[0],
-      users[1],
-    ].join(
-      ':',
-    );
+    return value;
   }
 
   // ==========================================================
-  // PARTICIPANT
-  // ==========================================================
-  //
-  // Canal específico de um participante dentro de uma chamada.
-  //
-  // Pode ser útil futuramente para comunicação direta
-  // servidor/cliente ou eventos individuais.
-  //
-  // Resultado:
-  //
-  // versin:call:participant:<callId>:<userId>
-  //
+  // READ STRING
   // ==========================================================
 
-  static String participant({
-    required String callId,
-    required String userId,
-  }) {
-    final normalizedCallId = _requiredId(
-      callId,
-      'callId',
-    );
+  String? _readNullableString(dynamic value) {
+    if (value == null) {
+      return null;
+    }
 
-    final normalizedUserId = _requiredId(
-      userId,
-      'userId',
-    );
-
-    return [
-      _root,
-      _module,
-      'participant',
-      normalizedCallId,
-      normalizedUserId,
-    ].join(
-      ':',
-    );
-  }
-
-  // ==========================================================
-  // BUILD
-  // ==========================================================
-
-  static String _build({
-    required String type,
-    required String id,
-  }) {
-    return [
-      _root,
-      _module,
-      type,
-      id,
-    ].join(
-      ':',
-    );
-  }
-
-  // ==========================================================
-  // REQUIRED ID
-  // ==========================================================
-
-  static String _requiredId(
-    String value,
-    String field,
-  ) {
-    final normalized = _normalizeId(
-      value,
-    );
+    final normalized = value.toString().trim();
 
     if (normalized.isEmpty) {
-      throw ArgumentError(
-        '$field não pode ser vazio.',
-      );
+      return null;
     }
 
     return normalized;
   }
 
   // ==========================================================
-  // NORMALIZE ID
-  // ==========================================================
-  //
-  // IDs UUID do Supabase já são compatíveis.
-  //
-  // Mesmo assim fazemos uma normalização defensiva:
-  //
-  // - trim;
-  // - lowercase;
-  // - espaços → hífen;
-  // - caracteres fora do conjunto seguro → hífen;
-  // - múltiplos hífens → um;
-  //
+  // READ INT
   // ==========================================================
 
-  static String _normalizeId(
-    String value,
-  ) {
-    var normalized = value.trim().toLowerCase();
-
-    if (normalized.isEmpty) {
-      return '';
+  int? _readNullableInt(dynamic value) {
+    if (value == null) {
+      return null;
     }
 
-    normalized = normalized.replaceAll(
-      RegExp(
-        r'\s+',
-      ),
-      '-',
-    );
+    if (value is int) {
+      return value;
+    }
 
-    normalized = normalized.replaceAll(
-      RegExp(
-        r'[^a-z0-9_-]',
-      ),
-      '-',
-    );
+    if (value is num) {
+      return value.toInt();
+    }
 
-    normalized = normalized.replaceAll(
-      RegExp(
-        r'-+',
-      ),
-      '-',
-    );
-
-    normalized = normalized.replaceAll(
-      RegExp(
-        r'^-+|-+$',
-      ),
-      '',
-    );
-
-    return normalized;
+    return int.tryParse(value.toString());
   }
 
   // ==========================================================
-  // DEBUG LABEL
-  // ==========================================================
-  //
-  // Retorna uma versão menor de um ID para logs/UI.
-  //
-  // NÃO deve ser usada como identificador real de canal.
-  //
+  // REQUIRED
   // ==========================================================
 
-  static String shortId(
-    String value, {
-    int length = 8,
-  }) {
-    if (length <=
-        0) {
-      throw ArgumentError(
-        'length deve ser maior que zero.',
-      );
-    }
-
+  String _required(String value, String field) {
     final normalized = value.trim();
 
     if (normalized.isEmpty) {
-      return '';
+      throw ArgumentError('$field não pode ser vazio.');
     }
 
-    if (normalized.length <=
-        length) {
-      return normalized;
+    return normalized;
+  }
+
+  // ==========================================================
+  // SHORT ID
+  // ==========================================================
+
+  String _short(String value) {
+    return CallChannelName.shortId(value);
+  }
+
+  // ==========================================================
+  // STOP
+  // ==========================================================
+
+  Future<void> stop() async {
+    final channel = _channel;
+
+    _channel = null;
+
+    _isSubscribed = false;
+
+    _callId = null;
+
+    _currentUserId = null;
+
+    final completer = _subscribeCompleter;
+
+    _subscribeCompleter = null;
+
+    if (completer != null && !completer.isCompleted) {
+      completer.completeError(
+        StateError('Signaling interrompido antes da inscrição.'),
+      );
     }
 
-    return normalized.substring(
-      0,
-      length,
+    if (channel == null) {
+      return;
+    }
+
+    try {
+      await _supabase.removeChannel(channel);
+
+      debugPrint(
+        '[CALL SIGNALING] '
+        'Canal removido.',
+      );
+    } catch (error) {
+      debugPrint(
+        '[CALL SIGNALING] '
+        'Erro removendo canal: '
+        '$error',
+      );
+    }
+  }
+
+  // ==========================================================
+  // ENSURE
+  // ==========================================================
+
+  void _ensureNotDisposed() {
+    if (_disposed) {
+      throw StateError('CallSignalingService já foi descartado.');
+    }
+  }
+
+  // ==========================================================
+  // DISPOSE
+  // ==========================================================
+
+  Future<void> dispose() async {
+    if (_disposed) {
+      return;
+    }
+
+    await stop();
+
+    _disposed = true;
+
+    onOffer = null;
+
+    onAnswer = null;
+
+    onIceCandidate = null;
+
+    onHangup = null;
+
+    onMediaState = null;
+
+    onSubscriptionStatus = null;
+
+    onError = null;
+
+    debugPrint(
+      '[CALL SIGNALING] '
+      'Service descartado.',
     );
   }
 }

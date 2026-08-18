@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:versin/app/routes/app_routes.dart';
 import 'package:versin/app/locator.dart';
 import 'package:versin/features/rhymes/presentation/controller/rhymes_controller.dart';
@@ -7,6 +8,10 @@ import 'package:versin/modules/login/domain/repositories/auth_repository.dart';
 import 'package:versin/modules/dashboard/controllers/dashboard_controller.dart';
 import 'package:versin/modules/profile/views/account_information_page.dart';
 import 'package:versin/modules/profile/views/professional_profile_settings_page.dart';
+import 'package:versin/modules/public_profile/controllers/public_profile_controller.dart';
+import 'package:versin/modules/public_profile/data/repositories/public_profile_repository_impl.dart';
+import 'package:versin/modules/public_profile/services/profile_track_service.dart';
+import 'package:versin/modules/public_profile/views/public_profile_page.dart';
 import 'package:versin/modules/settings/widgets/settings_tile.dart';
 import 'package:versin/modules/settings/views/private_api_settings_page.dart';
 
@@ -42,6 +47,12 @@ class _SettingsPageState
         DashboardController
       >();
 
+  // ============================================================
+  // PUBLIC PROFILE
+  // ============================================================
+
+  late final PublicProfileController _publicProfileController;
+
   bool _isLoggingOut = false;
 
   final Color primaryPurple = const Color(
@@ -56,6 +67,33 @@ class _SettingsPageState
 
   bool _syncCloud = true;
   bool _autoSave = true;
+
+  bool _isApiExpanded = false;
+  bool _obscureApiKey = true;
+  final TextEditingController _apiKeyController = TextEditingController();
+
+  // ============================================================
+  // INIT
+  // ============================================================
+
+  @override
+  void initState() {
+    super.initState();
+
+    _publicProfileController = PublicProfileController(
+      repository: PublicProfileRepositoryImpl(),
+      trackService: ProfileTrackService(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _apiKeyController.dispose();
+
+    _publicProfileController.dispose();
+
+    super.dispose();
+  }
 
   @override
   Widget build(
@@ -79,15 +117,18 @@ class _SettingsPageState
             ),
 
             _buildSectionTitle(
-              "Perfil do Produtor",
+              "Perfil",
             ),
             _buildSettingsContainer(
               child: Column(
                 children: [
+                  // ====================================================
+                  // CONTA
+                  // ====================================================
                   SettingsTile(
-                    icon: Icons.person_outline_rounded,
+                    icon: Icons.manage_accounts_outlined,
                     title: "Informações da Conta",
-                    subtitle: "Editar e-mail, nome artístico e avatar",
+                    subtitle: "E-mail, username, nome artístico e avatar",
                     onTap: () {
                       Navigator.of(
                         context,
@@ -101,11 +142,28 @@ class _SettingsPageState
                       );
                     },
                   ),
+
                   _buildDivider(),
+
+                  // ====================================================
+                  // PERFIL PÚBLICO
+                  // ====================================================
+                  SettingsTile(
+                    icon: Icons.public_rounded,
+                    title: "Perfil Público",
+                    subtitle: "Bio, identidade pública, demos e visibilidade",
+                    onTap: _openPublicProfile,
+                  ),
+
+                  _buildDivider(),
+
+                  // ====================================================
+                  // PERFIL PROFISSIONAL / CONECTAR
+                  // ====================================================
                   SettingsTile(
                     icon: Icons.groups_2_outlined,
-                    title: "Configurações do Conectar",
-                    subtitle: "Definir funções, habilidades e preferências profissionais",
+                    title: "Perfil Profissional",
+                    subtitle: "Funções, habilidades e preferências do Conectar",
                     onTap: () {
                       Navigator.of(
                         context,
@@ -197,22 +255,152 @@ class _SettingsPageState
                   ),
                   _buildDivider(),
 
-                  SettingsTile(
-                    icon: Icons.vpn_key_outlined,
-                    title: "Configurar API Privada",
-                    subtitle: "Gerenciar credenciais e chaves externas de IA/Serviços",
-                    onTap: () {
-                      Navigator.of(
-                        context,
-                      ).push(
-                        MaterialPageRoute(
-                          builder:
-                              (
-                                _,
-                              ) => const PrivateApiSettingsPage(),
+                  Theme(
+                    data:
+                        Theme.of(
+                          context,
+                        ).copyWith(
+                          dividerColor: Colors.transparent,
                         ),
-                      );
-                    },
+                    child: ExpansionTile(
+                      onExpansionChanged:
+                          (
+                            expanded,
+                          ) {
+                            setState(
+                              () => _isApiExpanded = expanded,
+                            );
+                          },
+                      leading: Icon(
+                        Icons.vpn_key_outlined,
+                        color: accentNeon,
+                        size: 22,
+                      ),
+                      title: const Text(
+                        "Configurar API Privada",
+                        style: TextStyle(
+                          color: Colors.white,
+                        ),
+                      ),
+                      subtitle: const Text(
+                        "Gerenciar credenciais e chaves externas de IA/Serviços",
+                        style: TextStyle(
+                          color: Colors.white54,
+                          fontSize: 12,
+                        ),
+                      ),
+                      trailing: Icon(
+                        _isApiExpanded
+                            ? Icons.keyboard_arrow_up
+                            : Icons.keyboard_arrow_down,
+                        color: Colors.white24,
+                      ),
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(
+                            left: 16,
+                            right: 16,
+                            bottom: 20,
+                            top: 4,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(
+                                  12,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withValues(
+                                    alpha: 0.3,
+                                  ),
+                                  borderRadius: BorderRadius.circular(
+                                    10,
+                                  ),
+                                  border: Border.all(
+                                    color: Colors.white.withValues(
+                                      alpha: 0.02,
+                                    ),
+                                  ),
+                                ),
+                                child: Text(
+                                  "Esta opção opcional concede autonomia para vincular sua própria chave de API ao ecossistema Versin. "
+                                  "Recomendado para contornar limitações padrão de cota de requisições ou para aplicar modelos neurais customizados dedicados.",
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(
+                                      alpha: 0.5,
+                                    ),
+                                    fontSize: 12,
+                                    height: 1.4,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(
+                                height: 14,
+                              ),
+                              TextField(
+                                controller: _apiKeyController,
+                                obscureText: _obscureApiKey,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 13,
+                                ),
+                                decoration: InputDecoration(
+                                  hintText: "Insira sua API Key privada",
+                                  hintStyle: const TextStyle(
+                                    color: Colors.white24,
+                                    fontSize: 13,
+                                  ),
+                                  filled: true,
+                                  fillColor: Colors.white.withValues(
+                                    alpha: 0.02,
+                                  ),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 14,
+                                    vertical: 12,
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(
+                                      12,
+                                    ),
+                                    borderSide: BorderSide(
+                                      color: Colors.white.withValues(
+                                        alpha: 0.05,
+                                      ),
+                                    ),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(
+                                      12,
+                                    ),
+                                    borderSide: BorderSide(
+                                      color: accentNeon.withValues(
+                                        alpha: 0.3,
+                                      ),
+                                    ),
+                                  ),
+                                  suffixIcon: IconButton(
+                                    icon: Icon(
+                                      _obscureApiKey
+                                          ? Icons.visibility_off
+                                          : Icons.visibility,
+                                      color: Colors.white30,
+                                      size: 18,
+                                    ),
+                                    onPressed: () {
+                                      setState(
+                                        () => _obscureApiKey = !_obscureApiKey,
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -300,6 +488,72 @@ class _SettingsPageState
         ),
       ),
     );
+  }
+
+  // ============================================================
+  // ABRIR PERFIL PÚBLICO
+  // ============================================================
+
+  Future<
+    void
+  >
+  _openPublicProfile() async {
+    final userId = Supabase.instance.client.auth.currentUser?.id.trim();
+
+    if (userId ==
+            null ||
+        userId.isEmpty) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(
+          context,
+        )
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            behavior: SnackBarBehavior.floating,
+            content: Text(
+              'Não foi possível identificar o usuário autenticado.',
+            ),
+          ),
+        );
+
+      return;
+    }
+
+    await _publicProfileController.load(
+      userId: userId,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    await Navigator.of(
+      context,
+    ).push(
+      MaterialPageRoute<
+        void
+      >(
+        builder:
+            (
+              _,
+            ) {
+              return PublicProfilePage(
+                userId: userId,
+                controller: _publicProfileController,
+              );
+            },
+      ),
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    await _publicProfileController.refresh();
   }
 
   Future<
@@ -1122,7 +1376,7 @@ class _SettingsPageState
     onChanged,
   }) {
     return SwitchListTile(
-      activeThumbColor: accentNeon,
+      activeColor: accentNeon,
       activeTrackColor: primaryPurple.withValues(
         alpha: 0.4,
       ),

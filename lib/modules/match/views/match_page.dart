@@ -20,6 +20,7 @@ import 'package:versin/modules/match/data/repositories/match_repository.dart';
 import 'package:versin/modules/match/models/match_discovery_mode.dart';
 import 'package:versin/modules/match/models/match_filter_state.dart';
 import 'package:versin/modules/match/services/match_session_service.dart';
+import 'package:versin/modules/match/views/match_projects_view.dart';
 
 // ============================================================
 // MATCH WIDGETS
@@ -35,8 +36,6 @@ import 'package:versin/modules/match/widgets/profile_track_player_sheet.dart';
 // ============================================================
 // NETWORKING
 // ============================================================
-
-import 'package:versin/modules/networking/views/networking_session_view.dart';
 
 // ============================================================
 // PROFESSIONAL PROFILE
@@ -805,6 +804,34 @@ class _MatchPageState
   }
 
   // ============================================================
+  // OPEN MATCH PROJECTS
+  // ============================================================
+
+  Future<
+    void
+  >
+  _openMatchProjects() async {
+    if (!mounted) {
+      return;
+    }
+
+    await Navigator.of(
+      context,
+    ).push(
+      MaterialPageRoute<
+        void
+      >(
+        builder:
+            (
+              _,
+            ) {
+              return const MatchProjectsView();
+            },
+      ),
+    );
+  }
+
+  // ============================================================
   // OPEN USER DEMO
   // ============================================================
   //
@@ -1339,6 +1366,14 @@ class _MatchPageState
   // ============================================================
   // MATCH EVENT
   // ============================================================
+  //
+  // O evento de Match não abre mais o projeto automaticamente.
+  //
+  // O projeto continua sendo criado/encontrado normalmente pelo
+  // fluxo do Match. O usuário escolhe quando deseja entrar através
+  // da página "Meus projetos".
+  //
+  // ============================================================
 
   void _handleMatchEvent(
     String projectId,
@@ -1356,15 +1391,6 @@ class _MatchPageState
     // ==========================================================
     // MODO EXPANSÃO
     // ==========================================================
-    //
-    // Enquanto esta página estiver sendo usada para expandir uma
-    // equipe, ela não deve navegar para um projeto criado pelo
-    // fluxo normal do Match.
-    //
-    // A próxima etapa vai substituir o LIKE por CONVIDAR neste
-    // modo, evitando que esse evento seja gerado.
-    //
-    // ==========================================================
 
     if (_isTeamExpansionMode) {
       debugPrint(
@@ -1377,45 +1403,15 @@ class _MatchPageState
       return;
     }
 
+    // ==========================================================
+    // MATCH NORMAL
+    // ==========================================================
+
     debugPrint(
       '[MATCH PAGE] '
       'Match recebido. '
-      'Projeto: '
+      'Projeto disponível em Meus projetos: '
       '$normalizedProjectId',
-    );
-
-    _openNetworkingSession(
-      normalizedProjectId,
-    );
-  }
-
-  // ============================================================
-  // NETWORKING
-  // ============================================================
-
-  void _openNetworkingSession(
-    String projectId,
-  ) {
-    final normalizedProjectId = projectId.trim();
-
-    if (normalizedProjectId.isEmpty ||
-        !mounted) {
-      return;
-    }
-
-    Navigator.of(
-      context,
-    ).push(
-      MaterialPageRoute(
-        builder:
-            (
-              _,
-            ) {
-              return NetworkingSessionView(
-                projectId: normalizedProjectId,
-              );
-            },
-      ),
     );
   }
 
@@ -2327,6 +2323,49 @@ class _MatchPageState
                       color: hasPublicProfile
                           ? _matchController.accentNeon
                           : Colors.white54,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+            const SizedBox(
+              width: 6,
+            ),
+
+            // ==================================================
+            // MEUS PROJETOS
+            // ==================================================
+            Tooltip(
+              message: 'Meus projetos',
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: _openMatchProjects,
+                  borderRadius: BorderRadius.circular(
+                    14,
+                  ),
+                  child: Container(
+                    width: 42,
+                    height: 42,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(
+                        alpha: 0.035,
+                      ),
+                      borderRadius: BorderRadius.circular(
+                        14,
+                      ),
+                      border: Border.all(
+                        color: Colors.white.withValues(
+                          alpha: 0.06,
+                        ),
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.folder_open_outlined,
+                      size: 21,
+                      color: Colors.white54,
                     ),
                   ),
                 ),

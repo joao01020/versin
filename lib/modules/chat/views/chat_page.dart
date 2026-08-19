@@ -456,7 +456,34 @@ class _ChatPageState
                                   (
                                     message,
                                   ) {
-                                    return message.toJson();
+                                    final data = message.toJson();
+
+                                    // =========================================
+                                    // WIDGET CUSTOMIZADO
+                                    // =========================================
+                                    //
+                                    // ChatMessage.toJson() não serializa Widget
+                                    // (e não deve serializar).
+                                    //
+                                    // Para a renderização em memória do chat,
+                                    // preservamos explicitamente customWidget.
+                                    //
+                                    // Isso permite que:
+                                    //
+                                    // - AiQuotaWarningCard;
+                                    // - AiQuotaExhaustedCard;
+                                    // - futuros cards do sistema;
+                                    //
+                                    // cheguem corretamente ao ChatListView.
+                                    //
+                                    // =========================================
+
+                                    if (message.customWidget !=
+                                        null) {
+                                      data['customWidget'] = message.customWidget;
+                                    }
+
+                                    return data;
                                   },
                                 ).toList(),
 

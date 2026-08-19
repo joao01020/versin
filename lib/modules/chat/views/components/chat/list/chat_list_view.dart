@@ -130,6 +130,12 @@ class ChatListView
                 role ==
                 'user';
 
+            final content =
+                message['content']?.toString() ??
+                '';
+
+            final normalizedContent = content.trim();
+
             final customWidget =
                 message['customWidget']
                     as Widget?;
@@ -137,11 +143,54 @@ class ChatListView
             // ======================================================
             // KEY ESTÁVEL
             // ======================================================
+            //
+            // Incluímos também o tipo do customWidget para que cards
+            // diferentes de quota mantenham identidade própria.
+            //
+            // ======================================================
 
             final messageKey = ValueKey(
               '${message['timestamp'] ?? index}'
-              '-${message['content']}',
+              '-$normalizedContent'
+              '-${customWidget?.runtimeType ?? 'message'}',
             );
+
+            // ======================================================
+            // SOMENTE WIDGET CUSTOMIZADO
+            // ======================================================
+            //
+            // Os cards de quota são adicionados pelo ChatController
+            // com:
+            //
+            // content: ''
+            // customWidget: AiQuotaWarningCard(...)
+            //
+            // Nesse caso NÃO desenhamos ChatMessageBubble, evitando
+            // uma bolha vazia acima do card.
+            //
+            // ======================================================
+
+            if (customWidget !=
+                    null &&
+                normalizedContent.isEmpty) {
+              return AnimatedChatMessage(
+                key: messageKey,
+
+                isUser: false,
+
+                child: Padding(
+                  padding: const EdgeInsets.only(
+                    bottom: 12,
+                  ),
+
+                  child: customWidget,
+                ),
+              );
+            }
+
+            // ======================================================
+            // MENSAGEM NORMAL / MENSAGEM + WIDGET
+            // ======================================================
 
             return AnimatedChatMessage(
               key: messageKey,
@@ -165,10 +214,7 @@ class ChatListView
                     ChatMessageBubble(
                       message: {
                         'role': role,
-
-                        'content':
-                            message['content']?.toString() ??
-                            '',
+                        'content': content,
                       },
 
                       activeColor: activeColor,
@@ -190,6 +236,11 @@ class ChatListView
 
                     // =================================================
                     // WIDGET CUSTOMIZADO
+                    // =================================================
+                    //
+                    // Mantemos suporte para mensagens que tenham texto
+                    // e um widget complementar ao mesmo tempo.
+                    //
                     // =================================================
                     if (customWidget !=
                         null)

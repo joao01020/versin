@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import redis.asyncio as redis
 
@@ -10,20 +10,34 @@ class QuotaService:
     # FAIXAS DE USO
     # ============================================================
 
-    WARNING_PERCENTAGE = 70.0
+    WARNING_PERCENTAGE = 80.0
     CRITICAL_PERCENTAGE = 90.0
     BLOCKED_PERCENTAGE = 100.0
 
     # ============================================================
-    # EXPIRAÇÕES
+    # CICLOS / LIMPEZA
+    # ============================================================
+    #
+    # A quota mensal segue o mesmo marco do ciclo mensal da Groq:
+    #
+    #     dia 1 de cada mês às 00:00 UTC
+    #
+    # A renovação NÃO depende do momento do primeiro uso.
+    #
+    # As chaves Redis incluem YYYY-MM, portanto uma nova chave é
+    # usada automaticamente quando o mês muda.
+    #
+    # Mantemos a chave do período anterior por alguns dias apenas
+    # para limpeza/diagnóstico. Isso NÃO prolonga a quota.
+    #
     # ============================================================
 
-    MONTHLY_EXPIRATION_SECONDS = (
-        60 * 60 * 24 * 40
+    MONTHLY_CLEANUP_GRACE_SECONDS = (
+        60 * 60 * 24 * 7
     )
 
-    DAILY_EXPIRATION_SECONDS = (
-        60 * 60 * 24 * 2
+    DAILY_CLEANUP_GRACE_SECONDS = (
+        60 * 60 * 24
     )
 
     # ============================================================
@@ -156,6 +170,200 @@ class QuotaService:
         return datetime.now(
             timezone.utc
         )
+
+    # ============================================================
+    # INÍCIO DO MÊS ATUAL
+    # ============================================================
+
+    def _get_current_month_start(
+        self,
+    ) -> datetime:
+        now = self._now()
+
+        return datetime(
+            year=now.year,
+            month=now.month,
+            day=1,
+            tzinfo=timezone.utc,
+        )
+
+    # ============================================================
+    # PRÓXIMA RENOVAÇÃO MENSAL
+    # ============================================================
+    #
+    # Alinhada ao ciclo mensal da Groq:
+    #
+    #     1º dia do próximo mês, 00:00 UTC
+    #
+    # ============================================================
+
+    def _get_next_month_start(
+        self,
+    ) -> datetime:
+        now = self._now()
+
+        if now.month == 12:
+            return datetime(
+                year=now.year + 1,
+                month=1,
+                day=1,
+                tzinfo=timezone.utc,
+            )
+
+        return datetime(
+            year=now.year,
+            month=now.month + 1,
+            day=1,
+            tzinfo=timezone.utc,
+        )
+
+    # ============================================================
+    # PRÓXIMO DIA UTC
+    # ============================================================
+
+    def _get_next_day_start(
+        self,
+    ) -> datetime:
+        now = self._now()
+
+        tomorrow = (
+            now
+            + timedelta(
+                days=1,
+            )
+        )
+
+        return datetime(
+            year=tomorrow.year,
+            month=tomorrow.month,
+            day=tomorrow.day,
+            tzinfo=timezone.utc,
+        )
+
+    # ============================================================
+    # SEGUNDOS ATÉ UMA DATA
+    # ============================================================
+
+    def _seconds_until(
+        self,
+        target: datetime,
+    ) -> int:
+        seconds = int(
+            (
+                target
+                - self._now()
+            ).total_seconds()
+        )
+
+        return max(
+            seconds,
+            0,
+        )
+
+    # ============================================================
+    # TTL DA CHAVE MENSAL
+    # ============================================================
+    #
+    # A chave atual pode permanecer alguns dias depois da
+    # renovação apenas para limpeza. Como a chave possui YYYY-MM,
+    # o novo mês nunca reutiliza a quota anterior.
+    #
+    # ============================================================
+
+    def _get_monthly_key_ttl(
+        self,
+    ) -> int:
+        return max(
+            1,
+            self._seconds_until(
+                self._get_next_month_start()
+            )
+            + self.MONTHLY_CLEANUP_GRACE_SECONDS,
+        )
+
+    # ============================================================
+    # TTL DA CHAVE DIÁRIA
+    # ============================================================
+
+    def _get_daily_key_ttl(
+        self,
+    ) -> int:
+        return max(
+            1,
+            self._seconds_until(
+                self._get_next_day_start()
+            )
+            + self.DAILY_CLEANUP_GRACE_SECONDS,
+        )
+
+    # ============================================================
+    # METADADOS DO CICLO MENSAL
+    # ============================================================
+
+    def _get_monthly_period_metadata(
+        self,
+    ) -> dict:
+        now = self._now()
+
+        period_start = (
+            self._get_current_month_start()
+        )
+
+        renews_at = (
+            self._get_next_month_start()
+        )
+
+        renews_in_seconds = max(
+            0,
+            int(
+                (
+                    renews_at
+                    - now
+                ).total_seconds()
+            ),
+        )
+
+        renews_in_hours = (
+            renews_in_seconds
+            // 3600
+        )
+
+        renews_in_days = (
+            (
+                renews_in_seconds
+                + 86399
+            )
+            // 86400
+        )
+
+        return {
+            "period":
+                "monthly",
+
+            "provider":
+                "groq",
+
+            "billing_cycle_anchor":
+                "first_day_of_month",
+
+            "renewal_timezone":
+                "UTC",
+
+            "period_start":
+                period_start.isoformat(),
+
+            "renews_at":
+                renews_at.isoformat(),
+
+            "renews_in_seconds":
+                renews_in_seconds,
+
+            "renews_in_hours":
+                renews_in_hours,
+
+            "renews_in_days":
+                renews_in_days,
+        }
 
     # ============================================================
     # CHAVE MENSAL DO USUÁRIO
@@ -562,7 +770,7 @@ class QuotaService:
 
             await self.redis.expire(
                 user_key,
-                self.MONTHLY_EXPIRATION_SECONDS,
+                self._get_monthly_key_ttl(),
             )
 
             # ====================================================
@@ -576,7 +784,7 @@ class QuotaService:
 
             await self.redis.expire(
                 global_key,
-                self.DAILY_EXPIRATION_SECONDS,
+                self._get_daily_key_ttl(),
             )
 
             self._redis_available = True
@@ -673,18 +881,20 @@ class QuotaService:
     ) -> str:
         if percentage >= self.BLOCKED_PERCENTAGE:
             return (
-                "Limite mensal de IA atingido."
+                "Seus créditos Versin acabaram "
+                "neste ciclo mensal."
             )
 
         if percentage >= self.CRITICAL_PERCENTAGE:
             return (
-                "Seu limite mensal está próximo."
+                "Seus créditos Versin estão "
+                "quase no fim."
             )
 
         if percentage >= self.WARNING_PERCENTAGE:
             return (
-                "Você já utilizou boa parte "
-                "da sua IA este mês."
+                "Você já utilizou 80% ou mais "
+                "dos seus créditos Versin."
             )
 
         return (
@@ -769,6 +979,14 @@ class QuotaService:
         )
 
         # ========================================================
+        # CICLO / RENOVAÇÃO
+        # ========================================================
+
+        period = (
+            self._get_monthly_period_metadata()
+        )
+
+        # ========================================================
         # GLOBAL
         # ========================================================
 
@@ -839,6 +1057,42 @@ class QuotaService:
                 can_use_ai,
 
             # ====================================================
+            # CICLO / RENOVAÇÃO
+            # ====================================================
+            #
+            # O frontend deve usar renews_at como fonte da verdade
+            # para mostrar quando os créditos serão renovados.
+            #
+            # ====================================================
+
+            "period":
+                period["period"],
+
+            "provider":
+                period["provider"],
+
+            "billing_cycle_anchor":
+                period["billing_cycle_anchor"],
+
+            "renewal_timezone":
+                period["renewal_timezone"],
+
+            "period_start":
+                period["period_start"],
+
+            "renews_at":
+                period["renews_at"],
+
+            "renews_in_seconds":
+                period["renews_in_seconds"],
+
+            "renews_in_hours":
+                period["renews_in_hours"],
+
+            "renews_in_days":
+                period["renews_in_days"],
+
+            # ====================================================
             # BARRA
             # ====================================================
 
@@ -901,6 +1155,16 @@ class QuotaService:
     ) -> dict:
         usage = await self.get_global_daily_usage()
 
+        resets_at = (
+            self._get_next_day_start()
+        )
+
+        resets_in_seconds = (
+            self._seconds_until(
+                resets_at
+            )
+        )
+
         remaining = max(
             0,
             self.global_daily_token_limit
@@ -940,6 +1204,18 @@ class QuotaService:
             "blocked":
                 usage
                 >= self.global_daily_token_limit,
+
+            "period":
+                "daily",
+
+            "reset_timezone":
+                "UTC",
+
+            "resets_at":
+                resets_at.isoformat(),
+
+            "resets_in_seconds":
+                resets_in_seconds,
         }
 
     # ============================================================

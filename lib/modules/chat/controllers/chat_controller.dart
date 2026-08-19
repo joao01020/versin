@@ -3,25 +3,46 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 
-import 'package:versin/modules/chat/domain/repositories/chat_repository.dart';
 import 'package:versin/features/rhymes/presentation/controller/rhymes_controller.dart';
 import 'package:versin/modules/brain/controller/brain_controller.dart';
+import 'package:versin/modules/chat/domain/repositories/chat_repository.dart';
+import 'package:versin/modules/chat/models/chat_intent.dart';
+import 'package:versin/modules/chat/models/ai_quota_warning_state.dart';
+import 'package:versin/modules/chat/services/ai_request_gate_service.dart' as ai_gate;
+import 'package:versin/modules/chat/services/ai_quota_warning_service.dart' as quota_warning;
+import 'package:versin/modules/chat/views/widgets/ai_quota_exhausted_card.dart';
+import 'package:versin/modules/chat/views/widgets/ai_quota_warning_card.dart';
 import 'package:versin/modules/studio/controllers/studio_controller.dart';
+
+// ============================================================
+// CHAT ROLE
+// ============================================================
 
 enum ChatRole {
   user,
   assistant,
 }
 
+// ============================================================
+// CHAT CREATION STAGE
+// ============================================================
+
 enum ChatCreationStage {
   imagination,
   writing,
 }
 
+// ============================================================
+// CHAT MESSAGE
+// ============================================================
+
 class ChatMessage {
   final ChatRole role;
+
   final String content;
+
   final DateTime timestamp;
+
   final Widget? customWidget;
 
   ChatMessage({
@@ -76,27 +97,99 @@ class ChatMessage {
       ChatRole.user;
 }
 
+// ============================================================
+// CHAT CONTROLLER
+// ============================================================
+
 class ChatController
     extends
         ChangeNotifier {
+  // ============================================================
+  // DEPENDÊNCIAS
+  // ============================================================
+
   final ChatRepository repository;
+
   final RhymesController rhymesController;
+
+  // ============================================================
+  // ECONOMIA DE IA
+  // ============================================================
+  //
+  // Filtra mensagens que podem ser resolvidas localmente antes
+  // de qualquer chamada para Groq/API privada.
+  //
+  // ============================================================
+
+  final ai_gate.AiRequestGateService _aiRequestGateService = ai_gate.AiRequestGateService();
+
+  // ============================================================
+  // AVISOS DE QUOTA
+  // ============================================================
+  //
+  // O backend continua sendo a fonte da verdade da quota.
+  //
+  // Este service apenas transforma o estado recebido em decisão
+  // de apresentação para o chat.
+  //
+  // ============================================================
+
+  final quota_warning.AiQuotaWarningService _aiQuotaWarningService = quota_warning.AiQuotaWarningService();
+
+  // ============================================================
+  // CALLBACK DE CONFIGURAÇÃO DA API PRIVADA
+  // ============================================================
+  //
+  // A tela que cria o ChatController pode fornecer este callback
+  // para abrir o onboarding/configuração da API privada.
+  //
+  // O callback é opcional para manter compatibilidade com os
+  // pontos existentes que já constroem o ChatController.
+  //
+  // ============================================================
+
+  final VoidCallback? onConfigurePrivateApi;
+
+  // ============================================================
+  // AVISOS JÁ EXIBIDOS
+  // ============================================================
+  //
+  // Evita inserir o mesmo card novamente em toda resposta.
+  //
+  // O ID inclui:
+  //
+  // - nível;
+  // - data de renovação.
+  //
+  // Portanto um novo ciclo mensal gera novos IDs naturalmente.
+  //
+  // ============================================================
+
+  final Set<
+    String
+  >
+  _shownQuotaWarningIds =
+      <
+        String
+      >{};
 
   late final StudioController studioController;
 
   // ============================================================
   // ÚLTIMO ESTADO SINCRONIZADO DO STUDIO
   // ============================================================
-  //
-  // Evita atualizações repetidas quando o próprio Chat altera o
-  // StudioController e o listener global é disparado em seguida.
-  //
-  // ============================================================
 
   late String _lastStudioTitle;
+
   late int _lastStudioBpm;
+
   String? _lastStudioVibe;
+
   String? _lastStudioTechnique;
+
+  // ============================================================
+  // BRAIN
+  // ============================================================
 
   BrainController? get brain =>
       rhymesController
@@ -105,20 +198,41 @@ class ChatController
             as BrainController
       : null;
 
+  // ============================================================
+  // CONTROLLERS
+  // ============================================================
+
   final TextEditingController messageController = TextEditingController();
 
   final ScrollController scrollController = ScrollController();
 
+  // ============================================================
+  // MENSAGENS
+  // ============================================================
+
   final List<
     ChatMessage
   >
-  messages = [];
+  messages =
+      <
+        ChatMessage
+      >[];
+
+  // ============================================================
+  // CREATION STAGE
+  // ============================================================
 
   ChatCreationStage creationStage = ChatCreationStage.imagination;
+
+  // ============================================================
+  // ESTADO
+  // ============================================================
 
   bool isAiTyping = false;
 
   final bool isInitializing = false;
+
+  bool _isDisposed = false;
 
   // ============================================================
   // PROJETO COMPARTILHADO COM O STUDIO
@@ -136,28 +250,35 @@ class ChatController
       studioController.technique ??
       rhymesController.selectedTechnique;
 
+  // ============================================================
+  // ESTRUTURA
+  // ============================================================
+
   String lastConfirmedStructure = '';
+
+  // ============================================================
+  // SUGESTÕES
+  // ============================================================
 
   int currentSuggestionIndex = 0;
 
+  // ============================================================
+  // TIMER
+  // ============================================================
+
   Timer? _creativeHelpTimer;
 
-  bool _isDisposed = false;
+  // ============================================================
+  // CONSTRUTOR
+  // ============================================================
 
   ChatController({
     required this.repository,
     required this.rhymesController,
+    this.onConfigurePrivateApi,
   }) {
     // ==========================================================
     // STUDIO CONTROLLER GLOBAL
-    // ==========================================================
-    //
-    // Chat e Studio usam exatamente a mesma instância.
-    //
-    // Se o Studio ainda não foi aberto, criamos o controller
-    // aqui. Quando o Studio abrir depois, ele reutilizará esta
-    // mesma instância pelo GetIt.
-    //
     // ==========================================================
 
     if (!GetIt.I
@@ -197,12 +318,6 @@ class ChatController
     // ==========================================================
     // SINCRONIZAR CONFIGURAÇÃO DA IA
     // ==========================================================
-    //
-    // O Studio é a fonte do projeto.
-    // O RhymesController continua recebendo os mesmos dados
-    // porque BPM/vibe/técnica são usados nas requisições de IA.
-    //
-    // ==========================================================
 
     rhymesController.updateStudioConfig(
       bpm: studioController.bpm,
@@ -234,11 +349,6 @@ class ChatController
 
     // ==========================================================
     // BPM
-    // ==========================================================
-    //
-    // Se o BPM mudou diretamente no Studio, atualiza também o
-    // RhymesController porque ele envia esse valor para a IA.
-    //
     // ==========================================================
 
     if (currentBpm !=
@@ -395,6 +505,10 @@ class ChatController
     notifyListeners();
   }
 
+  // ============================================================
+  // STOP WORDS
+  // ============================================================
+
   static const Set<
     String
   >
@@ -470,12 +584,20 @@ class ChatController
     'você',
   };
 
+  // ============================================================
+  // NOTIFY
+  // ============================================================
+
   @override
   void notifyListeners() {
     if (!_isDisposed) {
       super.notifyListeners();
     }
   }
+
+  // ============================================================
+  // SUGESTÕES
+  // ============================================================
 
   void nextSuggestion() {
     updateSuggestionIndex(
@@ -524,6 +646,10 @@ class ChatController
         suggestions.length];
   }
 
+  // ============================================================
+  // PROCESS MESSAGE
+  // ============================================================
+
   Future<
     void
   >
@@ -534,6 +660,10 @@ class ChatController
 
     await sendMessage();
   }
+
+  // ============================================================
+  // SEND MESSAGE
+  // ============================================================
 
   Future<
     void
@@ -560,6 +690,84 @@ class ChatController
 
     _scrollToBottom();
 
+    // ========================================================
+    // GATE DE ECONOMIA
+    // ========================================================
+    //
+    // O Gate sempre roda ANTES da IA.
+    //
+    // Social / fora do escopo / pedido incompleto:
+    //     resposta local -> 0 tokens
+    //
+    // Busca simples de rima:
+    //     biblioteca local -> 0 tokens
+    //
+    // Trabalho criativo real:
+    //     segue o fluxo normal
+    //
+    // ========================================================
+
+    final decision = _aiRequestGateService.evaluate(
+      message: text,
+      hasActiveCreativeContext: _hasActiveCreativeContext(),
+    );
+
+    debugPrint(
+      '[CHAT GATE] Intent: ${decision.intent.name}',
+    );
+
+    debugPrint(
+      '[CHAT GATE] Motivo: ${decision.reason}',
+    );
+
+    // ========================================================
+    // RESPOSTA LOCAL
+    // ========================================================
+
+    if (decision.intent ==
+            ChatIntent.social ||
+        decision.intent ==
+            ChatIntent.incompleteRequest ||
+        decision.intent ==
+            ChatIntent.outOfScope) {
+      _addLocalAssistantMessage(
+        decision.localResponse ??
+            _aiRequestGateService.localResponseService.responseFor(
+              intent: decision.intent,
+              message: text,
+            ),
+      );
+
+      return;
+    }
+
+    // ========================================================
+    // BUSCA DE RIMA NA BIBLIOTECA
+    // ========================================================
+
+    if (decision.intent ==
+        ChatIntent.rhymeSearch) {
+      await _handleLibraryRhymeSearch(
+        query:
+            decision.libraryQuery ??
+            _extractRhymeTerm(
+              text,
+            ),
+      );
+
+      return;
+    }
+
+    // ========================================================
+    // PRIMEIRA ETAPA — IMAGINAÇÃO
+    // ========================================================
+    //
+    // Mesmo que o Gate considere a mensagem criativa o bastante
+    // para IA, a primeira etapa continua usando o Brain/local.
+    // Isso mantém a descoberta inicial sem gastar tokens.
+    //
+    // ========================================================
+
     if (creationStage ==
         ChatCreationStage.imagination) {
       await _processInitialImagination(
@@ -569,10 +777,322 @@ class ChatController
       return;
     }
 
+    // ========================================================
+    // IA — SOMENTE QUANDO REALMENTE NECESSÁRIA
+    // ========================================================
+
     await _sendToAi(
       text,
     );
   }
+
+  // ============================================================
+  // CONTEXTO CRIATIVO ATIVO
+  // ============================================================
+
+  bool _hasActiveCreativeContext() {
+    if (creationStage !=
+        ChatCreationStage.writing) {
+      return false;
+    }
+
+    if (messages.length <
+        2) {
+      return false;
+    }
+
+    final recent =
+        messages.length <=
+            8
+        ? messages
+        : messages.sublist(
+            messages.length -
+                8,
+          );
+
+    final hasUserMessage = recent.any(
+      (
+        message,
+      ) =>
+          message.role ==
+          ChatRole.user,
+    );
+
+    final hasAssistantMessage = recent.any(
+      (
+        message,
+      ) =>
+          message.role ==
+          ChatRole.assistant,
+    );
+
+    return hasUserMessage &&
+        hasAssistantMessage;
+  }
+
+  // ============================================================
+  // ADICIONAR RESPOSTA LOCAL
+  // ============================================================
+
+  void _addLocalAssistantMessage(
+    String content,
+  ) {
+    final normalized = content.trim();
+
+    if (normalized.isEmpty) {
+      return;
+    }
+
+    messages.add(
+      ChatMessage(
+        role: ChatRole.assistant,
+        content: normalized,
+      ),
+    );
+
+    debugPrint(
+      '[CHAT GATE] Resposta local. 0 tokens consumidos.',
+    );
+
+    notifyListeners();
+
+    _scrollToBottom();
+  }
+
+  // ============================================================
+  // BUSCAR RIMAS NA BIBLIOTECA
+  // ============================================================
+
+  Future<
+    void
+  >
+  _handleLibraryRhymeSearch({
+    required String query,
+  }) async {
+    final normalizedQuery = query.trim();
+
+    if (normalizedQuery.isEmpty) {
+      _addLocalAssistantMessage(
+        _aiRequestGateService.localResponseService.rhymeSearchFallback(),
+      );
+
+      return;
+    }
+
+    // Garante que a memória criativa esteja disponível.
+    await rhymesController.carregarDadosUsuario();
+
+    if (_isDisposed) {
+      return;
+    }
+
+    final matches = _findLibraryRhymes(
+      normalizedQuery,
+    );
+
+    if (matches.isEmpty) {
+      _addLocalAssistantMessage(
+        'Não encontrei rimas para "$normalizedQuery" na sua biblioteca ainda. '
+        'Se quiser uma busca criativa nova, me manda o contexto em que você quer usar a palavra.',
+      );
+
+      return;
+    }
+
+    final preview = matches
+        .take(
+          12,
+        )
+        .join(
+          ' • ',
+        );
+
+    _addLocalAssistantMessage(
+      'Na sua biblioteca, encontrei para "$normalizedQuery":\n\n$preview',
+    );
+  }
+
+  // ============================================================
+  // FILTRAR RIMAS LOCAIS
+  // ============================================================
+  //
+  // A biblioteca atual guarda palavras. Como ainda não existe um
+  // índice fonético dedicado, usamos terminações como filtro local.
+  // Isso é propositalmente barato e não chama IA.
+  //
+  // ============================================================
+
+  List<
+    String
+  >
+  _findLibraryRhymes(
+    String query,
+  ) {
+    final normalizedQuery = _normalizeRhymeWord(
+      query,
+    );
+
+    if (normalizedQuery.isEmpty) {
+      return const [];
+    }
+
+    final queryEnding = _rhymeEnding(
+      normalizedQuery,
+    );
+
+    final results =
+        <
+          String
+        >[];
+
+    for (final rawWord in rhymesController.vocabularyWords) {
+      final word = rawWord.trim();
+
+      if (word.isEmpty) {
+        continue;
+      }
+
+      final normalizedWord = _normalizeRhymeWord(
+        word,
+      );
+
+      if (normalizedWord.isEmpty ||
+          normalizedWord ==
+              normalizedQuery) {
+        continue;
+      }
+
+      final wordEnding = _rhymeEnding(
+        normalizedWord,
+      );
+
+      if (wordEnding !=
+          queryEnding) {
+        continue;
+      }
+
+      if (results.any(
+        (
+          existing,
+        ) =>
+            _normalizeRhymeWord(
+              existing,
+            ) ==
+            normalizedWord,
+      )) {
+        continue;
+      }
+
+      results.add(
+        word,
+      );
+    }
+
+    return results;
+  }
+
+  String _normalizeRhymeWord(
+    String value,
+  ) {
+    var normalized = value.trim().toLowerCase();
+
+    const source = 'áàãâäéèêëíìîïóòõôöúùûüç';
+
+    const target = 'aaaaaeeeeiiiiooooouuuuc';
+
+    for (
+      var index = 0;
+      index <
+          source.length;
+      index++
+    ) {
+      normalized = normalized.replaceAll(
+        source[index],
+        target[index],
+      );
+    }
+
+    normalized = normalized.replaceAll(
+      RegExp(
+        r'[^a-z0-9]',
+      ),
+      '',
+    );
+
+    return normalized;
+  }
+
+  String _rhymeEnding(
+    String word,
+  ) {
+    if (word.length <=
+        3) {
+      return word;
+    }
+
+    return word.substring(
+      word.length -
+          3,
+    );
+  }
+
+  // ============================================================
+  // EXTRAIR TERMO DE RIMA — FALLBACK
+  // ============================================================
+
+  String _extractRhymeTerm(
+    String message,
+  ) {
+    final normalized = message.trim();
+
+    final patterns =
+        <
+          RegExp
+        >[
+          RegExp(
+            r'(?:rimas?|rima)\s+(?:com|para|pra|de)\s+(.+)$',
+            caseSensitive: false,
+          ),
+          RegExp(
+            r'rimam?\s+com\s+(.+)$',
+            caseSensitive: false,
+          ),
+          RegExp(
+            r'o\s+que\s+rima\s+com\s+(.+)$',
+            caseSensitive: false,
+          ),
+        ];
+
+    for (final pattern in patterns) {
+      final match = pattern.firstMatch(
+        normalized,
+      );
+
+      final value = match
+          ?.group(
+            1,
+          )
+          ?.replaceAll(
+            RegExp(
+              r'[?!.,;:]+$',
+            ),
+            '',
+          )
+          .trim();
+
+      if (value !=
+              null &&
+          value.isNotEmpty) {
+        return value;
+      }
+    }
+
+    return '';
+  }
+
+  // ============================================================
+  // PROCESSAR IMAGINAÇÃO
+  // ============================================================
 
   Future<
     void
@@ -608,6 +1128,7 @@ class ChatController
         );
 
         notifyListeners();
+
         _scrollToBottom();
 
         return;
@@ -643,6 +1164,7 @@ class ChatController
       buffer.writeln(
         'Estou começando a enxergar algo aqui.',
       );
+
       buffer.writeln();
 
       if (vision.summary.trim().isNotEmpty) {
@@ -653,9 +1175,11 @@ class ChatController
 
       if (originalText.isNotEmpty) {
         buffer.writeln();
+
         buffer.writeln(
           'O que veio de você:',
         );
+
         buffer.writeln(
           originalText,
         );
@@ -663,19 +1187,24 @@ class ChatController
 
       if (discoveriesText.isNotEmpty) {
         buffer.writeln();
+
         buffer.writeln(
           'Alguns caminhos que apareceram:',
         );
+
         buffer.writeln(
           discoveriesText,
         );
       }
 
       buffer.writeln();
+
       buffer.writeln(
         saveMessage,
       );
+
       buffer.writeln();
+
       buffer.write(
         'Agora começa a escrever sem tentar fechar a música cedo demais. '
         'Use esses caminhos se eles fizerem sentido — ou quebra tudo e segue outro.',
@@ -689,6 +1218,7 @@ class ChatController
       );
 
       notifyListeners();
+
       _scrollToBottom();
 
       return;
@@ -716,6 +1246,7 @@ class ChatController
       );
 
       notifyListeners();
+
       _scrollToBottom();
 
       return;
@@ -745,8 +1276,13 @@ class ChatController
     );
 
     notifyListeners();
+
     _scrollToBottom();
   }
+
+  // ============================================================
+  // EXTRAIR PALAVRAS CRIATIVAS
+  // ============================================================
 
   List<
     String
@@ -806,6 +1342,10 @@ class ChatController
     return extracted;
   }
 
+  // ============================================================
+  // SEND TO AI
+  // ============================================================
+
   Future<
     void
   >
@@ -825,13 +1365,110 @@ class ChatController
     _scrollToBottom();
 
     try {
+      // ========================================================
+      // REQUEST
+      // ========================================================
+
       final response = await repository.fetchAiResponse(
         normalizedText,
       );
 
+      // ========================================================
+      // METADADOS
+      // ========================================================
+      //
+      // Mantém compatibilidade com o fluxo já existente.
+      //
+      // ========================================================
+
       rhymesController.applyAiResponseMetadata(
         response,
       );
+
+      // ========================================================
+      // QUOTA
+      // ========================================================
+      //
+      // Agora o repository preserva:
+      //
+      // response['quota']
+      //
+      // vindo do backend.
+      //
+      // Fazemos atualização explícita para garantir:
+      //
+      // backend
+      //   ↓
+      // quota
+      //   ↓
+      // ChatController
+      //   ↓
+      // RhymesController
+      //   ↓
+      // AiQuotaController
+      //   ↓
+      // card IA mensal
+      //
+      // ========================================================
+
+      final quota = _extractMap(
+        response['quota'],
+      );
+
+      if (quota !=
+          null) {
+        rhymesController.updateAiQuotaFromMap(
+          quota,
+          notify: true,
+        );
+
+        // ======================================================
+        // AVISO DE QUOTA NO CHAT
+        // ======================================================
+        //
+        // O mesmo Map retornado pelo backend é convertido para o
+        // estado tipado utilizado pelos cards.
+        //
+        // Nenhuma chamada extra ao backend é feita aqui.
+        //
+        // ======================================================
+
+        _handleQuotaWarning(
+          quota,
+        );
+
+        debugPrint(
+          '[CHAT CONTROLLER] '
+          'Quota Versin atualizada.',
+        );
+
+        debugPrint(
+          '[CHAT CONTROLLER] '
+          'Tokens usados: '
+          '${rhymesController.aiUsedTokens}',
+        );
+
+        debugPrint(
+          '[CHAT CONTROLLER] '
+          'Tokens restantes: '
+          '${rhymesController.aiRemainingTokens}',
+        );
+
+        debugPrint(
+          '[CHAT CONTROLLER] '
+          'Limite: '
+          '${rhymesController.aiLimitTokens}',
+        );
+      } else {
+        debugPrint(
+          '[CHAT CONTROLLER] '
+          'Resposta sem quota.',
+        );
+      }
+
+      // ========================================================
+      // CONTENT
+      // ========================================================
 
       final content = response['content']?.toString().trim();
 
@@ -841,7 +1478,6 @@ class ChatController
         messages.add(
           ChatMessage(
             role: ChatRole.assistant,
-
             content: content,
           ),
         );
@@ -849,11 +1485,14 @@ class ChatController
         messages.add(
           ChatMessage(
             role: ChatRole.assistant,
-
             content: 'Resposta em branco.',
           ),
         );
       }
+
+      // ========================================================
+      // SOURCE
+      // ========================================================
 
       final usedVersinApi =
           response['used_versin_api'] ==
@@ -867,6 +1506,10 @@ class ChatController
 
       final model = response['model']?.toString().trim();
 
+      // ========================================================
+      // LOG
+      // ========================================================
+
       debugPrint(
         '[CHAT CONTROLLER] '
         'Resposta recebida.',
@@ -874,12 +1517,14 @@ class ChatController
 
       debugPrint(
         '[CHAT CONTROLLER] '
-        'IA Versin: $usedVersinApi',
+        'IA Versin: '
+        '$usedVersinApi',
       );
 
       debugPrint(
         '[CHAT CONTROLLER] '
-        'API privada: $usedPrivateApi',
+        'API privada: '
+        '$usedPrivateApi',
       );
 
       if (provider !=
@@ -887,7 +1532,8 @@ class ChatController
           provider.isNotEmpty) {
         debugPrint(
           '[CHAT CONTROLLER] '
-          'Provider: $provider',
+          'Provider: '
+          '$provider',
         );
       }
 
@@ -896,7 +1542,8 @@ class ChatController
           model.isNotEmpty) {
         debugPrint(
           '[CHAT CONTROLLER] '
-          'Modelo: $model',
+          'Modelo: '
+          '$model',
         );
       }
     } catch (
@@ -905,18 +1552,19 @@ class ChatController
     ) {
       debugPrint(
         '[CHAT CONTROLLER] '
-        'Erro ao enviar mensagem: $error',
+        'Erro ao enviar mensagem: '
+        '$error',
       );
 
       debugPrint(
         '[CHAT CONTROLLER] '
-        'Stack trace: $stackTrace',
+        'Stack trace: '
+        '$stackTrace',
       );
 
       messages.add(
         ChatMessage(
           role: ChatRole.assistant,
-
           content: _buildAiErrorMessage(
             error,
           ),
@@ -931,6 +1579,236 @@ class ChatController
     }
   }
 
+  // ============================================================
+  // PROCESSAR AVISO DE QUOTA
+  // ============================================================
+  //
+  // Fluxo:
+  //
+  // quota do backend
+  //      ↓
+  // AiQuotaWarningState
+  //      ↓
+  // normal
+  //      → não mostra nada
+  //
+  // warning / critical
+  //      → AiQuotaWarningCard
+  //
+  // blocked
+  //      → AiQuotaExhaustedCard
+  //
+  // ============================================================
+
+  void _handleQuotaWarning(
+    Map<
+      String,
+      dynamic
+    >
+    quota,
+  ) {
+    final state = AiQuotaWarningState.fromMap(
+      quota,
+    );
+
+    // ==========================================================
+    // NORMAL
+    // ==========================================================
+
+    if (!_aiQuotaWarningService.shouldShowWarning(
+      state,
+    )) {
+      return;
+    }
+
+    // ==========================================================
+    // ID ÚNICO DO AVISO
+    // ==========================================================
+
+    final warningId = _aiQuotaWarningService.buildWarningId(
+      state,
+    );
+
+    if (_shownQuotaWarningIds.contains(
+      warningId,
+    )) {
+      debugPrint(
+        '[CHAT QUOTA] '
+        'Aviso já exibido: $warningId',
+      );
+
+      return;
+    }
+
+    _shownQuotaWarningIds.add(
+      warningId,
+    );
+
+    // ==========================================================
+    // ESGOTADO
+    // ==========================================================
+
+    if (_aiQuotaWarningService.shouldShowExhaustedCard(
+      state,
+    )) {
+      messages.add(
+        ChatMessage(
+          role: ChatRole.assistant,
+          content: '',
+          customWidget: AiQuotaExhaustedCard(
+            state: state,
+            onConfigurePrivateApi: _requestPrivateApiConfiguration,
+          ),
+        ),
+      );
+
+      debugPrint(
+        '[CHAT QUOTA] '
+        'Card de créditos esgotados adicionado.',
+      );
+
+      return;
+    }
+
+    // ==========================================================
+    // WARNING / CRITICAL
+    // ==========================================================
+
+    if (_aiQuotaWarningService.shouldShowLowQuotaWarning(
+      state,
+    )) {
+      messages.add(
+        ChatMessage(
+          role: ChatRole.assistant,
+          content: '',
+          customWidget: AiQuotaWarningCard(
+            state: state,
+            onConfigurePrivateApi: state.isCritical
+                ? _requestPrivateApiConfiguration
+                : null,
+          ),
+        ),
+      );
+
+      debugPrint(
+        '[CHAT QUOTA] '
+        'Aviso de quota adicionado. '
+        'Nível: ${state.level.name}',
+      );
+    }
+  }
+
+  // ============================================================
+  // SOLICITAR CONFIGURAÇÃO DA API PRIVADA
+  // ============================================================
+  //
+  // O controller não conhece Navigator nem uma página específica.
+  //
+  // Isso mantém:
+  //
+  // Controller
+  //      ↓
+  // callback
+  //      ↓
+  // UI decide qual tela abrir
+  //
+  // ============================================================
+
+  void _requestPrivateApiConfiguration() {
+    final callback = onConfigurePrivateApi;
+
+    if (callback !=
+        null) {
+      callback();
+
+      return;
+    }
+
+    debugPrint(
+      '[CHAT QUOTA] '
+      'Configuração de API privada solicitada, '
+      'mas nenhum callback foi fornecido ao ChatController.',
+    );
+  }
+
+  // ============================================================
+  // LIMPAR HISTÓRICO DE AVISOS
+  // ============================================================
+  //
+  // Útil em testes ou quando uma sessão for reiniciada
+  // explicitamente.
+  //
+  // Não altera a quota do backend.
+  //
+  // ============================================================
+
+  void clearQuotaWarningHistory() {
+    _shownQuotaWarningIds.clear();
+  }
+
+  // ============================================================
+  // EXTRAIR MAP
+  // ============================================================
+
+  static Map<
+    String,
+    dynamic
+  >?
+  _extractMap(
+    dynamic value,
+  ) {
+    if (value ==
+        null) {
+      return null;
+    }
+
+    if (value
+        is Map<
+          String,
+          dynamic
+        >) {
+      if (value.isEmpty) {
+        return null;
+      }
+
+      return Map<
+        String,
+        dynamic
+      >.from(
+        value,
+      );
+    }
+
+    if (value
+        is Map) {
+      try {
+        final converted =
+            Map<
+              String,
+              dynamic
+            >.from(
+              value,
+            );
+
+        if (converted.isEmpty) {
+          return null;
+        }
+
+        return converted;
+      } catch (
+        _
+      ) {
+        return null;
+      }
+    }
+
+    return null;
+  }
+
+  // ============================================================
+  // AI ERROR MESSAGE
+  // ============================================================
+
   String _buildAiErrorMessage(
     Object error,
   ) {
@@ -939,7 +1817,8 @@ class ChatController
     if (normalized.contains(
       'unimplemented',
     )) {
-      return 'A API privada está configurada, mas o cliente desse provedor ainda não foi conectado.';
+      return 'A API privada está configurada, '
+          'mas o cliente desse provedor ainda não foi conectado.';
     }
 
     if (normalized.contains(
@@ -948,7 +1827,8 @@ class ChatController
         normalized.contains(
           'timed out',
         )) {
-      return 'A IA demorou demais para responder. Tente novamente.';
+      return 'A IA demorou demais para responder. '
+          'Tente novamente.';
     }
 
     if (normalized.contains(
@@ -960,7 +1840,8 @@ class ChatController
         normalized.contains(
           'não autorizado',
         )) {
-      return 'Não foi possível autenticar a API. Verifique a credencial configurada.';
+      return 'Não foi possível autenticar a API. '
+          'Verifique a credencial configurada.';
     }
 
     if (normalized.contains(
@@ -972,11 +1853,17 @@ class ChatController
         normalized.contains(
           'limite',
         )) {
-      return 'O limite de uso da IA foi atingido ou o provedor recusou novas requisições.';
+      return 'O limite de uso da IA foi atingido '
+          'ou o provedor recusou novas requisições.';
     }
 
-    return 'Erro de conexão com a IA. Tente novamente.';
+    return 'Erro de conexão com a IA. '
+        'Tente novamente.';
   }
+
+  // ============================================================
+  // SEND STRUCTURE
+  // ============================================================
 
   void sendStructureToChat(
     List<
@@ -991,7 +1878,9 @@ class ChatController
     messages.add(
       ChatMessage(
         role: ChatRole.assistant,
-        content: 'Estrutura definida: $structureText',
+        content:
+            'Estrutura definida: '
+            '$structureText',
       ),
     );
 
@@ -1000,6 +1889,10 @@ class ChatController
     _scrollToBottom();
   }
 
+  // ============================================================
+  // SAVE STRUCTURE
+  // ============================================================
+
   void saveStructure(
     String structure,
   ) {
@@ -1007,6 +1900,10 @@ class ChatController
 
     notifyListeners();
   }
+
+  // ============================================================
+  // ADD WORD
+  // ============================================================
 
   void addWordToText(
     String word,
@@ -1024,11 +1921,19 @@ class ChatController
     notifyListeners();
   }
 
+  // ============================================================
+  // BPM
+  // ============================================================
+
   void toggleBpm() {
     rhymesController.isBpmPlaying = !rhymesController.isBpmPlaying;
 
     notifyListeners();
   }
+
+  // ============================================================
+  // EDIT PROJECT NAME
+  // ============================================================
 
   void editProjectName(
     BuildContext context,
@@ -1176,6 +2081,10 @@ class ChatController
     );
   }
 
+  // ============================================================
+  // STUDIO QUICK MENU
+  // ============================================================
+
   void showStudioQuickMenu(
     BuildContext context,
     String title,
@@ -1235,6 +2144,10 @@ class ChatController
     );
   }
 
+  // ============================================================
+  // INIT CHAT SESSION
+  // ============================================================
+
   Future<
     void
   >
@@ -1247,12 +2160,6 @@ class ChatController
 
     // ==========================================================
     // CARREGAR MEMÓRIA CRIATIVA
-    // ==========================================================
-    //
-    // O vocabulário funciona como memória persistente da
-    // composição. Se já existem palavras salvas, não faz sentido
-    // voltar para a etapa inicial de imaginação.
-    //
     // ==========================================================
 
     await rhymesController.carregarDadosUsuario();
@@ -1328,6 +2235,10 @@ class ChatController
     _startCreativeHelpTimer();
   }
 
+  // ============================================================
+  // CREATIVE HELP
+  // ============================================================
+
   void _startCreativeHelpTimer() {
     _creativeHelpTimer?.cancel();
 
@@ -1369,11 +2280,19 @@ class ChatController
     );
   }
 
+  // ============================================================
+  // CANCEL CREATIVE HELP
+  // ============================================================
+
   void _cancelCreativeHelp() {
     _creativeHelpTimer?.cancel();
 
     _creativeHelpTimer = null;
   }
+
+  // ============================================================
+  // SCROLL
+  // ============================================================
 
   void _scrollToBottom() {
     if (_isDisposed) {
@@ -1400,6 +2319,10 @@ class ChatController
     );
   }
 
+  // ============================================================
+  // DISPOSE
+  // ============================================================
+
   @override
   void dispose() {
     _isDisposed = true;
@@ -1409,6 +2332,8 @@ class ChatController
     );
 
     _creativeHelpTimer?.cancel();
+
+    _shownQuotaWarningIds.clear();
 
     messageController.dispose();
 

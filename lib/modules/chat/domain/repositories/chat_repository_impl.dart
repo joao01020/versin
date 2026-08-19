@@ -24,13 +24,35 @@ import 'chat_repository.dart';
 // - IA Versin;
 // - API privada do usuário.
 //
-// Se utilizar API privada:
+// IA VERSIN:
+//
+// ChatRepositoryImpl
+//       ↓
+// ChatRemoteDatasource
+//       ↓
+// Backend Versin
+//       ↓
+// conteúdo + quota
+//       ↓
+// VersinAiResponse
+//       ↓
+// AiProviderResult
+//
+// API PRIVADA:
 //
 // AiProviderService
 //       ↓
 // PrivateAiClient
 //       ↓
 // OpenAI / Groq / OpenRouter / Gemini / Anthropic / Custom
+//
+// IMPORTANTE:
+//
+// API privada:
+//
+// - não utiliza backend oficial;
+// - não consome quota Versin;
+// - não deve alterar a quota exibida.
 //
 // ============================================================
 
@@ -85,11 +107,25 @@ class ChatRepositoryImpl
     );
 
     try {
+      // ========================================================
+      // AI PROVIDER
+      // ========================================================
+
       final result = await aiProviderService.generate(
         prompt: normalized,
 
         // ======================================================
         // IA OFICIAL VERSIN
+        // ======================================================
+        //
+        // Diferente da API privada, a resposta Versin precisa
+        // preservar:
+        //
+        // - conteúdo;
+        // - quota;
+        // - provider;
+        // - modelo.
+        //
         // ======================================================
         generateWithVersin:
             (
@@ -100,9 +136,17 @@ class ChatRepositoryImpl
                 'Utilizando IA Versin.',
               );
 
+              // ====================================================
+              // REMOTE RESPONSE
+              // ====================================================
+
               final response = await remoteDatasource.sendAiMessage(
                 prompt,
               );
+
+              // ====================================================
+              // CONTENT
+              // ====================================================
 
               final content = response['content']?.toString().trim();
 
@@ -114,7 +158,64 @@ class ChatRepositoryImpl
                 );
               }
 
-              return content;
+              // ====================================================
+              // QUOTA
+              // ====================================================
+
+              final quota = _extractMap(
+                response['quota'],
+              );
+
+              if (quota !=
+                  null) {
+                debugPrint(
+                  '[CHAT REPOSITORY] '
+                  'Quota recebida do backend Versin.',
+                );
+
+                debugPrint(
+                  '[CHAT REPOSITORY] '
+                  'Quota possui '
+                  '${quota.length} campo(s).',
+                );
+              } else {
+                debugPrint(
+                  '[CHAT REPOSITORY] '
+                  'Backend Versin não retornou quota.',
+                );
+              }
+
+              // ====================================================
+              // PROVIDER
+              // ====================================================
+
+              final provider = _extractString(
+                response['provider'],
+              );
+
+              // ====================================================
+              // MODEL
+              // ====================================================
+
+              final model = _extractString(
+                response['model'],
+              );
+
+              // ====================================================
+              // RESPONSE
+              // ====================================================
+
+              return VersinAiResponse(
+                content: content,
+
+                quota: quota,
+
+                provider:
+                    provider ??
+                    'versin',
+
+                model: model,
+              );
             },
 
         // ======================================================
@@ -171,6 +272,10 @@ class ChatRepositoryImpl
         'Fonte: ${result.source}',
       );
 
+      // ========================================================
+      // PROVIDER
+      // ========================================================
+
       if (result.provider !=
               null &&
           result.provider!.trim().isNotEmpty) {
@@ -179,6 +284,10 @@ class ChatRepositoryImpl
           'Provider: ${result.provider}',
         );
       }
+
+      // ========================================================
+      // MODEL
+      // ========================================================
 
       if (result.model !=
               null &&
@@ -190,23 +299,80 @@ class ChatRepositoryImpl
       }
 
       // ========================================================
+      // QUOTA
+      // ========================================================
+
+      if (result.hasQuota) {
+        debugPrint(
+          '[CHAT REPOSITORY] '
+          'Quota Versin preservada na resposta.',
+        );
+      }
+
+      // ========================================================
       // RESPOSTA PADRONIZADA
+      // ========================================================
+      //
+      // IMPORTANTE:
+      //
+      // Agora quota também é devolvida ao ChatController.
+      //
+      // Isso permite:
+      //
+      // Backend
+      //    ↓
+      // quota
+      //    ↓
+      // Repository
+      //    ↓
+      // ChatController
+      //    ↓
+      // RhymesController
+      //    ↓
+      // AiQuotaController
+      //    ↓
+      // card IA mensal
+      //
       // ========================================================
 
       return {
+        // ======================================================
+        // CONTENT
+        // ======================================================
         'content': result.content,
 
+        // ======================================================
+        // SOURCE
+        // ======================================================
         'source': result.source.name,
 
+        // ======================================================
+        // PROVIDER
+        // ======================================================
         'provider': result.provider,
 
+        // ======================================================
+        // MODEL
+        // ======================================================
         'model': result.model,
 
+        // ======================================================
+        // QUOTA
+        // ======================================================
+        'quota': result.quota,
+
+        // ======================================================
+        // SOURCE HELPERS
+        // ======================================================
         'used_versin_api': result.usedVersinApi,
 
         'used_private_api': result.usedPrivateApi,
       };
-    } on PrivateAiException catch (
+    }
+    // ==========================================================
+    // PRIVATE API ERROR
+    // ==========================================================
+    on PrivateAiException catch (
       error,
       stackTrace
     ) {
@@ -231,7 +397,11 @@ class ChatRepositoryImpl
       );
 
       rethrow;
-    } catch (
+    }
+    // ==========================================================
+    // OUTROS ERROS
+    // ==========================================================
+    catch (
       error,
       stackTrace
     ) {
@@ -252,6 +422,105 @@ class ChatRepositoryImpl
 
       rethrow;
     }
+  }
+
+  // ============================================================
+  // EXTRAIR MAP
+  // ============================================================
+  //
+  // Converte respostas JSON dinâmicas para:
+  //
+  // Map<String, dynamic>
+  //
+  // sem confiar no tipo específico retornado por jsonDecode.
+  //
+  // ============================================================
+
+  static Map<
+    String,
+    dynamic
+  >?
+  _extractMap(
+    dynamic value,
+  ) {
+    if (value ==
+        null) {
+      return null;
+    }
+
+    if (value
+        is Map<
+          String,
+          dynamic
+        >) {
+      if (value.isEmpty) {
+        return null;
+      }
+
+      return Map<
+        String,
+        dynamic
+      >.from(
+        value,
+      );
+    }
+
+    if (value
+        is Map) {
+      try {
+        final converted =
+            Map<
+              String,
+              dynamic
+            >.from(
+              value,
+            );
+
+        if (converted.isEmpty) {
+          return null;
+        }
+
+        return converted;
+      } catch (
+        _
+      ) {
+        return null;
+      }
+    }
+
+    return null;
+  }
+
+  // ============================================================
+  // EXTRAIR STRING
+  // ============================================================
+
+  static String? _extractString(
+    dynamic value,
+  ) {
+    if (value ==
+        null) {
+      return null;
+    }
+
+    final normalized = value.toString().trim();
+
+    if (normalized.isEmpty) {
+      return null;
+    }
+
+    final lowered = normalized.toLowerCase();
+
+    if (lowered ==
+            'null' ||
+        lowered ==
+            'none' ||
+        lowered ==
+            'undefined') {
+      return null;
+    }
+
+    return normalized;
   }
 
   // ============================================================

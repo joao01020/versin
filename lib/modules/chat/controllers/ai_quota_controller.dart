@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 
+import '../models/ai_quota_warning_state.dart';
+
 // ============================================================
 // AI QUOTA CONTROLLER
 // ============================================================
@@ -51,6 +53,23 @@ class AiQuotaController
   int _limitTokens = 0;
 
   // ============================================================
+  // ESTADO COMPLETO DE AVISO / RENOVAÇÃO
+  // ============================================================
+  //
+  // Mantém os metadados devolvidos pelo backend:
+  //
+  // - normal / warning / critical / blocked;
+  // - data de renovação;
+  // - dias/horas restantes;
+  // - provider;
+  // - período;
+  // - permissão de uso.
+  //
+  // ============================================================
+
+  AiQuotaWarningState _warningState = AiQuotaWarningState.initial();
+
+  // ============================================================
   // GETTERS
   // ============================================================
 
@@ -72,6 +91,20 @@ class AiQuotaController
 
   int get limitTokens => _limitTokens;
 
+  AiQuotaWarningState get warningState => _warningState;
+
+  DateTime? get renewsAt => _warningState.renewsAt;
+
+  int get renewsInDays => _warningState.renewsInDays;
+
+  int get renewsInHours => _warningState.renewsInHours;
+
+  String get quotaPeriod => _warningState.period;
+
+  String get quotaProvider => _warningState.provider;
+
+  String get renewalTimezone => _warningState.renewalTimezone;
+
   // ============================================================
   // HELPERS
   // ============================================================
@@ -88,7 +121,7 @@ class AiQuotaController
 
   bool get isWarning =>
       _usagePercentage >=
-          70 &&
+          80 &&
       _usagePercentage <
           90;
 
@@ -121,6 +154,27 @@ class AiQuotaController
 
     final quota = _extractQuotaMap(
       data,
+    );
+
+    // ==========================================================
+    // ESTADO TIPADO DE AVISO / RENOVAÇÃO
+    // ==========================================================
+    //
+    // O backend é a fonte da verdade para:
+    //
+    // level
+    // blocked
+    // can_use_ai
+    // renews_at
+    // renews_in_days
+    // renews_in_hours
+    // provider
+    // period
+    //
+    // ==========================================================
+
+    _warningState = AiQuotaWarningState.fromMap(
+      quota,
     );
 
     // ==========================================================
@@ -361,6 +415,28 @@ class AiQuotaController
       _usageMessage = _calculateMessage();
     }
 
+    // ==========================================================
+    // SINCRONIZAR ESTADO TIPADO COM CAMPOS LEGADOS
+    // ==========================================================
+    //
+    // Isso mantém compatibilidade com qualquer parte antiga do
+    // app que ainda leia os getters tradicionais deste controller.
+    //
+    // ==========================================================
+
+    _warningState = _warningState.copyWith(
+      level: _levelFromString(
+        _usageLevel,
+      ),
+      usedTokens: _usedTokens,
+      remainingTokens: _remainingTokens,
+      limitTokens: _limitTokens,
+      usagePercentage: _usagePercentage,
+      canUseAi: _canUse,
+      blocked: _quotaBlocked,
+      message: _usageMessage,
+    );
+
     notifyListeners();
   }
 
@@ -378,6 +454,7 @@ class AiQuotaController
     int? usedTokens,
     int? remainingTokens,
     int? limitTokens,
+    AiQuotaWarningState? warningState,
   }) {
     if (usagePercentage !=
         null) {
@@ -453,6 +530,24 @@ class AiQuotaController
           : limitTokens;
     }
 
+    if (warningState !=
+        null) {
+      _warningState = warningState;
+    } else {
+      _warningState = _warningState.copyWith(
+        level: _levelFromString(
+          _usageLevel,
+        ),
+        usedTokens: _usedTokens,
+        remainingTokens: _remainingTokens,
+        limitTokens: _limitTokens,
+        usagePercentage: _usagePercentage,
+        canUseAi: _canUse,
+        blocked: _quotaBlocked,
+        message: _usageMessage,
+      );
+    }
+
     notifyListeners();
   }
 
@@ -482,6 +577,17 @@ class AiQuotaController
       _remainingTokens = 0;
     }
 
+    _warningState = _warningState.copyWith(
+      level: AiQuotaWarningLevel.blocked,
+      usedTokens: _usedTokens,
+      remainingTokens: 0,
+      limitTokens: _limitTokens,
+      usagePercentage: 100.0,
+      canUseAi: false,
+      blocked: true,
+      message: message,
+    );
+
     notifyListeners();
   }
 
@@ -507,6 +613,8 @@ class AiQuotaController
     _remainingTokens = 0;
 
     _limitTokens = 0;
+
+    _warningState = AiQuotaWarningState.initial();
 
     notifyListeners();
   }
@@ -582,7 +690,7 @@ class AiQuotaController
     }
 
     if (_usagePercentage >=
-        70) {
+        80) {
       return 'warning';
     }
 
@@ -597,20 +705,43 @@ class AiQuotaController
     if (_quotaBlocked ||
         _usagePercentage >=
             100) {
-      return 'Limite mensal de IA atingido.';
+      return 'Seus créditos Versin acabaram neste ciclo mensal.';
     }
 
     if (_usagePercentage >=
         90) {
-      return 'Seu limite mensal está próximo.';
+      return 'Seus créditos Versin estão quase no fim.';
     }
 
     if (_usagePercentage >=
-        70) {
-      return 'Você já utilizou boa parte da sua IA este mês.';
+        80) {
+      return 'Você já utilizou 80% ou mais dos seus créditos Versin.';
     }
 
     return 'Uso normal da IA.';
+  }
+
+  // ============================================================
+  // CONVERTER LEVEL
+  // ============================================================
+
+  AiQuotaWarningLevel _levelFromString(
+    String value,
+  ) {
+    switch (value.trim().toLowerCase()) {
+      case 'warning':
+        return AiQuotaWarningLevel.warning;
+
+      case 'critical':
+        return AiQuotaWarningLevel.critical;
+
+      case 'blocked':
+        return AiQuotaWarningLevel.blocked;
+
+      case 'normal':
+      default:
+        return AiQuotaWarningLevel.normal;
+    }
   }
 
   // ============================================================

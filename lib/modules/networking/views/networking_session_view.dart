@@ -23,8 +23,12 @@ import '../invitations/widgets/project_invitation_banner.dart';
 import 'sub_features/chat_view.dart';
 import 'sub_features/contract_view.dart';
 import 'sub_features/members_view.dart';
-import 'sub_features/royalties_view.dart';
-import 'sub_features/tasks_view.dart';
+import 'package:versin/modules/networking/royalties/controllers/royalties_controller.dart';
+import 'package:versin/modules/networking/royalties/data/repositories/royalties_repository_impl.dart';
+import 'package:versin/modules/networking/royalties/views/royalties_view.dart';
+import 'package:versin/modules/networking/tasks/controllers/project_tasks_controller.dart';
+import 'package:versin/modules/networking/tasks/data/repositories/project_tasks_repository_impl.dart';
+import 'package:versin/modules/networking/tasks/views/tasks_view.dart';
 
 // ============================================================
 // NETWORKING SESSION VIEW
@@ -301,11 +305,7 @@ class _NetworkingSessionViewState
 
                                 Colors.pink,
 
-                                () => _openPage(
-                                  RoyaltiesView(
-                                    projectId: widget.projectId,
-                                  ),
-                                ),
+                                _openRoyaltiesPage,
                               ),
 
                               _buildSmallAction(
@@ -329,11 +329,7 @@ class _NetworkingSessionViewState
 
                                 Colors.teal,
 
-                                () => _openPage(
-                                  TasksView(
-                                    projectId: widget.projectId,
-                                  ),
-                                ),
+                                _openTasksPage,
                               ),
 
                               _buildSmallAction(
@@ -1950,6 +1946,152 @@ class _NetworkingSessionViewState
         _globalCallAction = action;
       },
     );
+  }
+
+  // ==========================================================
+  // OPEN ROYALTIES
+  // ==========================================================
+
+  Future<
+    void
+  >
+  _openRoyaltiesPage() async {
+    if (!mounted) {
+      return;
+    }
+
+    final currentUserId = _supabase.auth.currentUser?.id.trim();
+
+    final projectId = widget.projectId.trim();
+
+    if (currentUserId ==
+            null ||
+        currentUserId.isEmpty ||
+        projectId.isEmpty) {
+      _showProjectInvitationMessage(
+        'Não foi possível abrir os royalties deste projeto.',
+        error: true,
+      );
+
+      return;
+    }
+
+    final royaltiesRepository = RoyaltiesRepositoryImpl(
+      professionalRoleResolver:
+          (
+            userId,
+          ) async {
+            return null;
+          },
+    );
+
+    final royaltiesController = RoyaltiesController(
+      repository: royaltiesRepository,
+    );
+
+    await royaltiesController.load(
+      projectId: projectId,
+      currentUserId: currentUserId,
+    );
+
+    if (!mounted) {
+      royaltiesController.dispose();
+
+      return;
+    }
+
+    await Navigator.of(
+      context,
+    ).push(
+      MaterialPageRoute<
+        void
+      >(
+        builder:
+            (
+              _,
+            ) {
+              return RoyaltiesView(
+                projectId: projectId,
+                controller: royaltiesController,
+              );
+            },
+      ),
+    );
+
+    royaltiesController.dispose();
+  }
+
+  // ==========================================================
+  // OPEN TASKS
+  // ==========================================================
+
+  Future<
+    void
+  >
+  _openTasksPage() async {
+    if (!mounted) {
+      return;
+    }
+
+    final currentUserId = _supabase.auth.currentUser?.id.trim();
+
+    final projectId = widget.projectId.trim();
+
+    if (currentUserId ==
+            null ||
+        currentUserId.isEmpty ||
+        projectId.isEmpty) {
+      _showProjectInvitationMessage(
+        'Não foi possível abrir as tarefas deste projeto.',
+        error: true,
+      );
+
+      return;
+    }
+
+    final tasksRepository = ProjectTasksRepositoryImpl(
+      professionalRoleResolver:
+          (
+            userId,
+          ) async {
+            return null;
+          },
+    );
+
+    final tasksController = ProjectTasksController(
+      repository: tasksRepository,
+    );
+
+    await tasksController.load(
+      projectId: projectId,
+      currentUserId: currentUserId,
+    );
+
+    if (!mounted) {
+      tasksController.dispose();
+
+      return;
+    }
+
+    await Navigator.of(
+      context,
+    ).push(
+      MaterialPageRoute<
+        void
+      >(
+        builder:
+            (
+              _,
+            ) {
+              return TasksView(
+                projectId: projectId,
+                controller: tasksController,
+              );
+            },
+      ),
+    );
+
+    tasksController.dispose();
   }
 
   // ==========================================================

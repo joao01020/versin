@@ -17,6 +17,98 @@ enum AiProviderSource {
 }
 
 // ============================================================
+// VERSIN AI RESPONSE
+// ============================================================
+//
+// Resposta interna produzida pelo callback da IA oficial Versin.
+//
+// Ela preserva:
+//
+// - conteúdo;
+// - quota;
+// - provider;
+// - modelo.
+//
+// IMPORTANTE:
+//
+// A quota só existe no fluxo oficial Versin.
+//
+// API privada:
+//
+// PrivateAiClient
+//      ↓
+// resposta textual
+//      ↓
+// NÃO consome quota Versin.
+//
+// ============================================================
+
+class VersinAiResponse {
+  // ============================================================
+  // CONTENT
+  // ============================================================
+
+  final String content;
+
+  // ============================================================
+  // QUOTA
+  // ============================================================
+
+  final Map<
+    String,
+    dynamic
+  >?
+  quota;
+
+  // ============================================================
+  // PROVIDER
+  // ============================================================
+
+  final String? provider;
+
+  // ============================================================
+  // MODEL
+  // ============================================================
+
+  final String? model;
+
+  // ============================================================
+  // CONSTRUCTOR
+  // ============================================================
+
+  const VersinAiResponse({
+    required this.content,
+    this.quota,
+    this.provider,
+    this.model,
+  });
+
+  // ============================================================
+  // HAS QUOTA
+  // ============================================================
+
+  bool get hasQuota {
+    return quota !=
+            null &&
+        quota!.isNotEmpty;
+  }
+
+  // ============================================================
+  // TO STRING
+  // ============================================================
+
+  @override
+  String toString() {
+    return 'VersinAiResponse('
+        'contentLength: ${content.length}, '
+        'hasQuota: $hasQuota, '
+        'provider: $provider, '
+        'model: $model'
+        ')';
+  }
+}
+
+// ============================================================
 // AI PROVIDER RESULT
 // ============================================================
 //
@@ -27,13 +119,15 @@ enum AiProviderSource {
 // - texto retornado;
 // - fonte utilizada;
 // - provider;
-// - modelo.
+// - modelo;
+// - quota Versin.
 //
 // Essa informação é utilizada pelo restante do aplicativo para:
 //
-// - saber se a cota Versin deve ser atualizada;
+// - atualizar a cota Versin;
 // - indicar que uma API privada está ativa;
-// - exibir provider/modelo utilizados.
+// - exibir provider/modelo utilizados;
+// - impedir que API privada consuma quota Versin.
 //
 // ============================================================
 
@@ -63,6 +157,22 @@ class AiProviderResult {
   final String? model;
 
   // ============================================================
+  // QUOTA
+  // ============================================================
+  //
+  // Só deve ser preenchida quando:
+  //
+  // source == AiProviderSource.versin
+  //
+  // ============================================================
+
+  final Map<
+    String,
+    dynamic
+  >?
+  quota;
+
+  // ============================================================
   // CONSTRUTOR
   // ============================================================
 
@@ -71,6 +181,7 @@ class AiProviderResult {
     required this.source,
     this.provider,
     this.model,
+    this.quota,
   });
 
   // ============================================================
@@ -92,6 +203,17 @@ class AiProviderResult {
   }
 
   // ============================================================
+  // POSSUI QUOTA?
+  // ============================================================
+
+  bool get hasQuota {
+    return usedVersinApi &&
+        quota !=
+            null &&
+        quota!.isNotEmpty;
+  }
+
+  // ============================================================
   // TO STRING
   // ============================================================
 
@@ -101,6 +223,7 @@ class AiProviderResult {
         'source: $source, '
         'provider: $provider, '
         'model: $model, '
+        'hasQuota: $hasQuota, '
         'contentLength: ${content.length}'
         ')';
   }
@@ -215,6 +338,20 @@ class PrivateAiRequest {
 // - a chave não é logada;
 // - a chave não é devolvida em AiProviderResult.
 //
+// QUOTA:
+//
+// IA VERSIN
+//      ↓
+// backend retorna quota
+//      ↓
+// VersinAiResponse
+//      ↓
+// AiProviderResult.quota
+//
+// API PRIVADA
+//      ↓
+// quota = null
+//
 // ============================================================
 
 class AiProviderService {
@@ -240,9 +377,21 @@ class AiProviderService {
   //
   // executa a infraestrutura oficial do Versin.
   //
+  // Deve retornar VersinAiResponse para preservar:
+  //
+  // - conteúdo;
+  // - quota;
+  // - provider;
+  // - modelo.
+  //
   // generateWithPrivateApi:
   //
   // executa o PrivateAiClient.
+  //
+  // Retorna somente String porque API privada:
+  //
+  // - não consome quota Versin;
+  // - não utiliza quota do backend oficial.
   //
   // ============================================================
 
@@ -253,7 +402,7 @@ class AiProviderService {
     required String prompt,
 
     required Future<
-      String
+      VersinAiResponse
     >
     Function(
       String prompt,
@@ -289,9 +438,7 @@ class AiProviderService {
     if (config.canUsePrivateApi) {
       return _generatePrivate(
         prompt: normalizedPrompt,
-
         config: config,
-
         generate: generateWithPrivateApi,
       );
     }
@@ -302,7 +449,6 @@ class AiProviderService {
 
     return _generateVersin(
       prompt: normalizedPrompt,
-
       generate: generateWithVersin,
     );
   }
@@ -318,7 +464,7 @@ class AiProviderService {
     required String prompt,
 
     required Future<
-      String
+      VersinAiResponse
     >
     Function(
       String prompt,
@@ -330,11 +476,19 @@ class AiProviderService {
       'Utilizando IA Versin.',
     );
 
-    final content = await generate(
+    // ==========================================================
+    // REQUEST
+    // ==========================================================
+
+    final response = await generate(
       prompt,
     );
 
-    final normalizedContent = content.trim();
+    // ==========================================================
+    // CONTENT
+    // ==========================================================
+
+    final normalizedContent = response.content.trim();
 
     if (normalizedContent.isEmpty) {
       throw StateError(
@@ -342,12 +496,81 @@ class AiProviderService {
       );
     }
 
+    // ==========================================================
+    // QUOTA
+    // ==========================================================
+
+    Map<
+      String,
+      dynamic
+    >?
+    normalizedQuota;
+
+    final quota = response.quota;
+
+    if (quota !=
+            null &&
+        quota.isNotEmpty) {
+      normalizedQuota =
+          Map<
+            String,
+            dynamic
+          >.unmodifiable(
+            Map<
+              String,
+              dynamic
+            >.from(
+              quota,
+            ),
+          );
+
+      debugPrint(
+        '[AI PROVIDER] '
+        'Quota Versin recebida.',
+      );
+    } else {
+      debugPrint(
+        '[AI PROVIDER] '
+        'Resposta Versin sem quota.',
+      );
+    }
+
+    // ==========================================================
+    // PROVIDER
+    // ==========================================================
+
+    final normalizedProvider = response.provider?.trim();
+
+    // ==========================================================
+    // MODEL
+    // ==========================================================
+
+    final normalizedModel = response.model?.trim();
+
+    // ==========================================================
+    // RESULT
+    // ==========================================================
+
     return AiProviderResult(
       content: normalizedContent,
 
       source: AiProviderSource.versin,
 
-      provider: 'versin',
+      provider:
+          normalizedProvider !=
+                  null &&
+              normalizedProvider.isNotEmpty
+          ? normalizedProvider
+          : 'versin',
+
+      model:
+          normalizedModel !=
+                  null &&
+              normalizedModel.isNotEmpty
+          ? normalizedModel
+          : null,
+
+      quota: normalizedQuota,
     );
   }
 
@@ -429,7 +652,8 @@ class AiProviderService {
       await privateApiService.disable();
 
       throw StateError(
-        'A API privada estava ativa, mas a credencial não foi encontrada.',
+        'A API privada estava ativa, '
+        'mas a credencial não foi encontrada.',
       );
     }
 
@@ -471,6 +695,13 @@ class AiProviderService {
     //
     // A API Key NÃO é devolvida.
     //
+    // IMPORTANTE:
+    //
+    // quota = null
+    //
+    // porque uma API privada nunca deve descontar a quota
+    // oficial do Versin.
+    //
     // ==========================================================
 
     return AiProviderResult(
@@ -481,6 +712,8 @@ class AiProviderService {
       provider: config.providerLabel,
 
       model: config.normalizedModel,
+
+      quota: null,
     );
   }
 

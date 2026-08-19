@@ -425,6 +425,131 @@ class ChatRepositoryImpl
   }
 
   // ============================================================
+  // AI QUOTA
+  // ============================================================
+  //
+  // Busca a quota atual da IA Versin diretamente no backend.
+  //
+  // Esta operação:
+  //
+  // - não envia mensagem para a IA;
+  // - não consome tokens;
+  // - não consulta API privada;
+  // - não altera a decisão do AiProviderService.
+  //
+  // O backend continua sendo a fonte da verdade.
+  //
+  // ============================================================
+
+  @override
+  Future<
+    Map<
+      String,
+      dynamic
+    >
+  >
+  fetchAiQuota() async {
+    debugPrint(
+      '[CHAT REPOSITORY] '
+      'Buscando quota atual da IA Versin.',
+    );
+
+    try {
+      final quota = await remoteDatasource.fetchAiQuota();
+
+      if (quota.isEmpty) {
+        throw StateError(
+          'O backend Versin retornou uma quota vazia.',
+        );
+      }
+
+      debugPrint(
+        '[CHAT REPOSITORY] '
+        'Quota atual recebida.',
+      );
+
+      debugPrint(
+        '[CHAT REPOSITORY] '
+        'Quota possui ${quota.length} campo(s).',
+      );
+
+      if (quota.containsKey(
+        'used_tokens',
+      )) {
+        debugPrint(
+          '[CHAT REPOSITORY] '
+          'Tokens usados: ${quota['used_tokens']}',
+        );
+      }
+
+      if (quota.containsKey(
+        'remaining_tokens',
+      )) {
+        debugPrint(
+          '[CHAT REPOSITORY] '
+          'Tokens restantes: ${quota['remaining_tokens']}',
+        );
+      }
+
+      if (quota.containsKey(
+        'limit_tokens',
+      )) {
+        debugPrint(
+          '[CHAT REPOSITORY] '
+          'Limite: ${quota['limit_tokens']}',
+        );
+      }
+
+      return quota;
+    } on ChatRemoteException catch (
+      error,
+      stackTrace
+    ) {
+      debugPrint(
+        '[CHAT REPOSITORY] '
+        'Erro remoto ao buscar quota Versin.',
+      );
+
+      debugPrint(
+        '[CHAT REPOSITORY] '
+        'Status: ${error.statusCode}',
+      );
+
+      debugPrint(
+        '[CHAT REPOSITORY] '
+        'Mensagem: ${error.message}',
+      );
+
+      debugPrint(
+        '[CHAT REPOSITORY] '
+        'Stack trace: $stackTrace',
+      );
+
+      rethrow;
+    } catch (
+      error,
+      stackTrace
+    ) {
+      debugPrint(
+        '[CHAT REPOSITORY] '
+        'Erro ao buscar quota Versin.',
+      );
+
+      debugPrint(
+        '[CHAT REPOSITORY] '
+        'Erro: $error',
+      );
+
+      debugPrint(
+        '[CHAT REPOSITORY] '
+        'Stack trace: $stackTrace',
+      );
+
+      rethrow;
+    }
+  }
+
+  // ============================================================
   // EXTRAIR MAP
   // ============================================================
   //

@@ -32,9 +32,10 @@ class Settings:
         "",
     )
 
-   GROQ_MODEL: str = (
-    "openai/gpt-oss-20b"
-)
+    GROQ_MODEL: str = os.getenv(
+        "GROQ_MODEL",
+        "openai/gpt-oss-20b",
+    )
 
     # ============================================================
     # REDIS
@@ -103,6 +104,11 @@ class Settings:
         if not cls.REDIS_URL:
             raise ValueError(
                 "REDIS_URL não configurada no .env"
+            )
+
+        if not cls.GROQ_MODEL.strip():
+            raise ValueError(
+                "GROQ_MODEL não configurado."
             )
 
         if cls.AI_MONTHLY_TOKEN_LIMIT <= 0:

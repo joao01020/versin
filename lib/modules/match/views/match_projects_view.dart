@@ -32,28 +32,51 @@ import 'package:versin/modules/profile/services/profile_name_cache_service.dart'
 //
 // ============================================================
 
-class MatchProjectsView extends StatefulWidget {
-  const MatchProjectsView({super.key});
+class MatchProjectsView
+    extends
+        StatefulWidget {
+  const MatchProjectsView({
+    super.key,
+  });
 
   @override
-  State<MatchProjectsView> createState() => _MatchProjectsViewState();
+  State<
+    MatchProjectsView
+  >
+  createState() => _MatchProjectsViewState();
 }
 
 // ============================================================
 // STATE
 // ============================================================
 
-class _MatchProjectsViewState extends State<MatchProjectsView> {
+class _MatchProjectsViewState
+    extends
+        State<
+          MatchProjectsView
+        > {
   // ==========================================================
   // COLORS
   // ==========================================================
 
-  static const Color _background = Color(0xFF08080B);
-  static const Color _surface = Color(0xFF111116);
-  static const Color _surfaceLight = Color(0xFF17171E);
-  static const Color _purple = Color(0xFF8B5CF6);
-  static const Color _purpleLight = Color(0xFFA78BFA);
-  static const Color _green = Color(0xFF34D399);
+  static const Color _background = Color(
+    0xFF08080B,
+  );
+  static const Color _surface = Color(
+    0xFF111116,
+  );
+  static const Color _surfaceLight = Color(
+    0xFF17171E,
+  );
+  static const Color _purple = Color(
+    0xFF8B5CF6,
+  );
+  static const Color _purpleLight = Color(
+    0xFFA78BFA,
+  );
+  static const Color _green = Color(
+    0xFF34D399,
+  );
 
   // ==========================================================
   // SUPABASE
@@ -71,7 +94,13 @@ class _MatchProjectsViewState extends State<MatchProjectsView> {
 
   String? _renamingProjectId;
 
-  List<_MatchProjectItem> _projects = const <_MatchProjectItem>[];
+  List<
+    _MatchProjectItem
+  >
+  _projects =
+      const <
+        _MatchProjectItem
+      >[];
 
   // ==========================================================
   // PROFILE NAME CACHE
@@ -96,7 +125,10 @@ class _MatchProjectsViewState extends State<MatchProjectsView> {
   // INITIALIZE
   // ==========================================================
 
-  Future<void> _initialize() async {
+  Future<
+    void
+  >
+  _initialize() async {
     await _profileNameCacheService.init();
 
     if (!mounted) {
@@ -113,7 +145,9 @@ class _MatchProjectsViewState extends State<MatchProjectsView> {
   String? get _currentUserId {
     final userId = _supabase.auth.currentUser?.id.trim();
 
-    if (userId == null || userId.isEmpty) {
+    if (userId ==
+            null ||
+        userId.isEmpty) {
       return null;
     }
 
@@ -124,27 +158,38 @@ class _MatchProjectsViewState extends State<MatchProjectsView> {
   // LOAD PROJECTS
   // ==========================================================
 
-  Future<void> _loadProjects() async {
+  Future<
+    void
+  >
+  _loadProjects() async {
     if (!mounted) {
       return;
     }
 
     final userId = _currentUserId;
 
-    if (userId == null) {
-      setState(() {
-        _isLoading = false;
-        _errorMessage = 'Usuário não autenticado.';
-        _projects = const <_MatchProjectItem>[];
-      });
+    if (userId ==
+        null) {
+      setState(
+        () {
+          _isLoading = false;
+          _errorMessage = 'Usuário não autenticado.';
+          _projects =
+              const <
+                _MatchProjectItem
+              >[];
+        },
+      );
 
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+    setState(
+      () {
+        _isLoading = true;
+        _errorMessage = null;
+      },
+    );
 
     try {
       // ========================================================
@@ -152,16 +197,42 @@ class _MatchProjectsViewState extends State<MatchProjectsView> {
       // ========================================================
 
       final response = await _supabase
-          .from('projects')
+          .from(
+            'projects',
+          )
           .select(
             'id, title, members, founders, status, origin, created_at, updated_at',
           )
-          .eq('origin', 'match')
-          .eq('status', 'active')
-          .contains('members', <String>[userId])
-          .order('updated_at', ascending: false);
+          .eq(
+            'origin',
+            'match',
+          )
+          .eq(
+            'status',
+            'active',
+          )
+          .contains(
+            'members',
+            <
+              String
+            >[
+              userId,
+            ],
+          )
+          .order(
+            'updated_at',
+            ascending: false,
+          );
 
-      final rows = List<Map<String, dynamic>>.from(response);
+      final rows =
+          List<
+            Map<
+              String,
+              dynamic
+            >
+          >.from(
+            response,
+          );
 
       // ========================================================
       // TODOS OS MEMBER IDS
@@ -181,42 +252,72 @@ class _MatchProjectsViewState extends State<MatchProjectsView> {
       //
       // ========================================================
 
-      final allMemberIds = <String>{};
+      final allMemberIds =
+          <
+            String
+          >{};
 
       for (final row in rows) {
-        allMemberIds.addAll(_readStringList(row['members']));
+        allMemberIds.addAll(
+          _readStringList(
+            row['members'],
+          ),
+        );
       }
 
       final namesByUserId = await _profileNameCacheService.getNames(
         allMemberIds,
       );
 
-      final items = <_MatchProjectItem>[];
+      final items =
+          <
+            _MatchProjectItem
+          >[];
 
       for (final row in rows) {
-        final projectId = row['id']?.toString().trim() ?? '';
+        final projectId =
+            row['id']?.toString().trim() ??
+            '';
 
         if (projectId.isEmpty) {
           continue;
         }
 
-        final members = _readStringList(row['members']);
+        final members = _readStringList(
+          row['members'],
+        );
 
-        final founders = _readStringList(row['founders']);
+        final founders = _readStringList(
+          row['founders'],
+        );
 
         final memberNames = members
-            .map((memberId) => namesByUserId[memberId] ?? 'Membro')
-            .toList(growable: false);
+            .map(
+              (
+                memberId,
+              ) =>
+                  namesByUserId[memberId] ??
+                  'Membro',
+            )
+            .toList(
+              growable: false,
+            );
 
         items.add(
           _MatchProjectItem(
             id: projectId,
-            title: _readProjectTitle(row['title']),
+            title: _readProjectTitle(
+              row['title'],
+            ),
             members: members,
             founders: founders,
             memberNames: memberNames,
-            createdAt: _readDateTime(row['created_at']),
-            updatedAt: _readDateTime(row['updated_at']),
+            createdAt: _readDateTime(
+              row['created_at'],
+            ),
+            updatedAt: _readDateTime(
+              row['updated_at'],
+            ),
           ),
         );
       }
@@ -225,12 +326,22 @@ class _MatchProjectsViewState extends State<MatchProjectsView> {
         return;
       }
 
-      setState(() {
-        _projects = List<_MatchProjectItem>.unmodifiable(items);
+      setState(
+        () {
+          _projects =
+              List<
+                _MatchProjectItem
+              >.unmodifiable(
+                items,
+              );
 
-        _isLoading = false;
-      });
-    } on PostgrestException catch (error, stackTrace) {
+          _isLoading = false;
+        },
+      );
+    } on PostgrestException catch (
+      error,
+      stackTrace
+    ) {
       debugPrint(
         '[MATCH PROJECTS] '
         'Erro Supabase: ${error.message}',
@@ -241,32 +352,43 @@ class _MatchProjectsViewState extends State<MatchProjectsView> {
         'Código: ${error.code}',
       );
 
-      debugPrint('$stackTrace');
+      debugPrint(
+        '$stackTrace',
+      );
 
       if (!mounted) {
         return;
       }
 
-      setState(() {
-        _isLoading = false;
-        _errorMessage = error.message;
-      });
-    } catch (error, stackTrace) {
+      setState(
+        () {
+          _isLoading = false;
+          _errorMessage = error.message;
+        },
+      );
+    } catch (
+      error,
+      stackTrace
+    ) {
       debugPrint(
         '[MATCH PROJECTS] '
         'Erro ao carregar projetos: $error',
       );
 
-      debugPrint('$stackTrace');
+      debugPrint(
+        '$stackTrace',
+      );
 
       if (!mounted) {
         return;
       }
 
-      setState(() {
-        _isLoading = false;
-        _errorMessage = 'Não foi possível carregar os projetos de Match.';
-      });
+      setState(
+        () {
+          _isLoading = false;
+          _errorMessage = 'Não foi possível carregar os projetos de Match.';
+        },
+      );
     }
   }
 
@@ -281,181 +403,286 @@ class _MatchProjectsViewState extends State<MatchProjectsView> {
   //
   // ==========================================================
 
-  Future<void> _showRenameProjectDialog(_MatchProjectItem project) async {
+  Future<
+    void
+  >
+  _showRenameProjectDialog(
+    _MatchProjectItem project,
+  ) async {
     final currentUserId = _currentUserId;
 
-    if (currentUserId == null || !project.founders.contains(currentUserId)) {
-      _showMessage('Somente fundadores podem renomear este projeto.');
+    if (currentUserId ==
+            null ||
+        !project.founders.contains(
+          currentUserId,
+        )) {
+      _showMessage(
+        'Somente fundadores podem renomear este projeto.',
+      );
 
       return;
     }
 
-    if (_renamingProjectId == project.id) {
+    if (_renamingProjectId ==
+        project.id) {
       return;
     }
 
-    String draftTitle = project.title == 'Studio Session' ? '' : project.title;
+    String draftTitle =
+        project.title ==
+            'Studio Session'
+        ? ''
+        : project.title;
 
     String? validationMessage;
 
-    final newTitle = await showDialog<String>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            void submit() {
-              final normalizedTitle = draftTitle.trim();
+    final newTitle =
+        await showDialog<
+          String
+        >(
+          context: context,
+          barrierDismissible: false,
+          builder:
+              (
+                dialogContext,
+              ) {
+                return StatefulBuilder(
+                  builder:
+                      (
+                        context,
+                        setDialogState,
+                      ) {
+                        void submit() {
+                          final normalizedTitle = draftTitle.trim();
 
-              final validation = _validateProjectTitle(normalizedTitle);
+                          final validation = _validateProjectTitle(
+                            normalizedTitle,
+                          );
 
-              if (validation != null) {
-                setDialogState(() {
-                  validationMessage = validation;
-                });
+                          if (validation !=
+                              null) {
+                            setDialogState(
+                              () {
+                                validationMessage = validation;
+                              },
+                            );
 
-                return;
-              }
+                            return;
+                          }
 
-              Navigator.of(dialogContext).pop(normalizedTitle);
-            }
+                          Navigator.of(
+                            dialogContext,
+                          ).pop(
+                            normalizedTitle,
+                          );
+                        }
 
-            return AlertDialog(
-              backgroundColor: _surfaceLight,
-              surfaceTintColor: Colors.transparent,
-              title: const Text(
-                'Renomear projeto',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              content: SizedBox(
-                width: 380,
-                child: TextFormField(
-                  initialValue: draftTitle,
-                  autofocus: true,
-                  maxLength: 40,
-                  textInputAction: TextInputAction.done,
-                  onChanged: (value) {
-                    draftTitle = value;
+                        return AlertDialog(
+                          backgroundColor: _surfaceLight,
+                          surfaceTintColor: Colors.transparent,
+                          title: const Text(
+                            'Renomear projeto',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          content: SizedBox(
+                            width: 380,
+                            child: TextFormField(
+                              initialValue: draftTitle,
+                              autofocus: true,
+                              maxLength: 40,
+                              textInputAction: TextInputAction.done,
+                              onChanged:
+                                  (
+                                    value,
+                                  ) {
+                                    draftTitle = value;
 
-                    if (validationMessage != null) {
-                      setDialogState(() {
-                        validationMessage = null;
-                      });
-                    }
-                  },
-                  onFieldSubmitted: (_) {
-                    submit();
-                  },
-                  style: const TextStyle(color: Colors.white, fontSize: 13),
-                  decoration: InputDecoration(
-                    labelText: 'Nome do projeto',
-                    hintText: 'Ex.: Projeto - "Meu Laboratório"',
-                    errorText: validationMessage,
-                    labelStyle: const TextStyle(color: Colors.white54),
-                    hintStyle: const TextStyle(color: Colors.white30),
-                    counterStyle: const TextStyle(
-                      color: Colors.white30,
-                      fontSize: 9,
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: Colors.white.withValues(alpha: 0.08),
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: _purpleLight),
-                    ),
-                    errorBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Colors.redAccent),
-                    ),
-                    focusedErrorBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Colors.redAccent),
-                    ),
-                  ),
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () {
-                    Navigator.of(dialogContext).pop();
-                  },
-                  child: const Text('Cancelar'),
-                ),
-                FilledButton(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: _purple,
-                    foregroundColor: Colors.white,
-                  ),
-                  onPressed: submit,
-                  child: const Text('Salvar'),
-                ),
-              ],
-            );
-          },
+                                    if (validationMessage !=
+                                        null) {
+                                      setDialogState(
+                                        () {
+                                          validationMessage = null;
+                                        },
+                                      );
+                                    }
+                                  },
+                              onFieldSubmitted:
+                                  (
+                                    _,
+                                  ) {
+                                    submit();
+                                  },
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 13,
+                              ),
+                              decoration: InputDecoration(
+                                labelText: 'Nome do projeto',
+                                hintText: 'Ex.: Projeto - "Meu Laboratório"',
+                                errorText: validationMessage,
+                                labelStyle: const TextStyle(
+                                  color: Colors.white54,
+                                ),
+                                hintStyle: const TextStyle(
+                                  color: Colors.white30,
+                                ),
+                                counterStyle: const TextStyle(
+                                  color: Colors.white30,
+                                  fontSize: 9,
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(
+                                    12,
+                                  ),
+                                  borderSide: BorderSide(
+                                    color: Colors.white.withValues(
+                                      alpha: 0.08,
+                                    ),
+                                  ),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(
+                                    12,
+                                  ),
+                                  borderSide: const BorderSide(
+                                    color: _purpleLight,
+                                  ),
+                                ),
+                                errorBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(
+                                    12,
+                                  ),
+                                  borderSide: const BorderSide(
+                                    color: Colors.redAccent,
+                                  ),
+                                ),
+                                focusedErrorBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(
+                                    12,
+                                  ),
+                                  borderSide: const BorderSide(
+                                    color: Colors.redAccent,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () {
+                                Navigator.of(
+                                  dialogContext,
+                                ).pop();
+                              },
+                              child: const Text(
+                                'Cancelar',
+                              ),
+                            ),
+                            FilledButton(
+                              style: FilledButton.styleFrom(
+                                backgroundColor: _purple,
+                                foregroundColor: Colors.white,
+                              ),
+                              onPressed: submit,
+                              child: const Text(
+                                'Salvar',
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                );
+              },
         );
-      },
-    );
 
-    if (!mounted || newTitle == null) {
+    if (!mounted ||
+        newTitle ==
+            null) {
       return;
     }
 
     final normalizedCurrentTitle = project.title.trim();
 
-    if (newTitle == normalizedCurrentTitle) {
+    if (newTitle ==
+        normalizedCurrentTitle) {
       return;
     }
 
-    await _renameProject(project: project, newTitle: newTitle);
+    await _renameProject(
+      project: project,
+      newTitle: newTitle,
+    );
   }
 
   // ==========================================================
   // RENAME PROJECT
   // ==========================================================
 
-  Future<void> _renameProject({
+  Future<
+    void
+  >
+  _renameProject({
     required _MatchProjectItem project,
     required String newTitle,
   }) async {
     final currentUserId = _currentUserId;
 
-    if (currentUserId == null || !project.founders.contains(currentUserId)) {
-      _showMessage('Somente fundadores podem renomear este projeto.');
+    if (currentUserId ==
+            null ||
+        !project.founders.contains(
+          currentUserId,
+        )) {
+      _showMessage(
+        'Somente fundadores podem renomear este projeto.',
+      );
 
       return;
     }
 
     final normalizedTitle = newTitle.trim();
 
-    final validation = _validateProjectTitle(normalizedTitle);
+    final validation = _validateProjectTitle(
+      normalizedTitle,
+    );
 
-    if (validation != null) {
-      _showMessage(validation);
+    if (validation !=
+        null) {
+      _showMessage(
+        validation,
+      );
 
       return;
     }
 
-    if (_renamingProjectId != null) {
+    if (_renamingProjectId !=
+        null) {
       return;
     }
 
-    setState(() {
-      _renamingProjectId = project.id;
-    });
+    setState(
+      () {
+        _renamingProjectId = project.id;
+      },
+    );
 
     try {
       await _supabase
-          .from('projects')
-          .update({'title': normalizedTitle})
-          .eq('id', project.id);
+          .from(
+            'projects',
+          )
+          .update(
+            {
+              'title': normalizedTitle,
+            },
+          )
+          .eq(
+            'id',
+            project.id,
+          );
 
       if (!mounted) {
         return;
@@ -470,24 +697,36 @@ class _MatchProjectsViewState extends State<MatchProjectsView> {
       //
       // ======================================================
 
-      setState(() {
-        _projects = List<_MatchProjectItem>.unmodifiable(
-          _projects.map((item) {
-            if (item.id != project.id) {
-              return item;
-            }
+      setState(
+        () {
+          _projects =
+              List<
+                _MatchProjectItem
+              >.unmodifiable(
+                _projects.map(
+                  (
+                    item,
+                  ) {
+                    if (item.id !=
+                        project.id) {
+                      return item;
+                    }
 
-            return item.copyWith(
-              title: normalizedTitle,
-              updatedAt: DateTime.now(),
-            );
-          }),
-        );
+                    return item.copyWith(
+                      title: normalizedTitle,
+                      updatedAt: DateTime.now(),
+                    );
+                  },
+                ),
+              );
 
-        _renamingProjectId = null;
-      });
+          _renamingProjectId = null;
+        },
+      );
 
-      _showMessage('Nome do projeto atualizado.');
+      _showMessage(
+        'Nome do projeto atualizado.',
+      );
 
       // ======================================================
       // REFRESH REMOTO
@@ -498,7 +737,10 @@ class _MatchProjectsViewState extends State<MatchProjectsView> {
       // ======================================================
 
       await _loadProjects();
-    } on PostgrestException catch (error, stackTrace) {
+    } on PostgrestException catch (
+      error,
+      stackTrace
+    ) {
       debugPrint(
         '[MATCH PROJECTS] '
         'Erro ao renomear projeto: ${error.message}',
@@ -509,34 +751,49 @@ class _MatchProjectsViewState extends State<MatchProjectsView> {
         'Código: ${error.code}',
       );
 
-      debugPrint('$stackTrace');
+      debugPrint(
+        '$stackTrace',
+      );
 
       if (!mounted) {
         return;
       }
 
-      setState(() {
-        _renamingProjectId = null;
-      });
+      setState(
+        () {
+          _renamingProjectId = null;
+        },
+      );
 
-      _showMessage('Não foi possível renomear o projeto.');
-    } catch (error, stackTrace) {
+      _showMessage(
+        'Não foi possível renomear o projeto.',
+      );
+    } catch (
+      error,
+      stackTrace
+    ) {
       debugPrint(
         '[MATCH PROJECTS] '
         'Erro inesperado ao renomear projeto: $error',
       );
 
-      debugPrint('$stackTrace');
+      debugPrint(
+        '$stackTrace',
+      );
 
       if (!mounted) {
         return;
       }
 
-      setState(() {
-        _renamingProjectId = null;
-      });
+      setState(
+        () {
+          _renamingProjectId = null;
+        },
+      );
 
-      _showMessage('Não foi possível renomear o projeto.');
+      _showMessage(
+        'Não foi possível renomear o projeto.',
+      );
     }
   }
 
@@ -544,18 +801,22 @@ class _MatchProjectsViewState extends State<MatchProjectsView> {
   // VALIDATE PROJECT TITLE
   // ==========================================================
 
-  String? _validateProjectTitle(String title) {
+  String? _validateProjectTitle(
+    String title,
+  ) {
     final normalizedTitle = title.trim();
 
     if (normalizedTitle.isEmpty) {
       return 'Informe um nome para o projeto.';
     }
 
-    if (normalizedTitle.length < 3) {
+    if (normalizedTitle.length <
+        3) {
       return 'Use pelo menos 3 caracteres.';
     }
 
-    if (normalizedTitle.length > 40) {
+    if (normalizedTitle.length >
+        40) {
       return 'Use no máximo 40 caracteres.';
     }
 
@@ -566,15 +827,26 @@ class _MatchProjectsViewState extends State<MatchProjectsView> {
   // SHOW MESSAGE
   // ==========================================================
 
-  void _showMessage(String message) {
+  void _showMessage(
+    String message,
+  ) {
     if (!mounted) {
       return;
     }
 
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(
+      context,
+    ).hideCurrentSnackBar();
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(
+      SnackBar(
+        content: Text(
+          message,
+        ),
+        behavior: SnackBarBehavior.floating,
+      ),
     );
   }
 
@@ -582,7 +854,12 @@ class _MatchProjectsViewState extends State<MatchProjectsView> {
   // OPEN PROJECT
   // ==========================================================
 
-  Future<void> _openProject(_MatchProjectItem project) async {
+  Future<
+    void
+  >
+  _openProject(
+    _MatchProjectItem project,
+  ) async {
     if (!mounted) {
       return;
     }
@@ -593,11 +870,20 @@ class _MatchProjectsViewState extends State<MatchProjectsView> {
       return;
     }
 
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) {
-          return NetworkingSessionView(projectId: projectId);
-        },
+    await Navigator.of(
+      context,
+    ).push(
+      MaterialPageRoute<
+        void
+      >(
+        builder:
+            (
+              _,
+            ) {
+              return NetworkingSessionView(
+                projectId: projectId,
+              );
+            },
       ),
     );
 
@@ -613,7 +899,9 @@ class _MatchProjectsViewState extends State<MatchProjectsView> {
   // ==========================================================
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(
+    BuildContext context,
+  ) {
     return Scaffold(
       backgroundColor: _background,
 
@@ -643,9 +931,12 @@ class _MatchProjectsViewState extends State<MatchProjectsView> {
             ),
 
             Text(
-              'Studio Sessions ativas',
+              'Sessões de estúdio ativa',
 
-              style: TextStyle(color: Colors.white38, fontSize: 10),
+              style: TextStyle(
+                color: Colors.white38,
+                fontSize: 10,
+              ),
             ),
           ],
         ),
@@ -654,14 +945,22 @@ class _MatchProjectsViewState extends State<MatchProjectsView> {
           IconButton(
             tooltip: 'Atualizar',
 
-            onPressed: _isLoading ? null : _loadProjects,
+            onPressed: _isLoading
+                ? null
+                : _loadProjects,
 
-            icon: const Icon(Icons.refresh_rounded, size: 19),
+            icon: const Icon(
+              Icons.refresh_rounded,
+              size: 19,
+            ),
           ),
         ],
       ),
 
-      body: SafeArea(top: false, child: _buildBody()),
+      body: SafeArea(
+        top: false,
+        child: _buildBody(),
+      ),
     );
   }
 
@@ -670,11 +969,18 @@ class _MatchProjectsViewState extends State<MatchProjectsView> {
   // ==========================================================
 
   Widget _buildBody() {
-    if (_isLoading && _projects.isEmpty) {
-      return const Center(child: CircularProgressIndicator(color: _purple));
+    if (_isLoading &&
+        _projects.isEmpty) {
+      return const Center(
+        child: CircularProgressIndicator(
+          color: _purple,
+        ),
+      );
     }
 
-    if (_errorMessage != null && _projects.isEmpty) {
+    if (_errorMessage !=
+            null &&
+        _projects.isEmpty) {
       return _buildError();
     }
 
@@ -684,21 +990,32 @@ class _MatchProjectsViewState extends State<MatchProjectsView> {
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
 
-        padding: const EdgeInsets.fromLTRB(18, 12, 18, 28),
+        padding: const EdgeInsets.fromLTRB(
+          18,
+          12,
+          18,
+          28,
+        ),
 
         children: [
           _buildHeader(),
 
-          const SizedBox(height: 22),
+          const SizedBox(
+            height: 22,
+          ),
 
           _buildSectionHeader(),
 
-          const SizedBox(height: 10),
+          const SizedBox(
+            height: 10,
+          ),
 
           if (_projects.isEmpty)
             _buildEmpty()
           else
-            ..._projects.map(_buildProjectCard),
+            ..._projects.map(
+              _buildProjectCard,
+            ),
         ],
       ),
     );
@@ -714,20 +1031,33 @@ class _MatchProjectsViewState extends State<MatchProjectsView> {
     return Container(
       width: double.infinity,
 
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(
+        18,
+      ),
 
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(
+          22,
+        ),
 
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
 
           end: Alignment.bottomRight,
 
-          colors: [Color(0xFF21113E), _surface],
+          colors: [
+            Color(
+              0xFF21113E,
+            ),
+            _surface,
+          ],
         ),
 
-        border: Border.all(color: _purple.withValues(alpha: 0.22)),
+        border: Border.all(
+          color: _purple.withValues(
+            alpha: 0.22,
+          ),
+        ),
       ),
 
       child: Row(
@@ -740,11 +1070,19 @@ class _MatchProjectsViewState extends State<MatchProjectsView> {
             alignment: Alignment.center,
 
             decoration: BoxDecoration(
-              color: _purple.withValues(alpha: 0.12),
+              color: _purple.withValues(
+                alpha: 0.12,
+              ),
 
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(
+                16,
+              ),
 
-              border: Border.all(color: _purple.withValues(alpha: 0.22)),
+              border: Border.all(
+                color: _purple.withValues(
+                  alpha: 0.22,
+                ),
+              ),
             ),
 
             child: const Icon(
@@ -756,7 +1094,9 @@ class _MatchProjectsViewState extends State<MatchProjectsView> {
             ),
           ),
 
-          const SizedBox(width: 14),
+          const SizedBox(
+            width: 14,
+          ),
 
           Expanded(
             child: Column(
@@ -775,12 +1115,17 @@ class _MatchProjectsViewState extends State<MatchProjectsView> {
                   ),
                 ),
 
-                const SizedBox(height: 4),
+                const SizedBox(
+                  height: 4,
+                ),
 
                 const Text(
                   'Studio Sessions criadas a partir dos seus Matches.',
 
-                  style: TextStyle(color: Colors.white38, fontSize: 11),
+                  style: TextStyle(
+                    color: Colors.white38,
+                    fontSize: 11,
+                  ),
                 ),
               ],
             ),
@@ -820,24 +1165,38 @@ class _MatchProjectsViewState extends State<MatchProjectsView> {
   // PROJECT CARD
   // ==========================================================
 
-  Widget _buildProjectCard(_MatchProjectItem project) {
+  Widget _buildProjectCard(
+    _MatchProjectItem project,
+  ) {
     final currentUserId = _currentUserId;
 
     final isFounder =
-        currentUserId != null && project.founders.contains(currentUserId);
+        currentUserId !=
+            null &&
+        project.founders.contains(
+          currentUserId,
+        );
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
+      margin: const EdgeInsets.only(
+        bottom: 10,
+      ),
 
       decoration: BoxDecoration(
         color: _surface,
 
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(
+          18,
+        ),
 
         border: Border.all(
           color: isFounder
-              ? _purple.withValues(alpha: 0.22)
-              : Colors.white.withValues(alpha: 0.05),
+              ? _purple.withValues(
+                  alpha: 0.22,
+                )
+              : Colors.white.withValues(
+                  alpha: 0.05,
+                ),
         ),
       ),
 
@@ -846,13 +1205,19 @@ class _MatchProjectsViewState extends State<MatchProjectsView> {
 
         child: InkWell(
           onTap: () {
-            _openProject(project);
+            _openProject(
+              project,
+            );
           },
 
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(
+            18,
+          ),
 
           child: Padding(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.all(
+              14,
+            ),
 
             child: Row(
               children: [
@@ -864,9 +1229,13 @@ class _MatchProjectsViewState extends State<MatchProjectsView> {
                   alignment: Alignment.center,
 
                   decoration: BoxDecoration(
-                    color: _purple.withValues(alpha: 0.10),
+                    color: _purple.withValues(
+                      alpha: 0.10,
+                    ),
 
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(
+                      14,
+                    ),
                   ),
 
                   child: const Icon(
@@ -878,7 +1247,9 @@ class _MatchProjectsViewState extends State<MatchProjectsView> {
                   ),
                 ),
 
-                const SizedBox(width: 13),
+                const SizedBox(
+                  width: 13,
+                ),
 
                 Expanded(
                   child: Column(
@@ -906,18 +1277,26 @@ class _MatchProjectsViewState extends State<MatchProjectsView> {
                           ),
 
                           if (isFounder) ...[
-                            const SizedBox(width: 6),
+                            const SizedBox(
+                              width: 6,
+                            ),
 
-                            _buildRenameButton(project),
+                            _buildRenameButton(
+                              project,
+                            ),
 
-                            const SizedBox(width: 4),
+                            const SizedBox(
+                              width: 4,
+                            ),
 
                             _buildFounderBadge(),
                           ],
                         ],
                       ),
 
-                      const SizedBox(height: 4),
+                      const SizedBox(
+                        height: 4,
+                      ),
 
                       Text(
                         project.memberNamesLabel,
@@ -933,7 +1312,9 @@ class _MatchProjectsViewState extends State<MatchProjectsView> {
                         ),
                       ),
 
-                      const SizedBox(height: 9),
+                      const SizedBox(
+                        height: 9,
+                      ),
 
                       Wrap(
                         spacing: 7,
@@ -964,7 +1345,9 @@ class _MatchProjectsViewState extends State<MatchProjectsView> {
                   ),
                 ),
 
-                const SizedBox(width: 10),
+                const SizedBox(
+                  width: 10,
+                ),
 
                 const Icon(
                   Icons.chevron_right_rounded,
@@ -985,8 +1368,12 @@ class _MatchProjectsViewState extends State<MatchProjectsView> {
   // RENAME BUTTON
   // ==========================================================
 
-  Widget _buildRenameButton(_MatchProjectItem project) {
-    final isRenaming = _renamingProjectId == project.id;
+  Widget _buildRenameButton(
+    _MatchProjectItem project,
+  ) {
+    final isRenaming =
+        _renamingProjectId ==
+        project.id;
 
     return Tooltip(
       message: 'Renomear projeto',
@@ -994,16 +1381,24 @@ class _MatchProjectsViewState extends State<MatchProjectsView> {
         onTap: isRenaming
             ? null
             : () {
-                _showRenameProjectDialog(project);
+                _showRenameProjectDialog(
+                  project,
+                );
               },
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(
+          20,
+        ),
         child: Container(
           width: 26,
           height: 26,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: _purple.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(20),
+            color: _purple.withValues(
+              alpha: 0.08,
+            ),
+            borderRadius: BorderRadius.circular(
+              20,
+            ),
           ),
           child: isRenaming
               ? const SizedBox(
@@ -1014,7 +1409,11 @@ class _MatchProjectsViewState extends State<MatchProjectsView> {
                     color: _purpleLight,
                   ),
                 )
-              : const Icon(Icons.edit_outlined, color: _purpleLight, size: 14),
+              : const Icon(
+                  Icons.edit_outlined,
+                  color: _purpleLight,
+                  size: 14,
+                ),
         ),
       ),
     );
@@ -1026,12 +1425,19 @@ class _MatchProjectsViewState extends State<MatchProjectsView> {
 
   Widget _buildFounderBadge() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 7,
+        vertical: 3,
+      ),
 
       decoration: BoxDecoration(
-        color: _purple.withValues(alpha: 0.12),
+        color: _purple.withValues(
+          alpha: 0.12,
+        ),
 
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(
+          20,
+        ),
       ),
 
       child: const Text(
@@ -1060,21 +1466,38 @@ class _MatchProjectsViewState extends State<MatchProjectsView> {
     required Color color,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 8,
+        vertical: 4,
+      ),
 
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.06),
+        color: color.withValues(
+          alpha: 0.06,
+        ),
 
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(
+          20,
+        ),
       ),
 
       child: Row(
         mainAxisSize: MainAxisSize.min,
 
         children: [
-          Icon(icon, color: color, size: icon == Icons.circle ? 6 : 11),
+          Icon(
+            icon,
+            color: color,
+            size:
+                icon ==
+                    Icons.circle
+                ? 6
+                : 11,
+          ),
 
-          const SizedBox(width: 5),
+          const SizedBox(
+            width: 5,
+          ),
 
           Text(
             text,
@@ -1100,21 +1523,35 @@ class _MatchProjectsViewState extends State<MatchProjectsView> {
     return Container(
       width: double.infinity,
 
-      padding: const EdgeInsets.all(28),
+      padding: const EdgeInsets.all(
+        28,
+      ),
 
       decoration: BoxDecoration(
         color: _surface,
 
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(
+          18,
+        ),
 
-        border: Border.all(color: Colors.white.withValues(alpha: 0.04)),
+        border: Border.all(
+          color: Colors.white.withValues(
+            alpha: 0.04,
+          ),
+        ),
       ),
 
       child: const Column(
         children: [
-          Icon(Icons.workspaces_outline, color: Colors.white24, size: 36),
+          Icon(
+            Icons.workspaces_outline,
+            color: Colors.white24,
+            size: 36,
+          ),
 
-          SizedBox(height: 12),
+          SizedBox(
+            height: 12,
+          ),
 
           Text(
             'Nenhum projeto de Match ativo',
@@ -1130,7 +1567,9 @@ class _MatchProjectsViewState extends State<MatchProjectsView> {
             ),
           ),
 
-          SizedBox(height: 5),
+          SizedBox(
+            height: 5,
+          ),
 
           Text(
             'Quando um Match criar uma Studio Session, '
@@ -1138,7 +1577,11 @@ class _MatchProjectsViewState extends State<MatchProjectsView> {
 
             textAlign: TextAlign.center,
 
-            style: TextStyle(color: Colors.white30, fontSize: 10, height: 1.4),
+            style: TextStyle(
+              color: Colors.white30,
+              fontSize: 10,
+              height: 1.4,
+            ),
           ),
         ],
       ),
@@ -1152,7 +1595,9 @@ class _MatchProjectsViewState extends State<MatchProjectsView> {
   Widget _buildError() {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(
+          24,
+        ),
 
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -1166,9 +1611,13 @@ class _MatchProjectsViewState extends State<MatchProjectsView> {
               alignment: Alignment.center,
 
               decoration: BoxDecoration(
-                color: Colors.redAccent.withValues(alpha: 0.08),
+                color: Colors.redAccent.withValues(
+                  alpha: 0.08,
+                ),
 
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(
+                  20,
+                ),
               ),
 
               child: const Icon(
@@ -1180,24 +1629,36 @@ class _MatchProjectsViewState extends State<MatchProjectsView> {
               ),
             ),
 
-            const SizedBox(height: 15),
+            const SizedBox(
+              height: 15,
+            ),
 
             Text(
-              _errorMessage ?? 'Não foi possível carregar os projetos.',
+              _errorMessage ??
+                  'Não foi possível carregar os projetos.',
 
               textAlign: TextAlign.center,
 
-              style: const TextStyle(color: Colors.white54, fontSize: 11),
+              style: const TextStyle(
+                color: Colors.white54,
+                fontSize: 11,
+              ),
             ),
 
-            const SizedBox(height: 14),
+            const SizedBox(
+              height: 14,
+            ),
 
             TextButton.icon(
               onPressed: _loadProjects,
 
-              icon: const Icon(Icons.refresh_rounded),
+              icon: const Icon(
+                Icons.refresh_rounded,
+              ),
 
-              label: const Text('Tentar novamente'),
+              label: const Text(
+                'Tentar novamente',
+              ),
             ),
           ],
         ),
@@ -1209,33 +1670,61 @@ class _MatchProjectsViewState extends State<MatchProjectsView> {
   // HELPERS
   // ==========================================================
 
-  List<String> _readStringList(dynamic value) {
-    if (value is! List) {
-      return const <String>[];
+  List<
+    String
+  >
+  _readStringList(
+    dynamic value,
+  ) {
+    if (value
+        is! List) {
+      return const <
+        String
+      >[];
     }
 
     return value
-        .map((item) => item?.toString().trim() ?? '')
-        .where((item) => item.isNotEmpty)
-        .toList(growable: false);
+        .map(
+          (
+            item,
+          ) =>
+              item?.toString().trim() ??
+              '',
+        )
+        .where(
+          (
+            item,
+          ) => item.isNotEmpty,
+        )
+        .toList(
+          growable: false,
+        );
   }
 
-  String _readProjectTitle(dynamic value) {
+  String _readProjectTitle(
+    dynamic value,
+  ) {
     final title = value?.toString().trim();
 
-    if (title == null || title.isEmpty) {
+    if (title ==
+            null ||
+        title.isEmpty) {
       return 'Studio Session';
     }
 
     return title;
   }
 
-  DateTime? _readDateTime(dynamic value) {
-    if (value == null) {
+  DateTime? _readDateTime(
+    dynamic value,
+  ) {
+    if (value ==
+        null) {
       return null;
     }
 
-    if (value is DateTime) {
+    if (value
+        is DateTime) {
       return value;
     }
 
@@ -1245,7 +1734,9 @@ class _MatchProjectsViewState extends State<MatchProjectsView> {
       return null;
     }
 
-    return DateTime.tryParse(normalized);
+    return DateTime.tryParse(
+      normalized,
+    );
   }
 
   // ==========================================================
@@ -1266,9 +1757,18 @@ class _MatchProjectItem {
   final String id;
   final String title;
 
-  final List<String> members;
-  final List<String> founders;
-  final List<String> memberNames;
+  final List<
+    String
+  >
+  members;
+  final List<
+    String
+  >
+  founders;
+  final List<
+    String
+  >
+  memberNames;
 
   final DateTime? createdAt;
   final DateTime? updatedAt;
@@ -1286,20 +1786,43 @@ class _MatchProjectItem {
   _MatchProjectItem copyWith({
     String? id,
     String? title,
-    List<String>? members,
-    List<String>? founders,
-    List<String>? memberNames,
+    List<
+      String
+    >?
+    members,
+    List<
+      String
+    >?
+    founders,
+    List<
+      String
+    >?
+    memberNames,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
     return _MatchProjectItem(
-      id: id ?? this.id,
-      title: title ?? this.title,
-      members: members ?? this.members,
-      founders: founders ?? this.founders,
-      memberNames: memberNames ?? this.memberNames,
-      createdAt: createdAt ?? this.createdAt,
-      updatedAt: updatedAt ?? this.updatedAt,
+      id:
+          id ??
+          this.id,
+      title:
+          title ??
+          this.title,
+      members:
+          members ??
+          this.members,
+      founders:
+          founders ??
+          this.founders,
+      memberNames:
+          memberNames ??
+          this.memberNames,
+      createdAt:
+          createdAt ??
+          this.createdAt,
+      updatedAt:
+          updatedAt ??
+          this.updatedAt,
     );
   }
 
@@ -1310,13 +1833,24 @@ class _MatchProjectItem {
       return 'Participantes da Studio Session';
     }
 
-    if (memberNames.length <= 3) {
-      return memberNames.join(' • ');
+    if (memberNames.length <=
+        3) {
+      return memberNames.join(
+        ' • ',
+      );
     }
 
-    final visible = memberNames.take(3).join(' • ');
+    final visible = memberNames
+        .take(
+          3,
+        )
+        .join(
+          ' • ',
+        );
 
-    final remaining = memberNames.length - 3;
+    final remaining =
+        memberNames.length -
+        3;
 
     return '$visible +$remaining';
   }

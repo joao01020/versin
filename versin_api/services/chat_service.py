@@ -19,7 +19,7 @@ class ChatService:
 
     DEFAULT_ESTIMATED_TOKENS = 700
 
-    PRIVATE_API_MODEL = "llama-3.3-70b-versatile"
+    PRIVATE_API_MODEL = "openai/gpt-oss-20b"
 
     # ============================================================
     # CONSTRUTOR
@@ -386,7 +386,7 @@ class ChatService:
         # Mantemos o comportamento que você já tinha:
         #
         # API privada:
-        # llama-3.3-70b-versatile
+        # openai/gpt-oss-20b
         #
         # API padrão do Versin:
         # settings.GROQ_MODEL

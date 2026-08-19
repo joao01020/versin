@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../controllers/dashboard_controller.dart';
+import '../services/dashboard_ui_preferences_service.dart';
 
 // ============================================================
 // VERSIN STATISTICS CARD WIDGET
@@ -52,7 +53,94 @@ class _VersinStatisticsCardWidgetState
   // ESTADO
   // ============================================================
 
-  bool _isExpanded = true;
+  // ============================================================
+  // EXPANSION STATE
+  // ============================================================
+  //
+  // Começamos recolhido enquanto a preferência ainda está sendo
+  // carregada. Isso evita o efeito:
+  //
+  // aberto
+  //   ↓
+  // fecha sozinho
+  //
+  // Quando a preferência chega, aplicamos o estado salvo sem
+  // animação. As animações só são habilitadas depois disso.
+  //
+  // ============================================================
+
+  bool _isExpanded = false;
+
+  bool _hasLoadedExpansionPreference = false;
+
+  bool _animateExpansion = false;
+
+  // ============================================================
+  // UI PREFERENCES
+  // ============================================================
+
+  late final DashboardUiPreferencesService _uiPreferencesService;
+
+  // ============================================================
+  // INIT
+  // ============================================================
+
+  @override
+  void initState() {
+    super.initState();
+
+    _uiPreferencesService = DashboardUiPreferencesService();
+
+    _loadExpansionPreference();
+  }
+
+  // ============================================================
+  // LOAD EXPANSION PREFERENCE
+  // ============================================================
+
+  Future<
+    void
+  >
+  _loadExpansionPreference() async {
+    final isExpanded = await _uiPreferencesService.loadStatisticsCardExpanded();
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(
+      () {
+        _isExpanded = isExpanded;
+
+        _hasLoadedExpansionPreference = true;
+
+        // A restauração inicial nunca deve parecer uma ação
+        // executada pelo usuário.
+        _animateExpansion = false;
+      },
+    );
+
+    // ==========================================================
+    // ENABLE USER ANIMATIONS
+    // ==========================================================
+    //
+    // Habilitamos as animações somente depois que o primeiro
+    // frame com a preferência restaurada já foi desenhado.
+    //
+    // ==========================================================
+
+    WidgetsBinding.instance.addPostFrameCallback(
+      (
+        _,
+      ) {
+        if (!mounted) {
+          return;
+        }
+
+        _animateExpansion = true;
+      },
+    );
+  }
 
   // ============================================================
   // MESES
@@ -95,12 +183,34 @@ class _VersinStatisticsCardWidgetState
   // EXPANDIR / RECOLHER
   // ============================================================
 
-  void _toggleExpanded() {
+  Future<
+    void
+  >
+  _toggleExpanded() async {
+    if (!_hasLoadedExpansionPreference) {
+      return;
+    }
+
+    final nextIsExpanded = !_isExpanded;
+
     setState(
       () {
-        _isExpanded = !_isExpanded;
+        _animateExpansion = true;
+
+        _isExpanded = nextIsExpanded;
       },
     );
+
+    final saved = await _uiPreferencesService.saveStatisticsCardExpanded(
+      nextIsExpanded,
+    );
+
+    if (!saved) {
+      debugPrint(
+        '[DASHBOARD UI] '
+        'Não foi possível salvar o estado do card de estatísticas.',
+      );
+    }
   }
 
   // ============================================================
@@ -184,19 +294,22 @@ class _VersinStatisticsCardWidgetState
           // CONTEÚDO EXPANSÍVEL
           // ====================================================
           AnimatedSize(
-            duration: const Duration(
-              milliseconds: 320,
-            ),
+            duration: _animateExpansion
+                ? const Duration(
+                    milliseconds: 320,
+                  )
+                : Duration.zero,
 
             curve: Curves.easeOutCubic,
 
             alignment: Alignment.topCenter,
 
-            child: _isExpanded
+            child:
+                _hasLoadedExpansionPreference &&
+                    _isExpanded
                 ? _buildExpandedContent()
                 : const SizedBox(
                     width: double.infinity,
-
                     height: 0,
                   ),
           ),
@@ -292,7 +405,6 @@ class _VersinStatisticsCardWidgetState
 
                 style: TextStyle(
                   color: Colors.white38,
-
                   fontSize: 10,
                 ),
               ),
@@ -306,7 +418,6 @@ class _VersinStatisticsCardWidgetState
         Container(
           padding: const EdgeInsets.symmetric(
             horizontal: 10,
-
             vertical: 6,
           ),
 
@@ -365,7 +476,9 @@ class _VersinStatisticsCardWidgetState
         // EXPANDIR / RECOLHER
         // ======================================================
         Tooltip(
-          message: _isExpanded
+          message: !_hasLoadedExpansionPreference
+              ? 'Carregando preferência'
+              : _isExpanded
               ? 'Recolher gráfico'
               : 'Expandir gráfico',
 
@@ -373,7 +486,9 @@ class _VersinStatisticsCardWidgetState
             color: Colors.transparent,
 
             child: InkWell(
-              onTap: _toggleExpanded,
+              onTap: _hasLoadedExpansionPreference
+                  ? _toggleExpanded
+                  : null,
 
               borderRadius: BorderRadius.circular(
                 10,
@@ -405,9 +520,11 @@ class _VersinStatisticsCardWidgetState
                       ? 0
                       : 0.5,
 
-                  duration: const Duration(
-                    milliseconds: 250,
-                  ),
+                  duration: _animateExpansion
+                      ? const Duration(
+                          milliseconds: 250,
+                        )
+                      : Duration.zero,
 
                   curve: Curves.easeOutCubic,
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:versin/features/rhymes/presentation/controller/rhymes_controller.dart';
+import 'package:versin/modules/dashboard/services/dashboard_ui_preferences_service.dart';
 
 // ============================================================
 // AI MONTHLY USAGE CARD WIDGET
@@ -57,7 +58,99 @@ class _AiMonthlyUsageCardWidgetState
   // EXPANSÃO
   // ============================================================
 
-  bool _isExpanded = true;
+  // ============================================================
+  // EXPANSION STATE
+  // ============================================================
+  //
+  // Começamos recolhido enquanto a preferência ainda está sendo
+  // carregada. Isso evita o efeito visual:
+  //
+  // aberto
+  //   ↓
+  // fecha sozinho
+  //
+  // A preferência salva é aplicada sem animação. As animações
+  // ficam habilitadas somente depois da restauração inicial.
+  //
+  // ============================================================
+
+  bool _isExpanded = false;
+
+  bool _hasLoadedExpansionPreference = false;
+
+  bool _animateExpansion = false;
+
+  // ============================================================
+  // UI PREFERENCES
+  // ============================================================
+  //
+  // Responsável por restaurar e persistir o estado visual do
+  // card entre as sessões do aplicativo.
+  //
+  // ============================================================
+
+  late final DashboardUiPreferencesService _uiPreferencesService;
+
+  // ============================================================
+  // INIT
+  // ============================================================
+
+  @override
+  void initState() {
+    super.initState();
+
+    _uiPreferencesService = DashboardUiPreferencesService();
+
+    _loadExpansionPreference();
+  }
+
+  // ============================================================
+  // LOAD EXPANSION PREFERENCE
+  // ============================================================
+
+  Future<
+    void
+  >
+  _loadExpansionPreference() async {
+    final isExpanded = await _uiPreferencesService.loadAiMonthlyCardExpanded();
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(
+      () {
+        _isExpanded = isExpanded;
+
+        _hasLoadedExpansionPreference = true;
+
+        // A restauração inicial não deve parecer uma interação
+        // feita pelo usuário.
+        _animateExpansion = false;
+      },
+    );
+
+    // ==========================================================
+    // ENABLE USER ANIMATIONS
+    // ==========================================================
+    //
+    // Depois do primeiro frame já restaurado, as animações podem
+    // voltar a funcionar normalmente para os cliques do usuário.
+    //
+    // ==========================================================
+
+    WidgetsBinding.instance.addPostFrameCallback(
+      (
+        _,
+      ) {
+        if (!mounted) {
+          return;
+        }
+
+        _animateExpansion = true;
+      },
+    );
+  }
 
   // ============================================================
   // CONTROLLER
@@ -176,10 +269,14 @@ class _AiMonthlyUsageCardWidgetState
           // CONTEÚDO
           // ====================================================
           AnimatedCrossFade(
-            duration: const Duration(
-              milliseconds: 220,
-            ),
-            crossFadeState: _isExpanded
+            duration: _animateExpansion
+                ? const Duration(
+                    milliseconds: 220,
+                  )
+                : Duration.zero,
+            crossFadeState:
+                _hasLoadedExpansionPreference &&
+                    _isExpanded
                 ? CrossFadeState.showFirst
                 : CrossFadeState.showSecond,
             firstChild: _buildExpandedContent(
@@ -265,7 +362,8 @@ class _AiMonthlyUsageCardWidgetState
                 ),
               ),
 
-              if (_isExpanded) ...[
+              if (_hasLoadedExpansionPreference &&
+                  _isExpanded) ...[
                 const SizedBox(
                   height: 2,
                 ),
@@ -333,7 +431,9 @@ class _AiMonthlyUsageCardWidgetState
             borderRadius: BorderRadius.circular(
               20,
             ),
-            onTap: _toggleExpanded,
+            onTap: _hasLoadedExpansionPreference
+                ? _toggleExpanded
+                : null,
             child: Container(
               width: 34,
               height: 34,
@@ -342,9 +442,11 @@ class _AiMonthlyUsageCardWidgetState
                 turns: _isExpanded
                     ? 0
                     : 0.5,
-                duration: const Duration(
-                  milliseconds: 220,
-                ),
+                duration: _animateExpansion
+                    ? const Duration(
+                        milliseconds: 220,
+                      )
+                    : Duration.zero,
                 child: const Icon(
                   Icons.keyboard_arrow_up_rounded,
                   color: Colors.white54,
@@ -842,12 +944,34 @@ class _AiMonthlyUsageCardWidgetState
   // EXPANDIR / RECOLHER
   // ============================================================
 
-  void _toggleExpanded() {
+  Future<
+    void
+  >
+  _toggleExpanded() async {
+    if (!_hasLoadedExpansionPreference) {
+      return;
+    }
+
+    final nextIsExpanded = !_isExpanded;
+
     setState(
       () {
-        _isExpanded = !_isExpanded;
+        _animateExpansion = true;
+
+        _isExpanded = nextIsExpanded;
       },
     );
+
+    final saved = await _uiPreferencesService.saveAiMonthlyCardExpanded(
+      nextIsExpanded,
+    );
+
+    if (!saved) {
+      debugPrint(
+        '[DASHBOARD UI] '
+        'Não foi possível salvar o estado do card IA mensal.',
+      );
+    }
   }
 
   // ============================================================

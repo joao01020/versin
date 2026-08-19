@@ -199,7 +199,7 @@ class _NetworkingSessionViewState
 
       appBar: AppBar(
         title: const Text(
-          'Studio Session',
+          'Sessão de Estúdio',
           style: TextStyle(
             fontSize: 16,
           ),

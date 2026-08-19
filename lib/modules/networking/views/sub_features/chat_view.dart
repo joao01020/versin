@@ -685,7 +685,7 @@ class _ChatViewState
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Chat da Studio Session',
+              'Chat - Sessão de Studio',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w700,

@@ -32,10 +32,9 @@ class Settings:
         "",
     )
 
-    GROQ_MODEL: str = os.getenv(
-        "GROQ_MODEL",
-        "llama-3.1-8b-instant",
-    )
+   GROQ_MODEL: str = (
+    "openai/gpt-oss-20b"
+)
 
     # ============================================================
     # REDIS

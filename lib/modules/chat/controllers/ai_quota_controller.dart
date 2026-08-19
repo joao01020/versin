@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../models/ai_quota_warning_state.dart';
+import '../services/cache/ai_quota_cache_service.dart';
 
 // ============================================================
 // AI QUOTA CONTROLLER
@@ -27,9 +30,35 @@ import '../models/ai_quota_warning_state.dart';
 //
 // ============================================================
 
-class AiQuotaController
-    extends
-        ChangeNotifier {
+class AiQuotaController extends ChangeNotifier {
+  // ============================================================
+  // CACHE LOCAL
+  // ============================================================
+  //
+  // O cache serve apenas para preencher a interface rapidamente
+  // enquanto o backend ainda não respondeu.
+  //
+  // A fonte da verdade continua sendo o backend / Redis.
+  //
+  // ============================================================
+
+  final AiQuotaCacheService _cacheService;
+
+  bool _isLoadingInitialQuota = true;
+
+  bool _hasLoadedInitialQuota = false;
+
+  bool _hasCachedQuota = false;
+
+  // ============================================================
+  // CONSTRUTOR
+  // ============================================================
+
+  AiQuotaController({AiQuotaCacheService? cacheService})
+    : _cacheService = cacheService ?? AiQuotaCacheService() {
+    unawaited(loadCachedQuota());
+  }
+
   // ============================================================
   // ESTADO
   // ============================================================
@@ -106,55 +135,123 @@ class AiQuotaController
   String get renewalTimezone => _warningState.renewalTimezone;
 
   // ============================================================
+  // ESTADO DE CARREGAMENTO INICIAL
+  // ============================================================
+  //
+  // hasLoadedInitialQuota:
+  //
+  // true quando a tentativa de leitura do cache já terminou.
+  //
+  // hasCachedQuota:
+  //
+  // true somente quando havia uma quota local válida.
+  //
+  // Esses getters permitem que o Dashboard diferencie:
+  //
+  // "ainda carregando"
+  //
+  // de:
+  //
+  // "quota realmente zerada".
+  //
+  // ============================================================
+
+  bool get isLoadingInitialQuota => _isLoadingInitialQuota;
+
+  bool get hasLoadedInitialQuota => _hasLoadedInitialQuota;
+
+  bool get hasCachedQuota => _hasCachedQuota;
+
+  // ============================================================
   // HELPERS
   // ============================================================
 
-  bool get hasLimit =>
-      _limitTokens >
-      0;
+  bool get hasLimit => _limitTokens > 0;
 
-  bool get hasUsage =>
-      _usedTokens >
-          0 ||
-      _usagePercentage >
-          0;
+  bool get hasUsage => _usedTokens > 0 || _usagePercentage > 0;
 
-  bool get isWarning =>
-      _usagePercentage >=
-          80 &&
-      _usagePercentage <
-          90;
+  bool get isWarning => _usagePercentage >= 80 && _usagePercentage < 90;
 
-  bool get isCritical =>
-      _usagePercentage >=
-          90 &&
-      _usagePercentage <
-          100;
+  bool get isCritical => _usagePercentage >= 90 && _usagePercentage < 100;
 
-  bool get isBlocked =>
-      _quotaBlocked ||
-      _usagePercentage >=
-          100;
+  bool get isBlocked => _quotaBlocked || _usagePercentage >= 100;
+
+  // ============================================================
+  // CARREGAR QUOTA DO CACHE
+  // ============================================================
+  //
+  // Executado automaticamente ao criar o controller.
+  //
+  // Fluxo:
+  //
+  // app abre
+  //    ↓
+  // lê último valor conhecido
+  //    ↓
+  // atualiza interface
+  //    ↓
+  // backend posteriormente substitui pelo valor real
+  //
+  // ============================================================
+
+  Future<void> loadCachedQuota() async {
+    if (!_isLoadingInitialQuota && _hasLoadedInitialQuota) {
+      return;
+    }
+
+    _isLoadingInitialQuota = true;
+
+    try {
+      final cachedQuota = await _cacheService.loadQuota();
+
+      if (cachedQuota != null) {
+        _hasCachedQuota = true;
+
+        updateFromMap(cachedQuota, persistCache: false);
+
+        debugPrint(
+          '[AI QUOTA] '
+          'Estado inicial restaurado do cache.',
+        );
+      } else {
+        _hasCachedQuota = false;
+
+        debugPrint(
+          '[AI QUOTA] '
+          'Nenhuma quota em cache.',
+        );
+      }
+    } catch (error, stackTrace) {
+      _hasCachedQuota = false;
+
+      debugPrint(
+        '[AI QUOTA] '
+        'Erro ao carregar cache: $error',
+      );
+
+      debugPrint(
+        '[AI QUOTA] '
+        'Stack trace: $stackTrace',
+      );
+    } finally {
+      _isLoadingInitialQuota = false;
+
+      _hasLoadedInitialQuota = true;
+
+      notifyListeners();
+    }
+  }
 
   // ============================================================
   // ATUALIZAR A PARTIR DE MAP
   // ============================================================
 
-  void updateFromMap(
-    Map<
-      String,
-      dynamic
-    >?
-    data,
-  ) {
-    if (data ==
-        null) {
+  void updateFromMap(Map<String, dynamic>? data, {bool persistCache = true}) {
+    if (data == null) {
       return;
     }
 
-    final quota = _extractQuotaMap(
-      data,
-    );
+    final quota = _extractQuotaMap(data);
 
     // ==========================================================
     // ESTADO TIPADO DE AVISO / RENOVAÇÃO
@@ -173,219 +270,136 @@ class AiQuotaController
     //
     // ==========================================================
 
-    _warningState = AiQuotaWarningState.fromMap(
-      quota,
-    );
+    _warningState = AiQuotaWarningState.fromMap(quota);
 
     // ==========================================================
     // PERCENTUAL
     // ==========================================================
 
-    final percentage = _readDouble(
-      quota,
-      const [
-        'usage_percentage',
-        'usagePercentage',
-        'percentage',
-        'percent',
-      ],
-    );
+    final percentage = _readDouble(quota, const [
+      'usage_percentage',
+      'usagePercentage',
+      'percentage',
+      'percent',
+    ]);
 
     // ==========================================================
     // PROGRESSO
     // ==========================================================
 
-    final progress = _readDouble(
-      quota,
-      const [
-        'progress',
-        'usage_progress',
-        'usageProgress',
-      ],
-    );
+    final progress = _readDouble(quota, const [
+      'progress',
+      'usage_progress',
+      'usageProgress',
+    ]);
 
     // ==========================================================
     // TOKENS
     // ==========================================================
 
-    final usedTokens = _readInt(
-      quota,
-      const [
-        'used_tokens',
-        'usedTokens',
-        'tokens_used',
-      ],
-    );
+    final usedTokens = _readInt(quota, const [
+      'used_tokens',
+      'usedTokens',
+      'tokens_used',
+    ]);
 
-    final remainingTokens = _readInt(
-      quota,
-      const [
-        'remaining_tokens',
-        'remainingTokens',
-        'tokens_remaining',
-      ],
-    );
+    final remainingTokens = _readInt(quota, const [
+      'remaining_tokens',
+      'remainingTokens',
+      'tokens_remaining',
+    ]);
 
-    final limitTokens = _readInt(
-      quota,
-      const [
-        'limit_tokens',
-        'limitTokens',
-        'token_limit',
-        'monthly_limit',
-      ],
-    );
+    final limitTokens = _readInt(quota, const [
+      'limit_tokens',
+      'limitTokens',
+      'token_limit',
+      'monthly_limit',
+    ]);
 
     // ==========================================================
     // BLOQUEIO
     // ==========================================================
 
-    final blocked = _readBool(
-      quota,
-      const [
-        'blocked',
-        'quota_blocked',
-        'quotaBlocked',
-      ],
-    );
+    final blocked = _readBool(quota, const [
+      'blocked',
+      'quota_blocked',
+      'quotaBlocked',
+    ]);
 
-    final canUse = _readBool(
-      quota,
-      const [
-        'can_use_ai',
-        'canUseAi',
-        'can_use',
-        'canUse',
-      ],
-    );
+    final canUse = _readBool(quota, const [
+      'can_use_ai',
+      'canUseAi',
+      'can_use',
+      'canUse',
+    ]);
 
     // ==========================================================
     // LEVEL
     // ==========================================================
 
-    final level = _readString(
-      quota,
-      const [
-        'level',
-        'usage_level',
-        'usageLevel',
-      ],
-    );
+    final level = _readString(quota, const [
+      'level',
+      'usage_level',
+      'usageLevel',
+    ]);
 
     // ==========================================================
     // MESSAGE
     // ==========================================================
 
-    final message = _readString(
-      quota,
-      const [
-        'message',
-        'usage_message',
-        'usageMessage',
-      ],
-    );
+    final message = _readString(quota, const [
+      'message',
+      'usage_message',
+      'usageMessage',
+    ]);
 
     // ==========================================================
     // APLICAR
     // ==========================================================
 
-    if (percentage !=
-        null) {
-      _usagePercentage = percentage.clamp(
-        0.0,
-        100.0,
-      );
-    } else if (usedTokens !=
-            null &&
-        limitTokens !=
-            null &&
-        limitTokens >
-            0) {
-      _usagePercentage =
-          ((usedTokens /
-                      limitTokens) *
-                  100)
-              .clamp(
-                0.0,
-                100.0,
-              );
+    if (percentage != null) {
+      _usagePercentage = percentage.clamp(0.0, 100.0);
+    } else if (usedTokens != null && limitTokens != null && limitTokens > 0) {
+      _usagePercentage = ((usedTokens / limitTokens) * 100).clamp(0.0, 100.0);
     }
 
-    if (progress !=
-        null) {
-      _usageProgress = progress.clamp(
-        0.0,
-        1.0,
-      );
+    if (progress != null) {
+      _usageProgress = progress.clamp(0.0, 1.0);
     } else {
-      _usageProgress =
-          (_usagePercentage /
-                  100)
-              .clamp(
-                0.0,
-                1.0,
-              );
+      _usageProgress = (_usagePercentage / 100).clamp(0.0, 1.0);
     }
 
-    if (usedTokens !=
-        null) {
-      _usedTokens =
-          usedTokens <
-              0
-          ? 0
-          : usedTokens;
+    if (usedTokens != null) {
+      _usedTokens = usedTokens < 0 ? 0 : usedTokens;
     }
 
-    if (remainingTokens !=
-        null) {
-      _remainingTokens =
-          remainingTokens <
-              0
-          ? 0
-          : remainingTokens;
+    if (remainingTokens != null) {
+      _remainingTokens = remainingTokens < 0 ? 0 : remainingTokens;
     }
 
-    if (limitTokens !=
-        null) {
-      _limitTokens =
-          limitTokens <
-              0
-          ? 0
-          : limitTokens;
+    if (limitTokens != null) {
+      _limitTokens = limitTokens < 0 ? 0 : limitTokens;
     }
 
     // ==========================================================
     // CALCULAR RESTANTE
     // ==========================================================
 
-    if (remainingTokens ==
-            null &&
-        _limitTokens >
-            0) {
-      _remainingTokens =
-          (_limitTokens -
-                  _usedTokens)
-              .clamp(
-                0,
-                _limitTokens,
-              );
+    if (remainingTokens == null && _limitTokens > 0) {
+      _remainingTokens = (_limitTokens - _usedTokens).clamp(0, _limitTokens);
     }
 
     // ==========================================================
     // BLOQUEIO
     // ==========================================================
 
-    if (blocked !=
-        null) {
+    if (blocked != null) {
       _quotaBlocked = blocked;
     } else {
-      _quotaBlocked =
-          _usagePercentage >=
-          100;
+      _quotaBlocked = _usagePercentage >= 100;
     }
 
-    if (canUse !=
-        null) {
+    if (canUse != null) {
       _canUse = canUse;
     } else {
       _canUse = !_quotaBlocked;
@@ -395,9 +409,7 @@ class AiQuotaController
     // LEVEL
     // ==========================================================
 
-    if (level !=
-            null &&
-        level.isNotEmpty) {
+    if (level != null && level.isNotEmpty) {
       _usageLevel = level;
     } else {
       _usageLevel = _calculateLevel();
@@ -407,9 +419,7 @@ class AiQuotaController
     // MESSAGE
     // ==========================================================
 
-    if (message !=
-            null &&
-        message.isNotEmpty) {
+    if (message != null && message.isNotEmpty) {
       _usageMessage = message;
     } else {
       _usageMessage = _calculateMessage();
@@ -425,9 +435,7 @@ class AiQuotaController
     // ==========================================================
 
     _warningState = _warningState.copyWith(
-      level: _levelFromString(
-        _usageLevel,
-      ),
+      level: _levelFromString(_usageLevel),
       usedTokens: _usedTokens,
       remainingTokens: _remainingTokens,
       limitTokens: _limitTokens,
@@ -436,6 +444,25 @@ class AiQuotaController
       blocked: _quotaBlocked,
       message: _usageMessage,
     );
+
+    // ==========================================================
+    // BACKEND RESPONDEU
+    // ==========================================================
+    //
+    // A partir daqui já temos um estado real recebido pela
+    // aplicação. Isso também encerra o estado inicial de loading.
+    //
+    // ==========================================================
+
+    _isLoadingInitialQuota = false;
+
+    _hasLoadedInitialQuota = true;
+
+    if (persistCache) {
+      _hasCachedQuota = true;
+
+      unawaited(_persistCurrentQuota());
+    }
 
     notifyListeners();
   }
@@ -456,88 +483,49 @@ class AiQuotaController
     int? limitTokens,
     AiQuotaWarningState? warningState,
   }) {
-    if (usagePercentage !=
-        null) {
-      _usagePercentage = usagePercentage.clamp(
-        0.0,
-        100.0,
-      );
+    if (usagePercentage != null) {
+      _usagePercentage = usagePercentage.clamp(0.0, 100.0);
     }
 
-    if (usageProgress !=
-        null) {
-      _usageProgress = usageProgress.clamp(
-        0.0,
-        1.0,
-      );
-    } else if (usagePercentage !=
-        null) {
-      _usageProgress =
-          (_usagePercentage /
-                  100)
-              .clamp(
-                0.0,
-                1.0,
-              );
+    if (usageProgress != null) {
+      _usageProgress = usageProgress.clamp(0.0, 1.0);
+    } else if (usagePercentage != null) {
+      _usageProgress = (_usagePercentage / 100).clamp(0.0, 1.0);
     }
 
-    if (usageLevel !=
-            null &&
-        usageLevel.trim().isNotEmpty) {
+    if (usageLevel != null && usageLevel.trim().isNotEmpty) {
       _usageLevel = usageLevel.trim();
     }
 
-    if (usageMessage !=
-            null &&
-        usageMessage.trim().isNotEmpty) {
+    if (usageMessage != null && usageMessage.trim().isNotEmpty) {
       _usageMessage = usageMessage.trim();
     }
 
-    if (quotaBlocked !=
-        null) {
+    if (quotaBlocked != null) {
       _quotaBlocked = quotaBlocked;
     }
 
-    if (canUse !=
-        null) {
+    if (canUse != null) {
       _canUse = canUse;
     }
 
-    if (usedTokens !=
-        null) {
-      _usedTokens =
-          usedTokens <
-              0
-          ? 0
-          : usedTokens;
+    if (usedTokens != null) {
+      _usedTokens = usedTokens < 0 ? 0 : usedTokens;
     }
 
-    if (remainingTokens !=
-        null) {
-      _remainingTokens =
-          remainingTokens <
-              0
-          ? 0
-          : remainingTokens;
+    if (remainingTokens != null) {
+      _remainingTokens = remainingTokens < 0 ? 0 : remainingTokens;
     }
 
-    if (limitTokens !=
-        null) {
-      _limitTokens =
-          limitTokens <
-              0
-          ? 0
-          : limitTokens;
+    if (limitTokens != null) {
+      _limitTokens = limitTokens < 0 ? 0 : limitTokens;
     }
 
-    if (warningState !=
-        null) {
+    if (warningState != null) {
       _warningState = warningState;
     } else {
       _warningState = _warningState.copyWith(
-        level: _levelFromString(
-          _usageLevel,
-        ),
+        level: _levelFromString(_usageLevel),
         usedTokens: _usedTokens,
         remainingTokens: _remainingTokens,
         limitTokens: _limitTokens,
@@ -555,9 +543,7 @@ class AiQuotaController
   // BLOQUEAR
   // ============================================================
 
-  void block({
-    String message = 'Limite mensal de IA atingido.',
-  }) {
+  void block({String message = 'Limite mensal de IA atingido.'}) {
     _usagePercentage = 100.0;
 
     _usageProgress = 1.0;
@@ -570,8 +556,7 @@ class AiQuotaController
 
     _canUse = false;
 
-    if (_limitTokens >
-        0) {
+    if (_limitTokens > 0) {
       _usedTokens = _limitTokens;
 
       _remainingTokens = 0;
@@ -588,6 +573,14 @@ class AiQuotaController
       message: message,
     );
 
+    _isLoadingInitialQuota = false;
+
+    _hasLoadedInitialQuota = true;
+
+    _hasCachedQuota = true;
+
+    unawaited(_persistCurrentQuota());
+
     notifyListeners();
   }
 
@@ -595,7 +588,7 @@ class AiQuotaController
   // RESET
   // ============================================================
 
-  void reset() {
+  void reset({bool clearCache = false}) {
     _usagePercentage = 0.0;
 
     _usageProgress = 0.0;
@@ -616,6 +609,72 @@ class AiQuotaController
 
     _warningState = AiQuotaWarningState.initial();
 
+    _isLoadingInitialQuota = false;
+
+    _hasLoadedInitialQuota = true;
+
+    _hasCachedQuota = false;
+
+    if (clearCache) {
+      unawaited(_cacheService.clear());
+    }
+
+    notifyListeners();
+  }
+
+  // ============================================================
+  // PERSISTIR ESTADO ATUAL
+  // ============================================================
+
+  Future<void> _persistCurrentQuota() async {
+    final quota = <String, dynamic>{
+      'used_tokens': _usedTokens,
+
+      'remaining_tokens': _remainingTokens,
+
+      'limit_tokens': _limitTokens,
+
+      'usage_percentage': _usagePercentage,
+
+      'progress': _usageProgress,
+
+      'level': _usageLevel,
+
+      'message': _usageMessage,
+
+      'blocked': _quotaBlocked,
+
+      'can_use_ai': _canUse,
+
+      'renews_at': _warningState.renewsAt?.toUtc().toIso8601String(),
+
+      'renews_in_days': _warningState.renewsInDays,
+
+      'renews_in_hours': _warningState.renewsInHours,
+
+      'renewal_timezone': _warningState.renewalTimezone,
+
+      'period': _warningState.period,
+
+      'provider': _warningState.provider,
+    };
+
+    await _cacheService.saveQuota(quota);
+  }
+
+  // ============================================================
+  // LIMPAR CACHE EXPLICITAMENTE
+  // ============================================================
+  //
+  // Útil principalmente no logout ou troca de conta.
+  //
+  // ============================================================
+
+  Future<void> clearCache() async {
+    await _cacheService.clear();
+
+    _hasCachedQuota = false;
+
     notifyListeners();
   }
 
@@ -623,51 +682,23 @@ class AiQuotaController
   // EXTRAIR QUOTA
   // ============================================================
 
-  Map<
-    String,
-    dynamic
-  >
-  _extractQuotaMap(
-    Map<
-      String,
-      dynamic
-    >
-    data,
-  ) {
+  Map<String, dynamic> _extractQuotaMap(Map<String, dynamic> data) {
     final quota = data['quota'];
 
-    if (quota
-        is Map) {
-      return Map<
-        String,
-        dynamic
-      >.from(
-        quota,
-      );
+    if (quota is Map) {
+      return Map<String, dynamic>.from(quota);
     }
 
     final aiQuota = data['ai_quota'];
 
-    if (aiQuota
-        is Map) {
-      return Map<
-        String,
-        dynamic
-      >.from(
-        aiQuota,
-      );
+    if (aiQuota is Map) {
+      return Map<String, dynamic>.from(aiQuota);
     }
 
     final usage = data['usage'];
 
-    if (usage
-        is Map) {
-      return Map<
-        String,
-        dynamic
-      >.from(
-        usage,
-      );
+    if (usage is Map) {
+      return Map<String, dynamic>.from(usage);
     }
 
     return data;
@@ -678,19 +709,15 @@ class AiQuotaController
   // ============================================================
 
   String _calculateLevel() {
-    if (_quotaBlocked ||
-        _usagePercentage >=
-            100) {
+    if (_quotaBlocked || _usagePercentage >= 100) {
       return 'blocked';
     }
 
-    if (_usagePercentage >=
-        90) {
+    if (_usagePercentage >= 90) {
       return 'critical';
     }
 
-    if (_usagePercentage >=
-        80) {
+    if (_usagePercentage >= 80) {
       return 'warning';
     }
 
@@ -702,19 +729,15 @@ class AiQuotaController
   // ============================================================
 
   String _calculateMessage() {
-    if (_quotaBlocked ||
-        _usagePercentage >=
-            100) {
+    if (_quotaBlocked || _usagePercentage >= 100) {
       return 'Seus créditos Versin acabaram neste ciclo mensal.';
     }
 
-    if (_usagePercentage >=
-        90) {
+    if (_usagePercentage >= 90) {
       return 'Seus créditos Versin estão quase no fim.';
     }
 
-    if (_usagePercentage >=
-        80) {
+    if (_usagePercentage >= 80) {
       return 'Você já utilizou 80% ou mais dos seus créditos Versin.';
     }
 
@@ -725,9 +748,7 @@ class AiQuotaController
   // CONVERTER LEVEL
   // ============================================================
 
-  AiQuotaWarningLevel _levelFromString(
-    String value,
-  ) {
+  AiQuotaWarningLevel _levelFromString(String value) {
     switch (value.trim().toLowerCase()) {
       case 'warning':
         return AiQuotaWarningLevel.warning;
@@ -748,36 +769,21 @@ class AiQuotaController
   // LER DOUBLE
   // ============================================================
 
-  double? _readDouble(
-    Map<
-      String,
-      dynamic
-    >
-    map,
-    List<
-      String
-    >
-    keys,
-  ) {
+  double? _readDouble(Map<String, dynamic> map, List<String> keys) {
     for (final key in keys) {
       final value = map[key];
 
-      if (value ==
-          null) {
+      if (value == null) {
         continue;
       }
 
-      if (value
-          is num) {
+      if (value is num) {
         return value.toDouble();
       }
 
-      final parsed = double.tryParse(
-        value.toString(),
-      );
+      final parsed = double.tryParse(value.toString());
 
-      if (parsed !=
-          null) {
+      if (parsed != null) {
         return parsed;
       }
     }
@@ -789,41 +795,25 @@ class AiQuotaController
   // LER INT
   // ============================================================
 
-  int? _readInt(
-    Map<
-      String,
-      dynamic
-    >
-    map,
-    List<
-      String
-    >
-    keys,
-  ) {
+  int? _readInt(Map<String, dynamic> map, List<String> keys) {
     for (final key in keys) {
       final value = map[key];
 
-      if (value ==
-          null) {
+      if (value == null) {
         continue;
       }
 
-      if (value
-          is int) {
+      if (value is int) {
         return value;
       }
 
-      if (value
-          is num) {
+      if (value is num) {
         return value.toInt();
       }
 
-      final parsed = int.tryParse(
-        value.toString(),
-      );
+      final parsed = int.tryParse(value.toString());
 
-      if (parsed !=
-          null) {
+      if (parsed != null) {
         return parsed;
       }
     }
@@ -835,49 +825,29 @@ class AiQuotaController
   // LER BOOL
   // ============================================================
 
-  bool? _readBool(
-    Map<
-      String,
-      dynamic
-    >
-    map,
-    List<
-      String
-    >
-    keys,
-  ) {
+  bool? _readBool(Map<String, dynamic> map, List<String> keys) {
     for (final key in keys) {
       final value = map[key];
 
-      if (value ==
-          null) {
+      if (value == null) {
         continue;
       }
 
-      if (value
-          is bool) {
+      if (value is bool) {
         return value;
       }
 
-      if (value
-          is num) {
-        return value !=
-            0;
+      if (value is num) {
+        return value != 0;
       }
 
       final normalized = value.toString().trim().toLowerCase();
 
-      if (normalized ==
-              'true' ||
-          normalized ==
-              '1') {
+      if (normalized == 'true' || normalized == '1') {
         return true;
       }
 
-      if (normalized ==
-              'false' ||
-          normalized ==
-              '0') {
+      if (normalized == 'false' || normalized == '0') {
         return false;
       }
     }
@@ -889,22 +859,11 @@ class AiQuotaController
   // LER STRING
   // ============================================================
 
-  String? _readString(
-    Map<
-      String,
-      dynamic
-    >
-    map,
-    List<
-      String
-    >
-    keys,
-  ) {
+  String? _readString(Map<String, dynamic> map, List<String> keys) {
     for (final key in keys) {
       final value = map[key];
 
-      if (value ==
-          null) {
+      if (value == null) {
         continue;
       }
 

@@ -66,6 +66,21 @@ class ChatRemoteDatasource {
   static const String _chatPath = '/chat';
 
   // ============================================================
+  // QUOTA ENDPOINT
+  // ============================================================
+  //
+  // Endpoint utilizado para consultar a quota mensal atual sem
+  // consumir tokens e sem precisar enviar uma mensagem para a IA.
+  //
+  // GET:
+  //
+  // /chat/quota/{userId}
+  //
+  // ============================================================
+
+  static const String _quotaPath = '/chat/quota';
+
+  // ============================================================
   // TIMEOUT
   // ============================================================
 
@@ -623,6 +638,423 @@ class ChatRemoteDatasource {
       throw ChatRemoteException(
         message:
             'Erro inesperado ao conectar com a IA Versin: '
+            '$error',
+      );
+    }
+  }
+
+  // ============================================================
+  // BUSCAR QUOTA ATUAL DA IA VERSIN
+  // ============================================================
+  //
+  // Consulta a quota mensal atual do usuário autenticado.
+  //
+  // Esta chamada:
+  //
+  // - não envia mensagem para IA;
+  // - não consome tokens;
+  // - utiliza o usuário autenticado no Supabase;
+  // - envia JWT quando disponível;
+  // - retorna somente o estado atual informado pelo backend.
+  //
+  // O cache local continua sendo apenas uma otimização visual.
+  // A fonte da verdade permanece no backend.
+  //
+  // ============================================================
+
+  Future<
+    Map<
+      String,
+      dynamic
+    >
+  >
+  fetchAiQuota() async {
+    // ==========================================================
+    // USUÁRIO AUTENTICADO
+    // ==========================================================
+
+    final currentUser = _supabase.auth.currentUser;
+
+    if (currentUser ==
+        null) {
+      throw const ChatRemoteException(
+        statusCode: 401,
+        message: 'Usuário não autenticado.',
+      );
+    }
+
+    final userId = currentUser.id.trim();
+
+    if (userId.isEmpty) {
+      throw const ChatRemoteException(
+        statusCode: 401,
+        message: 'Não foi possível identificar o usuário autenticado.',
+      );
+    }
+
+    // ==========================================================
+    // SESSION
+    // ==========================================================
+
+    final session = _supabase.auth.currentSession;
+
+    final accessToken = session?.accessToken.trim();
+
+    // ==========================================================
+    // ENDPOINT
+    // ==========================================================
+
+    final encodedUserId = Uri.encodeComponent(
+      userId,
+    );
+
+    final uri = Uri.parse(
+      '$_baseUrl$_quotaPath/$encodedUserId',
+    );
+
+    // ==========================================================
+    // HEADERS
+    // ==========================================================
+
+    final headers =
+        <
+          String,
+          String
+        >{
+          'Accept': 'application/json',
+        };
+
+    if (accessToken !=
+            null &&
+        accessToken.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $accessToken';
+    }
+
+    // ==========================================================
+    // LOG REQUEST
+    // ==========================================================
+
+    debugPrint(
+      '[CHAT REMOTE] '
+      'Buscando quota atual da IA Versin.',
+    );
+
+    debugPrint(
+      '[CHAT REMOTE] '
+      'Quota endpoint: $uri',
+    );
+
+    debugPrint(
+      '[CHAT REMOTE] '
+      'User ID: $userId',
+    );
+
+    debugPrint(
+      '[CHAT REMOTE] '
+      'Autenticação JWT: '
+      '${accessToken?.isNotEmpty == true}',
+    );
+
+    try {
+      // ========================================================
+      // HTTP GET
+      // ========================================================
+
+      final response = await _httpClient
+          .get(
+            uri,
+            headers: headers,
+          )
+          .timeout(
+            _timeout,
+          );
+
+      debugPrint(
+        '[CHAT REMOTE] '
+        'Quota status: ${response.statusCode}',
+      );
+
+      // ========================================================
+      // HTTP ERROR
+      // ========================================================
+
+      if (!_isSuccessfulStatus(
+        response.statusCode,
+      )) {
+        final errorMessage = _extractErrorMessage(
+          response.body,
+        );
+
+        debugPrint(
+          '[CHAT REMOTE] '
+          'Backend retornou erro ao buscar quota.',
+        );
+
+        debugPrint(
+          '[CHAT REMOTE] '
+          'Status: ${response.statusCode}',
+        );
+
+        debugPrint(
+          '[CHAT REMOTE] '
+          'Mensagem: $errorMessage',
+        );
+
+        final bodyPreview = _safeBodyPreview(
+          response.body,
+        );
+
+        if (bodyPreview.isNotEmpty) {
+          debugPrint(
+            '[CHAT REMOTE] '
+            'Body: $bodyPreview',
+          );
+        }
+
+        throw ChatRemoteException(
+          statusCode: response.statusCode,
+          message: errorMessage,
+        );
+      }
+
+      // ========================================================
+      // EMPTY BODY
+      // ========================================================
+
+      final normalizedBody = response.body.trim();
+
+      if (normalizedBody.isEmpty) {
+        throw const ChatRemoteException(
+          message: 'O servidor Versin retornou uma quota vazia.',
+        );
+      }
+
+      // ========================================================
+      // DECODE JSON
+      // ========================================================
+
+      final dynamic decoded;
+
+      try {
+        decoded = jsonDecode(
+          normalizedBody,
+        );
+      } on FormatException catch (
+        error
+      ) {
+        debugPrint(
+          '[CHAT REMOTE] '
+          'Quota não é JSON válido.',
+        );
+
+        debugPrint(
+          '[CHAT REMOTE] '
+          'Erro JSON: $error',
+        );
+
+        throw const ChatRemoteException(
+          message: 'O servidor Versin retornou a quota em formato inválido.',
+        );
+      }
+
+      // ========================================================
+      // RESPONSE MUST BE MAP
+      // ========================================================
+
+      if (decoded
+          is! Map) {
+        throw const ChatRemoteException(
+          message: 'O servidor Versin retornou uma estrutura de quota inesperada.',
+        );
+      }
+
+      final data =
+          Map<
+            String,
+            dynamic
+          >.from(
+            decoded,
+          );
+
+      // ========================================================
+      // NORMALIZAR QUOTA
+      // ========================================================
+      //
+      // O backend pode devolver:
+      //
+      // {
+      //   "quota": {...}
+      // }
+      //
+      // ou diretamente:
+      //
+      // {
+      //   "used_tokens": ...
+      // }
+      //
+      // Mantemos ambos os formatos compatíveis.
+      //
+      // ========================================================
+
+      final rawQuota = data['quota'];
+
+      final quota =
+          rawQuota
+              is Map
+          ? Map<
+              String,
+              dynamic
+            >.from(
+              rawQuota,
+            )
+          : data;
+
+      // ========================================================
+      // VALIDAÇÃO MÍNIMA
+      // ========================================================
+
+      final hasQuotaFields =
+          quota.containsKey(
+            'used_tokens',
+          ) ||
+          quota.containsKey(
+            'remaining_tokens',
+          ) ||
+          quota.containsKey(
+            'limit_tokens',
+          ) ||
+          quota.containsKey(
+            'usage_percentage',
+          );
+
+      if (!hasQuotaFields) {
+        debugPrint(
+          '[CHAT REMOTE] '
+          'Resposta de quota sem campos reconhecidos.',
+        );
+
+        debugPrint(
+          '[CHAT REMOTE] '
+          'Chaves recebidas: '
+          '${quota.keys.join(', ')}',
+        );
+
+        throw const ChatRemoteException(
+          message: 'O servidor Versin retornou uma quota inválida.',
+        );
+      }
+
+      // ========================================================
+      // SUCCESS
+      // ========================================================
+
+      debugPrint(
+        '[CHAT REMOTE] '
+        'Quota recebida com sucesso.',
+      );
+
+      debugPrint(
+        '[CHAT REMOTE] '
+        'Usados: ${quota['used_tokens'] ?? '-'}',
+      );
+
+      debugPrint(
+        '[CHAT REMOTE] '
+        'Restantes: ${quota['remaining_tokens'] ?? '-'}',
+      );
+
+      debugPrint(
+        '[CHAT REMOTE] '
+        'Limite: ${quota['limit_tokens'] ?? '-'}',
+      );
+
+      return quota;
+    }
+    // ==========================================================
+    // CHAT REMOTE EXCEPTION
+    // ==========================================================
+    on ChatRemoteException {
+      rethrow;
+    }
+    // ==========================================================
+    // TIMEOUT
+    // ==========================================================
+    on TimeoutException catch (
+      error,
+      stackTrace
+    ) {
+      debugPrint(
+        '[CHAT REMOTE] '
+        'Timeout ao buscar quota.',
+      );
+
+      debugPrint(
+        '[CHAT REMOTE] '
+        'Erro: $error',
+      );
+
+      debugPrint(
+        '[CHAT REMOTE] '
+        'Stack trace: $stackTrace',
+      );
+
+      throw const ChatRemoteException(
+        message: 'O servidor Versin demorou demais para informar a quota.',
+      );
+    }
+    // ==========================================================
+    // HTTP CLIENT ERROR
+    // ==========================================================
+    on http.ClientException catch (
+      error,
+      stackTrace
+    ) {
+      debugPrint(
+        '[CHAT REMOTE] '
+        'Erro HTTP ao buscar quota.',
+      );
+
+      debugPrint(
+        '[CHAT REMOTE] '
+        'Erro: $error',
+      );
+
+      debugPrint(
+        '[CHAT REMOTE] '
+        'Stack trace: $stackTrace',
+      );
+
+      throw ChatRemoteException(
+        message:
+            'Não foi possível consultar a quota Versin. '
+            '${error.message}',
+      );
+    }
+    // ==========================================================
+    // UNKNOWN
+    // ==========================================================
+    catch (
+      error,
+      stackTrace
+    ) {
+      debugPrint(
+        '[CHAT REMOTE] '
+        'Erro inesperado ao buscar quota.',
+      );
+
+      debugPrint(
+        '[CHAT REMOTE] '
+        'Erro: $error',
+      );
+
+      debugPrint(
+        '[CHAT REMOTE] '
+        'Stack trace: $stackTrace',
+      );
+
+      throw ChatRemoteException(
+        message:
+            'Erro inesperado ao consultar a quota Versin: '
             '$error',
       );
     }

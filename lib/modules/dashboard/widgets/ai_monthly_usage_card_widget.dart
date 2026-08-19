@@ -93,15 +93,47 @@ class _AiMonthlyUsageCardWidgetState
 
     final limitTokens = controller.aiLimitTokens;
 
-    final accentColor = _accentForLevel(
-      level,
-      percentage,
-    );
+    // ==========================================================
+    // CACHE / CARREGAMENTO INICIAL
+    // ==========================================================
+    //
+    // O AiQuotaController restaura a última quota conhecida do
+    // cache local. Enquanto isso ainda não aconteceu, não devemos
+    // exibir 0 / 0 / 0 como se fossem valores reais.
+    //
+    // Se não existir cache, permanecemos no estado de carregamento
+    // até chegar uma quota válida do backend (normalmente com
+    // limitTokens > 0).
+    //
+    // ==========================================================
 
-    final statusText = _statusText(
-      level,
-      percentage,
-    );
+    final quotaController = controller.aiQuotaController;
+
+    final isWaitingForQuota =
+        quotaController.isLoadingInitialQuota ||
+        (!quotaController.hasCachedQuota &&
+            usedTokens ==
+                0 &&
+            remainingTokens ==
+                0 &&
+            limitTokens ==
+                0);
+
+    final accentColor = isWaitingForQuota
+        ? const Color(
+            0xFFE100FF,
+          )
+        : _accentForLevel(
+            level,
+            percentage,
+          );
+
+    final statusText = isWaitingForQuota
+        ? 'Carregando sua cota...'
+        : _statusText(
+            level,
+            percentage,
+          );
 
     return AnimatedContainer(
       duration: const Duration(
@@ -122,7 +154,7 @@ class _AiMonthlyUsageCardWidgetState
         border: Border.all(
           color: accentColor.withOpacity(
             percentage >=
-                    70
+                    80
                 ? 0.30
                 : 0.12,
           ),
@@ -137,6 +169,7 @@ class _AiMonthlyUsageCardWidgetState
           _buildHeader(
             accentColor: accentColor,
             percentage: percentage,
+            isLoadingQuota: isWaitingForQuota,
           ),
 
           // ====================================================
@@ -159,6 +192,7 @@ class _AiMonthlyUsageCardWidgetState
               usedTokens: usedTokens,
               remainingTokens: remainingTokens,
               limitTokens: limitTokens,
+              isLoadingQuota: isWaitingForQuota,
             ),
             secondChild: _buildCollapsedContent(
               accentColor: accentColor,
@@ -166,6 +200,7 @@ class _AiMonthlyUsageCardWidgetState
               statusText: statusText,
               level: level,
               percentage: percentage,
+              isLoadingQuota: isWaitingForQuota,
             ),
           ),
         ],
@@ -180,6 +215,7 @@ class _AiMonthlyUsageCardWidgetState
   Widget _buildHeader({
     required Color accentColor,
     required double percentage,
+    required bool isLoadingQuota,
   }) {
     return Row(
       children: [
@@ -272,7 +308,9 @@ class _AiMonthlyUsageCardWidgetState
             ),
           ),
           child: Text(
-            '${_formatPercentage(percentage)}%',
+            isLoadingQuota
+                ? '—'
+                : '${_formatPercentage(percentage)}%',
             style: TextStyle(
               color: accentColor,
               fontSize: 12,
@@ -334,6 +372,7 @@ class _AiMonthlyUsageCardWidgetState
     required int usedTokens,
     required int remainingTokens,
     required int limitTokens,
+    required bool isLoadingQuota,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -350,6 +389,7 @@ class _AiMonthlyUsageCardWidgetState
           level: level,
           percentage: percentage,
           statusText: statusText,
+          isLoadingQuota: isLoadingQuota,
         ),
 
         const SizedBox(
@@ -357,102 +397,152 @@ class _AiMonthlyUsageCardWidgetState
         ),
 
         // ======================================================
-        // BARRA
+        // CARREGANDO
         // ======================================================
-        _buildProgressBar(
-          progress: progress,
-          accentColor: accentColor,
-          height: 10,
-        ),
-
-        const SizedBox(
-          height: 6,
-        ),
-
-        // ======================================================
-        // MARCADORES
-        // ======================================================
-        const Row(
-          children: [
-            Text(
-              '0%',
-              style: TextStyle(
-                color: Colors.white24,
-                fontSize: 9,
-              ),
-            ),
-
-            Spacer(),
-
-            Text(
-              '70%',
-              style: TextStyle(
-                color: Colors.white24,
-                fontSize: 9,
-              ),
-            ),
-
-            SizedBox(
-              width: 24,
-            ),
-
-            Text(
-              '90%',
-              style: TextStyle(
-                color: Colors.white24,
-                fontSize: 9,
-              ),
-            ),
-
-            SizedBox(
-              width: 18,
-            ),
-
-            Text(
-              '100%',
-              style: TextStyle(
-                color: Colors.white24,
-                fontSize: 9,
-              ),
-            ),
-          ],
-        ),
-
-        const SizedBox(
-          height: 12,
-        ),
-
-        // ======================================================
-        // MENSAGEM
-        // ======================================================
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(
-            horizontal: 12,
-            vertical: 10,
+        if (isLoadingQuota) ...[
+          _buildLoadingContent(
+            accentColor,
           ),
-          decoration: BoxDecoration(
-            color: accentColor.withOpacity(
-              0.06,
-            ),
-            borderRadius: BorderRadius.circular(
-              10,
-            ),
-            border: Border.all(
-              color: accentColor.withOpacity(
-                0.12,
-              ),
-            ),
+        ] else ...[
+          // ====================================================
+          // BARRA
+          // ====================================================
+          _buildProgressBar(
+            progress: progress,
+            accentColor: accentColor,
+            height: 10,
           ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+
+          const SizedBox(
+            height: 6,
+          ),
+
+          // ====================================================
+          // MARCADORES
+          // ====================================================
+          const Row(
             children: [
-              Icon(
-                Icons.info_outline_rounded,
-                color: accentColor.withOpacity(
-                  0.90,
+              Text(
+                '0%',
+                style: TextStyle(
+                  color: Colors.white24,
+                  fontSize: 9,
                 ),
-                size: 15,
+              ),
+
+              Spacer(),
+
+              Text(
+                '80%',
+                style: TextStyle(
+                  color: Colors.white24,
+                  fontSize: 9,
+                ),
+              ),
+
+              SizedBox(
+                width: 24,
+              ),
+
+              Text(
+                '90%',
+                style: TextStyle(
+                  color: Colors.white24,
+                  fontSize: 9,
+                ),
+              ),
+
+              SizedBox(
+                width: 18,
+              ),
+
+              Text(
+                '100%',
+                style: TextStyle(
+                  color: Colors.white24,
+                  fontSize: 9,
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(
+            height: 12,
+          ),
+
+          // ====================================================
+          // MENSAGEM
+          // ====================================================
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 10,
+            ),
+            decoration: BoxDecoration(
+              color: accentColor.withOpacity(
+                0.06,
+              ),
+              borderRadius: BorderRadius.circular(
+                10,
+              ),
+              border: Border.all(
+                color: accentColor.withOpacity(
+                  0.12,
+                ),
+              ),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.info_outline_rounded,
+                  color: accentColor.withOpacity(
+                    0.90,
+                  ),
+                  size: 15,
+                ),
+
+                const SizedBox(
+                  width: 8,
+                ),
+
+                Expanded(
+                  child: Text(
+                    _normalizeMessage(
+                      message,
+                      percentage,
+                    ),
+                    style: TextStyle(
+                      color: accentColor.withOpacity(
+                        0.92,
+                      ),
+                      fontSize: 11,
+                      height: 1.35,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(
+            height: 14,
+          ),
+
+          // ====================================================
+          // TOKENS
+          // ====================================================
+          Row(
+            children: [
+              Expanded(
+                child: _buildMetric(
+                  label: 'USADOS',
+                  value: _formatTokens(
+                    usedTokens,
+                  ),
+                ),
               ),
 
               const SizedBox(
@@ -460,70 +550,29 @@ class _AiMonthlyUsageCardWidgetState
               ),
 
               Expanded(
-                child: Text(
-                  _normalizeMessage(
-                    message,
-                    percentage,
+                child: _buildMetric(
+                  label: 'RESTANTES',
+                  value: _formatTokens(
+                    remainingTokens,
                   ),
-                  style: TextStyle(
-                    color: accentColor.withOpacity(
-                      0.92,
-                    ),
-                    fontSize: 11,
-                    height: 1.35,
-                    fontWeight: FontWeight.w500,
+                ),
+              ),
+
+              const SizedBox(
+                width: 8,
+              ),
+
+              Expanded(
+                child: _buildMetric(
+                  label: 'LIMITE',
+                  value: _formatTokens(
+                    limitTokens,
                   ),
                 ),
               ),
             ],
           ),
-        ),
-
-        const SizedBox(
-          height: 14,
-        ),
-
-        // ======================================================
-        // TOKENS
-        // ======================================================
-        Row(
-          children: [
-            Expanded(
-              child: _buildMetric(
-                label: 'USADOS',
-                value: _formatTokens(
-                  usedTokens,
-                ),
-              ),
-            ),
-
-            const SizedBox(
-              width: 8,
-            ),
-
-            Expanded(
-              child: _buildMetric(
-                label: 'RESTANTES',
-                value: _formatTokens(
-                  remainingTokens,
-                ),
-              ),
-            ),
-
-            const SizedBox(
-              width: 8,
-            ),
-
-            Expanded(
-              child: _buildMetric(
-                label: 'LIMITE',
-                value: _formatTokens(
-                  limitTokens,
-                ),
-              ),
-            ),
-          ],
-        ),
+        ],
       ],
     );
   }
@@ -552,6 +601,7 @@ class _AiMonthlyUsageCardWidgetState
     required String statusText,
     required String level,
     required double percentage,
+    required bool isLoadingQuota,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -568,6 +618,7 @@ class _AiMonthlyUsageCardWidgetState
           level: level,
           percentage: percentage,
           statusText: statusText,
+          isLoadingQuota: isLoadingQuota,
         ),
 
         const SizedBox(
@@ -577,11 +628,17 @@ class _AiMonthlyUsageCardWidgetState
         // ======================================================
         // BARRA
         // ======================================================
-        _buildProgressBar(
-          progress: progress,
-          accentColor: accentColor,
-          height: 7,
-        ),
+        if (isLoadingQuota)
+          _buildLoadingBar(
+            accentColor,
+            height: 7,
+          )
+        else
+          _buildProgressBar(
+            progress: progress,
+            accentColor: accentColor,
+            height: 7,
+          ),
       ],
     );
   }
@@ -595,14 +652,17 @@ class _AiMonthlyUsageCardWidgetState
     required String level,
     required double percentage,
     required String statusText,
+    required bool isLoadingQuota,
   }) {
     return Row(
       children: [
         Icon(
-          _iconForLevel(
-            level,
-            percentage,
-          ),
+          isLoadingQuota
+              ? Icons.sync_rounded
+              : _iconForLevel(
+                  level,
+                  percentage,
+                ),
           size: 15,
           color: accentColor,
         ),
@@ -648,6 +708,132 @@ class _AiMonthlyUsageCardWidgetState
             >(
               accentColor,
             ),
+      ),
+    );
+  }
+
+  // ============================================================
+  // CONTEÚDO DE CARREGAMENTO
+  // ============================================================
+
+  Widget _buildLoadingContent(
+    Color accentColor,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildLoadingBar(
+          accentColor,
+          height: 10,
+        ),
+
+        const SizedBox(
+          height: 12,
+        ),
+
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 10,
+          ),
+          decoration: BoxDecoration(
+            color: accentColor.withOpacity(
+              0.05,
+            ),
+            borderRadius: BorderRadius.circular(
+              10,
+            ),
+            border: Border.all(
+              color: accentColor.withOpacity(
+                0.10,
+              ),
+            ),
+          ),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 15,
+                height: 15,
+                child: CircularProgressIndicator(
+                  strokeWidth: 1.8,
+                  color: accentColor,
+                ),
+              ),
+
+              const SizedBox(
+                width: 9,
+              ),
+
+              const Expanded(
+                child: Text(
+                  'Carregando a última cota conhecida...',
+                  style: TextStyle(
+                    color: Colors.white54,
+                    fontSize: 11,
+                    height: 1.35,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(
+          height: 14,
+        ),
+
+        const Row(
+          children: [
+            Expanded(
+              child: _LoadingMetricPlaceholder(
+                label: 'USADOS',
+              ),
+            ),
+
+            SizedBox(
+              width: 8,
+            ),
+
+            Expanded(
+              child: _LoadingMetricPlaceholder(
+                label: 'RESTANTES',
+              ),
+            ),
+
+            SizedBox(
+              width: 8,
+            ),
+
+            Expanded(
+              child: _LoadingMetricPlaceholder(
+                label: 'LIMITE',
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // ============================================================
+  // BARRA DE CARREGAMENTO
+  // ============================================================
+
+  Widget _buildLoadingBar(
+    Color accentColor, {
+    required double height,
+  }) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(
+        20,
+      ),
+      child: LinearProgressIndicator(
+        minHeight: height,
+        backgroundColor: Colors.white.withOpacity(
+          0.07,
+        ),
+        color: accentColor,
       ),
     );
   }
@@ -748,7 +934,7 @@ class _AiMonthlyUsageCardWidgetState
     }
 
     if (percentage >=
-            70 ||
+            80 ||
         normalizedLevel ==
             'warning') {
       return Colors.amberAccent;
@@ -784,7 +970,7 @@ class _AiMonthlyUsageCardWidgetState
     }
 
     if (percentage >=
-            70 ||
+            80 ||
         normalizedLevel ==
             'warning') {
       return Icons.info_outline_rounded;
@@ -807,21 +993,21 @@ class _AiMonthlyUsageCardWidgetState
             100 ||
         normalizedLevel ==
             'blocked') {
-      return 'Limite atingido';
+      return 'Cota Versin utilizada';
     }
 
     if (percentage >=
             90 ||
         normalizedLevel ==
             'critical') {
-      return 'Limite próximo';
+      return 'Continuidade disponível';
     }
 
     if (percentage >=
-            70 ||
+            80 ||
         normalizedLevel ==
             'warning') {
-      return 'Uso elevado';
+      return 'Uso avançado';
     }
 
     return 'Uso normal';
@@ -839,17 +1025,17 @@ class _AiMonthlyUsageCardWidgetState
 
     if (percentage >=
         100) {
-      return 'Limite mensal de IA atingido.';
+      return 'A cota Versin deste ciclo foi utilizada. Recursos locais continuam disponíveis.';
     }
 
     if (percentage >=
         90) {
-      return 'Seu limite mensal está próximo.';
+      return 'Você pode conectar uma API própria para manter a IA sempre disponível.';
     }
 
     if (percentage >=
-        70) {
-      return 'Você já utilizou boa parte da sua IA este mês.';
+        80) {
+      return 'Uso avançado da cota Versin neste ciclo.';
     }
 
     if (normalized.isNotEmpty) {
@@ -912,5 +1098,79 @@ class _AiMonthlyUsageCardWidgetState
     }
 
     return value.toString();
+  }
+}
+
+// ============================================================
+// LOADING METRIC PLACEHOLDER
+// ============================================================
+//
+// Usado somente enquanto ainda não existe uma quota local ou
+// resposta válida do backend.
+//
+// Evita mostrar 0 como se fosse um dado confirmado.
+//
+// ============================================================
+
+class _LoadingMetricPlaceholder
+    extends
+        StatelessWidget {
+  final String label;
+
+  const _LoadingMetricPlaceholder({
+    required this.label,
+  });
+
+  @override
+  Widget build(
+    BuildContext context,
+  ) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 10,
+        vertical: 9,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(
+          0.18,
+        ),
+        borderRadius: BorderRadius.circular(
+          10,
+        ),
+        border: Border.all(
+          color: Colors.white.withOpacity(
+            0.04,
+          ),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white30,
+              fontSize: 8,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 0.7,
+            ),
+          ),
+
+          const SizedBox(
+            height: 3,
+          ),
+
+          const Text(
+            '—',
+            style: TextStyle(
+              color: Colors.white54,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              fontFamily: 'monospace',
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

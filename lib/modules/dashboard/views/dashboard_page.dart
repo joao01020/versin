@@ -23,6 +23,11 @@ import '../widgets/dashboard_header_widget.dart';
 // ============================================================
 
 import 'package:versin/modules/calendar/views/calendar_page.dart';
+import 'package:versin/modules/chat/data/datasources/chat_remote_datasource.dart';
+import 'package:versin/modules/chat/domain/repositories/chat_repository_impl.dart';
+import 'package:versin/modules/chat/services/ai_provider_service.dart';
+import 'package:versin/modules/chat/services/private_ai_client.dart';
+import 'package:versin/modules/chat/services/private_api_service.dart';
 import 'package:versin/modules/chat/views/chat_page.dart';
 import 'package:versin/modules/hub/views/hub_page.dart';
 import 'package:versin/modules/market/market_page.dart';
@@ -154,6 +159,35 @@ class _DashboardPageState
   get _visibleMenuItems => DashboardMenuConfig.visibleItems;
 
   // ============================================================
+  // ONBOARDING OBRIGATÓRIO DO NOME
+  // ============================================================
+  //
+  // Enquanto o usuário ainda não possuir um nome público válido,
+  // a aplicação permanece na Home do Dashboard.
+  //
+  // O campo de nome é exibido pelo AccountActivitiesCardWidget.
+  //
+  // ============================================================
+
+  bool get _requiresDisplayName {
+    // Enquanto o DashboardController ainda não terminou de
+    // consultar o artist_name real do perfil, não exibimos
+    // onboarding e não bloqueamos a navegação.
+    //
+    // Isso evita o campo "Como devemos te chamar?" aparecer
+    // rapidamente em contas que já possuem nome salvo.
+    if (!_controller.artistNameResolved) {
+      return false;
+    }
+
+    final value = _controller.artistName.trim();
+
+    return value.isEmpty ||
+        value ==
+            'Membro';
+  }
+
+  // ============================================================
   // ÍNDICE VISÍVEL ATUAL
   // ============================================================
 
@@ -172,7 +206,9 @@ class _DashboardPageState
   void initState() {
     super.initState();
 
-    _controller.init();
+    unawaited(
+      _initializeDashboard(),
+    );
 
     _globalChatController = GlobalChatController()..init();
 
@@ -206,12 +242,176 @@ class _DashboardPageState
   }
 
   // ============================================================
+  // INITIALIZE DASHBOARD
+  // ============================================================
+
+  Future<
+    void
+  >
+  _initializeDashboard() async {
+    await _controller.init();
+
+    if (!mounted) {
+      return;
+    }
+
+    if (_requiresDisplayName &&
+        _controller.currentIndex !=
+            0) {
+      _controller.navigationTap(
+        0,
+      );
+    }
+
+    setState(
+      () {},
+    );
+
+    // Atualiza a quota real sem bloquear a abertura do Dashboard.
+    unawaited(
+      _refreshAiQuota(),
+    );
+  }
+
+  // ============================================================
+  // REFRESH AI QUOTA
+  // ============================================================
+
+  Future<
+    void
+  >
+  _refreshAiQuota() async {
+    final user = _supabase.auth.currentUser;
+
+    if (user ==
+        null) {
+      debugPrint(
+        '[DASHBOARD] '
+        'Quota não atualizada: usuário não autenticado.',
+      );
+
+      return;
+    }
+
+    final userId = user.id.trim();
+
+    if (userId.isEmpty) {
+      debugPrint(
+        '[DASHBOARD] '
+        'Quota não atualizada: userId inválido.',
+      );
+
+      return;
+    }
+
+    debugPrint(
+      '[DASHBOARD] '
+      'Atualizando quota real da IA Versin.',
+    );
+
+    final privateApiService = PrivateApiService();
+
+    final aiProviderService = AiProviderService(
+      privateApiService: privateApiService,
+    );
+
+    final privateAiClient = PrivateAiClient();
+
+    final remoteDatasource = ChatRemoteDatasource();
+
+    final chatRepository = ChatRepositoryImpl(
+      remoteDatasource: remoteDatasource,
+
+      aiProviderService: aiProviderService,
+
+      privateAiClient: privateAiClient,
+    );
+
+    try {
+      final quota = await chatRepository.fetchAiQuota();
+
+      if (!mounted) {
+        return;
+      }
+
+      final currentUserId = _supabase.auth.currentUser?.id.trim();
+
+      if (currentUserId !=
+          userId) {
+        debugPrint(
+          '[DASHBOARD] '
+          'Resposta de quota descartada: a conta autenticada mudou.',
+        );
+
+        return;
+      }
+
+      if (quota.isEmpty) {
+        debugPrint(
+          '[DASHBOARD] '
+          'Backend retornou quota vazia. Mantendo cache atual.',
+        );
+
+        return;
+      }
+
+      _rhymesController.updateAiQuotaFromMap(
+        quota,
+        notify: true,
+      );
+
+      debugPrint(
+        '[DASHBOARD] '
+        'Quota real atualizada com sucesso.',
+      );
+
+      debugPrint(
+        '[DASHBOARD] '
+        'Tokens usados: ${_rhymesController.aiUsedTokens}',
+      );
+
+      debugPrint(
+        '[DASHBOARD] '
+        'Tokens restantes: ${_rhymesController.aiRemainingTokens}',
+      );
+
+      debugPrint(
+        '[DASHBOARD] '
+        'Limite: ${_rhymesController.aiLimitTokens}',
+      );
+    } catch (
+      error,
+      stackTrace
+    ) {
+      debugPrint(
+        '[DASHBOARD] '
+        'Não foi possível atualizar a quota real: $error',
+      );
+
+      debugPrint(
+        '[DASHBOARD] '
+        'Mantendo quota/cache atual.',
+      );
+
+      debugPrint(
+        '$stackTrace',
+      );
+    }
+  }
+
+  // ============================================================
   // NAVEGAÇÃO
   // ============================================================
 
   void _onNavigationTap(
     int visibleIndex,
   ) {
+    if (_requiresDisplayName) {
+      _showCompleteNameMessage();
+
+      return;
+    }
+
     final originalIndex = DashboardNavigation.originalIndexFromVisibleIndex(
       items: DashboardMenuConfig.items,
       visibleIndex: visibleIndex,
@@ -232,6 +432,29 @@ class _DashboardPageState
   }
 
   // ============================================================
+  // COMPLETE NAME MESSAGE
+  // ============================================================
+
+  void _showCompleteNameMessage() {
+    if (!mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(
+        context,
+      )
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Defina seu nome para liberar o restante do aplicativo.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+  }
+
+  // ============================================================
   // ABRIR CALENDÁRIO
   // ============================================================
   //
@@ -247,6 +470,12 @@ class _DashboardPageState
   >
   _openCalendarPage() async {
     if (!mounted) {
+      return;
+    }
+
+    if (_requiresDisplayName) {
+      _showCompleteNameMessage();
+
       return;
     }
 
@@ -280,37 +509,61 @@ class _DashboardPageState
   Widget build(
     BuildContext context,
   ) {
-    return LayoutBuilder(
+    return AnimatedBuilder(
+      animation: _controller,
+
       builder:
           (
             context,
-            constraints,
+            _,
           ) {
-            final isMobile =
-                constraints.maxWidth <
-                800;
+            return LayoutBuilder(
+              builder:
+                  (
+                    context,
+                    constraints,
+                  ) {
+                    final isMobile =
+                        constraints.maxWidth <
+                        800;
 
-            return Scaffold(
-              backgroundColor: Colors.black,
+                    final locked = _requiresDisplayName;
 
-              // ====================================================
-              // NAVEGAÇÃO MOBILE
-              // ====================================================
-              bottomNavigationBar: isMobile
-                  ? DashboardBottomNavigation(
-                      controller: _controller,
-                      items: _visibleMenuItems,
-                      currentVisibleIndex: _visibleCurrentIndex,
-                      onTap: _onNavigationTap,
-                    )
-                  : null,
+                    return Scaffold(
+                      backgroundColor: Colors.black,
 
-              // ====================================================
-              // BODY
-              // ====================================================
-              body: _buildBody(
-                isMobile: isMobile,
-              ),
+                      // ====================================================
+                      // NAVEGAÇÃO MOBILE
+                      // ====================================================
+                      bottomNavigationBar: isMobile
+                          ? IgnorePointer(
+                              ignoring: locked,
+
+                              child: AnimatedOpacity(
+                                duration: const Duration(
+                                  milliseconds: 180,
+                                ),
+                                opacity: locked
+                                    ? 0.28
+                                    : 1.0,
+                                child: DashboardBottomNavigation(
+                                  controller: _controller,
+                                  items: _visibleMenuItems,
+                                  currentVisibleIndex: _visibleCurrentIndex,
+                                  onTap: _onNavigationTap,
+                                ),
+                              ),
+                            )
+                          : null,
+
+                      // ====================================================
+                      // BODY
+                      // ====================================================
+                      body: _buildBody(
+                        isMobile: isMobile,
+                      ),
+                    );
+                  },
             );
           },
     );
@@ -343,11 +596,23 @@ class _DashboardPageState
           // MENU DESKTOP
           // ====================================================
           if (!isMobile)
-            DashboardSideRail(
-              controller: _controller,
-              items: _visibleMenuItems,
-              currentVisibleIndex: _visibleCurrentIndex,
-              onTap: _onNavigationTap,
+            IgnorePointer(
+              ignoring: _requiresDisplayName,
+
+              child: AnimatedOpacity(
+                duration: const Duration(
+                  milliseconds: 180,
+                ),
+                opacity: _requiresDisplayName
+                    ? 0.28
+                    : 1.0,
+                child: DashboardSideRail(
+                  controller: _controller,
+                  items: _visibleMenuItems,
+                  currentVisibleIndex: _visibleCurrentIndex,
+                  onTap: _onNavigationTap,
+                ),
+              ),
             ),
 
           // ====================================================
@@ -371,19 +636,20 @@ class _DashboardPageState
                   ),
                 ),
 
-                Positioned(
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _buildGlobalProjectInvitationBanner(),
-                      _buildGlobalCallBanner(),
-                      _buildGlobalChatBanner(),
-                    ],
+                if (!_requiresDisplayName)
+                  Positioned(
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _buildGlobalProjectInvitationBanner(),
+                        _buildGlobalCallBanner(),
+                        _buildGlobalChatBanner(),
+                      ],
+                    ),
                   ),
-                ),
               ],
             ),
           ),
@@ -445,6 +711,12 @@ class _DashboardPageState
   _acceptProjectInvitation(
     ProjectInvitationModel invitation,
   ) async {
+    if (_requiresDisplayName) {
+      _showCompleteNameMessage();
+
+      return;
+    }
+
     if (!mounted ||
         _projectInvitationController.isBusy) {
       return;
@@ -499,6 +771,12 @@ class _DashboardPageState
   _rejectProjectInvitation(
     ProjectInvitationModel invitation,
   ) async {
+    if (_requiresDisplayName) {
+      _showCompleteNameMessage();
+
+      return;
+    }
+
     if (!mounted ||
         _projectInvitationController.isBusy) {
       return;
@@ -544,6 +822,12 @@ class _DashboardPageState
   _openInvitedProject(
     String projectId,
   ) async {
+    if (_requiresDisplayName) {
+      _showCompleteNameMessage();
+
+      return;
+    }
+
     final normalizedProjectId = projectId.trim();
 
     if (!mounted ||
@@ -737,6 +1021,12 @@ class _DashboardPageState
   _openGlobalChat(
     String projectId,
   ) async {
+    if (_requiresDisplayName) {
+      _showCompleteNameMessage();
+
+      return;
+    }
+
     final normalizedProjectId = projectId.trim();
 
     if (!mounted ||
@@ -1182,6 +1472,12 @@ class _DashboardPageState
   _openCallPage(
     String projectId,
   ) async {
+    if (_requiresDisplayName) {
+      _showCompleteNameMessage();
+
+      return;
+    }
+
     if (!mounted ||
         projectId.trim().isEmpty) {
       return;
@@ -1212,6 +1508,12 @@ class _DashboardPageState
     String callId,
     String projectId,
   ) async {
+    if (_requiresDisplayName) {
+      _showCompleteNameMessage();
+
+      return;
+    }
+
     if (_isGlobalCallActionProcessing) {
       return;
     }
@@ -1261,6 +1563,12 @@ class _DashboardPageState
   _rejectGlobalCall(
     String callId,
   ) async {
+    if (_requiresDisplayName) {
+      _showCompleteNameMessage();
+
+      return;
+    }
+
     if (_isGlobalCallActionProcessing) {
       return;
     }
@@ -1303,6 +1611,12 @@ class _DashboardPageState
   _endGlobalCall(
     String callId,
   ) async {
+    if (_requiresDisplayName) {
+      _showCompleteNameMessage();
+
+      return;
+    }
+
     if (_isGlobalCallActionProcessing) {
       return;
     }
@@ -1391,6 +1705,26 @@ class _DashboardPageState
             index,
           ) {
             if (!mounted) {
+              return;
+            }
+
+            if (_requiresDisplayName &&
+                index !=
+                    0) {
+              WidgetsBinding.instance.addPostFrameCallback(
+                (
+                  _,
+                ) {
+                  if (!mounted) {
+                    return;
+                  }
+
+                  _controller.navigationTap(
+                    0,
+                  );
+                },
+              );
+
               return;
             }
 

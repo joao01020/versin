@@ -69,9 +69,38 @@ class DashboardController
 
   bool _isLoadingArtistName = false;
 
+  bool _isSavingArtistName = false;
+
+  bool _artistNameResolved = false;
+
+  String? _artistNameError;
+
   String get artistName => _artistName;
 
   bool get isLoadingArtistName => _isLoadingArtistName;
+
+  bool get isSavingArtistName => _isSavingArtistName;
+
+  bool get artistNameResolved => _artistNameResolved;
+
+  String? get artistNameError => _artistNameError;
+
+  bool get requiresArtistName {
+    if (!_artistNameResolved) {
+      return false;
+    }
+
+    final normalized = _artistName.trim();
+
+    return normalized.isEmpty ||
+        normalized ==
+            'Membro';
+  }
+
+  bool get canUseApplication {
+    return _artistNameResolved &&
+        !requiresArtistName;
+  }
 
   String? profileImagePath;
 
@@ -190,90 +219,119 @@ class DashboardController
 
     _isLoadingArtistName = true;
 
+    _artistNameError = null;
+
     notifyListeners();
 
     try {
       final userId = Supabase.instance.client.auth.currentUser?.id.trim();
 
-      // ========================================================
-      // CACHE CENTRAL
-      // ========================================================
-      //
-      // O cache resolve na ordem:
-      //
-      // artist_name
-      // name
-      // @username
-      // Membro
-      //
-      // Isso evita iniciar o Dashboard com o texto fixo
-      // "Artista" e depois trocar o nome na tela.
-      //
-      // ========================================================
+      if (userId ==
+              null ||
+          userId.isEmpty) {
+        _artistName = 'Membro';
 
-      if (userId !=
-              null &&
-          userId.isNotEmpty) {
-        final cachedOrRemoteName = await _profileNameCacheService.getName(
-          userId,
-        );
+        _artistNameResolved = true;
 
-        final normalizedCachedName = cachedOrRemoteName.trim();
-
-        if (normalizedCachedName.isNotEmpty &&
-            normalizedCachedName !=
-                'Membro') {
-          _artistName = normalizedCachedName;
-
-          debugPrint(
-            '[DASHBOARD] '
-            'Nome carregado pelo cache de perfil: $_artistName',
-          );
-
-          return;
-        }
+        return;
       }
 
       // ========================================================
-      // FALLBACK LEGADO
+      // FONTE DE VERDADE DO ONBOARDING
       // ========================================================
       //
-      // Mantém compatibilidade com a implementação anterior.
+      // Para liberar o aplicativo, verificamos especificamente:
       //
-      // Se AuthRepository retornar um nome válido, também
-      // sincronizamos esse valor no cache central.
+      // public.profiles.artist_name
+      //
+      // NÃO usamos:
+      //
+      // - username;
+      // - name;
+      // - e-mail;
+      // - fallback do cache.
+      //
+      // Isso é intencional.
+      //
+      // O usuário só deixa o onboarding quando realmente possui
+      // um nome público salvo em artist_name.
       //
       // ========================================================
 
-      final name = await _authRepository.getArtistName();
+      final profile = await Supabase.instance.client
+          .from(
+            'profiles',
+          )
+          .select(
+            'artist_name',
+          )
+          .eq(
+            'id',
+            userId,
+          )
+          .maybeSingle();
 
-      final normalizedName =
-          name?.trim() ??
+      final artistName =
+          profile?['artist_name']?.toString().trim() ??
           '';
 
-      if (normalizedName.isNotEmpty) {
-        _artistName = normalizedName;
+      if (artistName.isNotEmpty) {
+        _artistName = artistName;
 
-        if (userId !=
-                null &&
-            userId.isNotEmpty) {
-          await _profileNameCacheService.cacheName(
-            userId: userId,
-            displayName: normalizedName,
-          );
-        }
+        await _profileNameCacheService.cacheName(
+          userId: userId,
+          displayName: artistName,
+        );
+
+        debugPrint(
+          '[DASHBOARD] '
+          'Nome público carregado: $_artistName',
+        );
       } else {
         _artistName = 'Membro';
+
+        debugPrint(
+          '[DASHBOARD] '
+          'Perfil sem artist_name. '
+          'Onboarding de nome obrigatório.',
+        );
       }
+
+      _artistNameResolved = true;
+    } on PostgrestException catch (
+      error,
+      stackTrace
+    ) {
+      _artistName = 'Membro';
+
+      _artistNameResolved = true;
+
+      _artistNameError = 'Não foi possível carregar o nome do perfil.';
 
       debugPrint(
         '[DASHBOARD] '
-        'Nome carregado: $_artistName',
+        'Erro Supabase ao carregar artist_name: '
+        '${error.message}',
+      );
+
+      debugPrint(
+        '[DASHBOARD] '
+        'Código: ${error.code}',
+      );
+
+      debugPrint(
+        '$stackTrace',
       );
     } catch (
       error,
       stackTrace
     ) {
+      _artistName = 'Membro';
+
+      _artistNameResolved = true;
+
+      _artistNameError = 'Não foi possível carregar o nome do perfil.';
+
       debugPrint(
         '[DASHBOARD] '
         'Erro ao carregar nome do perfil: $error',
@@ -282,12 +340,6 @@ class DashboardController
       debugPrint(
         '$stackTrace',
       );
-
-      // Não volta para "Artista", pois esse texto pode ser
-      // confundido com o nome real do usuário.
-      if (_artistName.trim().isEmpty) {
-        _artistName = 'Membro';
-      }
     } finally {
       _isLoadingArtistName = false;
 
@@ -310,7 +362,172 @@ class DashboardController
 
     _artistName = normalized;
 
+    _artistNameResolved = true;
+
+    _artistNameError = null;
+
     notifyListeners();
+  }
+
+  // ============================================================
+  // SALVAR NOME OBRIGATÓRIO
+  // ============================================================
+  //
+  // Salva somente:
+  //
+  // public.profiles.artist_name
+  //
+  // Não altera:
+  //
+  // - username;
+  // - bio;
+  // - avatar;
+  // - função profissional;
+  // - habilidades.
+  //
+  // ============================================================
+
+  Future<
+    bool
+  >
+  saveArtistName(
+    String value,
+  ) async {
+    if (_isSavingArtistName) {
+      return false;
+    }
+
+    final normalized = value.trim();
+
+    if (normalized.length <
+        2) {
+      _artistNameError = 'Digite pelo menos 2 caracteres.';
+
+      notifyListeners();
+
+      return false;
+    }
+
+    if (normalized.length >
+        60) {
+      _artistNameError = 'O nome pode ter no máximo 60 caracteres.';
+
+      notifyListeners();
+
+      return false;
+    }
+
+    final userId = Supabase.instance.client.auth.currentUser?.id.trim();
+
+    if (userId ==
+            null ||
+        userId.isEmpty) {
+      _artistNameError = 'Não foi possível identificar sua conta.';
+
+      notifyListeners();
+
+      return false;
+    }
+
+    _isSavingArtistName = true;
+
+    _artistNameError = null;
+
+    notifyListeners();
+
+    try {
+      final response = await Supabase.instance.client
+          .from(
+            'profiles',
+          )
+          .update(
+            {
+              'artist_name': normalized,
+
+              'updated_at': DateTime.now().toUtc().toIso8601String(),
+            },
+          )
+          .eq(
+            'id',
+            userId,
+          )
+          .select(
+            'artist_name',
+          )
+          .maybeSingle();
+
+      final savedName =
+          response?['artist_name']?.toString().trim() ??
+          '';
+
+      if (savedName.isEmpty) {
+        throw StateError(
+          'O banco não confirmou o nome salvo.',
+        );
+      }
+
+      await _profileNameCacheService.cacheName(
+        userId: userId,
+        displayName: savedName,
+      );
+
+      _artistName = savedName;
+
+      _artistNameResolved = true;
+
+      _artistNameError = null;
+
+      debugPrint(
+        '[DASHBOARD] '
+        'Nome público salvo com sucesso.',
+      );
+
+      notifyListeners();
+
+      return true;
+    } on PostgrestException catch (
+      error,
+      stackTrace
+    ) {
+      _artistNameError = 'Não foi possível salvar seu nome.';
+
+      debugPrint(
+        '[DASHBOARD] '
+        'Erro Supabase ao salvar artist_name: '
+        '${error.message}',
+      );
+
+      debugPrint(
+        '[DASHBOARD] '
+        'Código: ${error.code}',
+      );
+
+      debugPrint(
+        '$stackTrace',
+      );
+
+      return false;
+    } catch (
+      error,
+      stackTrace
+    ) {
+      _artistNameError = 'Não foi possível salvar seu nome.';
+
+      debugPrint(
+        '[DASHBOARD] '
+        'Erro ao salvar nome público: $error',
+      );
+
+      debugPrint(
+        '$stackTrace',
+      );
+
+      return false;
+    } finally {
+      _isSavingArtistName = false;
+
+      notifyListeners();
+    }
   }
 
   // ============================================================
@@ -480,6 +697,22 @@ class DashboardController
   void navigationTap(
     int index,
   ) {
+    // ========================================================
+    // ONBOARDING DE NOME
+    // ========================================================
+    //
+    // Mesmo que algum widget tente navegar diretamente pelo
+    // controller, o usuário permanece na Home até possuir
+    // artist_name.
+    //
+    // ========================================================
+
+    if (requiresArtistName &&
+        index !=
+            0) {
+      return;
+    }
+
     if (_currentIndex ==
         index) {
       return;
@@ -507,6 +740,12 @@ class DashboardController
   void handlePageChange(
     int index,
   ) {
+    if (requiresArtistName &&
+        index !=
+            0) {
+      return;
+    }
+
     if (_currentIndex ==
         index) {
       return;
@@ -596,6 +835,16 @@ class DashboardController
   // ============================================================
 
   void toggleProfileCard() {
+    if (requiresArtistName) {
+      if (!isProfileCardExpanded) {
+        isProfileCardExpanded = true;
+
+        notifyListeners();
+      }
+
+      return;
+    }
+
     isProfileCardExpanded = !isProfileCardExpanded;
 
     notifyListeners();
@@ -787,6 +1036,14 @@ class DashboardController
 
   void resetProfile() {
     _artistName = '';
+
+    _artistNameResolved = false;
+
+    _isLoadingArtistName = false;
+
+    _isSavingArtistName = false;
+
+    _artistNameError = null;
 
     profileImagePath = null;
 

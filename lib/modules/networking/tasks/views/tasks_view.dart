@@ -1,6 +1,8 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../controllers/project_tasks_controller.dart';
+import '../data/services/contribution_upload_service.dart';
 import '../models/contribution_delivery_model.dart';
 import '../models/project_contribution_model.dart';
 import '../models/project_task_member_model.dart';
@@ -90,6 +92,16 @@ class _TasksViewState
       <
         String
       >{};
+
+  final Set<
+    String
+  >
+  _uploadingContributionIds =
+      <
+        String
+      >{};
+
+  final ContributionUploadService _uploadService = ContributionUploadService();
 
   bool _isCreatingContribution = false;
 
@@ -504,8 +516,17 @@ class _TasksViewState
 
     return ProjectNextActionWidget(
       member: member,
+
       contribution: contribution,
-      allCompleted: _controller.allContributionsValidated,
+
+      workflowStage: _controller.workflowStage,
+
+      workflowTitle: _controller.nextActionTitle,
+
+      workflowDescription: _controller.nextActionDescription,
+
+      allCompleted: _controller.isWorkflowCompleted,
+
       onOpen:
           contribution ==
               null
@@ -564,14 +585,27 @@ class _TasksViewState
             null) {
           return ProductionFlowItem(
             member: member,
+
             contribution: null,
+
             delivery: null,
+
             approvedCount: 0,
-            requiredApprovalCount: _controller.memberCount,
+
+            requiredApprovalCount: _controller.requiredApprovalCountPerContribution,
+
             currentUserApproved: false,
+
             canApprove: false,
+
             canUpload: false,
+
+            contributionPlanApproved: false,
+
+            deadlinePassed: false,
+
             isApproving: false,
+
             isUploading: false,
           );
         }
@@ -610,27 +644,53 @@ class _TasksViewState
             currentUserId ==
                 member.userId;
 
+        final contributionPlanApproved = _controller.isContributionPlanApproved(
+          contribution,
+        );
+
+        final deadlinePassed = _controller.contributionDeadlinePassed(
+          contribution,
+        );
+
         final canApprove =
             contribution.isWaitingApproval &&
+            !contributionPlanApproved &&
             !currentUserApproved;
 
         final canUpload =
             isCurrentUser &&
-            contribution.isInProgress;
+            _controller.canCurrentUserUploadContribution(
+              contribution,
+            );
 
         return ProductionFlowItem(
           member: member,
+
           contribution: contribution,
+
           delivery: delivery,
+
           approvedCount: approvedCount,
-          requiredApprovalCount: _controller.memberCount,
+
+          requiredApprovalCount: _controller.requiredApprovalCountPerContribution,
+
           currentUserApproved: currentUserApproved,
+
           canApprove: canApprove,
+
           canUpload: canUpload,
+
+          contributionPlanApproved: contributionPlanApproved,
+
+          deadlinePassed: deadlinePassed,
+
           isApproving: _approvingContributionIds.contains(
             contribution.id,
           ),
-          isUploading: false,
+
+          isUploading: _uploadingContributionIds.contains(
+            contribution.id,
+          ),
         );
       },
     ).toList();
@@ -641,75 +701,17 @@ class _TasksViewState
   // ============================================================
 
   Widget _buildMilestones() {
-    final members = _controller.members;
-
     final contributions = _controller.contributions;
 
-    final deliveries = _controller.deliveries;
+    final allPlansApproved = _controller.allContributionPlansApproved;
 
-    // ==========================================================
-    // PLAN DEFINED
-    // ==========================================================
+    final materialsReleased = _controller.materialsReleased;
 
-    final allMembersDefined =
-        members.isNotEmpty &&
-        contributions.length >=
-            members.length &&
-        members.every(
-          (
-            member,
-          ) =>
-              _controller.contributionForUser(
-                member.userId,
-              ) !=
-              null,
-        );
-
-    // ==========================================================
-    // PLAN APPROVED
-    // ==========================================================
-
-    final allPlansApproved =
-        allMembersDefined &&
-        contributions.every(
-          (
-            contribution,
-          ) {
-            return _controller.approvalCountForContribution(
-                  contribution,
-                ) >=
-                _controller.memberCount;
-          },
-        );
-
-    // ==========================================================
-    // MATERIALS
-    // ==========================================================
-
-    final hasInitialMaterial = deliveries.isNotEmpty;
-
-    // ==========================================================
-    // ALL DELIVERED
-    // ==========================================================
-
-    final allDelivered =
-        contributions.isNotEmpty &&
-        contributions.every(
-          (
-            contribution,
-          ) {
-            return _controller.latestDeliveryForContribution(
-                  contribution.id,
-                ) !=
-                null;
-          },
-        );
-
-    // ==========================================================
-    // ALL VALIDATED
-    // ==========================================================
+    final allDelivered = _controller.allContributionsDelivered;
 
     final allValidated = _controller.allContributionsValidated;
+
+    final workflowCompleted = _controller.isWorkflowCompleted;
 
     final milestones =
         <
@@ -725,8 +727,8 @@ class _TasksViewState
           ProjectMilestoneItem(
             id: 'materials',
             title: 'Materiais iniciais liberados',
-            subtitle: 'O projeto recebeu sua primeira entrega.',
-            completed: hasInitialMaterial,
+            subtitle: 'O plano foi aprovado e a fase de entregas foi liberada.',
+            completed: materialsReleased,
           ),
 
           ProjectMilestoneItem(
@@ -748,7 +750,7 @@ class _TasksViewState
             title: 'Obra pronta para finalização',
             subtitle: 'Todas as etapas foram concluídas.',
             completed:
-                allValidated &&
+                workflowCompleted &&
                 contributions.isNotEmpty,
           ),
         ];
@@ -1176,25 +1178,393 @@ class _TasksViewState
   // UPLOAD DELIVERY
   // ============================================================
   //
-  // O fluxo de Storage já possui:
+  // Fluxo:
   //
-  // ContributionUploadService
+  // 1. valida se o usuário pode enviar;
+  // 2. abre o seletor de arquivos;
+  // 3. lê os bytes;
+  // 4. envia pelo ContributionUploadService;
+  // 5. registra os metadados pelo ProjectTasksController;
+  // 6. o Controller marca a contribuição como entregue;
+  // 7. Realtime/refetch atualiza a interface.
   //
-  // Porém a seleção física do arquivo ainda precisa ser ligada
-  // ao seletor de arquivos que o projeto utilizará.
+  // IMPORTANTE:
   //
-  // Não acessamos Storage diretamente nesta View.
+  // A View escolhe o arquivo, mas não acessa Supabase Storage
+  // diretamente. Todo o upload físico continua encapsulado no
+  // ContributionUploadService.
   //
   // ============================================================
 
-  void _uploadDelivery(
+  Future<
+    void
+  >
+  _uploadDelivery(
     ProjectContributionModel contribution,
-  ) {
-    _showMessage(
-      'A contribuição já está pronta para receber arquivos. '
-      'O próximo passo é conectar o seletor de arquivos ao '
-      'ContributionUploadService.',
+  ) async {
+    if (_uploadingContributionIds.contains(
+      contribution.id,
+    )) {
+      return;
+    }
+
+    // ==========================================================
+    // PERMISSION / DEADLINE
+    // ==========================================================
+
+    if (!_controller.canCurrentUserUploadContribution(
+      contribution,
+    )) {
+      if (_controller.contributionDeadlinePassed(
+        contribution,
+      )) {
+        _showMessage(
+          'O prazo desta contribuição já foi encerrado.',
+          error: true,
+        );
+
+        return;
+      }
+
+      _showMessage(
+        'Esta contribuição ainda não está liberada para envio.',
+        error: true,
+      );
+
+      return;
+    }
+
+    // ==========================================================
+    // FILE PICKER
+    // ==========================================================
+
+    FilePickerResult? pickerResult;
+
+    try {
+      pickerResult = await FilePicker.platform.pickFiles(
+        allowMultiple: false,
+
+        // O ContributionUploadService trabalha com Uint8List.
+        //
+        // Isso mantém o fluxo compatível com:
+        //
+        // - Linux;
+        // - Windows;
+        // - Android;
+        // - iOS;
+        // - Web.
+        withData: true,
+      );
+    } catch (
+      error
+    ) {
+      _showMessage(
+        'Não foi possível abrir o seletor de arquivos: '
+        '${_actionError(error)}',
+        error: true,
+      );
+
+      return;
+    }
+
+    // Usuário cancelou.
+    if (pickerResult ==
+            null ||
+        pickerResult.files.isEmpty) {
+      return;
+    }
+
+    final selectedFile = pickerResult.files.single;
+
+    final bytes = selectedFile.bytes;
+
+    if (bytes ==
+            null ||
+        bytes.isEmpty) {
+      _showMessage(
+        'Não foi possível ler o arquivo selecionado.',
+        error: true,
+      );
+
+      return;
+    }
+
+    // ==========================================================
+    // REVALIDATE DEADLINE
+    // ==========================================================
+    //
+    // O seletor pode ficar aberto por algum tempo. Antes de
+    // iniciar o upload verificamos novamente se o prazo continua
+    // válido.
+    //
+    // ==========================================================
+
+    if (!_controller.canCurrentUserUploadContribution(
+      contribution,
+    )) {
+      _showMessage(
+        _controller.contributionDeadlinePassed(
+              contribution,
+            )
+            ? 'O prazo terminou antes do envio do arquivo.'
+            : 'Esta contribuição não está mais liberada para envio.',
+        error: true,
+      );
+
+      return;
+    }
+
+    setState(
+      () {
+        _uploadingContributionIds.add(
+          contribution.id,
+        );
+      },
     );
+
+    String? uploadedStoragePath;
+
+    try {
+      // ========================================================
+      // MIME TYPE
+      // ========================================================
+
+      final mimeType = _resolveMimeType(
+        selectedFile.name,
+      );
+
+      // ========================================================
+      // PHYSICAL UPLOAD
+      // ========================================================
+
+      final uploadResult = await _uploadService.uploadContributionBytes(
+        projectId: widget.projectId,
+
+        contributionId: contribution.id,
+
+        version: contribution.version,
+
+        fileName: selectedFile.name,
+
+        bytes: bytes,
+
+        mimeType: mimeType,
+      );
+
+      uploadedStoragePath = uploadResult.storagePath;
+
+      if (!uploadResult.isReadyForDelivery) {
+        throw StateError(
+          'O upload terminou, mas os metadados da entrega estão incompletos.',
+        );
+      }
+
+      // ========================================================
+      // DATABASE DELIVERY
+      // ========================================================
+      //
+      // createDelivery() já:
+      //
+      // - cria contribution_deliveries;
+      // - marca a contribuição como delivered;
+      // - executa refresh().
+      //
+      // ========================================================
+
+      final delivery = await _controller.createDelivery(
+        contribution: contribution,
+
+        fileName: uploadResult.fileName,
+
+        storagePath: uploadResult.storagePath,
+
+        version: uploadResult.version,
+
+        fileSize: uploadResult.fileSize,
+
+        sha256: uploadResult.sha256,
+
+        mimeType: uploadResult.mimeType,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      _showMessage(
+        'Arquivo enviado com sucesso.',
+      );
+
+      // Abre os detalhes da entrega recém-criada.
+      await _openDelivery(
+        delivery,
+      );
+    } catch (
+      error
+    ) {
+      // ========================================================
+      // ROLLBACK
+      // ========================================================
+      //
+      // Se o arquivo físico foi enviado, mas o registro no banco
+      // falhou, removemos o objeto ainda não formalizado para não
+      // deixar um arquivo órfão no bucket.
+      //
+      // ========================================================
+
+      if (uploadedStoragePath !=
+              null &&
+          uploadedStoragePath.trim().isNotEmpty) {
+        await _uploadService.safeRemove(
+          storagePath: uploadedStoragePath,
+        );
+      }
+
+      if (!mounted) {
+        return;
+      }
+
+      _showMessage(
+        'Não foi possível enviar o arquivo: '
+        '${_actionError(error)}',
+        error: true,
+      );
+    } finally {
+      if (mounted) {
+        setState(
+          () {
+            _uploadingContributionIds.remove(
+              contribution.id,
+            );
+          },
+        );
+      }
+    }
+  }
+
+  // ============================================================
+  // RESOLVE MIME TYPE
+  // ============================================================
+  //
+  // Não adicionamos outra dependência apenas para MIME.
+  //
+  // Os tipos mais comuns de produção musical e documentos são
+  // resolvidos por extensão. Para formatos desconhecidos, o
+  // Storage recebe null e pode tratar como conteúdo genérico.
+  //
+  // ============================================================
+
+  String? _resolveMimeType(
+    String fileName,
+  ) {
+    final normalized = fileName.trim().toLowerCase();
+
+    final dotIndex = normalized.lastIndexOf(
+      '.',
+    );
+
+    if (dotIndex <
+            0 ||
+        dotIndex ==
+            normalized.length -
+                1) {
+      return null;
+    }
+
+    final extension = normalized.substring(
+      dotIndex +
+          1,
+    );
+
+    switch (extension) {
+      // ========================================================
+      // AUDIO
+      // ========================================================
+
+      case 'wav':
+        return 'audio/wav';
+
+      case 'mp3':
+        return 'audio/mpeg';
+
+      case 'flac':
+        return 'audio/flac';
+
+      case 'm4a':
+        return 'audio/mp4';
+
+      case 'aac':
+        return 'audio/aac';
+
+      case 'ogg':
+      case 'oga':
+        return 'audio/ogg';
+
+      case 'opus':
+        return 'audio/opus';
+
+      case 'aif':
+      case 'aiff':
+        return 'audio/aiff';
+
+      // ========================================================
+      // VIDEO
+      // ========================================================
+
+      case 'mp4':
+        return 'video/mp4';
+
+      case 'mov':
+        return 'video/quicktime';
+
+      case 'webm':
+        return 'video/webm';
+
+      case 'mkv':
+        return 'video/x-matroska';
+
+      // ========================================================
+      // IMAGES
+      // ========================================================
+
+      case 'png':
+        return 'image/png';
+
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+
+      case 'webp':
+        return 'image/webp';
+
+      case 'gif':
+        return 'image/gif';
+
+      // ========================================================
+      // DOCUMENTS
+      // ========================================================
+
+      case 'pdf':
+        return 'application/pdf';
+
+      case 'txt':
+        return 'text/plain';
+
+      case 'json':
+        return 'application/json';
+
+      case 'zip':
+        return 'application/zip';
+
+      case 'rar':
+        return 'application/vnd.rar';
+
+      case '7z':
+        return 'application/x-7z-compressed';
+
+      default:
+        return null;
+    }
   }
 
   // ============================================================
@@ -1587,7 +1957,13 @@ class _TasksViewState
                     _buildDeliveryDetail(
                       icon: Icons.info_outline,
                       label: 'Status',
-                      value: contribution.statusDatabaseValue,
+                      value:
+                          _controller.isContributionPlanApproved(
+                                contribution,
+                              ) &&
+                              contribution.isWaitingApproval
+                          ? 'Validado'
+                          : contribution.statusDatabaseValue,
                     ),
 
                     if (contribution.dueAt !=
@@ -1601,7 +1977,15 @@ class _TasksViewState
                       ),
 
                     if (isOwner &&
-                        contribution.isReady) ...[
+                        _controller.isContributionPlanApproved(
+                          contribution,
+                        ) &&
+                        !_controller.contributionDeadlinePassed(
+                          contribution,
+                        ) &&
+                        !contribution.isInProgress &&
+                        !contribution.isDelivered &&
+                        !contribution.isValidated) ...[
                       const SizedBox(
                         height: 18,
                       ),
@@ -2087,6 +2471,20 @@ class _TasksViewState
                     _buildTechnicalValue(
                       label: 'DELIVERIES',
                       value: '${_controller.deliveryCount}',
+                    ),
+
+                    _buildTechnicalValue(
+                      label: 'WORKFLOW STAGE',
+                      value: _controller.workflowStage.name,
+                      success: _controller.isWorkflowCompleted,
+                    ),
+
+                    _buildTechnicalValue(
+                      label: 'PLAN APPROVED',
+                      value:
+                          '${_controller.approvedContributionPlanCount}/'
+                          '${_controller.contributionCount}',
+                      success: _controller.allContributionPlansApproved,
                     ),
 
                     _buildTechnicalValue(

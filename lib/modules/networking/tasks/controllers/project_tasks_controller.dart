@@ -65,9 +65,7 @@ enum ProjectTasksWorkflowStage {
 //
 // ============================================================
 
-class ProjectTasksController
-    extends
-        ChangeNotifier {
+class ProjectTasksController extends ChangeNotifier {
   // ============================================================
   // REPOSITORY
   // ============================================================
@@ -78,9 +76,7 @@ class ProjectTasksController
   // CONSTRUCTOR
   // ============================================================
 
-  ProjectTasksController({
-    required this.repository,
-  });
+  ProjectTasksController({required this.repository});
 
   // ============================================================
   // PROJECT
@@ -91,8 +87,7 @@ class ProjectTasksController
   String? get projectId => _projectId;
 
   bool get hasProject {
-    return _projectId?.trim().isNotEmpty ==
-        true;
+    return _projectId?.trim().isNotEmpty == true;
   }
 
   // ============================================================
@@ -107,21 +102,10 @@ class ProjectTasksController
   // MEMBERS
   // ============================================================
 
-  List<
-    ProjectTaskMemberModel
-  >
-  _members =
-      const <
-        ProjectTaskMemberModel
-      >[];
+  List<ProjectTaskMemberModel> _members = const <ProjectTaskMemberModel>[];
 
-  List<
-    ProjectTaskMemberModel
-  >
-  get members {
-    return List.unmodifiable(
-      _members,
-    );
+  List<ProjectTaskMemberModel> get members {
+    return List.unmodifiable(_members);
   }
 
   int get memberCount => _members.length;
@@ -132,21 +116,11 @@ class ProjectTasksController
   // CONTRIBUTIONS
   // ============================================================
 
-  List<
-    ProjectContributionModel
-  >
-  _contributions =
-      const <
-        ProjectContributionModel
-      >[];
+  List<ProjectContributionModel> _contributions =
+      const <ProjectContributionModel>[];
 
-  List<
-    ProjectContributionModel
-  >
-  get contributions {
-    return List.unmodifiable(
-      _contributions,
-    );
+  List<ProjectContributionModel> get contributions {
+    return List.unmodifiable(_contributions);
   }
 
   int get contributionCount => _contributions.length;
@@ -157,21 +131,11 @@ class ProjectTasksController
   // APPROVALS
   // ============================================================
 
-  List<
-    ContributionApprovalModel
-  >
-  _approvals =
-      const <
-        ContributionApprovalModel
-      >[];
+  List<ContributionApprovalModel> _approvals =
+      const <ContributionApprovalModel>[];
 
-  List<
-    ContributionApprovalModel
-  >
-  get approvals {
-    return List.unmodifiable(
-      _approvals,
-    );
+  List<ContributionApprovalModel> get approvals {
+    return List.unmodifiable(_approvals);
   }
 
   int get approvalCount => _approvals.length;
@@ -180,21 +144,11 @@ class ProjectTasksController
   // DELIVERIES
   // ============================================================
 
-  List<
-    ContributionDeliveryModel
-  >
-  _deliveries =
-      const <
-        ContributionDeliveryModel
-      >[];
+  List<ContributionDeliveryModel> _deliveries =
+      const <ContributionDeliveryModel>[];
 
-  List<
-    ContributionDeliveryModel
-  >
-  get deliveries {
-    return List.unmodifiable(
-      _deliveries,
-    );
+  List<ContributionDeliveryModel> get deliveries {
+    return List.unmodifiable(_deliveries);
   }
 
   int get deliveryCount => _deliveries.length;
@@ -205,21 +159,11 @@ class ProjectTasksController
   // RECORD EVENTS
   // ============================================================
 
-  List<
-    ProjectRecordEventModel
-  >
-  _recordEvents =
-      const <
-        ProjectRecordEventModel
-      >[];
+  List<ProjectRecordEventModel> _recordEvents =
+      const <ProjectRecordEventModel>[];
 
-  List<
-    ProjectRecordEventModel
-  >
-  get recordEvents {
-    return List.unmodifiable(
-      _recordEvents,
-    );
+  List<ProjectRecordEventModel> get recordEvents {
+    return List.unmodifiable(_recordEvents);
   }
 
   int get recordEventCount => _recordEvents.length;
@@ -233,25 +177,19 @@ class ProjectTasksController
   ProjectTaskMemberModel? get currentMember {
     final userId = _currentUserId?.trim();
 
-    if (userId ==
-            null ||
-        userId.isEmpty) {
+    if (userId == null || userId.isEmpty) {
       return null;
     }
 
-    return findMember(
-      userId,
-    );
+    return findMember(userId);
   }
 
   bool get currentUserIsMember {
-    return currentMember !=
-        null;
+    return currentMember != null;
   }
 
   bool get currentUserIsFounder {
-    return currentMember?.isFounder ??
-        false;
+    return currentMember?.isFounder ?? false;
   }
 
   // ============================================================
@@ -261,15 +199,11 @@ class ProjectTasksController
   ProjectContributionModel? get currentUserContribution {
     final userId = _currentUserId?.trim();
 
-    if (userId ==
-            null ||
-        userId.isEmpty) {
+    if (userId == null || userId.isEmpty) {
       return null;
     }
 
-    return contributionForUser(
-      userId,
-    );
+    return contributionForUser(userId);
   }
 
   // ============================================================
@@ -278,11 +212,7 @@ class ProjectTasksController
 
   int get validatedContributionCount {
     return _contributions
-        .where(
-          (
-            contribution,
-          ) => contribution.isValidated,
-        )
+        .where((contribution) => contribution.isValidated)
         .length;
   }
 
@@ -291,17 +221,12 @@ class ProjectTasksController
       return 0.0;
     }
 
-    return validatedContributionCount /
-        _contributions.length;
+    return validatedContributionCount / _contributions.length;
   }
 
   bool get allContributionsValidated {
     return _contributions.isNotEmpty &&
-        _contributions.every(
-          (
-            contribution,
-          ) => contribution.isValidated,
-        );
+        _contributions.every((contribution) => contribution.isValidated);
   }
 
   // ============================================================
@@ -312,9 +237,7 @@ class ProjectTasksController
     return memberCount;
   }
 
-  bool isContributionPlanApproved(
-    ProjectContributionModel contribution,
-  ) {
+  bool isContributionPlanApproved(ProjectContributionModel contribution) {
     switch (contribution.status) {
       case ProjectContributionStatus.ready:
       case ProjectContributionStatus.inProgress:
@@ -330,29 +253,20 @@ class ProjectTasksController
 
     final requiredApprovals = requiredApprovalCountPerContribution;
 
-    if (requiredApprovals <=
-        0) {
+    if (requiredApprovals <= 0) {
       return false;
     }
 
-    return approvalCountForContribution(
-          contribution,
-        ) >=
-        requiredApprovals;
+    return approvalCountForContribution(contribution) >= requiredApprovals;
   }
 
   int get approvedContributionPlanCount {
-    return _contributions
-        .where(
-          isContributionPlanApproved,
-        )
-        .length;
+    return _contributions.where(isContributionPlanApproved).length;
   }
 
   bool get allContributionPlansApproved {
     return _contributions.isNotEmpty &&
-        approvedContributionPlanCount ==
-            _contributions.length;
+        approvedContributionPlanCount == _contributions.length;
   }
 
   // ============================================================
@@ -360,39 +274,25 @@ class ProjectTasksController
   // ============================================================
 
   int get contributionWithDeliveryCount {
-    if (_contributions.isEmpty ||
-        _deliveries.isEmpty) {
+    if (_contributions.isEmpty || _deliveries.isEmpty) {
       return 0;
     }
 
     final deliveredContributionIds = _deliveries
-        .map(
-          (
-            delivery,
-          ) => delivery.contributionId.trim(),
-        )
-        .where(
-          (
-            contributionId,
-          ) => contributionId.isNotEmpty,
-        )
+        .map((delivery) => delivery.contributionId.trim())
+        .where((contributionId) => contributionId.isNotEmpty)
         .toSet();
 
     return _contributions
         .where(
-          (
-            contribution,
-          ) => deliveredContributionIds.contains(
-            contribution.id,
-          ),
+          (contribution) => deliveredContributionIds.contains(contribution.id),
         )
         .length;
   }
 
   bool get allContributionsDelivered {
     return _contributions.isNotEmpty &&
-        contributionWithDeliveryCount ==
-            _contributions.length;
+        contributionWithDeliveryCount == _contributions.length;
   }
 
   bool get materialsReleased {
@@ -406,8 +306,7 @@ class ProjectTasksController
   ProjectTasksWorkflowStage get workflowStage {
     if (_contributions.isEmpty ||
         _members.isEmpty ||
-        _contributions.length <
-            _members.length) {
+        _contributions.length < _members.length) {
       return ProjectTasksWorkflowStage.definingPlan;
     }
 
@@ -431,13 +330,11 @@ class ProjectTasksController
   }
 
   bool get isAwaitingPlanApproval {
-    return workflowStage ==
-        ProjectTasksWorkflowStage.awaitingApproval;
+    return workflowStage == ProjectTasksWorkflowStage.awaitingApproval;
   }
 
   bool get isAwaitingFirstDelivery {
-    return workflowStage ==
-        ProjectTasksWorkflowStage.awaitingFirstDelivery;
+    return workflowStage == ProjectTasksWorkflowStage.awaitingFirstDelivery;
   }
 
   bool get isDeliveryPhaseActive {
@@ -460,8 +357,7 @@ class ProjectTasksController
   }
 
   bool get isWorkflowCompleted {
-    return workflowStage ==
-        ProjectTasksWorkflowStage.completed;
+    return workflowStage == ProjectTasksWorkflowStage.completed;
   }
 
   // ============================================================
@@ -522,27 +418,20 @@ class ProjectTasksController
   }) {
     final dueAt = contribution.dueAt;
 
-    if (dueAt ==
-        null) {
+    if (dueAt == null) {
       return false;
     }
 
-    final now =
-        referenceDate ??
-        DateTime.now();
+    final now = referenceDate ?? DateTime.now();
 
-    return now.isAfter(
-      dueAt,
-    );
+    return now.isAfter(dueAt);
   }
 
   bool canUploadContribution(
     ProjectContributionModel contribution, {
     DateTime? referenceDate,
   }) {
-    if (!isContributionPlanApproved(
-      contribution,
-    )) {
+    if (!isContributionPlanApproved(contribution)) {
       return false;
     }
 
@@ -566,18 +455,13 @@ class ProjectTasksController
   }) {
     final currentUserId = _currentUserId?.trim();
 
-    if (currentUserId ==
-            null ||
+    if (currentUserId == null ||
         currentUserId.isEmpty ||
-        contribution.userId !=
-            currentUserId) {
+        contribution.userId != currentUserId) {
       return false;
     }
 
-    return canUploadContribution(
-      contribution,
-      referenceDate: referenceDate,
-    );
+    return canUploadContribution(contribution, referenceDate: referenceDate);
   }
 
   // ============================================================
@@ -605,57 +489,29 @@ class ProjectTasksController
   String? get errorMessage => _errorMessage;
 
   bool get hasError {
-    return _errorMessage?.trim().isNotEmpty ==
-        true;
+    return _errorMessage?.trim().isNotEmpty == true;
   }
 
   // ============================================================
   // REALTIME SUBSCRIPTIONS
   // ============================================================
 
-  StreamSubscription<
-    List<
-      ProjectTaskMemberModel
-    >
-  >?
-  _membersSubscription;
+  StreamSubscription<List<ProjectTaskMemberModel>>? _membersSubscription;
 
-  StreamSubscription<
-    List<
-      ProjectContributionModel
-    >
-  >?
+  StreamSubscription<List<ProjectContributionModel>>?
   _contributionsSubscription;
 
-  StreamSubscription<
-    List<
-      ContributionApprovalModel
-    >
-  >?
-  _approvalsSubscription;
+  StreamSubscription<List<ContributionApprovalModel>>? _approvalsSubscription;
 
-  StreamSubscription<
-    List<
-      ContributionDeliveryModel
-    >
-  >?
-  _deliveriesSubscription;
+  StreamSubscription<List<ContributionDeliveryModel>>? _deliveriesSubscription;
 
-  StreamSubscription<
-    List<
-      ProjectRecordEventModel
-    >
-  >?
-  _recordEventsSubscription;
+  StreamSubscription<List<ProjectRecordEventModel>>? _recordEventsSubscription;
 
   // ============================================================
   // LOAD
   // ============================================================
 
-  Future<
-    void
-  >
-  load({
+  Future<void> load({
     required String projectId,
     required String currentUserId,
   }) async {
@@ -668,17 +524,13 @@ class ProjectTasksController
     // ==========================================================
 
     if (normalizedProjectId.isEmpty) {
-      _setError(
-        'ID do projeto inválido.',
-      );
+      _setError('ID do projeto inválido.');
 
       return;
     }
 
     if (normalizedUserId.isEmpty) {
-      _setError(
-        'Usuário não identificado.',
-      );
+      _setError('Usuário não identificado.');
 
       return;
     }
@@ -715,9 +567,7 @@ class ProjectTasksController
       );
 
       if (!exists) {
-        throw StateError(
-          'Projeto não encontrado.',
-        );
+        throw StateError('Projeto não encontrado.');
       }
 
       // ========================================================
@@ -730,18 +580,14 @@ class ProjectTasksController
       );
 
       if (!isMember) {
-        throw StateError(
-          'Você não faz parte deste projeto.',
-        );
+        throw StateError('Você não faz parte deste projeto.');
       }
 
       // ========================================================
       // LOAD ALL
       // ========================================================
 
-      await _loadAllData(
-        normalizedProjectId,
-      );
+      await _loadAllData(normalizedProjectId);
 
       // ========================================================
       // REALTIME
@@ -803,10 +649,7 @@ class ProjectTasksController
         '$approvedContributionPlanCount/'
         '${_contributions.length}',
       );
-    } catch (
-      error,
-      stackTrace
-    ) {
+    } catch (error, stackTrace) {
       debugPrint(
         '[PROJECT TASKS] '
         'Erro ao carregar projeto: '
@@ -820,9 +663,7 @@ class ProjectTasksController
 
       _clearCollections();
 
-      _errorMessage = _resolveErrorMessage(
-        error,
-      );
+      _errorMessage = _resolveErrorMessage(error);
     } finally {
       _isLoading = false;
 
@@ -834,12 +675,7 @@ class ProjectTasksController
   // LOAD ALL DATA
   // ============================================================
 
-  Future<
-    void
-  >
-  _loadAllData(
-    String projectId,
-  ) async {
+  Future<void> _loadAllData(String projectId) async {
     final loadedMembers = await repository.getProjectMembers(
       projectId: projectId,
     );
@@ -860,55 +696,35 @@ class ProjectTasksController
       projectId: projectId,
     );
 
-    _members = _normalizeMembers(
-      loadedMembers,
-    );
+    _members = _normalizeMembers(loadedMembers);
 
-    _contributions = _normalizeContributions(
-      loadedContributions,
-    );
+    _contributions = _normalizeContributions(loadedContributions);
 
-    _approvals = _normalizeApprovals(
-      loadedApprovals,
-    );
+    _approvals = _normalizeApprovals(loadedApprovals);
 
-    _deliveries = _normalizeDeliveries(
-      loadedDeliveries,
-    );
+    _deliveries = _normalizeDeliveries(loadedDeliveries);
 
-    _recordEvents = _normalizeRecordEvents(
-      loadedRecordEvents,
-    );
+    _recordEvents = _normalizeRecordEvents(loadedRecordEvents);
   }
 
   // ============================================================
   // REFRESH
   // ============================================================
 
-  Future<
-    void
-  >
-  refresh() async {
+  Future<void> refresh() async {
     final projectId = _projectId?.trim();
 
-    if (projectId ==
-            null ||
-        projectId.isEmpty) {
+    if (projectId == null || projectId.isEmpty) {
       return;
     }
 
     try {
       _errorMessage = null;
 
-      await _loadAllData(
-        projectId,
-      );
+      await _loadAllData(projectId);
 
       notifyListeners();
-    } catch (
-      error,
-      stackTrace
-    ) {
+    } catch (error, stackTrace) {
       debugPrint(
         '[PROJECT TASKS] '
         'Erro ao atualizar projeto: '
@@ -920,9 +736,7 @@ class ProjectTasksController
         '$stackTrace',
       );
 
-      _errorMessage = _resolveErrorMessage(
-        error,
-      );
+      _errorMessage = _resolveErrorMessage(error);
 
       notifyListeners();
     }
@@ -932,150 +746,97 @@ class ProjectTasksController
   // START REALTIME
   // ============================================================
 
-  Future<
-    void
-  >
-  _startRealtime() async {
+  Future<void> _startRealtime() async {
     await _cancelRealtime();
 
     final projectId = _projectId?.trim();
 
-    if (projectId ==
-            null ||
-        projectId.isEmpty) {
+    if (projectId == null || projectId.isEmpty) {
       return;
     }
 
     _membersSubscription = repository
-        .watchProjectMembers(
-          projectId: projectId,
-        )
-        .listen(
-          (
-            members,
-          ) {
-            _members = _normalizeMembers(
-              members,
-            );
+        .watchProjectMembers(projectId: projectId)
+        .listen((members) {
+          _members = _normalizeMembers(members);
 
-            debugPrint(
-              '[PROJECT TASKS] '
-              'Membros atualizados em realtime: '
-              '${_members.length}',
-            );
+          debugPrint(
+            '[PROJECT TASKS] '
+            'Membros atualizados em realtime: '
+            '${_members.length}',
+          );
 
-            notifyListeners();
-          },
-          onError: _handleRealtimeError,
-        );
+          notifyListeners();
+        }, onError: _handleRealtimeError);
 
     _contributionsSubscription = repository
-        .watchContributions(
-          projectId: projectId,
-        )
-        .listen(
-          (
-            contributions,
-          ) {
-            _contributions = _normalizeContributions(
-              contributions,
-            );
+        .watchContributions(projectId: projectId)
+        .listen((contributions) {
+          _contributions = _normalizeContributions(contributions);
 
-            debugPrint(
-              '[PROJECT TASKS] '
-              'Contribuições atualizadas em realtime: '
-              '${_contributions.length}',
-            );
+          debugPrint(
+            '[PROJECT TASKS] '
+            'Contribuições atualizadas em realtime: '
+            '${_contributions.length}',
+          );
 
-            notifyListeners();
-          },
-          onError: _handleRealtimeError,
-        );
+          notifyListeners();
+        }, onError: _handleRealtimeError);
 
     _approvalsSubscription = repository
-        .watchContributionApprovals(
-          projectId: projectId,
-        )
-        .listen(
-          (
-            approvals,
-          ) {
-            _approvals = _normalizeApprovals(
-              approvals,
-            );
+        .watchContributionApprovals(projectId: projectId)
+        .listen((approvals) {
+          _approvals = _normalizeApprovals(approvals);
 
-            debugPrint(
-              '[PROJECT TASKS] '
-              'Aprovações atualizadas em realtime: '
-              '${_approvals.length}',
-            );
+          debugPrint(
+            '[PROJECT TASKS] '
+            'Aprovações atualizadas em realtime: '
+            '${_approvals.length}',
+          );
 
-            debugPrint(
-              '[PROJECT TASKS] '
-              'Estágio após aprovação: '
-              '${workflowStage.name}',
-            );
+          debugPrint(
+            '[PROJECT TASKS] '
+            'Estágio após aprovação: '
+            '${workflowStage.name}',
+          );
 
-            notifyListeners();
-          },
-          onError: _handleRealtimeError,
-        );
+          notifyListeners();
+        }, onError: _handleRealtimeError);
 
     _deliveriesSubscription = repository
-        .watchDeliveries(
-          projectId: projectId,
-        )
-        .listen(
-          (
-            deliveries,
-          ) {
-            _deliveries = _normalizeDeliveries(
-              deliveries,
-            );
+        .watchDeliveries(projectId: projectId)
+        .listen((deliveries) {
+          _deliveries = _normalizeDeliveries(deliveries);
 
-            debugPrint(
-              '[PROJECT TASKS] '
-              'Entregas atualizadas em realtime: '
-              '${_deliveries.length}',
-            );
+          debugPrint(
+            '[PROJECT TASKS] '
+            'Entregas atualizadas em realtime: '
+            '${_deliveries.length}',
+          );
 
-            notifyListeners();
-          },
-          onError: _handleRealtimeError,
-        );
+          notifyListeners();
+        }, onError: _handleRealtimeError);
 
     _recordEventsSubscription = repository
-        .watchProjectRecordEvents(
-          projectId: projectId,
-        )
-        .listen(
-          (
-            events,
-          ) {
-            _recordEvents = _normalizeRecordEvents(
-              events,
-            );
+        .watchProjectRecordEvents(projectId: projectId)
+        .listen((events) {
+          _recordEvents = _normalizeRecordEvents(events);
 
-            debugPrint(
-              '[PROJECT TASKS] '
-              'Versin Record atualizado em realtime: '
-              '${_recordEvents.length}',
-            );
+          debugPrint(
+            '[PROJECT TASKS] '
+            'Versin Record atualizado em realtime: '
+            '${_recordEvents.length}',
+          );
 
-            notifyListeners();
-          },
-          onError: _handleRealtimeError,
-        );
+          notifyListeners();
+        }, onError: _handleRealtimeError);
   }
 
   // ============================================================
   // REALTIME ERROR
   // ============================================================
 
-  void _handleRealtimeError(
-    Object error,
-    StackTrace stackTrace,
-  ) {
+  void _handleRealtimeError(Object error, StackTrace stackTrace) {
     debugPrint(
       '[PROJECT TASKS] '
       'Erro realtime: '
@@ -1092,9 +853,7 @@ class ProjectTasksController
   // CONTRIBUTION FOR USER
   // ============================================================
 
-  ProjectContributionModel? contributionForUser(
-    String userId,
-  ) {
+  ProjectContributionModel? contributionForUser(String userId) {
     final normalizedUserId = userId.trim();
 
     if (normalizedUserId.isEmpty) {
@@ -1102,8 +861,7 @@ class ProjectTasksController
     }
 
     for (final contribution in _contributions) {
-      if (contribution.userId ==
-          normalizedUserId) {
+      if (contribution.userId == normalizedUserId) {
         return contribution;
       }
     }
@@ -1115,9 +873,7 @@ class ProjectTasksController
   // FIND CONTRIBUTION
   // ============================================================
 
-  ProjectContributionModel? findContribution(
-    String contributionId,
-  ) {
+  ProjectContributionModel? findContribution(String contributionId) {
     final normalizedContributionId = contributionId.trim();
 
     if (normalizedContributionId.isEmpty) {
@@ -1125,8 +881,7 @@ class ProjectTasksController
     }
 
     for (final contribution in _contributions) {
-      if (contribution.id ==
-          normalizedContributionId) {
+      if (contribution.id == normalizedContributionId) {
         return contribution;
       }
     }
@@ -1138,21 +893,14 @@ class ProjectTasksController
   // APPROVALS FOR CONTRIBUTION
   // ============================================================
 
-  List<
-    ContributionApprovalModel
-  >
-  approvalsForContribution(
+  List<ContributionApprovalModel> approvalsForContribution(
     ProjectContributionModel contribution,
   ) {
     return _approvals
         .where(
-          (
-            approval,
-          ) =>
-              approval.contributionId ==
-                  contribution.id &&
-              approval.contributionVersion ==
-                  contribution.version,
+          (approval) =>
+              approval.contributionId == contribution.id &&
+              approval.contributionVersion == contribution.version,
         )
         .toList();
   }
@@ -1161,12 +909,8 @@ class ProjectTasksController
   // APPROVAL COUNT
   // ============================================================
 
-  int approvalCountForContribution(
-    ProjectContributionModel contribution,
-  ) {
-    return approvalsForContribution(
-      contribution,
-    ).length;
+  int approvalCountForContribution(ProjectContributionModel contribution) {
+    return approvalsForContribution(contribution).length;
   }
 
   int remainingApprovalCountForContribution(
@@ -1174,14 +918,9 @@ class ProjectTasksController
   ) {
     final remaining =
         requiredApprovalCountPerContribution -
-        approvalCountForContribution(
-          contribution,
-        );
+        approvalCountForContribution(contribution);
 
-    return remaining <
-            0
-        ? 0
-        : remaining;
+    return remaining < 0 ? 0 : remaining;
   }
 
   double approvalProgressForContribution(
@@ -1189,19 +928,12 @@ class ProjectTasksController
   ) {
     final requiredApprovals = requiredApprovalCountPerContribution;
 
-    if (requiredApprovals <=
-        0) {
+    if (requiredApprovals <= 0) {
       return 0.0;
     }
 
-    return (approvalCountForContribution(
-              contribution,
-            ) /
-            requiredApprovals)
-        .clamp(
-          0.0,
-          1.0,
-        )
+    return (approvalCountForContribution(contribution) / requiredApprovals)
+        .clamp(0.0, 1.0)
         .toDouble();
   }
 
@@ -1220,9 +952,7 @@ class ProjectTasksController
     }
 
     return _approvals.any(
-      (
-        approval,
-      ) => approval.approves(
+      (approval) => approval.approves(
         contributionId: contribution.id,
         userId: normalizedUserId,
         version: contribution.version,
@@ -1234,59 +964,36 @@ class ProjectTasksController
   // CURRENT USER APPROVED
   // ============================================================
 
-  bool currentUserApprovedContribution(
-    ProjectContributionModel contribution,
-  ) {
+  bool currentUserApprovedContribution(ProjectContributionModel contribution) {
     final userId = _currentUserId?.trim();
 
-    if (userId ==
-            null ||
-        userId.isEmpty) {
+    if (userId == null || userId.isEmpty) {
       return false;
     }
 
-    return userApprovedContribution(
-      contribution: contribution,
-      userId: userId,
-    );
+    return userApprovedContribution(contribution: contribution, userId: userId);
   }
 
   // ============================================================
   // DELIVERIES FOR CONTRIBUTION
   // ============================================================
 
-  List<
-    ContributionDeliveryModel
-  >
-  deliveriesForContribution(
+  List<ContributionDeliveryModel> deliveriesForContribution(
     String contributionId,
   ) {
     final normalizedContributionId = contributionId.trim();
 
     if (normalizedContributionId.isEmpty) {
-      return const <
-        ContributionDeliveryModel
-      >[];
+      return const <ContributionDeliveryModel>[];
     }
 
     final result = _deliveries
         .where(
-          (
-            delivery,
-          ) =>
-              delivery.contributionId ==
-              normalizedContributionId,
+          (delivery) => delivery.contributionId == normalizedContributionId,
         )
         .toList();
 
-    result.sort(
-      (
-        a,
-        b,
-      ) => b.version.compareTo(
-        a.version,
-      ),
-    );
+    result.sort((a, b) => b.version.compareTo(a.version));
 
     return result;
   }
@@ -1298,9 +1005,7 @@ class ProjectTasksController
   ContributionDeliveryModel? latestDeliveryForContribution(
     String contributionId,
   ) {
-    final deliveries = deliveriesForContribution(
-      contributionId,
-    );
+    final deliveries = deliveriesForContribution(contributionId);
 
     if (deliveries.isEmpty) {
       return null;
@@ -1318,94 +1023,59 @@ class ProjectTasksController
       return null;
     }
 
-    const priority =
-        <
-          ProjectContributionStatus,
-          int
-        >{
-          ProjectContributionStatus.delivered: 0,
-          ProjectContributionStatus.waitingApproval: 1,
-          ProjectContributionStatus.ready: 2,
-          ProjectContributionStatus.inProgress: 3,
-          ProjectContributionStatus.blocked: 4,
-          ProjectContributionStatus.draft: 5,
-          ProjectContributionStatus.validated: 6,
-        };
+    const priority = <ProjectContributionStatus, int>{
+      ProjectContributionStatus.delivered: 0,
+      ProjectContributionStatus.waitingApproval: 1,
+      ProjectContributionStatus.ready: 2,
+      ProjectContributionStatus.inProgress: 3,
+      ProjectContributionStatus.blocked: 4,
+      ProjectContributionStatus.draft: 5,
+      ProjectContributionStatus.validated: 6,
+    };
 
     final pending = _contributions
-        .where(
-          (
-            contribution,
-          ) => !contribution.isValidated,
-        )
+        .where((contribution) => !contribution.isValidated)
         .toList();
 
     if (pending.isEmpty) {
       return null;
     }
 
-    pending.sort(
-      (
-        a,
-        b,
-      ) {
-        final aPriority =
-            a.status ==
-                    ProjectContributionStatus.waitingApproval &&
-                isContributionPlanApproved(
-                  a,
-                )
-            ? priority[ProjectContributionStatus.ready] ??
-                  999
-            : priority[a.status] ??
-                  999;
+    pending.sort((a, b) {
+      final aPriority =
+          a.status == ProjectContributionStatus.waitingApproval &&
+              isContributionPlanApproved(a)
+          ? priority[ProjectContributionStatus.ready] ?? 999
+          : priority[a.status] ?? 999;
 
-        final bPriority =
-            b.status ==
-                    ProjectContributionStatus.waitingApproval &&
-                isContributionPlanApproved(
-                  b,
-                )
-            ? priority[ProjectContributionStatus.ready] ??
-                  999
-            : priority[b.status] ??
-                  999;
+      final bPriority =
+          b.status == ProjectContributionStatus.waitingApproval &&
+              isContributionPlanApproved(b)
+          ? priority[ProjectContributionStatus.ready] ?? 999
+          : priority[b.status] ?? 999;
 
-        if (aPriority !=
-            bPriority) {
-          return aPriority.compareTo(
-            bPriority,
-          );
-        }
+      if (aPriority != bPriority) {
+        return aPriority.compareTo(bPriority);
+      }
 
-        final aDue = a.dueAt;
+      final aDue = a.dueAt;
 
-        final bDue = b.dueAt;
+      final bDue = b.dueAt;
 
-        if (aDue !=
-                null &&
-            bDue !=
-                null) {
-          return aDue.compareTo(
-            bDue,
-          );
-        }
+      if (aDue != null && bDue != null) {
+        return aDue.compareTo(bDue);
+      }
 
-        if (aDue !=
-            null) {
-          return -1;
-        }
+      if (aDue != null) {
+        return -1;
+      }
 
-        if (bDue !=
-            null) {
-          return 1;
-        }
+      if (bDue != null) {
+        return 1;
+      }
 
-        return a.createdAt.compareTo(
-          b.createdAt,
-        );
-      },
-    );
+      return a.createdAt.compareTo(b.createdAt);
+    });
 
     return pending.first;
   }
@@ -1417,24 +1087,18 @@ class ProjectTasksController
   ProjectTaskMemberModel? get nextActionMember {
     final contribution = nextContributionAction;
 
-    if (contribution ==
-        null) {
+    if (contribution == null) {
       return null;
     }
 
-    return findMember(
-      contribution.userId,
-    );
+    return findMember(contribution.userId);
   }
 
   // ============================================================
   // CREATE CONTRIBUTION
   // ============================================================
 
-  Future<
-    ProjectContributionModel
-  >
-  createContribution({
+  Future<ProjectContributionModel> createContribution({
     required String title,
     required String description,
     String? dependencyContributionId,
@@ -1446,18 +1110,12 @@ class ProjectTasksController
 
     final member = currentMember;
 
-    if (member ==
-        null) {
-      throw StateError(
-        'Usuário não encontrado entre os membros do projeto.',
-      );
+    if (member == null) {
+      throw StateError('Usuário não encontrado entre os membros do projeto.');
     }
 
-    if (currentUserContribution !=
-        null) {
-      throw StateError(
-        'Você já possui uma contribuição neste projeto.',
-      );
+    if (currentUserContribution != null) {
+      throw StateError('Você já possui uma contribuição neste projeto.');
     }
 
     final created = await repository.createContribution(
@@ -1470,6 +1128,25 @@ class ProjectTasksController
       dueAt: dueAt,
     );
 
+    await _createRecordEventSafely(
+      eventNames: const <String>[
+        'contributionCreated',
+        'contribution_created',
+        'contribution.created',
+      ],
+      actorUserId: userId,
+      entityType: 'contribution',
+      entityId: created.id,
+      payload: <String, dynamic>{
+        'contribution_id': created.id,
+        'user_id': userId,
+        'title': created.title,
+        'version': created.version,
+        'role': member.resolvedProfessionalRole,
+        'due_at': created.dueAt?.toUtc().toIso8601String(),
+      },
+    );
+
     await refresh();
 
     return created;
@@ -1479,29 +1156,40 @@ class ProjectTasksController
   // UPDATE CONTRIBUTION
   // ============================================================
 
-  Future<
-    ProjectContributionModel
-  >
-  updateContribution(
+  Future<ProjectContributionModel> updateContribution(
     ProjectContributionModel contribution,
   ) async {
     final currentUserId = _requireCurrentUserId();
 
-    if (contribution.userId !=
-        currentUserId) {
-      throw StateError(
-        'Você só pode editar sua própria contribuição.',
-      );
+    if (contribution.userId != currentUserId) {
+      throw StateError('Você só pode editar sua própria contribuição.');
     }
 
     if (!contribution.canBeEdited) {
-      throw StateError(
-        'Esta contribuição não pode mais ser editada.',
-      );
+      throw StateError('Esta contribuição não pode mais ser editada.');
     }
 
     final updated = await repository.updateContribution(
       contribution: contribution,
+    );
+
+    await _createRecordEventSafely(
+      eventNames: const <String>[
+        'contributionUpdated',
+        'contribution_updated',
+        'contribution.updated',
+      ],
+      actorUserId: currentUserId,
+      entityType: 'contribution',
+      entityId: updated.id,
+      payload: <String, dynamic>{
+        'contribution_id': updated.id,
+        'user_id': updated.userId,
+        'title': updated.title,
+        'version': updated.version,
+        'status': updated.statusDatabaseValue,
+        'due_at': updated.dueAt?.toUtc().toIso8601String(),
+      },
     );
 
     await refresh();
@@ -1513,16 +1201,12 @@ class ProjectTasksController
   // SUBMIT CONTRIBUTION
   // ============================================================
 
-  Future<
-    ProjectContributionModel
-  >
-  submitContributionForApproval(
+  Future<ProjectContributionModel> submitContributionForApproval(
     ProjectContributionModel contribution,
   ) async {
     final currentUserId = _requireCurrentUserId();
 
-    if (contribution.userId !=
-        currentUserId) {
+    if (contribution.userId != currentUserId) {
       throw StateError(
         'Você só pode enviar sua própria contribuição para aprovação.',
       );
@@ -1541,20 +1225,13 @@ class ProjectTasksController
   // APPROVE CONTRIBUTION
   // ============================================================
 
-  Future<
-    ContributionApprovalModel
-  >
-  approveContribution(
+  Future<ContributionApprovalModel> approveContribution(
     ProjectContributionModel contribution,
   ) async {
     final currentUserId = _requireCurrentUserId();
 
-    if (currentUserApprovedContribution(
-      contribution,
-    )) {
-      throw StateError(
-        'Você já confirmou esta contribuição.',
-      );
+    if (currentUserApprovedContribution(contribution)) {
+      throw StateError('Você já confirmou esta contribuição.');
     }
 
     final approval = await repository.approveContribution(
@@ -1565,6 +1242,31 @@ class ProjectTasksController
 
     await refresh();
 
+    final refreshedContribution =
+        findContribution(contribution.id) ?? contribution;
+
+    if (isContributionPlanApproved(refreshedContribution)) {
+      await _createRecordEventSafely(
+        eventNames: const <String>[
+          'contributionApproved',
+          'contribution_approved',
+          'contribution.approved',
+        ],
+        actorUserId: currentUserId,
+        entityType: 'contribution',
+        entityId: refreshedContribution.id,
+        payload: <String, dynamic>{
+          'contribution_id': refreshedContribution.id,
+          'user_id': refreshedContribution.userId,
+          'title': refreshedContribution.title,
+          'version': refreshedContribution.version,
+          'approved_count': approvalCountForContribution(refreshedContribution),
+          'required_approval_count': requiredApprovalCountPerContribution,
+          'collective_approval': true,
+        },
+      );
+    }
+
     return approval;
   }
 
@@ -1572,23 +1274,34 @@ class ProjectTasksController
   // START CONTRIBUTION
   // ============================================================
 
-  Future<
-    ProjectContributionModel
-  >
-  startContribution(
+  Future<ProjectContributionModel> startContribution(
     ProjectContributionModel contribution,
   ) async {
     final currentUserId = _requireCurrentUserId();
 
-    if (contribution.userId !=
-        currentUserId) {
-      throw StateError(
-        'Você só pode iniciar sua própria contribuição.',
-      );
+    if (contribution.userId != currentUserId) {
+      throw StateError('Você só pode iniciar sua própria contribuição.');
     }
 
     final updated = await repository.startContribution(
       contributionId: contribution.id,
+    );
+
+    await _createRecordEventSafely(
+      eventNames: const <String>[
+        'contributionStarted',
+        'contribution_started',
+        'contribution.started',
+      ],
+      actorUserId: currentUserId,
+      entityType: 'contribution',
+      entityId: updated.id,
+      payload: <String, dynamic>{
+        'contribution_id': updated.id,
+        'user_id': updated.userId,
+        'title': updated.title,
+        'version': updated.version,
+      },
     );
 
     await refresh();
@@ -1600,10 +1313,7 @@ class ProjectTasksController
   // CREATE DELIVERY METADATA
   // ============================================================
 
-  Future<
-    ContributionDeliveryModel
-  >
-  createDelivery({
+  Future<ContributionDeliveryModel> createDelivery({
     required ProjectContributionModel contribution,
     required String fileName,
     required String storagePath,
@@ -1614,8 +1324,7 @@ class ProjectTasksController
   }) async {
     final currentUserId = _requireCurrentUserId();
 
-    if (contribution.userId !=
-        currentUserId) {
+    if (contribution.userId != currentUserId) {
       throw StateError(
         'Você só pode enviar arquivos para sua própria contribuição.',
       );
@@ -1632,8 +1341,29 @@ class ProjectTasksController
       mimeType: mimeType,
     );
 
-    await repository.markContributionDelivered(
-      contributionId: contribution.id,
+    await repository.markContributionDelivered(contributionId: contribution.id);
+
+    await _createRecordEventSafely(
+      eventNames: const <String>[
+        'deliverySubmitted',
+        'delivery_submitted',
+        'delivery.submitted',
+      ],
+      actorUserId: currentUserId,
+      entityType: 'delivery',
+      entityId: delivery.id,
+      payload: <String, dynamic>{
+        'delivery_id': delivery.id,
+        'contribution_id': contribution.id,
+        'contribution_title': contribution.title,
+        'uploaded_by': currentUserId,
+        'file_name': fileName,
+        'storage_path': storagePath,
+        'version': version,
+        'file_size': fileSize,
+        'sha256': sha256,
+        'mime_type': mimeType,
+      },
     );
 
     await refresh();
@@ -1645,17 +1375,54 @@ class ProjectTasksController
   // VALIDATE DELIVERY
   // ============================================================
 
-  Future<
-    ContributionDeliveryModel
-  >
-  validateDelivery(
+  Future<ContributionDeliveryModel> validateDelivery(
     ContributionDeliveryModel delivery,
   ) async {
+    final currentUserId = _requireCurrentUserId();
+
     final validated = await repository.validateDelivery(
       deliveryId: delivery.id,
     );
 
+    await _createRecordEventSafely(
+      eventNames: const <String>[
+        'deliveryValidated',
+        'delivery_validated',
+        'delivery.validated',
+      ],
+      actorUserId: currentUserId,
+      entityType: 'delivery',
+      entityId: validated.id,
+      payload: <String, dynamic>{
+        'delivery_id': validated.id,
+        'contribution_id': validated.contributionId,
+        'validated_by': currentUserId,
+        'version': validated.version,
+      },
+    );
+
     await refresh();
+
+    if (isWorkflowCompleted) {
+      await _createRecordEventSafely(
+        eventNames: const <String>[
+          'projectCompleted',
+          'project_completed',
+          'project.completed',
+        ],
+        actorUserId: currentUserId,
+        entityType: 'project',
+        entityId: _requireProjectId(),
+        payload: <String, dynamic>{
+          'project_id': _requireProjectId(),
+          'contribution_count': contributionCount,
+          'delivery_count': deliveryCount,
+          'completed_at': DateTime.now().toUtc().toIso8601String(),
+        },
+      );
+
+      await refresh();
+    }
 
     return validated;
   }
@@ -1664,14 +1431,28 @@ class ProjectTasksController
   // REJECT DELIVERY
   // ============================================================
 
-  Future<
-    ContributionDeliveryModel
-  >
-  rejectDelivery(
+  Future<ContributionDeliveryModel> rejectDelivery(
     ContributionDeliveryModel delivery,
   ) async {
-    final rejected = await repository.rejectDelivery(
-      deliveryId: delivery.id,
+    final currentUserId = _requireCurrentUserId();
+
+    final rejected = await repository.rejectDelivery(deliveryId: delivery.id);
+
+    await _createRecordEventSafely(
+      eventNames: const <String>[
+        'deliveryRejected',
+        'delivery_rejected',
+        'delivery.rejected',
+      ],
+      actorUserId: currentUserId,
+      entityType: 'delivery',
+      entityId: rejected.id,
+      payload: <String, dynamic>{
+        'delivery_id': rejected.id,
+        'contribution_id': rejected.contributionId,
+        'rejected_by': currentUserId,
+        'version': rejected.version,
+      },
     );
 
     await refresh();
@@ -1683,10 +1464,7 @@ class ProjectTasksController
   // ATTACH CALENDAR EVENT
   // ============================================================
 
-  Future<
-    ProjectContributionModel
-  >
-  attachCalendarEvent({
+  Future<ProjectContributionModel> attachCalendarEvent({
     required ProjectContributionModel contribution,
     required String calendarEventId,
   }) async {
@@ -1704,10 +1482,7 @@ class ProjectTasksController
   // DETACH CALENDAR EVENT
   // ============================================================
 
-  Future<
-    ProjectContributionModel
-  >
-  detachCalendarEvent(
+  Future<ProjectContributionModel> detachCalendarEvent(
     ProjectContributionModel contribution,
   ) async {
     final updated = await repository.detachCalendarEvent(
@@ -1720,12 +1495,118 @@ class ProjectTasksController
   }
 
   // ============================================================
+  // VERSIN RECORD
+  // ============================================================
+  //
+  // Registra somente eventos relevantes do fluxo.
+  //
+  // IMPORTANTE:
+  //
+  // - falha no histórico NÃO desfaz a ação principal;
+  // - o Controller não calcula hashes;
+  // - os hashes continuam sendo responsabilidade do
+  //   ContributionIntegrityService;
+  // - usamos resolução por nome para manter compatibilidade com
+  //   diferentes versões do enum ProjectRecordEventType.
+  //
+  // ============================================================
+
+  Future<void> _createRecordEventSafely({
+    required List<String> eventNames,
+    required Map<String, dynamic> payload,
+    String? actorUserId,
+    String? entityType,
+    String? entityId,
+  }) async {
+    final projectId = _projectId?.trim();
+
+    if (projectId == null || projectId.isEmpty) {
+      return;
+    }
+
+    final eventType = _resolveRecordEventType(eventNames);
+
+    if (eventType == null) {
+      debugPrint(
+        '[PROJECT TASKS] '
+        'Versin Record ignorado: tipo de evento não encontrado. '
+        'Tentativas: $eventNames',
+      );
+
+      return;
+    }
+
+    try {
+      await repository.createProjectRecordEvent(
+        projectId: projectId,
+        eventType: eventType,
+        payload: payload,
+        createdAt: DateTime.now().toUtc(),
+        actorUserId: actorUserId,
+        entityType: entityType,
+        entityId: entityId,
+      );
+
+      debugPrint(
+        '[PROJECT TASKS] '
+        'Versin Record criado: '
+        '${eventType.name}',
+      );
+    } catch (error, stackTrace) {
+      debugPrint(
+        '[PROJECT TASKS] '
+        'Falha ao registrar Versin Record: '
+        '$error',
+      );
+
+      debugPrint(
+        '[PROJECT TASKS] '
+        '$stackTrace',
+      );
+    }
+  }
+
+  // ============================================================
+  // RESOLVE RECORD EVENT TYPE
+  // ============================================================
+
+  ProjectRecordEventType? _resolveRecordEventType(List<String> candidates) {
+    final normalizedCandidates = candidates
+        .map(_normalizeRecordEventName)
+        .where((value) => value.isNotEmpty)
+        .toSet();
+
+    for (final eventType in ProjectRecordEventType.values) {
+      final names = <String>{
+        _normalizeRecordEventName(eventType.name),
+        _normalizeRecordEventName(eventType.toString()),
+      };
+
+      if (names.any(normalizedCandidates.contains)) {
+        return eventType;
+      }
+    }
+
+    return null;
+  }
+
+  // ============================================================
+  // NORMALIZE RECORD EVENT NAME
+  // ============================================================
+
+  String _normalizeRecordEventName(String value) {
+    return value
+        .trim()
+        .toLowerCase()
+        .replaceAll('projectrecordeventtype.', '')
+        .replaceAll(RegExp(r'[^a-z0-9]'), '');
+  }
+
+  // ============================================================
   // FIND MEMBER
   // ============================================================
 
-  ProjectTaskMemberModel? findMember(
-    String userId,
-  ) {
+  ProjectTaskMemberModel? findMember(String userId) {
     final normalized = userId.trim();
 
     if (normalized.isEmpty) {
@@ -1733,8 +1614,7 @@ class ProjectTasksController
     }
 
     for (final member in _members) {
-      if (member.userId ==
-          normalized) {
+      if (member.userId == normalized) {
         return member;
       }
     }
@@ -1746,20 +1626,10 @@ class ProjectTasksController
   // NORMALIZE MEMBERS
   // ============================================================
 
-  List<
-    ProjectTaskMemberModel
-  >
-  _normalizeMembers(
-    List<
-      ProjectTaskMemberModel
-    >
-    members,
+  List<ProjectTaskMemberModel> _normalizeMembers(
+    List<ProjectTaskMemberModel> members,
   ) {
-    final unique =
-        <
-          String,
-          ProjectTaskMemberModel
-        >{};
+    final unique = <String, ProjectTaskMemberModel>{};
 
     for (final member in members) {
       final userId = member.userId.trim();
@@ -1773,23 +1643,15 @@ class ProjectTasksController
 
     final result = unique.values.toList();
 
-    result.sort(
-      (
-        a,
-        b,
-      ) {
-        if (a.isFounder !=
-            b.isFounder) {
-          return a.isFounder
-              ? -1
-              : 1;
-        }
+    result.sort((a, b) {
+      if (a.isFounder != b.isFounder) {
+        return a.isFounder ? -1 : 1;
+      }
 
-        return a.resolvedDisplayName.toLowerCase().compareTo(
-          b.resolvedDisplayName.toLowerCase(),
-        );
-      },
-    );
+      return a.resolvedDisplayName.toLowerCase().compareTo(
+        b.resolvedDisplayName.toLowerCase(),
+      );
+    });
 
     return result;
   }
@@ -1798,20 +1660,10 @@ class ProjectTasksController
   // NORMALIZE CONTRIBUTIONS
   // ============================================================
 
-  List<
-    ProjectContributionModel
-  >
-  _normalizeContributions(
-    List<
-      ProjectContributionModel
-    >
-    contributions,
+  List<ProjectContributionModel> _normalizeContributions(
+    List<ProjectContributionModel> contributions,
   ) {
-    final unique =
-        <
-          String,
-          ProjectContributionModel
-        >{};
+    final unique = <String, ProjectContributionModel>{};
 
     for (final contribution in contributions) {
       final id = contribution.id.trim();
@@ -1822,24 +1674,14 @@ class ProjectTasksController
 
       final current = unique[id];
 
-      if (current ==
-              null ||
-          contribution.version >=
-              current.version) {
+      if (current == null || contribution.version >= current.version) {
         unique[id] = contribution;
       }
     }
 
     final result = unique.values.toList();
 
-    result.sort(
-      (
-        a,
-        b,
-      ) => a.createdAt.compareTo(
-        b.createdAt,
-      ),
-    );
+    result.sort((a, b) => a.createdAt.compareTo(b.createdAt));
 
     return result;
   }
@@ -1848,20 +1690,10 @@ class ProjectTasksController
   // NORMALIZE APPROVALS
   // ============================================================
 
-  List<
-    ContributionApprovalModel
-  >
-  _normalizeApprovals(
-    List<
-      ContributionApprovalModel
-    >
-    approvals,
+  List<ContributionApprovalModel> _normalizeApprovals(
+    List<ContributionApprovalModel> approvals,
   ) {
-    final unique =
-        <
-          String,
-          ContributionApprovalModel
-        >{};
+    final unique = <String, ContributionApprovalModel>{};
 
     for (final approval in approvals) {
       final key =
@@ -1874,14 +1706,7 @@ class ProjectTasksController
 
     final result = unique.values.toList();
 
-    result.sort(
-      (
-        a,
-        b,
-      ) => a.approvedAt.compareTo(
-        b.approvedAt,
-      ),
-    );
+    result.sort((a, b) => a.approvedAt.compareTo(b.approvedAt));
 
     return result;
   }
@@ -1890,20 +1715,10 @@ class ProjectTasksController
   // NORMALIZE DELIVERIES
   // ============================================================
 
-  List<
-    ContributionDeliveryModel
-  >
-  _normalizeDeliveries(
-    List<
-      ContributionDeliveryModel
-    >
-    deliveries,
+  List<ContributionDeliveryModel> _normalizeDeliveries(
+    List<ContributionDeliveryModel> deliveries,
   ) {
-    final unique =
-        <
-          String,
-          ContributionDeliveryModel
-        >{};
+    final unique = <String, ContributionDeliveryModel>{};
 
     for (final delivery in deliveries) {
       final id = delivery.id.trim();
@@ -1917,25 +1732,15 @@ class ProjectTasksController
 
     final result = unique.values.toList();
 
-    result.sort(
-      (
-        a,
-        b,
-      ) {
-        final versionCompare = b.version.compareTo(
-          a.version,
-        );
+    result.sort((a, b) {
+      final versionCompare = b.version.compareTo(a.version);
 
-        if (versionCompare !=
-            0) {
-          return versionCompare;
-        }
+      if (versionCompare != 0) {
+        return versionCompare;
+      }
 
-        return b.createdAt.compareTo(
-          a.createdAt,
-        );
-      },
-    );
+      return b.createdAt.compareTo(a.createdAt);
+    });
 
     return result;
   }
@@ -1944,20 +1749,10 @@ class ProjectTasksController
   // NORMALIZE RECORD EVENTS
   // ============================================================
 
-  List<
-    ProjectRecordEventModel
-  >
-  _normalizeRecordEvents(
-    List<
-      ProjectRecordEventModel
-    >
-    events,
+  List<ProjectRecordEventModel> _normalizeRecordEvents(
+    List<ProjectRecordEventModel> events,
   ) {
-    final unique =
-        <
-          String,
-          ProjectRecordEventModel
-        >{};
+    final unique = <String, ProjectRecordEventModel>{};
 
     for (final event in events) {
       final id = event.id.trim();
@@ -1971,14 +1766,7 @@ class ProjectTasksController
 
     final result = unique.values.toList();
 
-    result.sort(
-      (
-        a,
-        b,
-      ) => b.createdAt.compareTo(
-        a.createdAt,
-      ),
-    );
+    result.sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
     return result;
   }
@@ -1988,40 +1776,22 @@ class ProjectTasksController
   // ============================================================
 
   void _clearCollections() {
-    _members =
-        const <
-          ProjectTaskMemberModel
-        >[];
+    _members = const <ProjectTaskMemberModel>[];
 
-    _contributions =
-        const <
-          ProjectContributionModel
-        >[];
+    _contributions = const <ProjectContributionModel>[];
 
-    _approvals =
-        const <
-          ContributionApprovalModel
-        >[];
+    _approvals = const <ContributionApprovalModel>[];
 
-    _deliveries =
-        const <
-          ContributionDeliveryModel
-        >[];
+    _deliveries = const <ContributionDeliveryModel>[];
 
-    _recordEvents =
-        const <
-          ProjectRecordEventModel
-        >[];
+    _recordEvents = const <ProjectRecordEventModel>[];
   }
 
   // ============================================================
   // CANCEL REALTIME
   // ============================================================
 
-  Future<
-    void
-  >
-  _cancelRealtime() async {
+  Future<void> _cancelRealtime() async {
     await _membersSubscription?.cancel();
 
     await _contributionsSubscription?.cancel();
@@ -2050,12 +1820,8 @@ class ProjectTasksController
   String _requireProjectId() {
     final value = _projectId?.trim();
 
-    if (value ==
-            null ||
-        value.isEmpty) {
-      throw StateError(
-        'Projeto não inicializado.',
-      );
+    if (value == null || value.isEmpty) {
+      throw StateError('Projeto não inicializado.');
     }
 
     return value;
@@ -2068,12 +1834,8 @@ class ProjectTasksController
   String _requireCurrentUserId() {
     final value = _currentUserId?.trim();
 
-    if (value ==
-            null ||
-        value.isEmpty) {
-      throw StateError(
-        'Usuário não identificado.',
-      );
+    if (value == null || value.isEmpty) {
+      throw StateError('Usuário não identificado.');
     }
 
     return value;
@@ -2084,8 +1846,7 @@ class ProjectTasksController
   // ============================================================
 
   void clearError() {
-    if (_errorMessage ==
-        null) {
+    if (_errorMessage == null) {
       return;
     }
 
@@ -2098,9 +1859,7 @@ class ProjectTasksController
   // SET ERROR
   // ============================================================
 
-  void _setError(
-    String message,
-  ) {
+  void _setError(String message) {
     _errorMessage = message;
 
     _isLoading = false;
@@ -2112,18 +1871,13 @@ class ProjectTasksController
   // RESOLVE ERROR
   // ============================================================
 
-  String _resolveErrorMessage(
-    Object error,
-  ) {
-    if (error
-        is StateError) {
+  String _resolveErrorMessage(Object error) {
+    if (error is StateError) {
       return error.message.toString();
     }
 
-    if (error
-        is ArgumentError) {
-      return error.message?.toString() ??
-          'Dados inválidos.';
+    if (error is ArgumentError) {
+      return error.message?.toString() ?? 'Dados inválidos.';
     }
 
     return 'Não foi possível carregar '
@@ -2134,10 +1888,7 @@ class ProjectTasksController
   // RESET
   // ============================================================
 
-  Future<
-    void
-  >
-  reset() async {
+  Future<void> reset() async {
     await _cancelRealtime();
 
     _projectId = null;
@@ -2161,9 +1912,7 @@ class ProjectTasksController
 
   @override
   void dispose() {
-    unawaited(
-      _cancelRealtime(),
-    );
+    unawaited(_cancelRealtime());
 
     super.dispose();
   }

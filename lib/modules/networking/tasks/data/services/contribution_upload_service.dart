@@ -240,6 +240,13 @@ class ContributionUploadService {
   // ============================================================
   // DOWNLOAD
   // ============================================================
+  //
+  // Faz o download autenticado do bucket privado.
+  //
+  // A policy de SELECT em storage.objects continua sendo a
+  // responsável por decidir se o usuário pode acessar o arquivo.
+  //
+  // ============================================================
 
   Future<
     Uint8List
@@ -247,18 +254,147 @@ class ContributionUploadService {
   download({
     required String storagePath,
   }) async {
+    _requireAuthenticatedUser();
+
     final normalizedPath = _requireValue(
       storagePath,
       fieldName: 'storagePath',
     );
 
-    return _supabase.storage
+    debugPrint(
+      '[CONTRIBUTION UPLOAD] '
+      'Baixando: '
+      '$normalizedPath',
+    );
+
+    final bytes = await _supabase.storage
         .from(
           bucketName,
         )
         .download(
           normalizedPath,
         );
+
+    if (bytes.isEmpty) {
+      throw StateError(
+        'O arquivo baixado está vazio.',
+      );
+    }
+
+    debugPrint(
+      '[CONTRIBUTION UPLOAD] '
+      'Download concluído. '
+      'Bytes: ${bytes.lengthInBytes}',
+    );
+
+    return bytes;
+  }
+
+  // ============================================================
+  // DOWNLOAD AND VERIFY
+  // ============================================================
+  //
+  // Baixa o arquivo e compara o SHA-256 com o hash salvo na
+  // contribution_delivery.
+  //
+  // Isso permite que a UI só grave no disco um arquivo cuja
+  // integridade foi confirmada.
+  //
+  // ============================================================
+
+  Future<
+    ContributionDownloadResult
+  >
+  downloadAndVerify({
+    required String storagePath,
+    required String fileName,
+    required String expectedSha256,
+    String? mimeType,
+  }) async {
+    final normalizedPath = _requireValue(
+      storagePath,
+      fieldName: 'storagePath',
+    );
+
+    final normalizedFileName = _sanitizeFileName(
+      fileName,
+    );
+
+    final normalizedExpectedHash = _requireValue(
+      expectedSha256,
+      fieldName: 'expectedSha256',
+    ).toLowerCase();
+
+    final bytes = await download(
+      storagePath: normalizedPath,
+    );
+
+    final actualSha256 = _integrityService.hashBytes(
+      bytes,
+    );
+
+    final integrityValid =
+        actualSha256.toLowerCase() ==
+        normalizedExpectedHash;
+
+    debugPrint(
+      '[CONTRIBUTION UPLOAD] '
+      'Integridade do download: '
+      '${integrityValid ? 'OK' : 'FALHOU'}. '
+      'SHA-256: '
+      '${_integrityService.shortHash(actualSha256)}',
+    );
+
+    return ContributionDownloadResult(
+      bucketName: bucketName,
+      storagePath: normalizedPath,
+      fileName: normalizedFileName,
+      mimeType: _normalizeMimeType(
+        mimeType,
+      ),
+      bytes: bytes,
+      fileSize: bytes.lengthInBytes,
+      sha256: actualSha256,
+      expectedSha256: normalizedExpectedHash,
+      integrityValid: integrityValid,
+      downloadedAt: DateTime.now().toUtc(),
+    );
+  }
+
+  // ============================================================
+  // DOWNLOAD VERIFIED
+  // ============================================================
+  //
+  // Variante estrita.
+  //
+  // Se o SHA-256 não corresponder ao hash registrado, lança erro
+  // e não devolve um resultado que a UI possa salvar sem querer.
+  //
+  // ============================================================
+
+  Future<
+    ContributionDownloadResult
+  >
+  downloadVerified({
+    required String storagePath,
+    required String fileName,
+    required String expectedSha256,
+    String? mimeType,
+  }) async {
+    final result = await downloadAndVerify(
+      storagePath: storagePath,
+      fileName: fileName,
+      expectedSha256: expectedSha256,
+      mimeType: mimeType,
+    );
+
+    if (!result.integrityValid) {
+      throw StateError(
+        'A integridade do arquivo baixado não pôde ser confirmada.',
+      );
+    }
+
+    return result;
   }
 
   // ============================================================
@@ -389,6 +525,11 @@ class ContributionUploadService {
     required String storagePath,
     required String expectedSha256,
   }) async {
+    final normalizedExpectedHash = _requireValue(
+      expectedSha256,
+      fieldName: 'expectedSha256',
+    );
+
     final bytes = await download(
       storagePath: storagePath,
     );
@@ -396,7 +537,7 @@ class ContributionUploadService {
     return _integrityService.verifyBytes(
       bytes: bytes,
 
-      expectedHash: expectedSha256,
+      expectedHash: normalizedExpectedHash,
     );
   }
 
@@ -557,6 +698,24 @@ class ContributionUploadService {
   }
 
   // ============================================================
+  // REQUIRE AUTHENTICATED USER
+  // ============================================================
+
+  String _requireAuthenticatedUser() {
+    final userId = _supabase.auth.currentUser?.id.trim();
+
+    if (userId ==
+            null ||
+        userId.isEmpty) {
+      throw StateError(
+        'Usuário não autenticado.',
+      );
+    }
+
+    return userId;
+  }
+
+  // ============================================================
   // REQUIRE VALUE
   // ============================================================
 
@@ -695,6 +854,84 @@ class ContributionUploadResult {
         'fileSize: $fileSize, '
         'version: $version, '
         'uploadedBy: $uploadedBy'
+        ')';
+  }
+}
+
+// ============================================================
+// CONTRIBUTION DOWNLOAD RESULT
+// ============================================================
+//
+// Resultado de um download autenticado.
+//
+// A UI pode usar:
+//
+// - bytes:
+//   para gravar no disco;
+// - fileName:
+//   como nome sugerido;
+// - integrityValid:
+//   para confirmar se o conteúdo é o mesmo registrado;
+// - sha256:
+//   para auditoria/debug.
+//
+// ============================================================
+
+class ContributionDownloadResult {
+  final String bucketName;
+
+  final String storagePath;
+
+  final String fileName;
+
+  final String? mimeType;
+
+  final Uint8List bytes;
+
+  final int fileSize;
+
+  final String sha256;
+
+  final String expectedSha256;
+
+  final bool integrityValid;
+
+  final DateTime downloadedAt;
+
+  const ContributionDownloadResult({
+    required this.bucketName,
+    required this.storagePath,
+    required this.fileName,
+    required this.bytes,
+    required this.fileSize,
+    required this.sha256,
+    required this.expectedSha256,
+    required this.integrityValid,
+    required this.downloadedAt,
+    this.mimeType,
+  });
+
+  bool get hasMimeType {
+    return mimeType?.trim().isNotEmpty ==
+        true;
+  }
+
+  bool get isReadyToSave {
+    return fileName.trim().isNotEmpty &&
+        bytes.isNotEmpty &&
+        fileSize >
+            0 &&
+        integrityValid;
+  }
+
+  @override
+  String toString() {
+    return 'ContributionDownloadResult('
+        'bucketName: $bucketName, '
+        'storagePath: $storagePath, '
+        'fileName: $fileName, '
+        'fileSize: $fileSize, '
+        'integrityValid: $integrityValid'
         ')';
   }
 }

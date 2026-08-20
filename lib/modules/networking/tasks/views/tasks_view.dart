@@ -32,6 +32,7 @@ import '../widgets/project_record_widget.dart';
 // - editar contribuição;
 // - aprovar contribuição;
 // - iniciar contribuição;
+// - baixar entrega;
 // - validar/rejeitar entrega.
 //
 // NÃO:
@@ -44,9 +45,7 @@ import '../widgets/project_record_widget.dart';
 //
 // ============================================================
 
-class TasksView
-    extends
-        StatefulWidget {
+class TasksView extends StatefulWidget {
   final String projectId;
 
   final ProjectTasksController controller;
@@ -58,48 +57,25 @@ class TasksView
   });
 
   @override
-  State<
-    TasksView
-  >
-  createState() => _TasksViewState();
+  State<TasksView> createState() => _TasksViewState();
 }
 
 // ============================================================
 // STATE
 // ============================================================
 
-class _TasksViewState
-    extends
-        State<
-          TasksView
-        > {
+class _TasksViewState extends State<TasksView> {
   // ============================================================
   // LOCAL ACTION STATE
   // ============================================================
 
-  final Set<
-    String
-  >
-  _approvingContributionIds =
-      <
-        String
-      >{};
+  final Set<String> _approvingContributionIds = <String>{};
 
-  final Set<
-    String
-  >
-  _validatingDeliveryIds =
-      <
-        String
-      >{};
+  final Set<String> _validatingDeliveryIds = <String>{};
 
-  final Set<
-    String
-  >
-  _uploadingContributionIds =
-      <
-        String
-      >{};
+  final Set<String> _uploadingContributionIds = <String>{};
+
+  final Set<String> _downloadingDeliveryIds = <String>{};
 
   final ContributionUploadService _uploadService = ContributionUploadService();
 
@@ -119,41 +95,29 @@ class _TasksViewState
   void initState() {
     super.initState();
 
-    _controller.addListener(
-      _handleControllerChange,
-    );
+    _controller.addListener(_handleControllerChange);
 
-    WidgetsBinding.instance.addPostFrameCallback(
-      (
-        _,
-      ) {
-        _initialize();
-      },
-    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initialize();
+    });
   }
 
   // ============================================================
   // INITIALIZE
   // ============================================================
 
-  Future<
-    void
-  >
-  _initialize() async {
+  Future<void> _initialize() async {
     if (!mounted) {
       return;
     }
 
-    if (_controller.isLoading ||
-        _controller.isInitialized) {
+    if (_controller.isLoading || _controller.isInitialized) {
       return;
     }
 
     final currentUserId = _controller.currentUserId?.trim();
 
-    if (currentUserId ==
-            null ||
-        currentUserId.isEmpty) {
+    if (currentUserId == null || currentUserId.isEmpty) {
       return;
     }
 
@@ -172,9 +136,7 @@ class _TasksViewState
       return;
     }
 
-    setState(
-      () {},
-    );
+    setState(() {});
   }
 
   // ============================================================
@@ -183,9 +145,7 @@ class _TasksViewState
 
   @override
   void dispose() {
-    _controller.removeListener(
-      _handleControllerChange,
-    );
+    _controller.removeListener(_handleControllerChange);
 
     super.dispose();
   }
@@ -195,13 +155,9 @@ class _TasksViewState
   // ============================================================
 
   @override
-  Widget build(
-    BuildContext context,
-  ) {
+  Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(
-        0xFF0B0B0F,
-      ),
+      backgroundColor: const Color(0xFF0B0B0F),
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Colors.transparent,
@@ -217,23 +173,15 @@ class _TasksViewState
                 fontWeight: FontWeight.w700,
               ),
             ),
-            SizedBox(
-              height: 2,
-            ),
+            SizedBox(height: 2),
             Text(
               'Contribuições do projeto',
-              style: TextStyle(
-                color: Colors.white38,
-                fontSize: 10,
-              ),
+              style: TextStyle(color: Colors.white38, fontSize: 10),
             ),
           ],
         ),
       ),
-      body: SafeArea(
-        top: false,
-        child: _buildBody(),
-      ),
+      body: SafeArea(top: false, child: _buildBody()),
     );
   }
 
@@ -242,113 +190,87 @@ class _TasksViewState
   // ============================================================
 
   Widget _buildBody() {
-    if (_controller.isLoading &&
-        !_controller.isInitialized) {
+    if (_controller.isLoading && !_controller.isInitialized) {
       return _buildLoading();
     }
 
-    if (_controller.hasError &&
-        !_controller.isInitialized) {
+    if (_controller.hasError && !_controller.isInitialized) {
       return _buildError();
     }
 
     return RefreshIndicator(
       onRefresh: _controller.refresh,
       child: LayoutBuilder(
-        builder:
-            (
-              context,
-              constraints,
-            ) {
-              return SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(
-                  16,
-                  8,
-                  16,
-                  32,
-                ),
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(
-                      maxWidth: 850,
+        builder: (context, constraints) {
+          return SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 850),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // ======================================
+                    // SUMMARY
+                    // ======================================
+                    _buildSummary(),
+
+                    const SizedBox(height: 16),
+
+                    // ======================================
+                    // NEXT ACTION
+                    // ======================================
+                    _buildNextAction(),
+
+                    const SizedBox(height: 26),
+
+                    // ======================================
+                    // PRODUCTION FLOW
+                    // ======================================
+                    _buildSectionHeader(
+                      title: 'Produção',
+                      subtitle:
+                          'Responsabilidades, validações e entregas de cada participante.',
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // ======================================
-                        // SUMMARY
-                        // ======================================
-                        _buildSummary(),
 
-                        const SizedBox(
-                          height: 16,
-                        ),
+                    const SizedBox(height: 14),
 
-                        // ======================================
-                        // NEXT ACTION
-                        // ======================================
-                        _buildNextAction(),
+                    _buildProductionFlow(),
 
-                        const SizedBox(
-                          height: 26,
-                        ),
+                    const SizedBox(height: 26),
 
-                        // ======================================
-                        // PRODUCTION FLOW
-                        // ======================================
-                        _buildSectionHeader(
-                          title: 'Produção',
-                          subtitle: 'Responsabilidades, validações e entregas de cada participante.',
-                        ),
-
-                        const SizedBox(
-                          height: 14,
-                        ),
-
-                        _buildProductionFlow(),
-
-                        const SizedBox(
-                          height: 26,
-                        ),
-
-                        // ======================================
-                        // MILESTONES
-                        // ======================================
-                        _buildSectionHeader(
-                          title: 'Marcos da colaboração',
-                          subtitle: 'Etapas coletivas preservadas pelo projeto.',
-                        ),
-
-                        const SizedBox(
-                          height: 14,
-                        ),
-
-                        _buildMilestones(),
-
-                        const SizedBox(
-                          height: 26,
-                        ),
-
-                        // ======================================
-                        // RECORD
-                        // ======================================
-                        _buildSectionHeader(
-                          title: 'Registro da colaboração',
-                          subtitle: 'Histórico das ações relevantes do projeto.',
-                        ),
-
-                        const SizedBox(
-                          height: 14,
-                        ),
-
-                        _buildProjectRecord(),
-                      ],
+                    // ======================================
+                    // MILESTONES
+                    // ======================================
+                    _buildSectionHeader(
+                      title: 'Marcos da colaboração',
+                      subtitle: 'Etapas coletivas preservadas pelo projeto.',
                     ),
-                  ),
+
+                    const SizedBox(height: 14),
+
+                    _buildMilestones(),
+
+                    const SizedBox(height: 26),
+
+                    // ======================================
+                    // RECORD
+                    // ======================================
+                    _buildSectionHeader(
+                      title: 'Registro da colaboração',
+                      subtitle: 'Histórico das ações relevantes do projeto.',
+                    ),
+
+                    const SizedBox(height: 14),
+
+                    _buildProjectRecord(),
+                  ],
                 ),
-              );
-            },
+              ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -368,21 +290,11 @@ class _TasksViewState
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(
-        18,
-      ),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: const Color(
-          0xFF15151B,
-        ),
-        borderRadius: BorderRadius.circular(
-          18,
-        ),
-        border: Border.all(
-          color: Colors.white.withValues(
-            alpha: 0.06,
-          ),
-        ),
+        color: const Color(0xFF15151B),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
       ),
       child: Column(
         children: [
@@ -392,28 +304,17 @@ class _TasksViewState
                 width: 42,
                 height: 42,
                 decoration: BoxDecoration(
-                  color:
-                      const Color(
-                        0xFFE100FF,
-                      ).withValues(
-                        alpha: 0.10,
-                      ),
-                  borderRadius: BorderRadius.circular(
-                    13,
-                  ),
+                  color: const Color(0xFFE100FF).withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(13),
                 ),
                 child: const Icon(
                   Icons.account_tree_outlined,
-                  color: Color(
-                    0xFFE100FF,
-                  ),
+                  color: Color(0xFFE100FF),
                   size: 21,
                 ),
               ),
 
-              const SizedBox(
-                width: 12,
-              ),
+              const SizedBox(width: 12),
 
               const Expanded(
                 child: Column(
@@ -427,15 +328,10 @@ class _TasksViewState
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                    SizedBox(
-                      height: 3,
-                    ),
+                    SizedBox(height: 3),
                     Text(
                       'Acompanhe as contribuições até a finalização.',
-                      style: TextStyle(
-                        color: Colors.white38,
-                        fontSize: 10,
-                      ),
+                      style: TextStyle(color: Colors.white38, fontSize: 10),
                     ),
                   ],
                 ),
@@ -444,9 +340,7 @@ class _TasksViewState
               Text(
                 '${(progress * 100).round()}%',
                 style: const TextStyle(
-                  color: Color(
-                    0xFFE100FF,
-                  ),
+                  color: Color(0xFFE100FF),
                   fontSize: 20,
                   fontWeight: FontWeight.w800,
                 ),
@@ -454,29 +348,19 @@ class _TasksViewState
             ],
           ),
 
-          const SizedBox(
-            height: 18,
-          ),
+          const SizedBox(height: 18),
 
           ClipRRect(
-            borderRadius: BorderRadius.circular(
-              20,
-            ),
+            borderRadius: BorderRadius.circular(20),
             child: LinearProgressIndicator(
               value: progress,
               minHeight: 6,
-              backgroundColor: Colors.white.withValues(
-                alpha: 0.05,
-              ),
-              color: const Color(
-                0xFFE100FF,
-              ),
+              backgroundColor: Colors.white.withValues(alpha: 0.05),
+              color: const Color(0xFFE100FF),
             ),
           ),
 
-          const SizedBox(
-            height: 15,
-          ),
+          const SizedBox(height: 15),
 
           Row(
             children: [
@@ -527,14 +411,10 @@ class _TasksViewState
 
       allCompleted: _controller.isWorkflowCompleted,
 
-      onOpen:
-          contribution ==
-              null
+      onOpen: contribution == null
           ? null
           : () {
-              _openContribution(
-                contribution,
-              );
+              _openContribution(contribution);
             },
     );
   }
@@ -559,141 +439,120 @@ class _TasksViewState
   // FLOW ITEMS
   // ============================================================
 
-  List<
-    ProductionFlowItem
-  >
-  _buildFlowItems() {
+  List<ProductionFlowItem> _buildFlowItems() {
     final currentUserId = _controller.currentUserId?.trim();
 
-    return _controller.members.map(
-      (
-        member,
-      ) {
-        // ======================================================
-        // CONTRIBUTION
-        // ======================================================
+    return _controller.members.map((member) {
+      // ======================================================
+      // CONTRIBUTION
+      // ======================================================
 
-        final contribution = _controller.contributionForUser(
-          member.userId,
-        );
+      final contribution = _controller.contributionForUser(member.userId);
 
-        // ======================================================
-        // NO CONTRIBUTION
-        // ======================================================
+      // ======================================================
+      // NO CONTRIBUTION
+      // ======================================================
 
-        if (contribution ==
-            null) {
-          return ProductionFlowItem(
-            member: member,
-
-            contribution: null,
-
-            delivery: null,
-
-            approvedCount: 0,
-
-            requiredApprovalCount: _controller.requiredApprovalCountPerContribution,
-
-            currentUserApproved: false,
-
-            canApprove: false,
-
-            canUpload: false,
-
-            contributionPlanApproved: false,
-
-            deadlinePassed: false,
-
-            isApproving: false,
-
-            isUploading: false,
-          );
-        }
-
-        // ======================================================
-        // APPROVAL
-        // ======================================================
-
-        final approvedCount = _controller.approvalCountForContribution(
-          contribution,
-        );
-
-        final currentUserApproved =
-            currentUserId !=
-                null &&
-            currentUserId.isNotEmpty &&
-            _controller.currentUserApprovedContribution(
-              contribution,
-            );
-
-        // ======================================================
-        // DELIVERY
-        // ======================================================
-
-        final delivery = _controller.latestDeliveryForContribution(
-          contribution.id,
-        );
-
-        // ======================================================
-        // PERMISSIONS
-        // ======================================================
-
-        final isCurrentUser =
-            currentUserId !=
-                null &&
-            currentUserId ==
-                member.userId;
-
-        final contributionPlanApproved = _controller.isContributionPlanApproved(
-          contribution,
-        );
-
-        final deadlinePassed = _controller.contributionDeadlinePassed(
-          contribution,
-        );
-
-        final canApprove =
-            contribution.isWaitingApproval &&
-            !contributionPlanApproved &&
-            !currentUserApproved;
-
-        final canUpload =
-            isCurrentUser &&
-            _controller.canCurrentUserUploadContribution(
-              contribution,
-            );
-
+      if (contribution == null) {
         return ProductionFlowItem(
           member: member,
 
-          contribution: contribution,
+          contribution: null,
 
-          delivery: delivery,
+          delivery: null,
 
-          approvedCount: approvedCount,
+          approvedCount: 0,
 
-          requiredApprovalCount: _controller.requiredApprovalCountPerContribution,
+          requiredApprovalCount:
+              _controller.requiredApprovalCountPerContribution,
 
-          currentUserApproved: currentUserApproved,
+          currentUserApproved: false,
 
-          canApprove: canApprove,
+          canApprove: false,
 
-          canUpload: canUpload,
+          canUpload: false,
 
-          contributionPlanApproved: contributionPlanApproved,
+          contributionPlanApproved: false,
 
-          deadlinePassed: deadlinePassed,
+          deadlinePassed: false,
 
-          isApproving: _approvingContributionIds.contains(
-            contribution.id,
-          ),
+          isApproving: false,
 
-          isUploading: _uploadingContributionIds.contains(
-            contribution.id,
-          ),
+          isUploading: false,
         );
-      },
-    ).toList();
+      }
+
+      // ======================================================
+      // APPROVAL
+      // ======================================================
+
+      final approvedCount = _controller.approvalCountForContribution(
+        contribution,
+      );
+
+      final currentUserApproved =
+          currentUserId != null &&
+          currentUserId.isNotEmpty &&
+          _controller.currentUserApprovedContribution(contribution);
+
+      // ======================================================
+      // DELIVERY
+      // ======================================================
+
+      final delivery = _controller.latestDeliveryForContribution(
+        contribution.id,
+      );
+
+      // ======================================================
+      // PERMISSIONS
+      // ======================================================
+
+      final isCurrentUser =
+          currentUserId != null && currentUserId == member.userId;
+
+      final contributionPlanApproved = _controller.isContributionPlanApproved(
+        contribution,
+      );
+
+      final deadlinePassed = _controller.contributionDeadlinePassed(
+        contribution,
+      );
+
+      final canApprove =
+          contribution.isWaitingApproval &&
+          !contributionPlanApproved &&
+          !currentUserApproved;
+
+      final canUpload =
+          isCurrentUser &&
+          _controller.canCurrentUserUploadContribution(contribution);
+
+      return ProductionFlowItem(
+        member: member,
+
+        contribution: contribution,
+
+        delivery: delivery,
+
+        approvedCount: approvedCount,
+
+        requiredApprovalCount: _controller.requiredApprovalCountPerContribution,
+
+        currentUserApproved: currentUserApproved,
+
+        canApprove: canApprove,
+
+        canUpload: canUpload,
+
+        contributionPlanApproved: contributionPlanApproved,
+
+        deadlinePassed: deadlinePassed,
+
+        isApproving: _approvingContributionIds.contains(contribution.id),
+
+        isUploading: _uploadingContributionIds.contains(contribution.id),
+      );
+    }).toList();
   }
 
   // ============================================================
@@ -713,51 +572,44 @@ class _TasksViewState
 
     final workflowCompleted = _controller.isWorkflowCompleted;
 
-    final milestones =
-        <
-          ProjectMilestoneItem
-        >[
-          ProjectMilestoneItem(
-            id: 'plan',
-            title: 'Plano de contribuição aprovado',
-            subtitle: 'Responsabilidades definidas e confirmadas pelo grupo.',
-            completed: allPlansApproved,
-          ),
+    final milestones = <ProjectMilestoneItem>[
+      ProjectMilestoneItem(
+        id: 'plan',
+        title: 'Plano de contribuição aprovado',
+        subtitle: 'Responsabilidades definidas e confirmadas pelo grupo.',
+        completed: allPlansApproved,
+      ),
 
-          ProjectMilestoneItem(
-            id: 'materials',
-            title: 'Materiais iniciais liberados',
-            subtitle: 'O plano foi aprovado e a fase de entregas foi liberada.',
-            completed: materialsReleased,
-          ),
+      ProjectMilestoneItem(
+        id: 'materials',
+        title: 'Materiais iniciais liberados',
+        subtitle: 'O plano foi aprovado e a fase de entregas foi liberada.',
+        completed: materialsReleased,
+      ),
 
-          ProjectMilestoneItem(
-            id: 'deliveries',
-            title: 'Contribuições entregues',
-            subtitle: 'Todos os participantes enviaram suas partes.',
-            completed: allDelivered,
-          ),
+      ProjectMilestoneItem(
+        id: 'deliveries',
+        title: 'Contribuições entregues',
+        subtitle: 'Todos os participantes enviaram suas partes.',
+        completed: allDelivered,
+      ),
 
-          ProjectMilestoneItem(
-            id: 'validation',
-            title: 'Entregas validadas',
-            subtitle: 'As contribuições foram confirmadas pela equipe.',
-            completed: allValidated,
-          ),
+      ProjectMilestoneItem(
+        id: 'validation',
+        title: 'Entregas validadas',
+        subtitle: 'As contribuições foram confirmadas pela equipe.',
+        completed: allValidated,
+      ),
 
-          ProjectMilestoneItem(
-            id: 'finalization',
-            title: 'Obra pronta para finalização',
-            subtitle: 'Todas as etapas foram concluídas.',
-            completed:
-                workflowCompleted &&
-                contributions.isNotEmpty,
-          ),
-        ];
+      ProjectMilestoneItem(
+        id: 'finalization',
+        title: 'Obra pronta para finalização',
+        subtitle: 'Todas as etapas foram concluídas.',
+        completed: workflowCompleted && contributions.isNotEmpty,
+      ),
+    ];
 
-    return ProjectMilestonesWidget(
-      milestones: milestones,
-    );
+    return ProjectMilestonesWidget(milestones: milestones);
   }
 
   // ============================================================
@@ -767,23 +619,19 @@ class _TasksViewState
   Widget _buildProjectRecord() {
     final events = _controller.recordEvents;
 
-    final integrityValid = events.every(
-      (
-        event,
-      ) {
-        // Enquanto um evento ainda não possuir hashes,
-        // não declaramos falha de integridade.
-        //
-        // A verificação criptográfica completa será feita pelo
-        // ContributionIntegrityService em uma próxima etapa.
+    final integrityValid = events.every((event) {
+      // Enquanto um evento ainda não possuir hashes,
+      // não declaramos falha de integridade.
+      //
+      // A verificação criptográfica completa será feita pelo
+      // ContributionIntegrityService em uma próxima etapa.
 
-        if (!event.hasEventHash) {
-          return true;
-        }
+      if (!event.hasEventHash) {
+        return true;
+      }
 
-        return event.hasIntegrityRecord;
-      },
-    );
+      return event.hasIntegrityRecord;
+    });
 
     return ProjectRecordWidget(
       events: events,
@@ -812,16 +660,11 @@ class _TasksViewState
           ),
         ),
 
-        const SizedBox(
-          height: 3,
-        ),
+        const SizedBox(height: 3),
 
         Text(
           subtitle,
-          style: const TextStyle(
-            color: Colors.white38,
-            fontSize: 10,
-          ),
+          style: const TextStyle(color: Colors.white38, fontSize: 10),
         ),
       ],
     );
@@ -831,10 +674,7 @@ class _TasksViewState
   // SUMMARY VALUE
   // ============================================================
 
-  Widget _buildSummaryValue({
-    required String value,
-    required String label,
-  }) {
+  Widget _buildSummaryValue({required String value, required String label}) {
     return Column(
       children: [
         Text(
@@ -846,17 +686,9 @@ class _TasksViewState
           ),
         ),
 
-        const SizedBox(
-          height: 2,
-        ),
+        const SizedBox(height: 2),
 
-        Text(
-          label,
-          style: const TextStyle(
-            color: Colors.white30,
-            fontSize: 8,
-          ),
-        ),
+        Text(label, style: const TextStyle(color: Colors.white30, fontSize: 8)),
       ],
     );
   }
@@ -867,11 +699,7 @@ class _TasksViewState
 
   Widget _buildLoading() {
     return const Center(
-      child: CircularProgressIndicator(
-        color: Color(
-          0xFFE100FF,
-        ),
-      ),
+      child: CircularProgressIndicator(color: Color(0xFFE100FF)),
     );
   }
 
@@ -882,45 +710,27 @@ class _TasksViewState
   Widget _buildError() {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(
-          24,
-        ),
+        padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
-              Icons.error_outline,
-              color: Colors.redAccent,
-              size: 32,
-            ),
+            const Icon(Icons.error_outline, color: Colors.redAccent, size: 32),
 
-            const SizedBox(
-              height: 12,
-            ),
+            const SizedBox(height: 12),
 
             Text(
               _controller.errorMessage ??
                   'Não foi possível carregar o projeto.',
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Colors.white60,
-                fontSize: 11,
-              ),
+              style: const TextStyle(color: Colors.white60, fontSize: 11),
             ),
 
-            const SizedBox(
-              height: 16,
-            ),
+            const SizedBox(height: 16),
 
             OutlinedButton.icon(
               onPressed: _controller.refresh,
-              icon: const Icon(
-                Icons.refresh,
-                size: 16,
-              ),
-              label: const Text(
-                'Tentar novamente',
-              ),
+              icon: const Icon(Icons.refresh, size: 16),
+              label: const Text('Tentar novamente'),
             ),
           ],
         ),
@@ -932,22 +742,14 @@ class _TasksViewState
   // DEFINE CONTRIBUTION
   // ============================================================
 
-  Future<
-    void
-  >
-  _defineContribution(
-    ProjectTaskMemberModel member,
-  ) async {
+  Future<void> _defineContribution(ProjectTaskMemberModel member) async {
     if (_isCreatingContribution) {
       return;
     }
 
     final currentUserId = _controller.currentUserId?.trim();
 
-    if (currentUserId ==
-            null ||
-        currentUserId !=
-            member.userId) {
+    if (currentUserId == null || currentUserId != member.userId) {
       _showMessage(
         'Você só pode definir a sua própria contribuição.',
         error: true,
@@ -961,17 +763,13 @@ class _TasksViewState
       contribution: null,
     );
 
-    if (result ==
-            null ||
-        !mounted) {
+    if (result == null || !mounted) {
       return;
     }
 
-    setState(
-      () {
-        _isCreatingContribution = true;
-      },
-    );
+    setState(() {
+      _isCreatingContribution = true;
+    });
 
     try {
       // ========================================================
@@ -999,33 +797,20 @@ class _TasksViewState
       //
       // ========================================================
 
-      await _controller.submitContributionForApproval(
-        created,
-      );
+      await _controller.submitContributionForApproval(created);
 
       if (!mounted) {
         return;
       }
 
-      _showMessage(
-        'Contribuição enviada para confirmação do grupo.',
-      );
-    } catch (
-      error
-    ) {
-      _showMessage(
-        _actionError(
-          error,
-        ),
-        error: true,
-      );
+      _showMessage('Contribuição enviada para confirmação do grupo.');
+    } catch (error) {
+      _showMessage(_actionError(error), error: true);
     } finally {
       if (mounted) {
-        setState(
-          () {
-            _isCreatingContribution = false;
-          },
-        );
+        setState(() {
+          _isCreatingContribution = false;
+        });
       }
     }
   }
@@ -1034,22 +819,11 @@ class _TasksViewState
   // EDIT CONTRIBUTION
   // ============================================================
 
-  Future<
-    void
-  >
-  _editContribution(
-    ProjectContributionModel contribution,
-  ) async {
-    final member = _controller.findMember(
-      contribution.userId,
-    );
+  Future<void> _editContribution(ProjectContributionModel contribution) async {
+    final member = _controller.findMember(contribution.userId);
 
-    if (member ==
-        null) {
-      _showMessage(
-        'Participante não encontrado.',
-        error: true,
-      );
+    if (member == null) {
+      _showMessage('Participante não encontrado.', error: true);
 
       return;
     }
@@ -1059,9 +833,7 @@ class _TasksViewState
       contribution: contribution,
     );
 
-    if (result ==
-            null ||
-        !mounted) {
+    if (result == null || !mounted) {
       return;
     }
 
@@ -1082,37 +854,22 @@ class _TasksViewState
         title: result.title,
         description: result.description,
         dueAt: result.dueAt,
-        clearDueAt:
-            result.dueAt ==
-            null,
-        version:
-            contribution.version +
-            1,
+        clearDueAt: result.dueAt == null,
+        version: contribution.version + 1,
         status: ProjectContributionStatus.waitingApproval,
         updatedAt: DateTime.now().toUtc(),
         clearLockedAt: true,
       );
 
-      await _controller.updateContribution(
-        updated,
-      );
+      await _controller.updateContribution(updated);
 
       if (!mounted) {
         return;
       }
 
-      _showMessage(
-        'Nova versão enviada para confirmação.',
-      );
-    } catch (
-      error
-    ) {
-      _showMessage(
-        _actionError(
-          error,
-        ),
-        error: true,
-      );
+      _showMessage('Nova versão enviada para confirmação.');
+    } catch (error) {
+      _showMessage(_actionError(error), error: true);
     }
   }
 
@@ -1120,56 +877,32 @@ class _TasksViewState
   // APPROVE CONTRIBUTION
   // ============================================================
 
-  Future<
-    void
-  >
-  _approveContribution(
+  Future<void> _approveContribution(
     ProjectContributionModel contribution,
   ) async {
-    if (_approvingContributionIds.contains(
-      contribution.id,
-    )) {
+    if (_approvingContributionIds.contains(contribution.id)) {
       return;
     }
 
-    setState(
-      () {
-        _approvingContributionIds.add(
-          contribution.id,
-        );
-      },
-    );
+    setState(() {
+      _approvingContributionIds.add(contribution.id);
+    });
 
     try {
-      await _controller.approveContribution(
-        contribution,
-      );
+      await _controller.approveContribution(contribution);
 
       if (!mounted) {
         return;
       }
 
-      _showMessage(
-        'Contribuição confirmada.',
-      );
-    } catch (
-      error
-    ) {
-      _showMessage(
-        _actionError(
-          error,
-        ),
-        error: true,
-      );
+      _showMessage('Contribuição confirmada.');
+    } catch (error) {
+      _showMessage(_actionError(error), error: true);
     } finally {
       if (mounted) {
-        setState(
-          () {
-            _approvingContributionIds.remove(
-              contribution.id,
-            );
-          },
-        );
+        setState(() {
+          _approvingContributionIds.remove(contribution.id);
+        });
       }
     }
   }
@@ -1196,15 +929,8 @@ class _TasksViewState
   //
   // ============================================================
 
-  Future<
-    void
-  >
-  _uploadDelivery(
-    ProjectContributionModel contribution,
-  ) async {
-    if (_uploadingContributionIds.contains(
-      contribution.id,
-    )) {
+  Future<void> _uploadDelivery(ProjectContributionModel contribution) async {
+    if (_uploadingContributionIds.contains(contribution.id)) {
       return;
     }
 
@@ -1212,12 +938,8 @@ class _TasksViewState
     // PERMISSION / DEADLINE
     // ==========================================================
 
-    if (!_controller.canCurrentUserUploadContribution(
-      contribution,
-    )) {
-      if (_controller.contributionDeadlinePassed(
-        contribution,
-      )) {
+    if (!_controller.canCurrentUserUploadContribution(contribution)) {
+      if (_controller.contributionDeadlinePassed(contribution)) {
         _showMessage(
           'O prazo desta contribuição já foi encerrado.',
           error: true,
@@ -1255,9 +977,7 @@ class _TasksViewState
         // - Web.
         withData: true,
       );
-    } catch (
-      error
-    ) {
+    } catch (error) {
       _showMessage(
         'Não foi possível abrir o seletor de arquivos: '
         '${_actionError(error)}',
@@ -1268,9 +988,7 @@ class _TasksViewState
     }
 
     // Usuário cancelou.
-    if (pickerResult ==
-            null ||
-        pickerResult.files.isEmpty) {
+    if (pickerResult == null || pickerResult.files.isEmpty) {
       return;
     }
 
@@ -1278,13 +996,8 @@ class _TasksViewState
 
     final bytes = selectedFile.bytes;
 
-    if (bytes ==
-            null ||
-        bytes.isEmpty) {
-      _showMessage(
-        'Não foi possível ler o arquivo selecionado.',
-        error: true,
-      );
+    if (bytes == null || bytes.isEmpty) {
+      _showMessage('Não foi possível ler o arquivo selecionado.', error: true);
 
       return;
     }
@@ -1299,13 +1012,9 @@ class _TasksViewState
     //
     // ==========================================================
 
-    if (!_controller.canCurrentUserUploadContribution(
-      contribution,
-    )) {
+    if (!_controller.canCurrentUserUploadContribution(contribution)) {
       _showMessage(
-        _controller.contributionDeadlinePassed(
-              contribution,
-            )
+        _controller.contributionDeadlinePassed(contribution)
             ? 'O prazo terminou antes do envio do arquivo.'
             : 'Esta contribuição não está mais liberada para envio.',
         error: true,
@@ -1314,13 +1023,9 @@ class _TasksViewState
       return;
     }
 
-    setState(
-      () {
-        _uploadingContributionIds.add(
-          contribution.id,
-        );
-      },
-    );
+    setState(() {
+      _uploadingContributionIds.add(contribution.id);
+    });
 
     String? uploadedStoragePath;
 
@@ -1329,9 +1034,7 @@ class _TasksViewState
       // MIME TYPE
       // ========================================================
 
-      final mimeType = _resolveMimeType(
-        selectedFile.name,
-      );
+      final mimeType = _resolveMimeType(selectedFile.name);
 
       // ========================================================
       // PHYSICAL UPLOAD
@@ -1391,17 +1094,11 @@ class _TasksViewState
         return;
       }
 
-      _showMessage(
-        'Arquivo enviado com sucesso.',
-      );
+      _showMessage('Arquivo enviado com sucesso.');
 
       // Abre os detalhes da entrega recém-criada.
-      await _openDelivery(
-        delivery,
-      );
-    } catch (
-      error
-    ) {
+      await _openDelivery(delivery);
+    } catch (error) {
       // ========================================================
       // ROLLBACK
       // ========================================================
@@ -1412,12 +1109,9 @@ class _TasksViewState
       //
       // ========================================================
 
-      if (uploadedStoragePath !=
-              null &&
+      if (uploadedStoragePath != null &&
           uploadedStoragePath.trim().isNotEmpty) {
-        await _uploadService.safeRemove(
-          storagePath: uploadedStoragePath,
-        );
+        await _uploadService.safeRemove(storagePath: uploadedStoragePath);
       }
 
       if (!mounted) {
@@ -1431,13 +1125,9 @@ class _TasksViewState
       );
     } finally {
       if (mounted) {
-        setState(
-          () {
-            _uploadingContributionIds.remove(
-              contribution.id,
-            );
-          },
-        );
+        setState(() {
+          _uploadingContributionIds.remove(contribution.id);
+        });
       }
     }
   }
@@ -1454,27 +1144,16 @@ class _TasksViewState
   //
   // ============================================================
 
-  String? _resolveMimeType(
-    String fileName,
-  ) {
+  String? _resolveMimeType(String fileName) {
     final normalized = fileName.trim().toLowerCase();
 
-    final dotIndex = normalized.lastIndexOf(
-      '.',
-    );
+    final dotIndex = normalized.lastIndexOf('.');
 
-    if (dotIndex <
-            0 ||
-        dotIndex ==
-            normalized.length -
-                1) {
+    if (dotIndex < 0 || dotIndex == normalized.length - 1) {
       return null;
     }
 
-    final extension = normalized.substring(
-      dotIndex +
-          1,
-    );
+    final extension = normalized.substring(dotIndex + 1);
 
     switch (extension) {
       // ========================================================
@@ -1571,41 +1250,26 @@ class _TasksViewState
   // OPEN DELIVERY
   // ============================================================
 
-  Future<
-    void
-  >
-  _openDelivery(
-    ContributionDeliveryModel delivery,
-  ) async {
+  Future<void> _openDelivery(ContributionDeliveryModel delivery) async {
     if (!mounted) {
       return;
     }
 
-    await showModalBottomSheet<
-      void
-    >(
+    await showModalBottomSheet<void>(
       context: context,
-      backgroundColor: const Color(
-        0xFF15151B,
-      ),
+      backgroundColor: const Color(0xFF15151B),
       showDragHandle: true,
       isScrollControlled: true,
-      builder:
-          (
-            context,
-          ) {
-            final isProcessing = _validatingDeliveryIds.contains(
-              delivery.id,
-            );
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            final isProcessing = _validatingDeliveryIds.contains(delivery.id);
+
+            final isDownloading = _downloadingDeliveryIds.contains(delivery.id);
 
             return SafeArea(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  20,
-                  4,
-                  20,
-                  28,
-                ),
+                padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1619,9 +1283,7 @@ class _TasksViewState
                       ),
                     ),
 
-                    const SizedBox(
-                      height: 16,
-                    ),
+                    const SizedBox(height: 16),
 
                     _buildDeliveryDetail(
                       icon: Icons.insert_drive_file_outlined,
@@ -1646,9 +1308,7 @@ class _TasksViewState
                       _buildDeliveryDetail(
                         icon: Icons.fingerprint,
                         label: 'SHA-256',
-                        value:
-                            delivery.sha256 ??
-                            '',
+                        value: delivery.sha256 ?? '',
                         monospace: true,
                       ),
 
@@ -1658,17 +1318,67 @@ class _TasksViewState
                       value: delivery.statusDatabaseValue,
                     ),
 
-                    if (!delivery.isValidated) ...[
-                      const SizedBox(
-                        height: 18,
+                    // ==================================================
+                    // DOWNLOAD
+                    // ==================================================
+                    const SizedBox(height: 8),
+
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: isDownloading
+                            ? null
+                            : () async {
+                                setSheetState(() {
+                                  _downloadingDeliveryIds.add(delivery.id);
+                                });
+
+                                try {
+                                  final saved = await _downloadDelivery(
+                                    delivery,
+                                  );
+
+                                  if (!context.mounted) {
+                                    return;
+                                  }
+
+                                  if (saved) {
+                                    Navigator.of(context).pop();
+                                  }
+                                } finally {
+                                  _downloadingDeliveryIds.remove(delivery.id);
+
+                                  if (context.mounted) {
+                                    setSheetState(() {});
+                                  }
+                                }
+                              },
+                        icon: isDownloading
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 1.6,
+                                ),
+                              )
+                            : const Icon(Icons.download_outlined, size: 17),
+                        label: Text(
+                          isDownloading ? 'BAIXANDO...' : 'BAIXAR ARQUIVO',
+                          style: const TextStyle(
+                            fontSize: 8,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
                       ),
+                    ),
+
+                    if (!delivery.isValidated) ...[
+                      const SizedBox(height: 12),
 
                       if (isProcessing)
                         const Center(
                           child: CircularProgressIndicator(
-                            color: Color(
-                              0xFFE100FF,
-                            ),
+                            color: Color(0xFFE100FF),
                           ),
                         )
                       else
@@ -1677,41 +1387,26 @@ class _TasksViewState
                             Expanded(
                               child: OutlinedButton.icon(
                                 onPressed: () {
-                                  Navigator.of(
-                                    context,
-                                  ).pop();
+                                  Navigator.of(context).pop();
 
-                                  _rejectDelivery(
-                                    delivery,
-                                  );
+                                  _rejectDelivery(delivery);
                                 },
-                                icon: const Icon(
-                                  Icons.close,
-                                  size: 16,
-                                ),
+                                icon: const Icon(Icons.close, size: 16),
                                 label: const Text(
                                   'SOLICITAR REVISÃO',
-                                  style: TextStyle(
-                                    fontSize: 8,
-                                  ),
+                                  style: TextStyle(fontSize: 8),
                                 ),
                               ),
                             ),
 
-                            const SizedBox(
-                              width: 8,
-                            ),
+                            const SizedBox(width: 8),
 
                             Expanded(
                               child: FilledButton.icon(
                                 onPressed: () {
-                                  Navigator.of(
-                                    context,
-                                  ).pop();
+                                  Navigator.of(context).pop();
 
-                                  _validateDelivery(
-                                    delivery,
-                                  );
+                                  _validateDelivery(delivery);
                                 },
                                 style: FilledButton.styleFrom(
                                   backgroundColor: Colors.greenAccent,
@@ -1738,63 +1433,146 @@ class _TasksViewState
               ),
             );
           },
+        );
+      },
     );
+  }
+
+  // ============================================================
+  // DOWNLOAD DELIVERY
+  // ============================================================
+  //
+  // Fluxo:
+  //
+  // 1. baixa do bucket privado;
+  // 2. valida SHA-256;
+  // 3. abre o seletor de destino;
+  // 4. grava os bytes pelo FilePicker;
+  // 5. informa sucesso.
+  //
+  // O bucket continua privado e a policy SELECT do Storage
+  // continua sendo a fonte de autorização.
+  //
+  // ============================================================
+
+  Future<bool> _downloadDelivery(ContributionDeliveryModel delivery) async {
+    if (_downloadingDeliveryIds.contains(delivery.id) && !delivery.hasHash) {
+      return false;
+    }
+
+    final storagePath = delivery.storagePath.trim();
+
+    if (storagePath.isEmpty) {
+      _showMessage('O caminho do arquivo não está disponível.', error: true);
+
+      return false;
+    }
+
+    final expectedSha256 = delivery.sha256?.trim() ?? '';
+
+    if (expectedSha256.isEmpty) {
+      _showMessage(
+        'Não é possível baixar com segurança porque esta entrega não possui SHA-256 registrado.',
+        error: true,
+      );
+
+      return false;
+    }
+
+    try {
+      // ========================================================
+      // DOWNLOAD + INTEGRITY
+      // ========================================================
+
+      final result = await _uploadService.downloadVerified(
+        storagePath: storagePath,
+        fileName: delivery.fileName,
+        expectedSha256: expectedSha256,
+        mimeType: delivery.mimeType,
+      );
+
+      if (!result.isReadyToSave) {
+        throw StateError('O arquivo baixado não está pronto para ser salvo.');
+      }
+
+      // ========================================================
+      // SAVE FILE
+      // ========================================================
+      //
+      // O FilePicker recebe os bytes diretamente. Isso evita
+      // acesso direto ao filesystem dentro desta View e mantém o
+      // fluxo compatível com as plataformas suportadas pelo
+      // plugin.
+      //
+      // ========================================================
+
+      final savedPath = await FilePicker.platform.saveFile(
+        dialogTitle: 'Salvar arquivo da contribuição',
+        fileName: result.fileName,
+        bytes: result.bytes,
+      );
+
+      // Usuário cancelou o diálogo.
+      if (savedPath == null || savedPath.trim().isEmpty) {
+        return false;
+      }
+
+      if (!mounted) {
+        return true;
+      }
+
+      _showMessage('Arquivo baixado e verificado com sucesso.');
+
+      debugPrint(
+        '[PROJECT TASKS] '
+        'Arquivo salvo em: '
+        '$savedPath',
+      );
+
+      return true;
+    } catch (error) {
+      if (!mounted) {
+        return false;
+      }
+
+      _showMessage(
+        'Não foi possível baixar o arquivo: '
+        '${_actionError(error)}',
+        error: true,
+      );
+
+      return false;
+    }
   }
 
   // ============================================================
   // VALIDATE DELIVERY
   // ============================================================
 
-  Future<
-    void
-  >
-  _validateDelivery(
-    ContributionDeliveryModel delivery,
-  ) async {
-    if (_validatingDeliveryIds.contains(
-      delivery.id,
-    )) {
+  Future<void> _validateDelivery(ContributionDeliveryModel delivery) async {
+    if (_validatingDeliveryIds.contains(delivery.id)) {
       return;
     }
 
-    setState(
-      () {
-        _validatingDeliveryIds.add(
-          delivery.id,
-        );
-      },
-    );
+    setState(() {
+      _validatingDeliveryIds.add(delivery.id);
+    });
 
     try {
-      await _controller.validateDelivery(
-        delivery,
-      );
+      await _controller.validateDelivery(delivery);
 
       if (!mounted) {
         return;
       }
 
-      _showMessage(
-        'Entrega validada.',
-      );
-    } catch (
-      error
-    ) {
-      _showMessage(
-        _actionError(
-          error,
-        ),
-        error: true,
-      );
+      _showMessage('Entrega validada.');
+    } catch (error) {
+      _showMessage(_actionError(error), error: true);
     } finally {
       if (mounted) {
-        setState(
-          () {
-            _validatingDeliveryIds.remove(
-              delivery.id,
-            );
-          },
-        );
+        setState(() {
+          _validatingDeliveryIds.remove(delivery.id);
+        });
       }
     }
   }
@@ -1803,56 +1581,30 @@ class _TasksViewState
   // REJECT DELIVERY
   // ============================================================
 
-  Future<
-    void
-  >
-  _rejectDelivery(
-    ContributionDeliveryModel delivery,
-  ) async {
-    if (_validatingDeliveryIds.contains(
-      delivery.id,
-    )) {
+  Future<void> _rejectDelivery(ContributionDeliveryModel delivery) async {
+    if (_validatingDeliveryIds.contains(delivery.id)) {
       return;
     }
 
-    setState(
-      () {
-        _validatingDeliveryIds.add(
-          delivery.id,
-        );
-      },
-    );
+    setState(() {
+      _validatingDeliveryIds.add(delivery.id);
+    });
 
     try {
-      await _controller.rejectDelivery(
-        delivery,
-      );
+      await _controller.rejectDelivery(delivery);
 
       if (!mounted) {
         return;
       }
 
-      _showMessage(
-        'Entrega marcada para revisão.',
-      );
-    } catch (
-      error
-    ) {
-      _showMessage(
-        _actionError(
-          error,
-        ),
-        error: true,
-      );
+      _showMessage('Entrega marcada para revisão.');
+    } catch (error) {
+      _showMessage(_actionError(error), error: true);
     } finally {
       if (mounted) {
-        setState(
-          () {
-            _validatingDeliveryIds.remove(
-              delivery.id,
-            );
-          },
-        );
+        setState(() {
+          _validatingDeliveryIds.remove(delivery.id);
+        });
       }
     }
   }
@@ -1861,167 +1613,114 @@ class _TasksViewState
   // OPEN CONTRIBUTION
   // ============================================================
 
-  Future<
-    void
-  >
-  _openContribution(
-    ProjectContributionModel contribution,
-  ) async {
-    final member = _controller.findMember(
-      contribution.userId,
-    );
+  Future<void> _openContribution(ProjectContributionModel contribution) async {
+    final member = _controller.findMember(contribution.userId);
 
-    if (member ==
-        null) {
+    if (member == null) {
       return;
     }
 
     final currentUserId = _controller.currentUserId?.trim();
 
     final isOwner =
-        currentUserId !=
-            null &&
-        currentUserId ==
-            contribution.userId;
+        currentUserId != null && currentUserId == contribution.userId;
 
-    await showModalBottomSheet<
-      void
-    >(
+    await showModalBottomSheet<void>(
       context: context,
-      backgroundColor: const Color(
-        0xFF15151B,
-      ),
+      backgroundColor: const Color(0xFF15151B),
       showDragHandle: true,
-      builder:
-          (
-            context,
-          ) {
-            return SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  20,
-                  4,
-                  20,
-                  28,
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  contribution.title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      contribution.title,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
 
-                    const SizedBox(
-                      height: 5,
-                    ),
+                const SizedBox(height: 5),
 
-                    Text(
-                      '${member.resolvedDisplayName} • '
-                      '${member.resolvedProfessionalRole}',
-                      style: const TextStyle(
-                        color: Colors.white38,
-                        fontSize: 10,
-                      ),
-                    ),
-
-                    if (contribution.description.trim().isNotEmpty) ...[
-                      const SizedBox(
-                        height: 16,
-                      ),
-                      Text(
-                        contribution.description,
-                        style: const TextStyle(
-                          color: Colors.white60,
-                          fontSize: 11,
-                          height: 1.5,
-                        ),
-                      ),
-                    ],
-
-                    const SizedBox(
-                      height: 16,
-                    ),
-
-                    _buildDeliveryDetail(
-                      icon: Icons.history,
-                      label: 'Versão',
-                      value: '${contribution.version}',
-                    ),
-
-                    _buildDeliveryDetail(
-                      icon: Icons.info_outline,
-                      label: 'Status',
-                      value:
-                          _controller.isContributionPlanApproved(
-                                contribution,
-                              ) &&
-                              contribution.isWaitingApproval
-                          ? 'Validado'
-                          : contribution.statusDatabaseValue,
-                    ),
-
-                    if (contribution.dueAt !=
-                        null)
-                      _buildDeliveryDetail(
-                        icon: Icons.event_outlined,
-                        label: 'Prazo',
-                        value: _formatDate(
-                          contribution.dueAt!,
-                        ),
-                      ),
-
-                    if (isOwner &&
-                        _controller.isContributionPlanApproved(
-                          contribution,
-                        ) &&
-                        !_controller.contributionDeadlinePassed(
-                          contribution,
-                        ) &&
-                        !contribution.isInProgress &&
-                        !contribution.isDelivered &&
-                        !contribution.isValidated) ...[
-                      const SizedBox(
-                        height: 18,
-                      ),
-
-                      SizedBox(
-                        width: double.infinity,
-                        child: FilledButton.icon(
-                          onPressed: () {
-                            Navigator.of(
-                              context,
-                            ).pop();
-
-                            _startContribution(
-                              contribution,
-                            );
-                          },
-                          style: FilledButton.styleFrom(
-                            backgroundColor: const Color(
-                              0xFFE100FF,
-                            ),
-                            foregroundColor: Colors.black,
-                          ),
-                          icon: const Icon(
-                            Icons.play_arrow_rounded,
-                          ),
-                          label: const Text(
-                            'INICIAR CONTRIBUIÇÃO',
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
+                Text(
+                  '${member.resolvedDisplayName} • '
+                  '${member.resolvedProfessionalRole}',
+                  style: const TextStyle(color: Colors.white38, fontSize: 10),
                 ),
-              ),
-            );
-          },
+
+                if (contribution.description.trim().isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  Text(
+                    contribution.description,
+                    style: const TextStyle(
+                      color: Colors.white60,
+                      fontSize: 11,
+                      height: 1.5,
+                    ),
+                  ),
+                ],
+
+                const SizedBox(height: 16),
+
+                _buildDeliveryDetail(
+                  icon: Icons.history,
+                  label: 'Versão',
+                  value: '${contribution.version}',
+                ),
+
+                _buildDeliveryDetail(
+                  icon: Icons.info_outline,
+                  label: 'Status',
+                  value:
+                      _controller.isContributionPlanApproved(contribution) &&
+                          contribution.isWaitingApproval
+                      ? 'Validado'
+                      : contribution.statusDatabaseValue,
+                ),
+
+                if (contribution.dueAt != null)
+                  _buildDeliveryDetail(
+                    icon: Icons.event_outlined,
+                    label: 'Prazo',
+                    value: _formatDate(contribution.dueAt!),
+                  ),
+
+                if (isOwner &&
+                    _controller.isContributionPlanApproved(contribution) &&
+                    !_controller.contributionDeadlinePassed(contribution) &&
+                    !contribution.isInProgress &&
+                    !contribution.isDelivered &&
+                    !contribution.isValidated) ...[
+                  const SizedBox(height: 18),
+
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+
+                        _startContribution(contribution);
+                      },
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFFE100FF),
+                        foregroundColor: Colors.black,
+                      ),
+                      icon: const Icon(Icons.play_arrow_rounded),
+                      label: const Text('INICIAR CONTRIBUIÇÃO'),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -2029,33 +1728,17 @@ class _TasksViewState
   // START CONTRIBUTION
   // ============================================================
 
-  Future<
-    void
-  >
-  _startContribution(
-    ProjectContributionModel contribution,
-  ) async {
+  Future<void> _startContribution(ProjectContributionModel contribution) async {
     try {
-      await _controller.startContribution(
-        contribution,
-      );
+      await _controller.startContribution(contribution);
 
       if (!mounted) {
         return;
       }
 
-      _showMessage(
-        'Contribuição iniciada.',
-      );
-    } catch (
-      error
-    ) {
-      _showMessage(
-        _actionError(
-          error,
-        ),
-        error: true,
-      );
+      _showMessage('Contribuição iniciada.');
+    } catch (error) {
+      _showMessage(_actionError(error), error: true);
     }
   }
 
@@ -2063,323 +1746,249 @@ class _TasksViewState
   // CONTRIBUTION EDITOR
   // ============================================================
 
-  Future<
-    _ContributionEditorResult?
-  >
-  _showContributionEditor({
+  Future<_ContributionEditorResult?> _showContributionEditor({
     required ProjectTaskMemberModel member,
     required ProjectContributionModel? contribution,
   }) async {
     final titleController = TextEditingController(
-      text:
-          contribution?.title ??
-          '',
+      text: contribution?.title ?? '',
     );
 
     final descriptionController = TextEditingController(
-      text:
-          contribution?.description ??
-          '',
+      text: contribution?.description ?? '',
     );
 
     DateTime? selectedDueAt = contribution?.dueAt;
 
-    final result =
-        await showDialog<
-          _ContributionEditorResult
-        >(
-          context: context,
-          barrierDismissible: false,
-          builder:
-              (
-                dialogContext,
-              ) {
-                return StatefulBuilder(
-                  builder:
-                      (
-                        context,
-                        setDialogState,
-                      ) {
-                        return AlertDialog(
-                          backgroundColor: const Color(
-                            0xFF17171D,
-                          ),
-                          title: Text(
-                            contribution ==
-                                    null
-                                ? 'Definir contribuição'
-                                : 'Editar contribuição',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
+    final result = await showDialog<_ContributionEditorResult>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: const Color(0xFF17171D),
+              title: Text(
+                contribution == null
+                    ? 'Definir contribuição'
+                    : 'Editar contribuição',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              content: SingleChildScrollView(
+                child: SizedBox(
+                  width: 440,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        member.resolvedDisplayName,
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+
+                      const SizedBox(height: 3),
+
+                      Text(
+                        member.resolvedProfessionalRole,
+                        style: const TextStyle(
+                          color: Color(0xFFE100FF),
+                          fontSize: 9,
+                        ),
+                      ),
+
+                      const SizedBox(height: 18),
+
+                      TextField(
+                        controller: titleController,
+                        maxLength: 80,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                        ),
+                        decoration: const InputDecoration(
+                          labelText: 'O que você vai realizar?',
+                          hintText: 'Ex: Mixagem e masterização',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+
+                      const SizedBox(height: 10),
+
+                      TextField(
+                        controller: descriptionController,
+                        minLines: 3,
+                        maxLines: 6,
+                        maxLength: 500,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                        ),
+                        decoration: const InputDecoration(
+                          labelText: 'Descreva sua contribuição',
+                          hintText:
+                              'Explique claramente o que você pretende entregar ao projeto.',
+                          alignLabelWithHint: true,
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+
+                      const SizedBox(height: 8),
+
+                      InkWell(
+                        borderRadius: BorderRadius.circular(10),
+                        onTap: () async {
+                          final now = DateTime.now();
+
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: selectedDueAt?.toLocal() ?? now,
+                            firstDate: DateTime(now.year, now.month, now.day),
+                            lastDate: DateTime(now.year + 5),
+                          );
+
+                          if (picked == null) {
+                            return;
+                          }
+
+                          setDialogState(() {
+                            selectedDueAt = DateTime(
+                              picked.year,
+                              picked.month,
+                              picked.day,
+                              23,
+                              59,
+                            ).toUtc();
+                          });
+                        },
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.03),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.07),
                             ),
                           ),
-                          content: SingleChildScrollView(
-                            child: SizedBox(
-                              width: 440,
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    member.resolvedDisplayName,
-                                    style: const TextStyle(
-                                      color: Colors.white70,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-
-                                  const SizedBox(
-                                    height: 3,
-                                  ),
-
-                                  Text(
-                                    member.resolvedProfessionalRole,
-                                    style: const TextStyle(
-                                      color: Color(
-                                        0xFFE100FF,
-                                      ),
-                                      fontSize: 9,
-                                    ),
-                                  ),
-
-                                  const SizedBox(
-                                    height: 18,
-                                  ),
-
-                                  TextField(
-                                    controller: titleController,
-                                    maxLength: 80,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 12,
-                                    ),
-                                    decoration: const InputDecoration(
-                                      labelText: 'O que você vai realizar?',
-                                      hintText: 'Ex: Mixagem e masterização',
-                                      border: OutlineInputBorder(),
-                                    ),
-                                  ),
-
-                                  const SizedBox(
-                                    height: 10,
-                                  ),
-
-                                  TextField(
-                                    controller: descriptionController,
-                                    minLines: 3,
-                                    maxLines: 6,
-                                    maxLength: 500,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 12,
-                                    ),
-                                    decoration: const InputDecoration(
-                                      labelText: 'Descreva sua contribuição',
-                                      hintText: 'Explique claramente o que você pretende entregar ao projeto.',
-                                      alignLabelWithHint: true,
-                                      border: OutlineInputBorder(),
-                                    ),
-                                  ),
-
-                                  const SizedBox(
-                                    height: 8,
-                                  ),
-
-                                  InkWell(
-                                    borderRadius: BorderRadius.circular(
-                                      10,
-                                    ),
-                                    onTap: () async {
-                                      final now = DateTime.now();
-
-                                      final picked = await showDatePicker(
-                                        context: context,
-                                        initialDate:
-                                            selectedDueAt?.toLocal() ??
-                                            now,
-                                        firstDate: DateTime(
-                                          now.year,
-                                          now.month,
-                                          now.day,
-                                        ),
-                                        lastDate: DateTime(
-                                          now.year +
-                                              5,
-                                        ),
-                                      );
-
-                                      if (picked ==
-                                          null) {
-                                        return;
-                                      }
-
-                                      setDialogState(
-                                        () {
-                                          selectedDueAt = DateTime(
-                                            picked.year,
-                                            picked.month,
-                                            picked.day,
-                                            23,
-                                            59,
-                                          ).toUtc();
-                                        },
-                                      );
-                                    },
-                                    child: Container(
-                                      width: double.infinity,
-                                      padding: const EdgeInsets.all(
-                                        12,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white.withValues(
-                                          alpha: 0.03,
-                                        ),
-                                        borderRadius: BorderRadius.circular(
-                                          10,
-                                        ),
-                                        border: Border.all(
-                                          color: Colors.white.withValues(
-                                            alpha: 0.07,
-                                          ),
-                                        ),
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          const Icon(
-                                            Icons.event_outlined,
-                                            color: Colors.white38,
-                                            size: 17,
-                                          ),
-
-                                          const SizedBox(
-                                            width: 8,
-                                          ),
-
-                                          Expanded(
-                                            child: Text(
-                                              selectedDueAt ==
-                                                      null
-                                                  ? 'Definir prazo opcional'
-                                                  : 'Prazo: ${_formatDate(selectedDueAt!)}',
-                                              style: const TextStyle(
-                                                color: Colors.white54,
-                                                fontSize: 10,
-                                              ),
-                                            ),
-                                          ),
-
-                                          if (selectedDueAt !=
-                                              null)
-                                            IconButton(
-                                              onPressed: () {
-                                                setDialogState(
-                                                  () {
-                                                    selectedDueAt = null;
-                                                  },
-                                                );
-                                              },
-                                              icon: const Icon(
-                                                Icons.close,
-                                                color: Colors.white38,
-                                                size: 16,
-                                              ),
-                                            ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.event_outlined,
+                                color: Colors.white38,
+                                size: 17,
                               ),
-                            ),
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () {
-                                Navigator.of(
-                                  dialogContext,
-                                ).pop();
-                              },
-                              child: const Text(
-                                'CANCELAR',
-                              ),
-                            ),
 
-                            FilledButton(
-                              onPressed: () {
-                                final title = titleController.text.trim();
+                              const SizedBox(width: 8),
 
-                                final description = descriptionController.text.trim();
-
-                                if (title.isEmpty) {
-                                  ScaffoldMessenger.of(
-                                      dialogContext,
-                                    )
-                                    ..hideCurrentSnackBar()
-                                    ..showSnackBar(
-                                      const SnackBar(
-                                        behavior: SnackBarBehavior.floating,
-                                        content: Text(
-                                          'Informe o que você vai realizar.',
-                                        ),
-                                      ),
-                                    );
-
-                                  return;
-                                }
-
-                                if (description.isEmpty) {
-                                  ScaffoldMessenger.of(
-                                      dialogContext,
-                                    )
-                                    ..hideCurrentSnackBar()
-                                    ..showSnackBar(
-                                      const SnackBar(
-                                        behavior: SnackBarBehavior.floating,
-                                        content: Text(
-                                          'Descreva sua contribuição.',
-                                        ),
-                                      ),
-                                    );
-
-                                  return;
-                                }
-
-                                Navigator.of(
-                                  dialogContext,
-                                ).pop(
-                                  _ContributionEditorResult(
-                                    title: title,
-                                    description: description,
-                                    dueAt: selectedDueAt,
+                              Expanded(
+                                child: Text(
+                                  selectedDueAt == null
+                                      ? 'Definir prazo opcional'
+                                      : 'Prazo: ${_formatDate(selectedDueAt!)}',
+                                  style: const TextStyle(
+                                    color: Colors.white54,
+                                    fontSize: 10,
                                   ),
-                                );
-                              },
-                              style: FilledButton.styleFrom(
-                                backgroundColor: const Color(
-                                  0xFFE100FF,
-                                ),
-                                foregroundColor: Colors.black,
-                              ),
-                              child: Text(
-                                contribution ==
-                                        null
-                                    ? 'ENVIAR PARA O GRUPO'
-                                    : 'SALVAR NOVA VERSÃO',
-                                style: const TextStyle(
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w800,
                                 ),
                               ),
-                            ),
-                          ],
+
+                              if (selectedDueAt != null)
+                                IconButton(
+                                  onPressed: () {
+                                    setDialogState(() {
+                                      selectedDueAt = null;
+                                    });
+                                  },
+                                  icon: const Icon(
+                                    Icons.close,
+                                    color: Colors.white38,
+                                    size: 16,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(dialogContext).pop();
+                  },
+                  child: const Text('CANCELAR'),
+                ),
+
+                FilledButton(
+                  onPressed: () {
+                    final title = titleController.text.trim();
+
+                    final description = descriptionController.text.trim();
+
+                    if (title.isEmpty) {
+                      ScaffoldMessenger.of(dialogContext)
+                        ..hideCurrentSnackBar()
+                        ..showSnackBar(
+                          const SnackBar(
+                            behavior: SnackBarBehavior.floating,
+                            content: Text('Informe o que você vai realizar.'),
+                          ),
                         );
-                      },
-                );
-              },
+
+                      return;
+                    }
+
+                    if (description.isEmpty) {
+                      ScaffoldMessenger.of(dialogContext)
+                        ..hideCurrentSnackBar()
+                        ..showSnackBar(
+                          const SnackBar(
+                            behavior: SnackBarBehavior.floating,
+                            content: Text('Descreva sua contribuição.'),
+                          ),
+                        );
+
+                      return;
+                    }
+
+                    Navigator.of(dialogContext).pop(
+                      _ContributionEditorResult(
+                        title: title,
+                        description: description,
+                        dueAt: selectedDueAt,
+                      ),
+                    );
+                  },
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFFE100FF),
+                    foregroundColor: Colors.black,
+                  ),
+                  child: Text(
+                    contribution == null
+                        ? 'ENVIAR PARA O GRUPO'
+                        : 'SALVAR NOVA VERSÃO',
+                    style: const TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
         );
+      },
+    );
 
     titleController.dispose();
 
@@ -2395,136 +2004,106 @@ class _TasksViewState
   void _openTechnicalRecord() {
     final events = _controller.recordEvents;
 
-    final latest = events.isEmpty
-        ? null
-        : events.first;
+    final latest = events.isEmpty ? null : events.first;
 
-    showModalBottomSheet<
-      void
-    >(
+    showModalBottomSheet<void>(
       context: context,
-      backgroundColor: const Color(
-        0xFF15151B,
-      ),
+      backgroundColor: const Color(0xFF15151B),
       showDragHandle: true,
-      builder:
-          (
-            context,
-          ) {
-            return SafeArea(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(
-                  20,
-                  4,
-                  20,
-                  28,
+      builder: (context) {
+        return SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Registro técnico',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Registro técnico',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
 
-                    const SizedBox(
-                      height: 5,
-                    ),
+                const SizedBox(height: 5),
 
-                    const Text(
-                      'Informações técnicas da trilha de colaboração.',
-                      style: TextStyle(
-                        color: Colors.white38,
-                        fontSize: 9,
-                      ),
-                    ),
-
-                    const SizedBox(
-                      height: 18,
-                    ),
-
-                    _buildTechnicalValue(
-                      label: 'PROJECT',
-                      value: widget.projectId,
-                    ),
-
-                    _buildTechnicalValue(
-                      label: 'MEMBERS',
-                      value: '${_controller.memberCount}',
-                    ),
-
-                    _buildTechnicalValue(
-                      label: 'CONTRIBUTIONS',
-                      value: '${_controller.contributionCount}',
-                    ),
-
-                    _buildTechnicalValue(
-                      label: 'APPROVALS',
-                      value: '${_controller.approvalCount}',
-                    ),
-
-                    _buildTechnicalValue(
-                      label: 'DELIVERIES',
-                      value: '${_controller.deliveryCount}',
-                    ),
-
-                    _buildTechnicalValue(
-                      label: 'WORKFLOW STAGE',
-                      value: _controller.workflowStage.name,
-                      success: _controller.isWorkflowCompleted,
-                    ),
-
-                    _buildTechnicalValue(
-                      label: 'PLAN APPROVED',
-                      value:
-                          '${_controller.approvedContributionPlanCount}/'
-                          '${_controller.contributionCount}',
-                      success: _controller.allContributionPlansApproved,
-                    ),
-
-                    _buildTechnicalValue(
-                      label: 'EVENTS',
-                      value: '${_controller.recordEventCount}',
-                    ),
-
-                    _buildTechnicalValue(
-                      label: 'LAST EVENT',
-                      value:
-                          latest?.eventDatabaseValue ??
-                          'NONE',
-                    ),
-
-                    _buildTechnicalValue(
-                      label: 'LAST EVENT HASH',
-                      value:
-                          latest?.eventHash ??
-                          'NOT GENERATED',
-                    ),
-
-                    _buildTechnicalValue(
-                      label: 'PREVIOUS EVENT HASH',
-                      value:
-                          latest?.previousEventHash ??
-                          'NONE',
-                    ),
-
-                    _buildTechnicalValue(
-                      label: 'STATUS',
-                      value: events.isEmpty
-                          ? 'AGUARDANDO EVENTOS'
-                          : 'RECORD ACTIVE',
-                      success: events.isNotEmpty,
-                    ),
-                  ],
+                const Text(
+                  'Informações técnicas da trilha de colaboração.',
+                  style: TextStyle(color: Colors.white38, fontSize: 9),
                 ),
-              ),
-            );
-          },
+
+                const SizedBox(height: 18),
+
+                _buildTechnicalValue(label: 'PROJECT', value: widget.projectId),
+
+                _buildTechnicalValue(
+                  label: 'MEMBERS',
+                  value: '${_controller.memberCount}',
+                ),
+
+                _buildTechnicalValue(
+                  label: 'CONTRIBUTIONS',
+                  value: '${_controller.contributionCount}',
+                ),
+
+                _buildTechnicalValue(
+                  label: 'APPROVALS',
+                  value: '${_controller.approvalCount}',
+                ),
+
+                _buildTechnicalValue(
+                  label: 'DELIVERIES',
+                  value: '${_controller.deliveryCount}',
+                ),
+
+                _buildTechnicalValue(
+                  label: 'WORKFLOW STAGE',
+                  value: _controller.workflowStage.name,
+                  success: _controller.isWorkflowCompleted,
+                ),
+
+                _buildTechnicalValue(
+                  label: 'PLAN APPROVED',
+                  value:
+                      '${_controller.approvedContributionPlanCount}/'
+                      '${_controller.contributionCount}',
+                  success: _controller.allContributionPlansApproved,
+                ),
+
+                _buildTechnicalValue(
+                  label: 'EVENTS',
+                  value: '${_controller.recordEventCount}',
+                ),
+
+                _buildTechnicalValue(
+                  label: 'LAST EVENT',
+                  value: latest?.eventDatabaseValue ?? 'NONE',
+                ),
+
+                _buildTechnicalValue(
+                  label: 'LAST EVENT HASH',
+                  value: latest?.eventHash ?? 'NOT GENERATED',
+                ),
+
+                _buildTechnicalValue(
+                  label: 'PREVIOUS EVENT HASH',
+                  value: latest?.previousEventHash ?? 'NONE',
+                ),
+
+                _buildTechnicalValue(
+                  label: 'STATUS',
+                  value: events.isEmpty
+                      ? 'AGUARDANDO EVENTOS'
+                      : 'RECORD ACTIVE',
+                  success: events.isNotEmpty,
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -2538,9 +2117,7 @@ class _TasksViewState
     bool success = false,
   }) {
     return Padding(
-      padding: const EdgeInsets.only(
-        bottom: 12,
-      ),
+      padding: const EdgeInsets.only(bottom: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -2554,16 +2131,12 @@ class _TasksViewState
             ),
           ),
 
-          const SizedBox(
-            height: 4,
-          ),
+          const SizedBox(height: 4),
 
           SelectableText(
             value,
             style: TextStyle(
-              color: success
-                  ? Colors.greenAccent
-                  : Colors.white60,
+              color: success ? Colors.greenAccent : Colors.white60,
               fontSize: 9,
               fontFamily: 'monospace',
             ),
@@ -2584,30 +2157,19 @@ class _TasksViewState
     bool monospace = false,
   }) {
     return Padding(
-      padding: const EdgeInsets.only(
-        bottom: 11,
-      ),
+      padding: const EdgeInsets.only(bottom: 11),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            icon,
-            color: Colors.white38,
-            size: 16,
-          ),
+          Icon(icon, color: Colors.white38, size: 16),
 
-          const SizedBox(
-            width: 8,
-          ),
+          const SizedBox(width: 8),
 
           SizedBox(
             width: 70,
             child: Text(
               label,
-              style: const TextStyle(
-                color: Colors.white30,
-                fontSize: 9,
-              ),
+              style: const TextStyle(color: Colors.white30, fontSize: 9),
             ),
           ),
 
@@ -2617,9 +2179,7 @@ class _TasksViewState
               style: TextStyle(
                 color: Colors.white70,
                 fontSize: 9,
-                fontFamily: monospace
-                    ? 'monospace'
-                    : null,
+                fontFamily: monospace ? 'monospace' : null,
               ),
             ),
           ),
@@ -2632,20 +2192,12 @@ class _TasksViewState
   // FORMAT DATE
   // ============================================================
 
-  String _formatDate(
-    DateTime value,
-  ) {
+  String _formatDate(DateTime value) {
     final local = value.toLocal();
 
-    final day = local.day.toString().padLeft(
-      2,
-      '0',
-    );
+    final day = local.day.toString().padLeft(2, '0');
 
-    final month = local.month.toString().padLeft(
-      2,
-      '0',
-    );
+    final month = local.month.toString().padLeft(2, '0');
 
     return '$day/$month/${local.year}';
   }
@@ -2654,18 +2206,13 @@ class _TasksViewState
   // ACTION ERROR
   // ============================================================
 
-  String _actionError(
-    Object error,
-  ) {
-    if (error
-        is StateError) {
+  String _actionError(Object error) {
+    if (error is StateError) {
       return error.message.toString();
     }
 
-    if (error
-        is ArgumentError) {
-      return error.message?.toString() ??
-          'Dados inválidos.';
+    if (error is ArgumentError) {
+      return error.message?.toString() ?? 'Dados inválidos.';
     }
 
     return error.toString();
@@ -2675,27 +2222,18 @@ class _TasksViewState
   // MESSAGE
   // ============================================================
 
-  void _showMessage(
-    String message, {
-    bool error = false,
-  }) {
+  void _showMessage(String message, {bool error = false}) {
     if (!mounted) {
       return;
     }
 
-    ScaffoldMessenger.of(
-        context,
-      )
+    ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
           behavior: SnackBarBehavior.floating,
-          backgroundColor: error
-              ? Colors.red.shade900
-              : null,
-          content: Text(
-            message,
-          ),
+          backgroundColor: error ? Colors.red.shade900 : null,
+          content: Text(message),
         ),
       );
   }

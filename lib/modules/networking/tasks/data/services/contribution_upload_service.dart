@@ -338,6 +338,47 @@ class ContributionUploadService {
   }
 
   // ============================================================
+  // SAFE REMOVE
+  // ============================================================
+  //
+  // Usado como rollback quando:
+  //
+  // 1. o upload físico termina;
+  // 2. mas o registro de contribution_deliveries falha.
+  //
+  // Neste caso ainda não existe uma entrega oficial, então o
+  // arquivo pode ser removido sem deixar um objeto órfão.
+  //
+  // Diferente de remove(), este método não propaga erro.
+  //
+  // ============================================================
+
+  Future<
+    bool
+  >
+  safeRemove({
+    required String storagePath,
+  }) async {
+    try {
+      await remove(
+        storagePath: storagePath,
+      );
+
+      return true;
+    } catch (
+      error
+    ) {
+      debugPrint(
+        '[CONTRIBUTION UPLOAD] '
+        'Falha ao remover upload não formalizado: '
+        '$error',
+      );
+
+      return false;
+    }
+  }
+
+  // ============================================================
   // VERIFY DOWNLOADED FILE
   // ============================================================
 
@@ -591,6 +632,17 @@ class ContributionUploadResult {
   bool get hasMimeType {
     return mimeType?.trim().isNotEmpty ==
         true;
+  }
+
+  bool get isReadyForDelivery {
+    return storagePath.trim().isNotEmpty &&
+        fileName.trim().isNotEmpty &&
+        fileSize >
+            0 &&
+        sha256.trim().isNotEmpty &&
+        version >
+            0 &&
+        uploadedBy.trim().isNotEmpty;
   }
 
   // ============================================================

@@ -10,6 +10,28 @@ import '../models/project_task_member_model.dart';
 import '../repositories/project_tasks_repository.dart';
 
 // ============================================================
+// PROJECT TASKS WORKFLOW STAGE
+// ============================================================
+//
+// Representa o estágio coletivo atual do fluxo de produção.
+//
+// IMPORTANTE:
+//
+// Este enum é derivado dos dados já carregados pelo controller.
+// Ele não substitui os status individuais de cada contribuição.
+//
+// ============================================================
+
+enum ProjectTasksWorkflowStage {
+  definingPlan,
+  awaitingApproval,
+  awaitingFirstDelivery,
+  deliveriesInProgress,
+  awaitingDeliveryValidation,
+  completed,
+}
+
+// ============================================================
 // PROJECT TASKS CONTROLLER
 // ============================================================
 //
@@ -283,6 +305,282 @@ class ProjectTasksController
   }
 
   // ============================================================
+  // CONTRIBUTION PLAN APPROVAL
+  // ============================================================
+
+  int get requiredApprovalCountPerContribution {
+    return memberCount;
+  }
+
+  bool isContributionPlanApproved(
+    ProjectContributionModel contribution,
+  ) {
+    switch (contribution.status) {
+      case ProjectContributionStatus.ready:
+      case ProjectContributionStatus.inProgress:
+      case ProjectContributionStatus.delivered:
+      case ProjectContributionStatus.validated:
+        return true;
+
+      case ProjectContributionStatus.draft:
+      case ProjectContributionStatus.waitingApproval:
+      case ProjectContributionStatus.blocked:
+        break;
+    }
+
+    final requiredApprovals = requiredApprovalCountPerContribution;
+
+    if (requiredApprovals <=
+        0) {
+      return false;
+    }
+
+    return approvalCountForContribution(
+          contribution,
+        ) >=
+        requiredApprovals;
+  }
+
+  int get approvedContributionPlanCount {
+    return _contributions
+        .where(
+          isContributionPlanApproved,
+        )
+        .length;
+  }
+
+  bool get allContributionPlansApproved {
+    return _contributions.isNotEmpty &&
+        approvedContributionPlanCount ==
+            _contributions.length;
+  }
+
+  // ============================================================
+  // DELIVERIES PROGRESS
+  // ============================================================
+
+  int get contributionWithDeliveryCount {
+    if (_contributions.isEmpty ||
+        _deliveries.isEmpty) {
+      return 0;
+    }
+
+    final deliveredContributionIds = _deliveries
+        .map(
+          (
+            delivery,
+          ) => delivery.contributionId.trim(),
+        )
+        .where(
+          (
+            contributionId,
+          ) => contributionId.isNotEmpty,
+        )
+        .toSet();
+
+    return _contributions
+        .where(
+          (
+            contribution,
+          ) => deliveredContributionIds.contains(
+            contribution.id,
+          ),
+        )
+        .length;
+  }
+
+  bool get allContributionsDelivered {
+    return _contributions.isNotEmpty &&
+        contributionWithDeliveryCount ==
+            _contributions.length;
+  }
+
+  bool get materialsReleased {
+    return allContributionPlansApproved;
+  }
+
+  // ============================================================
+  // WORKFLOW STAGE
+  // ============================================================
+
+  ProjectTasksWorkflowStage get workflowStage {
+    if (_contributions.isEmpty ||
+        _members.isEmpty ||
+        _contributions.length <
+            _members.length) {
+      return ProjectTasksWorkflowStage.definingPlan;
+    }
+
+    if (!allContributionPlansApproved) {
+      return ProjectTasksWorkflowStage.awaitingApproval;
+    }
+
+    if (!hasDeliveries) {
+      return ProjectTasksWorkflowStage.awaitingFirstDelivery;
+    }
+
+    if (!allContributionsDelivered) {
+      return ProjectTasksWorkflowStage.deliveriesInProgress;
+    }
+
+    if (!allContributionsValidated) {
+      return ProjectTasksWorkflowStage.awaitingDeliveryValidation;
+    }
+
+    return ProjectTasksWorkflowStage.completed;
+  }
+
+  bool get isAwaitingPlanApproval {
+    return workflowStage ==
+        ProjectTasksWorkflowStage.awaitingApproval;
+  }
+
+  bool get isAwaitingFirstDelivery {
+    return workflowStage ==
+        ProjectTasksWorkflowStage.awaitingFirstDelivery;
+  }
+
+  bool get isDeliveryPhaseActive {
+    switch (workflowStage) {
+      case ProjectTasksWorkflowStage.awaitingFirstDelivery:
+      case ProjectTasksWorkflowStage.deliveriesInProgress:
+        return true;
+
+      case ProjectTasksWorkflowStage.definingPlan:
+      case ProjectTasksWorkflowStage.awaitingApproval:
+      case ProjectTasksWorkflowStage.awaitingDeliveryValidation:
+      case ProjectTasksWorkflowStage.completed:
+        return false;
+    }
+  }
+
+  bool get isAwaitingDeliveryValidation {
+    return workflowStage ==
+        ProjectTasksWorkflowStage.awaitingDeliveryValidation;
+  }
+
+  bool get isWorkflowCompleted {
+    return workflowStage ==
+        ProjectTasksWorkflowStage.completed;
+  }
+
+  // ============================================================
+  // NEXT ACTION TEXT
+  // ============================================================
+
+  String get nextActionTitle {
+    switch (workflowStage) {
+      case ProjectTasksWorkflowStage.definingPlan:
+        return 'Defina as contribuições do projeto.';
+
+      case ProjectTasksWorkflowStage.awaitingApproval:
+        return 'Aguardando aprovação do grupo.';
+
+      case ProjectTasksWorkflowStage.awaitingFirstDelivery:
+        return 'Aguardando primeira entrega.';
+
+      case ProjectTasksWorkflowStage.deliveriesInProgress:
+        return 'Contribuições em andamento.';
+
+      case ProjectTasksWorkflowStage.awaitingDeliveryValidation:
+        return 'Entregas aguardam validação.';
+
+      case ProjectTasksWorkflowStage.completed:
+        return 'Projeto pronto para finalização.';
+    }
+  }
+
+  String get nextActionDescription {
+    switch (workflowStage) {
+      case ProjectTasksWorkflowStage.definingPlan:
+        return 'Todos os participantes precisam definir suas responsabilidades.';
+
+      case ProjectTasksWorkflowStage.awaitingApproval:
+        return 'As contribuições precisam ser confirmadas por todos os participantes.';
+
+      case ProjectTasksWorkflowStage.awaitingFirstDelivery:
+        return 'O plano foi aprovado. Os responsáveis já podem enviar seus arquivos.';
+
+      case ProjectTasksWorkflowStage.deliveriesInProgress:
+        return 'Aguardando as contribuições que ainda não foram entregues.';
+
+      case ProjectTasksWorkflowStage.awaitingDeliveryValidation:
+        return 'Todos enviaram suas partes. Agora as entregas precisam ser confirmadas.';
+
+      case ProjectTasksWorkflowStage.completed:
+        return 'Todas as contribuições foram entregues e validadas.';
+    }
+  }
+
+  // ============================================================
+  // DEADLINE / UPLOAD
+  // ============================================================
+
+  bool contributionDeadlinePassed(
+    ProjectContributionModel contribution, {
+    DateTime? referenceDate,
+  }) {
+    final dueAt = contribution.dueAt;
+
+    if (dueAt ==
+        null) {
+      return false;
+    }
+
+    final now =
+        referenceDate ??
+        DateTime.now();
+
+    return now.isAfter(
+      dueAt,
+    );
+  }
+
+  bool canUploadContribution(
+    ProjectContributionModel contribution, {
+    DateTime? referenceDate,
+  }) {
+    if (!isContributionPlanApproved(
+      contribution,
+    )) {
+      return false;
+    }
+
+    if (contribution.isValidated) {
+      return false;
+    }
+
+    if (contributionDeadlinePassed(
+      contribution,
+      referenceDate: referenceDate,
+    )) {
+      return false;
+    }
+
+    return true;
+  }
+
+  bool canCurrentUserUploadContribution(
+    ProjectContributionModel contribution, {
+    DateTime? referenceDate,
+  }) {
+    final currentUserId = _currentUserId?.trim();
+
+    if (currentUserId ==
+            null ||
+        currentUserId.isEmpty ||
+        contribution.userId !=
+            currentUserId) {
+      return false;
+    }
+
+    return canUploadContribution(
+      contribution,
+      referenceDate: referenceDate,
+    );
+  }
+
+  // ============================================================
   // LOADING
   // ============================================================
 
@@ -492,6 +790,19 @@ class ProjectTasksController
         'Eventos: '
         '${_recordEvents.length}',
       );
+
+      debugPrint(
+        '[PROJECT TASKS] '
+        'Estágio do fluxo: '
+        '${workflowStage.name}',
+      );
+
+      debugPrint(
+        '[PROJECT TASKS] '
+        'Planos aprovados: '
+        '$approvedContributionPlanCount/'
+        '${_contributions.length}',
+      );
     } catch (
       error,
       stackTrace
@@ -699,6 +1010,12 @@ class ProjectTasksController
               '${_approvals.length}',
             );
 
+            debugPrint(
+              '[PROJECT TASKS] '
+              'Estágio após aprovação: '
+              '${workflowStage.name}',
+            );
+
             notifyListeners();
           },
           onError: _handleRealtimeError,
@@ -852,6 +1169,42 @@ class ProjectTasksController
     ).length;
   }
 
+  int remainingApprovalCountForContribution(
+    ProjectContributionModel contribution,
+  ) {
+    final remaining =
+        requiredApprovalCountPerContribution -
+        approvalCountForContribution(
+          contribution,
+        );
+
+    return remaining <
+            0
+        ? 0
+        : remaining;
+  }
+
+  double approvalProgressForContribution(
+    ProjectContributionModel contribution,
+  ) {
+    final requiredApprovals = requiredApprovalCountPerContribution;
+
+    if (requiredApprovals <=
+        0) {
+      return 0.0;
+    }
+
+    return (approvalCountForContribution(
+              contribution,
+            ) /
+            requiredApprovals)
+        .clamp(
+          0.0,
+          1.0,
+        )
+        .toDouble();
+  }
+
   // ============================================================
   // USER APPROVED CONTRIBUTION
   // ============================================================
@@ -997,12 +1350,26 @@ class ProjectTasksController
         b,
       ) {
         final aPriority =
-            priority[a.status] ??
-            999;
+            a.status ==
+                    ProjectContributionStatus.waitingApproval &&
+                isContributionPlanApproved(
+                  a,
+                )
+            ? priority[ProjectContributionStatus.ready] ??
+                  999
+            : priority[a.status] ??
+                  999;
 
         final bPriority =
-            priority[b.status] ??
-            999;
+            b.status ==
+                    ProjectContributionStatus.waitingApproval &&
+                isContributionPlanApproved(
+                  b,
+                )
+            ? priority[ProjectContributionStatus.ready] ??
+                  999
+            : priority[b.status] ??
+                  999;
 
         if (aPriority !=
             bPriority) {

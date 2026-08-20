@@ -34,6 +34,21 @@ class ProductionFlowItem {
 
   final bool canUpload;
 
+  // ============================================================
+  // WORKFLOW STATE
+  // ============================================================
+  //
+  // Estes dois campos são derivados pelo ProjectTasksController
+  // e permitem que o card reflita imediatamente o estágio real
+  // do fluxo, mesmo que o status persistido ainda esteja chegando
+  // via Realtime.
+  //
+  // ============================================================
+
+  final bool contributionPlanApproved;
+
+  final bool deadlinePassed;
+
   final bool isApproving;
 
   final bool isUploading;
@@ -49,6 +64,8 @@ class ProductionFlowItem {
     this.currentUserApproved = false,
     this.canApprove = false,
     this.canUpload = false,
+    this.contributionPlanApproved = false,
+    this.deadlinePassed = false,
     this.isApproving = false,
     this.isUploading = false,
     this.uploadProgress,
@@ -217,11 +234,14 @@ class ProductionFlowWidget
 
     final delivery = item.delivery;
 
+    final normalizedCurrentUserId = currentUserId?.trim();
+
     final isCurrentUser =
-        currentUserId?.trim().isNotEmpty ==
-            true &&
+        normalizedCurrentUserId !=
+            null &&
+        normalizedCurrentUserId.isNotEmpty &&
         item.member.userId ==
-            currentUserId!.trim();
+            normalizedCurrentUserId;
 
     return ProductionContributionCard(
       member: item.member,
@@ -241,6 +261,10 @@ class ProductionFlowWidget
       canApprove: item.canApprove,
 
       canUpload: item.canUpload,
+
+      contributionPlanApproved: item.contributionPlanApproved,
+
+      deadlinePassed: item.deadlinePassed,
 
       isApproving: item.isApproving,
 
@@ -336,7 +360,6 @@ class ProductionFlowWidget
                     ),
               ),
             ),
-
             Positioned(
               left: -6,
               bottom: 1,
@@ -388,11 +411,9 @@ class ProductionFlowWidget
             size: 30,
             color: Colors.white24,
           ),
-
           SizedBox(
             height: 10,
           ),
-
           Text(
             'Fluxo ainda não iniciado',
             style: TextStyle(
@@ -401,11 +422,9 @@ class ProductionFlowWidget
               fontWeight: FontWeight.w500,
             ),
           ),
-
           SizedBox(
             height: 5,
           ),
-
           Text(
             'As contribuições dos participantes aparecerão aqui.',
             textAlign: TextAlign.center,

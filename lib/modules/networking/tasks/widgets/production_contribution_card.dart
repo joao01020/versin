@@ -51,6 +51,10 @@ class ProductionContributionCard
 
   final bool canUpload;
 
+  final bool contributionPlanApproved;
+
+  final bool deadlinePassed;
+
   final bool isApproving;
 
   final bool isUploading;
@@ -78,6 +82,8 @@ class ProductionContributionCard
     this.isCurrentUser = false,
     this.canApprove = false,
     this.canUpload = false,
+    this.contributionPlanApproved = false,
+    this.deadlinePassed = false,
     this.isApproving = false,
     this.isUploading = false,
     this.uploadProgress,
@@ -442,9 +448,18 @@ class ProductionContributionCard
         // ======================================================
         // APPROVAL
         // ======================================================
-        if (currentContribution.isWaitingApproval ||
-            currentContribution.isReady ||
-            currentContribution.isBlocked) ...[
+        //
+        // Enquanto ainda faltam confirmações, mostramos o bloco
+        // de aprovação normalmente.
+        //
+        // Quando o plano já foi aprovado por todos, esse bloco
+        // desaparece e dá lugar à fase de entrega.
+        //
+        // ======================================================
+        if (!contributionPlanApproved &&
+            (currentContribution.isWaitingApproval ||
+                currentContribution.isReady ||
+                currentContribution.isBlocked)) ...[
           const SizedBox(
             height: 14,
           ),
@@ -459,9 +474,16 @@ class ProductionContributionCard
         ],
 
         // ======================================================
-        // DELIVERY
+        // DELIVERY PHASE
         // ======================================================
-        if (currentContribution.isInProgress ||
+        //
+        // A entrega é liberada assim que todos aprovam o plano,
+        // mesmo que o status individual ainda esteja chegando via
+        // Realtime como waitingApproval.
+        //
+        // ======================================================
+        if (contributionPlanApproved ||
+            currentContribution.isInProgress ||
             currentContribution.isDelivered ||
             currentContribution.isValidated ||
             delivery !=
@@ -469,16 +491,87 @@ class ProductionContributionCard
           const SizedBox(
             height: 14,
           ),
-          ContributionDeliveryWidget(
-            delivery: delivery,
-            canUpload: canUpload,
-            isUploading: isUploading,
-            uploadProgress: uploadProgress,
-            onUpload: onUpload,
-            onOpen: onOpenDelivery,
-          ),
+
+          if (deadlinePassed &&
+              delivery ==
+                  null)
+            _buildDeadlineExpired()
+          else
+            ContributionDeliveryWidget(
+              delivery: delivery,
+              canUpload: canUpload,
+              isUploading: isUploading,
+              uploadProgress: uploadProgress,
+              onUpload: onUpload,
+              onOpen: onOpenDelivery,
+            ),
         ],
       ],
+    );
+  }
+
+  // ============================================================
+  // DEADLINE EXPIRED
+  // ============================================================
+
+  Widget _buildDeadlineExpired() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(
+        14,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.redAccent.withValues(
+          alpha: 0.06,
+        ),
+        borderRadius: BorderRadius.circular(
+          14,
+        ),
+        border: Border.all(
+          color: Colors.redAccent.withValues(
+            alpha: 0.20,
+          ),
+        ),
+      ),
+      child: const Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.event_busy_outlined,
+            color: Colors.redAccent,
+            size: 18,
+          ),
+          SizedBox(
+            width: 10,
+          ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Prazo encerrado',
+                  style: TextStyle(
+                    color: Colors.redAccent,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                SizedBox(
+                  height: 4,
+                ),
+                Text(
+                  'O prazo desta contribuição terminou e um novo envio não está mais disponível.',
+                  style: TextStyle(
+                    color: Colors.white38,
+                    fontSize: 10,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -537,41 +630,71 @@ class ProductionContributionCard
 
     late final Color color;
 
-    switch (contribution.status) {
-      case ProjectContributionStatus.draft:
-        text = 'Rascunho';
+    // ==========================================================
+    // DERIVED APPROVAL STATE
+    // ==========================================================
+    //
+    // Se todos já aprovaram a versão atual, a interface deve
+    // refletir "Validado" imediatamente, sem esperar o status
+    // persistido mudar via Realtime.
+    //
+    // Estados posteriores continuam tendo prioridade.
+    //
+    // ==========================================================
 
-        color = Colors.white54;
+    if (contribution.isValidated) {
+      text = 'Concluído';
 
-      case ProjectContributionStatus.waitingApproval:
-        text = 'Aguardando validação';
+      color = Colors.greenAccent;
+    } else if (contribution.isDelivered) {
+      text = 'Entregue';
 
-        color = Colors.amberAccent;
+      color = Colors.amberAccent;
+    } else if (contribution.isInProgress) {
+      text = 'Em produção';
 
-      case ProjectContributionStatus.blocked:
-        text = 'Bloqueado';
+      color = Colors.lightBlueAccent;
+    } else if (contributionPlanApproved) {
+      text = 'Validado';
 
-        color = Colors.redAccent;
+      color = Colors.greenAccent;
+    } else {
+      switch (contribution.status) {
+        case ProjectContributionStatus.draft:
+          text = 'Rascunho';
 
-      case ProjectContributionStatus.ready:
-        text = 'Aprovado';
+          color = Colors.white54;
 
-        color = Colors.greenAccent;
+        case ProjectContributionStatus.waitingApproval:
+          text = 'Aguardando validação';
 
-      case ProjectContributionStatus.inProgress:
-        text = 'Em produção';
+          color = Colors.amberAccent;
 
-        color = Colors.lightBlueAccent;
+        case ProjectContributionStatus.blocked:
+          text = 'Bloqueado';
 
-      case ProjectContributionStatus.delivered:
-        text = 'Entregue';
+          color = Colors.redAccent;
 
-        color = Colors.amberAccent;
+        case ProjectContributionStatus.ready:
+          text = 'Validado';
 
-      case ProjectContributionStatus.validated:
-        text = 'Concluído';
+          color = Colors.greenAccent;
 
-        color = Colors.greenAccent;
+        case ProjectContributionStatus.inProgress:
+          text = 'Em produção';
+
+          color = Colors.lightBlueAccent;
+
+        case ProjectContributionStatus.delivered:
+          text = 'Entregue';
+
+          color = Colors.amberAccent;
+
+        case ProjectContributionStatus.validated:
+          text = 'Concluído';
+
+          color = Colors.greenAccent;
+      }
     }
 
     return Container(

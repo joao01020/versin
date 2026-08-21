@@ -2173,37 +2173,24 @@ class ChatController
     // ==========================================================
     // RETOMAR TRABALHO EXISTENTE
     // ==========================================================
+    //
+    // Se já existem palavras salvas, apenas retomamos o estágio
+    // de escrita.
+    //
+    // Não adicionamos mais mensagem automática no Chat.
+    //
+    // O restante continua igual:
+    //
+    // - vocabulário;
+    // - biblioteca;
+    // - rimas;
+    // - contexto criativo;
+    // - histórico;
+    //
+    // ==========================================================
 
     if (savedWords.isNotEmpty) {
       creationStage = ChatCreationStage.writing;
-
-      final preview = savedWords
-          .take(
-            5,
-          )
-          .join(
-            ' • ',
-          );
-
-      final wordCount = savedWords.length;
-
-      final wordLabel =
-          wordCount ==
-              1
-          ? 'palavra salva'
-          : 'palavras salvas';
-
-      messages.add(
-        ChatMessage(
-          role: ChatRole.assistant,
-          content:
-              'Vamos voltar ao trabalho?\n\n'
-              'Já temos $wordCount $wordLabel '
-              'da sua composição.\n\n'
-              '$preview\n\n'
-              'O que posso te ajudar agora?',
-        ),
-      );
 
       notifyListeners();
 

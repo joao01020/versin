@@ -36,9 +36,7 @@ import '../../profile/controllers/professional_profile_controller.dart';
 //
 // ============================================================
 
-class ConnectionProfileCardWidget
-    extends
-        StatefulWidget {
+class ConnectionProfileCardWidget extends StatefulWidget {
   // ============================================================
   // CONTROLLERS
   // ============================================================
@@ -57,11 +55,7 @@ class ConnectionProfileCardWidget
   // CALLBACK
   // ============================================================
 
-  final Future<
-    void
-  >
-  Function()
-  onEditProfile;
+  final Future<void> Function() onEditProfile;
 
   // ============================================================
   // AUTO COLLAPSE
@@ -79,9 +73,7 @@ class ConnectionProfileCardWidget
     required this.profileController,
     required this.isInitializingMatch,
     required this.onEditProfile,
-    this.autoCollapseDelay = const Duration(
-      milliseconds: 1800,
-    ),
+    this.autoCollapseDelay = const Duration(milliseconds: 1800),
   });
 
   // ============================================================
@@ -89,10 +81,8 @@ class ConnectionProfileCardWidget
   // ============================================================
 
   @override
-  State<
-    ConnectionProfileCardWidget
-  >
-  createState() => _ConnectionProfileCardWidgetState();
+  State<ConnectionProfileCardWidget> createState() =>
+      _ConnectionProfileCardWidgetState();
 }
 
 // ============================================================
@@ -100,17 +90,13 @@ class ConnectionProfileCardWidget
 // ============================================================
 
 class _ConnectionProfileCardWidgetState
-    extends
-        State<
-          ConnectionProfileCardWidget
-        > {
+    extends State<ConnectionProfileCardWidget>
+    with SingleTickerProviderStateMixin {
   // ============================================================
   // CONSTANTS
   // ============================================================
 
-  static const Duration _animationDuration = Duration(
-    milliseconds: 520,
-  );
+  static const Duration _animationDuration = Duration(milliseconds: 520);
 
   // ============================================================
   // STATE
@@ -122,6 +108,18 @@ class _ConnectionProfileCardWidgetState
 
   Timer? _autoCollapseTimer;
 
+  late final AnimationController _glowController;
+
+  late final Animation<double> _glowAnimation;
+
+  int _lastAttentionRevision = 0;
+
+  bool get _requiresProfessionalProfile =>
+      widget.matchController.requiresProfessionalProfile;
+
+  bool get _shouldHighlightEditButton =>
+      _requiresProfessionalProfile && !widget.isInitializingMatch;
+
   // ============================================================
   // INIT
   // ============================================================
@@ -130,7 +128,160 @@ class _ConnectionProfileCardWidgetState
   void initState() {
     super.initState();
 
-    _scheduleAutoCollapse();
+    _glowController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 950),
+    );
+
+    _glowAnimation = CurvedAnimation(
+      parent: _glowController,
+      curve: Curves.easeInOut,
+    );
+
+    _lastAttentionRevision =
+        widget.matchController.professionalProfileAttentionRevision;
+
+    widget.matchController.addListener(_handleMatchControllerChanged);
+
+    _syncRequiredState(initial: true);
+  }
+
+  // ============================================================
+  // DID UPDATE WIDGET
+  // ============================================================
+
+  @override
+  void didUpdateWidget(covariant ConnectionProfileCardWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (!identical(oldWidget.matchController, widget.matchController)) {
+      oldWidget.matchController.removeListener(_handleMatchControllerChanged);
+
+      widget.matchController.addListener(_handleMatchControllerChanged);
+
+      _lastAttentionRevision =
+          widget.matchController.professionalProfileAttentionRevision;
+    }
+
+    _syncRequiredState();
+  }
+
+  // ============================================================
+  // MATCH CONTROLLER CHANGED
+  // ============================================================
+
+  void _handleMatchControllerChanged() {
+    if (!mounted) {
+      return;
+    }
+
+    final revision =
+        widget.matchController.professionalProfileAttentionRevision;
+
+    if (revision != _lastAttentionRevision) {
+      _lastAttentionRevision = revision;
+
+      _triggerAttentionFlash();
+    }
+
+    _syncRequiredState();
+  }
+
+  // ============================================================
+  // SINCRONIZAR ESTADO OBRIGATÓRIO
+  // ============================================================
+
+  void _syncRequiredState({bool initial = false}) {
+    if (!mounted && !initial) {
+      return;
+    }
+
+    if (_requiresProfessionalProfile) {
+      _autoCollapseTimer?.cancel();
+
+      if (!_expanded) {
+        setState(() {
+          _expanded = true;
+        });
+      }
+
+      if (!_glowController.isAnimating) {
+        _glowController.repeat(reverse: true);
+      }
+
+      return;
+    }
+
+    if (_glowController.isAnimating) {
+      _glowController.stop();
+    }
+
+    _glowController.value = 0;
+
+    if (!initial) {
+      _scheduleAutoCollapse();
+    } else {
+      _scheduleAutoCollapse();
+    }
+  }
+
+  // ============================================================
+  // FLASH DE ATENÇÃO
+  // ============================================================
+  //
+  // Chamado quando o usuário tenta interagir com alguma área do
+  // Match enquanto ainda falta a função principal.
+  //
+  // O MatchController incrementa:
+  //
+  // professionalProfileAttentionRevision
+  //
+  // e este widget responde com um pulso rápido adicional.
+  //
+  // ============================================================
+
+  Future<void> _triggerAttentionFlash() async {
+    if (!mounted || !_requiresProfessionalProfile) {
+      return;
+    }
+
+    _autoCollapseTimer?.cancel();
+
+    if (!_expanded) {
+      setState(() {
+        _expanded = true;
+      });
+    }
+
+    _glowController.stop();
+
+    for (var index = 0; index < 2; index++) {
+      if (!mounted) {
+        return;
+      }
+
+      await _glowController.animateTo(
+        1,
+        duration: const Duration(milliseconds: 150),
+        curve: Curves.easeOut,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      await _glowController.animateTo(
+        0.22,
+        duration: const Duration(milliseconds: 140),
+        curve: Curves.easeIn,
+      );
+    }
+
+    if (!mounted || !_requiresProfessionalProfile) {
+      return;
+    }
+
+    _glowController.repeat(reverse: true);
   }
 
   // ============================================================
@@ -140,21 +291,19 @@ class _ConnectionProfileCardWidgetState
   void _scheduleAutoCollapse() {
     _autoCollapseTimer?.cancel();
 
-    _autoCollapseTimer = Timer(
-      widget.autoCollapseDelay,
-      () {
-        if (!mounted ||
-            !_expanded) {
-          return;
-        }
+    if (_requiresProfessionalProfile) {
+      return;
+    }
 
-        setState(
-          () {
-            _expanded = false;
-          },
-        );
-      },
-    );
+    _autoCollapseTimer = Timer(widget.autoCollapseDelay, () {
+      if (!mounted || !_expanded || _requiresProfessionalProfile) {
+        return;
+      }
+
+      setState(() {
+        _expanded = false;
+      });
+    });
   }
 
   // ============================================================
@@ -164,30 +313,33 @@ class _ConnectionProfileCardWidgetState
   void _toggleExpanded() {
     _autoCollapseTimer?.cancel();
 
-    setState(
-      () {
-        _expanded = !_expanded;
-      },
-    );
+    if (_requiresProfessionalProfile && _expanded) {
+      _triggerAttentionFlash();
+
+      return;
+    }
+
+    setState(() {
+      _expanded = !_expanded;
+    });
+
+    if (_expanded && !_requiresProfessionalProfile) {
+      _scheduleAutoCollapse();
+    }
   }
 
   // ============================================================
   // EDIT
   // ============================================================
 
-  Future<
-    void
-  >
-  _handleEdit() async {
+  Future<void> _handleEdit() async {
     if (_editing) {
       return;
     }
 
-    setState(
-      () {
-        _editing = true;
-      },
-    );
+    setState(() {
+      _editing = true;
+    });
 
     try {
       await widget.onEditProfile();
@@ -196,11 +348,9 @@ class _ConnectionProfileCardWidgetState
         return;
       }
 
-      setState(
-        () {
-          _editing = false;
-        },
-      );
+      setState(() {
+        _editing = false;
+      });
     }
   }
 
@@ -209,70 +359,67 @@ class _ConnectionProfileCardWidgetState
   // ============================================================
 
   @override
-  Widget build(
-    BuildContext context,
-  ) {
-    return AnimatedSize(
-      duration: _animationDuration,
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _glowAnimation,
+      builder: (context, child) {
+        final glowValue = _shouldHighlightEditButton
+            ? _glowAnimation.value
+            : 0.0;
 
-      curve: Curves.easeInOutCubic,
+        final accentColor = widget.matchController.accentNeon;
 
-      alignment: Alignment.topCenter,
-
-      child: Container(
-        width: double.infinity,
-
-        decoration: BoxDecoration(
-          color:
-              const Color(
-                0xFF17132D,
-              ).withValues(
-                alpha: 0.90,
+        return AnimatedSize(
+          duration: _animationDuration,
+          curve: Curves.easeInOutCubic,
+          alignment: Alignment.topCenter,
+          child: Container(
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: const Color(0xFF17132D).withValues(alpha: 0.90),
+              borderRadius: BorderRadius.circular(_expanded ? 22 : 15),
+              border: Border.all(
+                color: _shouldHighlightEditButton
+                    ? accentColor.withValues(alpha: 0.18 + (glowValue * 0.48))
+                    : Colors.white.withValues(alpha: 0.07),
+                width: _shouldHighlightEditButton ? 1.25 : 1,
               ),
+              boxShadow: _shouldHighlightEditButton
+                  ? [
+                      BoxShadow(
+                        color: accentColor.withValues(
+                          alpha: 0.05 + (glowValue * 0.22),
+                        ),
+                        blurRadius: 14 + (glowValue * 20),
+                        spreadRadius: glowValue * 1.8,
+                      ),
+                    ]
+                  : const [],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildHeader(),
 
-          borderRadius: BorderRadius.circular(
-            _expanded
-                ? 22
-                : 15,
-          ),
-
-          border: Border.all(
-            color: Colors.white.withValues(
-              alpha: 0.07,
+                AnimatedCrossFade(
+                  duration: _animationDuration,
+                  sizeCurve: Curves.easeInOutCubic,
+                  firstCurve: Curves.easeOut,
+                  secondCurve: Curves.easeIn,
+                  crossFadeState: _expanded
+                      ? CrossFadeState.showFirst
+                      : CrossFadeState.showSecond,
+                  firstChild: _buildExpandedContent(),
+                  secondChild: const SizedBox(
+                    width: double.infinity,
+                    height: 0,
+                  ),
+                ),
+              ],
             ),
           ),
-        ),
-
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-
-          children: [
-            _buildHeader(),
-
-            AnimatedCrossFade(
-              duration: _animationDuration,
-
-              sizeCurve: Curves.easeInOutCubic,
-
-              firstCurve: Curves.easeOut,
-
-              secondCurve: Curves.easeIn,
-
-              crossFadeState: _expanded
-                  ? CrossFadeState.showFirst
-                  : CrossFadeState.showSecond,
-
-              firstChild: _buildExpandedContent(),
-
-              secondChild: const SizedBox(
-                width: double.infinity,
-
-                height: 0,
-              ),
-            ),
-          ],
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -285,14 +432,11 @@ class _ConnectionProfileCardWidgetState
 
     final lookingFor = controller.lookingForRoleLabels;
 
-    final subtitle =
-        controller.isLoading ||
-            widget.isInitializingMatch
+    final subtitle = controller.isLoading || widget.isInitializingMatch
         ? 'Carregando perfil...'
         : lookingFor.isEmpty
         ? 'Não informado'
-        : lookingFor.length ==
-              1
+        : lookingFor.length == 1
         ? '1 tipo de profissional'
         : '${lookingFor.length} tipos de profissionais';
 
@@ -302,11 +446,7 @@ class _ConnectionProfileCardWidgetState
       child: InkWell(
         onTap: _toggleExpanded,
 
-        borderRadius: BorderRadius.circular(
-          _expanded
-              ? 22
-              : 15,
-        ),
+        borderRadius: BorderRadius.circular(_expanded ? 22 : 15),
 
         child: AnimatedPadding(
           duration: _animationDuration,
@@ -314,13 +454,9 @@ class _ConnectionProfileCardWidgetState
           curve: Curves.easeInOutCubic,
 
           padding: EdgeInsets.symmetric(
-            horizontal: _expanded
-                ? 16
-                : 12,
+            horizontal: _expanded ? 16 : 12,
 
-            vertical: _expanded
-                ? 16
-                : 9,
+            vertical: _expanded ? 16 : 9,
           ),
 
           child: Row(
@@ -333,13 +469,9 @@ class _ConnectionProfileCardWidgetState
 
                 curve: Curves.easeInOutCubic,
 
-                width: _expanded
-                    ? 46
-                    : 32,
+                width: _expanded ? 46 : 32,
 
-                height: _expanded
-                    ? 46
-                    : 32,
+                height: _expanded ? 46 : 32,
 
                 decoration: BoxDecoration(
                   color: widget.matchController.accentNeon.withValues(
@@ -360,17 +492,11 @@ class _ConnectionProfileCardWidgetState
 
                   color: widget.matchController.accentNeon,
 
-                  size: _expanded
-                      ? 22
-                      : 16,
+                  size: _expanded ? 22 : 16,
                 ),
               ),
 
-              SizedBox(
-                width: _expanded
-                    ? 13
-                    : 10,
-              ),
+              SizedBox(width: _expanded ? 13 : 10),
 
               // ==================================================
               // TITLE
@@ -392,17 +518,13 @@ class _ConnectionProfileCardWidgetState
                       style: TextStyle(
                         color: Colors.white,
 
-                        fontSize: _expanded
-                            ? 14
-                            : 12,
+                        fontSize: _expanded ? 14 : 12,
 
                         fontWeight: FontWeight.w600,
                       ),
                     ),
 
-                    const SizedBox(
-                      height: 2,
-                    ),
+                    const SizedBox(height: 2),
 
                     Text(
                       subtitle,
@@ -414,9 +536,7 @@ class _ConnectionProfileCardWidgetState
                       style: TextStyle(
                         color: Colors.white38,
 
-                        fontSize: _expanded
-                            ? 10
-                            : 9,
+                        fontSize: _expanded ? 10 : 9,
                       ),
                     ),
                   ],
@@ -431,9 +551,7 @@ class _ConnectionProfileCardWidgetState
 
                 visualDensity: VisualDensity.compact,
 
-                onPressed: _editing
-                    ? null
-                    : _handleEdit,
+                onPressed: _editing ? null : _handleEdit,
 
                 icon: _editing
                     ? SizedBox(
@@ -452,9 +570,7 @@ class _ConnectionProfileCardWidgetState
 
                         color: widget.matchController.accentNeon,
 
-                        size: _expanded
-                            ? 18
-                            : 16,
+                        size: _expanded ? 18 : 16,
                       ),
               ),
 
@@ -462,9 +578,7 @@ class _ConnectionProfileCardWidgetState
               // EXPAND
               // ==================================================
               AnimatedRotation(
-                turns: _expanded
-                    ? 0.5
-                    : 0,
+                turns: _expanded ? 0.5 : 0,
 
                 duration: _animationDuration,
 
@@ -494,12 +608,7 @@ class _ConnectionProfileCardWidgetState
 
     if (controller.isLoading) {
       return const Padding(
-        padding: EdgeInsets.fromLTRB(
-          16,
-          0,
-          16,
-          18,
-        ),
+        padding: EdgeInsets.fromLTRB(16, 0, 16, 18),
 
         child: Center(
           child: SizedBox(
@@ -520,28 +629,15 @@ class _ConnectionProfileCardWidgetState
     final lookingFor = controller.lookingForRoleLabels;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        16,
-        0,
-        16,
-        16,
-      ),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
 
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
 
         children: [
-          Divider(
-            height: 1,
+          Divider(height: 1, color: Colors.white.withValues(alpha: 0.06)),
 
-            color: Colors.white.withValues(
-              alpha: 0.06,
-            ),
-          ),
-
-          const SizedBox(
-            height: 14,
-          ),
+          const SizedBox(height: 14),
 
           // ======================================================
           // PRIMARY ROLE
@@ -551,16 +647,10 @@ class _ConnectionProfileCardWidgetState
               const Text(
                 'Sua função principal:',
 
-                style: TextStyle(
-                  color: Colors.white38,
-
-                  fontSize: 10,
-                ),
+                style: TextStyle(color: Colors.white38, fontSize: 10),
               ),
 
-              const SizedBox(
-                width: 6,
-              ),
+              const SizedBox(width: 6),
 
               Flexible(
                 child: Text(
@@ -582,9 +672,7 @@ class _ConnectionProfileCardWidgetState
             ],
           ),
 
-          const SizedBox(
-            height: 14,
-          ),
+          const SizedBox(height: 14),
 
           // ======================================================
           // LOOKING FOR
@@ -603,19 +691,13 @@ class _ConnectionProfileCardWidgetState
             ),
           ),
 
-          const SizedBox(
-            height: 10,
-          ),
+          const SizedBox(height: 10),
 
           if (lookingFor.isEmpty)
             const Text(
               'Nenhum profissional configurado.',
 
-              style: TextStyle(
-                color: Colors.white30,
-
-                fontSize: 10,
-              ),
+              style: TextStyle(color: Colors.white30, fontSize: 10),
             )
           else
             Wrap(
@@ -624,67 +706,125 @@ class _ConnectionProfileCardWidgetState
               runSpacing: 8,
 
               children: lookingFor
-                  .map(
-                    (
-                      label,
-                    ) => _buildRoleChip(
-                      label,
-                    ),
-                  )
-                  .toList(
-                    growable: false,
-                  ),
+                  .map((label) => _buildRoleChip(label))
+                  .toList(growable: false),
             ),
 
-          const SizedBox(
-            height: 16,
-          ),
+          const SizedBox(height: 16),
+
+          if (_requiresProfessionalProfile) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
+              decoration: BoxDecoration(
+                color: widget.matchController.accentNeon.withValues(
+                  alpha: 0.06,
+                ),
+                borderRadius: BorderRadius.circular(11),
+                border: Border.all(
+                  color: widget.matchController.accentNeon.withValues(
+                    alpha: 0.18,
+                  ),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.info_outline_rounded,
+                    color: widget.matchController.accentNeon,
+                    size: 15,
+                  ),
+
+                  const SizedBox(width: 8),
+
+                  const Expanded(
+                    child: Text(
+                      'Defina sua função principal para liberar o Match.',
+                      style: TextStyle(
+                        color: Colors.white54,
+                        fontSize: 10,
+                        height: 1.35,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 10),
+          ],
 
           // ======================================================
           // EDIT BUTTON
           // ======================================================
-          SizedBox(
-            width: double.infinity,
+          AnimatedBuilder(
+            animation: _glowAnimation,
+            builder: (context, child) {
+              final accentColor = widget.matchController.accentNeon;
 
-            height: 34,
+              final glowValue = _shouldHighlightEditButton
+                  ? _glowAnimation.value
+                  : 0.0;
 
-            child: OutlinedButton.icon(
-              onPressed: _editing
-                  ? null
-                  : _handleEdit,
-
-              icon: const Icon(
-                Icons.tune_rounded,
-
-                size: 15,
-              ),
-
-              label: const Text(
-                'EDITAR PERFIL PROFISSIONAL',
-              ),
-
-              style: OutlinedButton.styleFrom(
-                foregroundColor: widget.matchController.accentNeon,
-
-                side: BorderSide(
-                  color: widget.matchController.accentNeon.withValues(
-                    alpha: 0.38,
+              return Container(
+                width: double.infinity,
+                height: 38,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: _shouldHighlightEditButton
+                      ? [
+                          BoxShadow(
+                            color: accentColor.withValues(
+                              alpha: 0.08 + (glowValue * 0.34),
+                            ),
+                            blurRadius: 8 + (glowValue * 18),
+                            spreadRadius: glowValue * 1.4,
+                          ),
+                        ]
+                      : const [],
+                ),
+                child: OutlinedButton.icon(
+                  onPressed: _editing ? null : _handleEdit,
+                  icon: _editing
+                      ? SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 1.7,
+                            color: accentColor,
+                          ),
+                        )
+                      : Icon(Icons.tune_rounded, size: 15, color: accentColor),
+                  label: Text(
+                    'EDITAR PERFIL PROFISSIONAL',
+                    style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: _shouldHighlightEditButton ? 0.75 : 0.45,
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: accentColor,
+                    backgroundColor: _shouldHighlightEditButton
+                        ? accentColor.withValues(
+                            alpha: 0.04 + (glowValue * 0.08),
+                          )
+                        : Colors.transparent,
+                    side: BorderSide(
+                      color: accentColor.withValues(
+                        alpha: _shouldHighlightEditButton
+                            ? 0.42 + (glowValue * 0.42)
+                            : 0.38,
+                      ),
+                      width: _shouldHighlightEditButton ? 1.35 : 1,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(11),
+                    ),
                   ),
                 ),
-
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(
-                    11,
-                  ),
-                ),
-
-                textStyle: const TextStyle(
-                  fontSize: 9,
-
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
+              );
+            },
           ),
         ],
       ),
@@ -695,29 +835,17 @@ class _ConnectionProfileCardWidgetState
   // ROLE CHIP
   // ============================================================
 
-  Widget _buildRoleChip(
-    String label,
-  ) {
+  Widget _buildRoleChip(String label) {
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 10,
-
-        vertical: 6,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
 
       decoration: BoxDecoration(
-        color: widget.matchController.accentNeon.withValues(
-          alpha: 0.09,
-        ),
+        color: widget.matchController.accentNeon.withValues(alpha: 0.09),
 
-        borderRadius: BorderRadius.circular(
-          20,
-        ),
+        borderRadius: BorderRadius.circular(20),
 
         border: Border.all(
-          color: widget.matchController.accentNeon.withValues(
-            alpha: 0.26,
-          ),
+          color: widget.matchController.accentNeon.withValues(alpha: 0.26),
         ),
       ),
 
@@ -742,6 +870,10 @@ class _ConnectionProfileCardWidgetState
   @override
   void dispose() {
     _autoCollapseTimer?.cancel();
+
+    widget.matchController.removeListener(_handleMatchControllerChanged);
+
+    _glowController.dispose();
 
     super.dispose();
   }

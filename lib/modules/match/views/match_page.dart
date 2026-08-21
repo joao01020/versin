@@ -161,6 +161,16 @@ class _MatchPageState
 
   final FocusNode _searchFocusNode = FocusNode();
 
+  // ============================================================
+  // USERNAME ONBOARDING
+  // ============================================================
+
+  final TextEditingController _usernameController = TextEditingController();
+
+  final FocusNode _usernameFocusNode = FocusNode();
+
+  Timer? _usernameDebounce;
+
   bool _isSearchPanelOpen = false;
 
   // ============================================================
@@ -500,6 +510,8 @@ class _MatchPageState
 
   bool _isCreatingProjectInvitation = false;
 
+  bool _usernameWasSeeded = false;
+
   // ============================================================
   // STREAM
   // ============================================================
@@ -664,8 +676,41 @@ class _MatchPageState
       return;
     }
 
+    _syncUsernameFieldFromController();
+
     setState(
       () {},
+    );
+  }
+
+  // ============================================================
+  // SINCRONIZAR USERNAME NO CAMPO
+  // ============================================================
+
+  void _syncUsernameFieldFromController() {
+    final username = _matchController.currentUsername.trim();
+
+    if (username.isEmpty) {
+      return;
+    }
+
+    if (_usernameFocusNode.hasFocus) {
+      return;
+    }
+
+    if (_usernameWasSeeded &&
+        _usernameController.text.trim() ==
+            username) {
+      return;
+    }
+
+    _usernameWasSeeded = true;
+
+    _usernameController.value = TextEditingValue(
+      text: username,
+      selection: TextSelection.collapsed(
+        offset: username.length,
+      ),
     );
   }
 
@@ -687,6 +732,8 @@ class _MatchPageState
 
     try {
       await _sessionService.initialize();
+
+      _syncUsernameFieldFromController();
 
       await _loadPublicProfile();
     } catch (
@@ -754,6 +801,129 @@ class _MatchPageState
   }
 
   // ============================================================
+  // GUARD DE ONBOARDING
+  // ============================================================
+  //
+  // Enquanto faltar username:
+  //
+  // - o bloco "Complete seu perfil" é obrigatório.
+  //
+  // Depois do username:
+  //
+  // - se faltar função principal, o único caminho permitido
+  //   é "EDITAR PERFIL PROFISSIONAL".
+  //
+  // Qualquer tentativa de usar outra área solicita atenção ao
+  // botão profissional através do MatchController.
+  //
+  // ============================================================
+
+  bool _ensureMatchUnlockedForInteraction() {
+    if (_matchController.isMatchUnlocked) {
+      return true;
+    }
+
+    if (_matchController.requiresUsername) {
+      _usernameFocusNode.requestFocus();
+
+      return false;
+    }
+
+    if (_matchController.requiresProfessionalProfile) {
+      _matchController.requestProfessionalProfileAttention();
+
+      return false;
+    }
+
+    return false;
+  }
+
+  // ============================================================
+  // USERNAME CHANGED
+  // ============================================================
+
+  void _handleUsernameChanged(
+    String value,
+  ) {
+    _usernameDebounce?.cancel();
+
+    _matchController.resetUsernameCheck();
+
+    final validationError = _matchController.validateUsername(
+      value,
+    );
+
+    if (validationError !=
+        null) {
+      // O próprio controller já exibirá o erro assim que
+      // checkUsernameAvailability() for chamado.
+      //
+      // Fazemos a chamada imediatamente apenas para manter
+      // a mensagem visual consistente.
+      unawaited(
+        _matchController.checkUsernameAvailability(
+          value,
+        ),
+      );
+
+      return;
+    }
+
+    _usernameDebounce = Timer(
+      const Duration(
+        milliseconds: 450,
+      ),
+      () {
+        if (!mounted) {
+          return;
+        }
+
+        unawaited(
+          _matchController.checkUsernameAvailability(
+            value,
+          ),
+        );
+      },
+    );
+  }
+
+  // ============================================================
+  // SALVAR USERNAME
+  // ============================================================
+
+  Future<
+    void
+  >
+  _saveUsername() async {
+    if (!mounted ||
+        !_matchController.canSubmitUsername) {
+      return;
+    }
+
+    final saved = await _matchController.saveUsername(
+      _usernameController.text,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    if (!saved) {
+      return;
+    }
+
+    _usernameFocusNode.unfocus();
+
+    // Depois do username, o próximo passo obrigatório passa a
+    // ser o perfil profissional.
+    _matchController.requestProfessionalProfileAttention();
+
+    setState(
+      () {},
+    );
+  }
+
+  // ============================================================
   // OPEN PUBLIC PROFILE
   // ============================================================
 
@@ -761,6 +931,10 @@ class _MatchPageState
     void
   >
   _openPublicProfile() async {
+    if (!_ensureMatchUnlockedForInteraction()) {
+      return;
+    }
+
     final userId = _authenticatedUserId;
 
     if (userId ==
@@ -811,7 +985,8 @@ class _MatchPageState
     void
   >
   _openMatchProjects() async {
-    if (!mounted) {
+    if (!mounted ||
+        !_ensureMatchUnlockedForInteraction()) {
       return;
     }
 
@@ -859,6 +1034,10 @@ class _MatchPageState
   _openUserDemo(
     String userId,
   ) async {
+    if (!_ensureMatchUnlockedForInteraction()) {
+      return;
+    }
+
     final normalizedUserId = userId.trim();
 
     // ==========================================================
@@ -1055,6 +1234,10 @@ class _MatchPageState
   _inviteUserToProject(
     String userId,
   ) async {
+    if (!_ensureMatchUnlockedForInteraction()) {
+      return false;
+    }
+
     if (!mounted ||
         !_isTeamExpansionMode ||
         _isCreatingProjectInvitation) {
@@ -1420,6 +1603,10 @@ class _MatchPageState
   // ============================================================
 
   void _toggleSearchPanel() {
+    if (!_ensureMatchUnlockedForInteraction()) {
+      return;
+    }
+
     setState(
       () {
         _isSearchPanelOpen = !_isSearchPanelOpen;
@@ -1489,6 +1676,10 @@ class _MatchPageState
   _changeDiscoveryMode(
     MatchDiscoveryMode mode,
   ) async {
+    if (!_ensureMatchUnlockedForInteraction()) {
+      return;
+    }
+
     if (!mounted ||
         _isInitializingMatch ||
         _sessionService.isRestarting) {
@@ -1562,6 +1753,10 @@ class _MatchPageState
     void
   >
   _openFilters() async {
+    if (!_ensureMatchUnlockedForInteraction()) {
+      return;
+    }
+
     final result = await MatchFilterSheet.show(
       context: context,
       initialState: _filterState,
@@ -1613,7 +1808,15 @@ class _MatchPageState
     );
 
     try {
-      await _sessionService.refreshProfileAndRestart();
+      await _matchController.refreshMatchOnboarding();
+
+      if (!mounted) {
+        return;
+      }
+
+      if (_matchController.isMatchUnlocked) {
+        await _sessionService.refreshProfileAndRestart();
+      }
 
       await _loadPublicProfile();
     } catch (
@@ -1754,6 +1957,18 @@ class _MatchPageState
             ),
 
             // ==================================================
+            // USERNAME ONBOARDING
+            // ==================================================
+            if (!_isInitializingMatch &&
+                _matchController.requiresUsername) ...[
+              _buildUsernameOnboardingCard(),
+
+              const SizedBox(
+                height: 10,
+              ),
+            ],
+
+            // ==================================================
             // PROFESSIONAL PROFILE
             // ==================================================
             ConnectionProfileCardWidget(
@@ -1773,7 +1988,23 @@ class _MatchPageState
             // ==================================================
             // DISCOVERY MODE
             // ==================================================
-            _buildDiscoveryModeSelector(),
+            GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTap: _matchController.isMatchUnlocked
+                  ? null
+                  : () {
+                      _ensureMatchUnlockedForInteraction();
+                    },
+              child: IgnorePointer(
+                ignoring: !_matchController.isMatchUnlocked,
+                child: Opacity(
+                  opacity: _matchController.isMatchUnlocked
+                      ? 1
+                      : 0.42,
+                  child: _buildDiscoveryModeSelector(),
+                ),
+              ),
+            ),
 
             const SizedBox(
               height: 14,
@@ -1782,80 +2013,96 @@ class _MatchPageState
             // ==================================================
             // DISCOVERY
             // ==================================================
-            Stack(
-              children: [
-                // ==================================================
-                // DISCOVERY CARD
-                // ==================================================
-                //
-                // A chave acompanha o usuário atual para garantir
-                // que o card seja reconstruído corretamente quando
-                // o controller avançar para o próximo candidato.
-                //
-                // ==================================================
-                AnimatedSwitcher(
-                  duration: const Duration(
-                    milliseconds: 220,
-                  ),
-
-                  switchInCurve: Curves.easeOut,
-
-                  switchOutCurve: Curves.easeIn,
-
-                  child: DiscoverySectionWidget(
-                    key:
-                        ValueKey<
-                          String
-                        >(
-                          _matchController.discoveryUser?.id ??
-                              'discovery-empty',
+            GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTap: _matchController.isMatchUnlocked
+                  ? null
+                  : () {
+                      _ensureMatchUnlockedForInteraction();
+                    },
+              child: IgnorePointer(
+                ignoring: !_matchController.isMatchUnlocked,
+                child: Opacity(
+                  opacity: _matchController.isMatchUnlocked
+                      ? 1
+                      : 0.42,
+                  child: Stack(
+                    children: [
+                      // ==================================================
+                      // DISCOVERY CARD
+                      // ==================================================
+                      //
+                      // A chave acompanha o usuário atual para garantir
+                      // que o card seja reconstruído corretamente quando
+                      // o controller avançar para o próximo candidato.
+                      //
+                      // ==================================================
+                      AnimatedSwitcher(
+                        duration: const Duration(
+                          milliseconds: 220,
                         ),
 
-                    controller: _matchController,
+                        switchInCurve: Curves.easeOut,
 
-                    isInitializingMatch:
-                        _isInitializingMatch ||
-                        _isCreatingProjectInvitation,
+                        switchOutCurve: Curves.easeIn,
 
-                    isTeamExpansionMode: _isTeamExpansionMode,
+                        child: DiscoverySectionWidget(
+                          key:
+                              ValueKey<
+                                String
+                              >(
+                                _matchController.discoveryUser?.id ??
+                                    'discovery-empty',
+                              ),
 
-                    onInviteUser: _isTeamExpansionMode
-                        ? _inviteUserToProject
-                        : null,
+                          controller: _matchController,
 
-                    // ============================================
-                    // ASYNC CALLBACK
-                    // ============================================
-                    onListenDemo: _openUserDemo,
-                  ),
-                ),
+                          isInitializingMatch:
+                              _isInitializingMatch ||
+                              _isCreatingProjectInvitation,
 
-                // ==============================================
-                // LOADING
-                // ==============================================
-                if (_isLoadingDemo)
-                  Positioned.fill(
-                    child: IgnorePointer(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(
-                            alpha: 0.30,
-                          ),
+                          isTeamExpansionMode: _isTeamExpansionMode,
 
-                          borderRadius: BorderRadius.circular(
-                            24,
-                          ),
-                        ),
+                          onInviteUser: _isTeamExpansionMode
+                              ? _inviteUserToProject
+                              : null,
 
-                        alignment: Alignment.center,
-
-                        child: CircularProgressIndicator(
-                          color: _matchController.accentNeon,
+                          // ============================================
+                          // ASYNC CALLBACK
+                          // ============================================
+                          onListenDemo: _openUserDemo,
                         ),
                       ),
-                    ),
+
+                      // ==============================================
+                      // LOADING
+                      // ==============================================
+                      if (_isLoadingDemo)
+                        Positioned.fill(
+                          child: IgnorePointer(
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(
+                                  alpha: 0.30,
+                                ),
+
+                                borderRadius: BorderRadius.circular(
+                                  24,
+                                ),
+                              ),
+
+                              alignment: Alignment.center,
+
+                              child: CircularProgressIndicator(
+                                color: _matchController.accentNeon,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
-              ],
+                ),
+              ),
             ),
 
             const SizedBox(
@@ -1863,6 +2110,312 @@ class _MatchPageState
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  // ============================================================
+  // USERNAME ONBOARDING CARD
+  // ============================================================
+
+  Widget _buildUsernameOnboardingCard() {
+    final accentColor = _matchController.accentNeon;
+
+    final message = _matchController.usernameValidationMessage;
+
+    final available = _matchController.usernameAvailable;
+
+    final checking = _matchController.isCheckingUsername;
+
+    final saving = _matchController.isSavingUsername;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(
+        18,
+      ),
+      decoration: BoxDecoration(
+        color: const Color(
+          0xFF17132D,
+        ),
+        borderRadius: BorderRadius.circular(
+          18,
+        ),
+        border: Border.all(
+          color: accentColor.withValues(
+            alpha: 0.28,
+          ),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: accentColor.withValues(
+              alpha: 0.08,
+            ),
+            blurRadius: 22,
+            spreadRadius: 1,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: accentColor.withValues(
+                    alpha: 0.12,
+                  ),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.person_add_alt_1_rounded,
+                  color: accentColor,
+                  size: 19,
+                ),
+              ),
+
+              const SizedBox(
+                width: 12,
+              ),
+
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Complete seu perfil',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+
+                    SizedBox(
+                      height: 3,
+                    ),
+
+                    Text(
+                      'Escolha um username único para continuar no Match.',
+                      style: TextStyle(
+                        color: Colors.white38,
+                        fontSize: 10,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(
+            height: 18,
+          ),
+
+          const Text(
+            'Como você quer ser chamado?',
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+
+          const SizedBox(
+            height: 8,
+          ),
+
+          TextField(
+            controller: _usernameController,
+            focusNode: _usernameFocusNode,
+            enabled: !saving,
+            autocorrect: false,
+            enableSuggestions: false,
+            textInputAction: TextInputAction.done,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+            ),
+            onChanged: _handleUsernameChanged,
+            onSubmitted:
+                (
+                  _,
+                ) {
+                  if (_matchController.canSubmitUsername) {
+                    unawaited(
+                      _saveUsername(),
+                    );
+                  }
+                },
+            decoration: InputDecoration(
+              hintText: 'lucasvinicius',
+              hintStyle: const TextStyle(
+                color: Colors.white24,
+              ),
+              prefixText: '@',
+              prefixStyle: TextStyle(
+                color: accentColor,
+                fontWeight: FontWeight.bold,
+              ),
+              suffixIcon: checking
+                  ? Padding(
+                      padding: const EdgeInsets.all(
+                        13,
+                      ),
+                      child: SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 1.8,
+                          color: accentColor,
+                        ),
+                      ),
+                    )
+                  : available ==
+                        true
+                  ? const Icon(
+                      Icons.check_circle_rounded,
+                      color: Colors.greenAccent,
+                      size: 19,
+                    )
+                  : available ==
+                        false
+                  ? const Icon(
+                      Icons.cancel_rounded,
+                      color: Colors.redAccent,
+                      size: 19,
+                    )
+                  : null,
+              filled: true,
+              fillColor: Colors.white.withValues(
+                alpha: 0.035,
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(
+                  12,
+                ),
+                borderSide: BorderSide(
+                  color: Colors.white.withValues(
+                    alpha: 0.08,
+                  ),
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(
+                  12,
+                ),
+                borderSide: BorderSide(
+                  color: accentColor.withValues(
+                    alpha: 0.65,
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          if (message !=
+              null) ...[
+            const SizedBox(
+              height: 8,
+            ),
+
+            Row(
+              children: [
+                if (checking)
+                  SizedBox(
+                    width: 13,
+                    height: 13,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 1.6,
+                      color: accentColor,
+                    ),
+                  )
+                else
+                  Icon(
+                    available ==
+                            true
+                        ? Icons.check_circle_rounded
+                        : Icons.cancel_rounded,
+                    size: 14,
+                    color:
+                        available ==
+                            true
+                        ? Colors.greenAccent
+                        : Colors.redAccent,
+                  ),
+
+                const SizedBox(
+                  width: 6,
+                ),
+
+                Flexible(
+                  child: Text(
+                    message,
+                    style: TextStyle(
+                      color: checking
+                          ? Colors.white38
+                          : available ==
+                                true
+                          ? Colors.greenAccent
+                          : Colors.redAccent,
+                      fontSize: 10,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+
+          const SizedBox(
+            height: 16,
+          ),
+
+          Align(
+            alignment: Alignment.centerRight,
+            child: FilledButton(
+              onPressed: _matchController.canSubmitUsername
+                  ? () {
+                      unawaited(
+                        _saveUsername(),
+                      );
+                    }
+                  : null,
+              style: FilledButton.styleFrom(
+                backgroundColor: accentColor,
+                foregroundColor: Colors.black,
+                disabledBackgroundColor: Colors.white.withValues(
+                  alpha: 0.05,
+                ),
+                disabledForegroundColor: Colors.white24,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 12,
+                ),
+              ),
+              child: saving
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 1.8,
+                        color: Colors.black,
+                      ),
+                    )
+                  : const Text(
+                      'CONTINUAR',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.6,
+                      ),
+                    ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -2514,6 +3067,14 @@ class _MatchPageState
     _publicProfileController.removeListener(
       _handleStateChange,
     );
+
+    _usernameDebounce?.cancel();
+
+    _usernameDebounce = null;
+
+    _usernameController.dispose();
+
+    _usernameFocusNode.dispose();
 
     _searchTextController.dispose();
 

@@ -204,6 +204,61 @@ class StudioController
   get rhymeLibrary => timelineController.rhymeLibrary;
 
   // ============================================================
+  // BIBLIOTECA GLOBAL NORMALIZADA
+  // ============================================================
+  //
+  // Fonte única usada por:
+  //
+  // - modal da Timeline;
+  // - LyricEditor;
+  // - SuggestionBalloon;
+  //
+  // Evita snapshots paralelos e listas antigas.
+  //
+  // ============================================================
+
+  List<
+    String
+  >
+  get normalizedRhymeLibrary {
+    final seen =
+        <
+          String
+        >{};
+
+    final result =
+        <
+          String
+        >[];
+
+    for (final rawWord in timelineController.rhymeLibrary) {
+      final word = rawWord.trim();
+
+      if (word.isEmpty) {
+        continue;
+      }
+
+      final normalized = word.toLowerCase();
+
+      if (!seen.add(
+        normalized,
+      )) {
+        continue;
+      }
+
+      result.add(
+        word,
+      );
+    }
+
+    return List<
+      String
+    >.unmodifiable(
+      result,
+    );
+  }
+
+  // ============================================================
   // MIND MAP - GETTERS COMPATÍVEIS
   // ============================================================
 
@@ -234,6 +289,30 @@ class StudioController
 
   void syncGlobalRhymesToTimeline() {
     timelineController.syncGlobalRhymesToTimeline();
+  }
+
+  // ============================================================
+  // RECARREGAR BIBLIOTECA GLOBAL
+  // ============================================================
+  //
+  // Mantém a responsabilidade de carregamento no RhymesController
+  // e apenas sincroniza o resultado com o Studio.
+  //
+  // ============================================================
+
+  Future<
+    void
+  >
+  reloadRhymeLibrary() async {
+    await rhymesController.carregarDadosUsuario();
+
+    if (_isDisposed) {
+      return;
+    }
+
+    timelineController.syncGlobalRhymesToTimeline();
+
+    notifyListeners();
   }
 
   // ============================================================

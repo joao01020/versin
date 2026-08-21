@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 // ============================================================
 // DASHBOARD UI PREFERENCES SERVICE
@@ -13,7 +15,32 @@ import 'package:shared_preferences/shared_preferences.dart';
 // - modos de visualização;
 // - outras preferências de interface.
 //
-// IMPORTANTE:
+// ============================================================
+// ISOLAMENTO POR USUÁRIO
+// ============================================================
+//
+// Cada usuário possui suas próprias chaves.
+//
+// Exemplo:
+//
+// dashboard_ui_v2.<USER_ID>.profile_card_expanded
+// dashboard_ui_v2.<USER_ID>.ai_monthly_card_expanded
+//
+// Dessa forma:
+//
+// Conta A
+//   ↓
+// preferências A
+//
+// Conta B
+//   ↓
+// preferências B
+//
+// Uma conta nunca reutiliza o estado visual da outra.
+//
+// ============================================================
+// IMPORTANTE
+// ============================================================
 //
 // Este service NÃO deve armazenar:
 //
@@ -21,27 +48,84 @@ import 'package:shared_preferences/shared_preferences.dart';
 // - API keys;
 // - senhas;
 // - JWT;
-// - dados de autenticação;
+// - refresh tokens;
 // - informações sensíveis.
 //
-// SharedPreferences é utilizado apenas para preferências locais
-// de interface.
+// SharedPreferences é utilizado somente para preferências
+// locais de interface.
 //
 // ============================================================
 
 class DashboardUiPreferencesService {
   // ============================================================
-  // KEYS
+  // SUPABASE
   // ============================================================
 
-  static const String _aiMonthlyCardExpandedKey =
-      'dashboard_ai_monthly_card_expanded';
+  final SupabaseClient _supabase;
 
-  static const String _profileCardExpandedKey =
-      'dashboard_profile_card_expanded';
+  // ============================================================
+  // CONSTRUTOR
+  // ============================================================
+  //
+  // Permitir injetar SupabaseClient melhora:
+  //
+  // - testabilidade;
+  // - desacoplamento;
+  // - mocks;
+  // - testes unitários.
+  //
+  // No aplicativo normal:
+  //
+  // DashboardUiPreferencesService()
+  //
+  // continua funcionando sem alterações.
+  //
+  // ============================================================
 
-  static const String _statisticsCardExpandedKey =
-      'dashboard_statistics_card_expanded';
+  DashboardUiPreferencesService({
+    SupabaseClient? supabase,
+  }) : _supabase =
+           supabase ??
+           Supabase.instance.client;
+
+  // ============================================================
+  // NAMESPACE
+  // ============================================================
+
+  static const String _namespace = 'dashboard_ui_v2';
+
+  // ============================================================
+  // SUFIXOS DAS PREFERÊNCIAS
+  // ============================================================
+
+  static const String _aiMonthlyCardExpandedPreference = 'ai_monthly_card_expanded';
+
+  static const String _profileCardExpandedPreference = 'profile_card_expanded';
+
+  static const String _statisticsCardExpandedPreference = 'statistics_card_expanded';
+
+  // ============================================================
+  // CHAVES LEGADAS
+  // ============================================================
+  //
+  // Essas eram globais.
+  //
+  // Não migramos os valores porque não existe uma forma segura
+  // de saber a qual usuário eles pertenciam.
+  //
+  // ============================================================
+
+  static const String _legacyAiMonthlyCardExpandedKey = 'dashboard_ai_monthly_card_expanded';
+
+  static const String _legacyProfileCardExpandedKey = 'dashboard_profile_card_expanded';
+
+  static const String _legacyStatisticsCardExpandedKey = 'dashboard_statistics_card_expanded';
+
+  // ============================================================
+  // LEGACY CLEANUP MARKER
+  // ============================================================
+
+  static const String _legacyCleanupMarker = 'dashboard_ui_v2_legacy_cleanup_done';
 
   // ============================================================
   // DEFAULT VALUES
@@ -54,154 +138,513 @@ class DashboardUiPreferencesService {
   static const bool _defaultStatisticsCardExpanded = true;
 
   // ============================================================
-  // LOAD AI MONTHLY CARD EXPANDED
+  // CURRENT USER ID
   // ============================================================
 
-  Future<bool> loadAiMonthlyCardExpanded() async {
-    try {
-      final preferences = await SharedPreferences.getInstance();
+  String? _currentUserId() {
+    final userId = _supabase.auth.currentUser?.id.trim();
 
-      return preferences.getBool(_aiMonthlyCardExpandedKey) ??
-          _defaultAiMonthlyCardExpanded;
-    } catch (_) {
-      return _defaultAiMonthlyCardExpanded;
+    if (userId ==
+            null ||
+        userId.isEmpty) {
+      return null;
+    }
+
+    return userId;
+  }
+
+  // ============================================================
+  // BUILD USER KEY
+  // ============================================================
+  //
+  // IMPORTANTE:
+  //
+  // Capturamos o userId antes de qualquer operação async.
+  //
+  // Isso evita situações como:
+  //
+  // Conta A inicia uma gravação
+  //      ↓
+  // usuário troca para B
+  //      ↓
+  // operação termina usando a conta errada
+  //
+  // ============================================================
+
+  String _buildUserKey({
+    required String userId,
+    required String preference,
+  }) {
+    final normalizedUserId = _normalizeUserIdForKey(
+      userId,
+    );
+
+    return '$_namespace.'
+        '$normalizedUserId.'
+        '$preference';
+  }
+
+  // ============================================================
+  // NORMALIZE USER ID
+  // ============================================================
+
+  String _normalizeUserIdForKey(
+    String userId,
+  ) {
+    final normalized = userId.trim().replaceAll(
+      RegExp(
+        r'[^a-zA-Z0-9_-]',
+      ),
+      '_',
+    );
+
+    if (normalized.isEmpty) {
+      throw ArgumentError(
+        'userId inválido para preferência local.',
+      );
+    }
+
+    return normalized;
+  }
+
+  // ============================================================
+  // PREPARE PREFERENCES
+  // ============================================================
+
+  Future<
+    SharedPreferences
+  >
+  _preferences() async {
+    final preferences = await SharedPreferences.getInstance();
+
+    await _removeLegacyGlobalPreferences(
+      preferences,
+    );
+
+    return preferences;
+  }
+
+  // ============================================================
+  // REMOVE LEGACY GLOBAL PREFERENCES
+  // ============================================================
+  //
+  // Executado somente uma vez neste dispositivo.
+  //
+  // Os valores antigos são removidos em vez de migrados porque
+  // poderiam pertencer a outra conta.
+  //
+  // ============================================================
+
+  Future<
+    void
+  >
+  _removeLegacyGlobalPreferences(
+    SharedPreferences preferences,
+  ) async {
+    final alreadyCleaned =
+        preferences.getBool(
+          _legacyCleanupMarker,
+        ) ??
+        false;
+
+    if (alreadyCleaned) {
+      return;
+    }
+
+    await preferences.remove(
+      _legacyAiMonthlyCardExpandedKey,
+    );
+
+    await preferences.remove(
+      _legacyProfileCardExpandedKey,
+    );
+
+    await preferences.remove(
+      _legacyStatisticsCardExpandedKey,
+    );
+
+    await preferences.setBool(
+      _legacyCleanupMarker,
+      true,
+    );
+
+    debugPrint(
+      '[DASHBOARD UI] '
+      'Preferências globais legadas removidas.',
+    );
+  }
+
+  // ============================================================
+  // LOAD BOOL
+  // ============================================================
+
+  Future<
+    bool
+  >
+  _loadBool({
+    required String preference,
+    required bool defaultValue,
+  }) async {
+    // ==========================================================
+    // CAPTURAR USUÁRIO
+    // ==========================================================
+
+    final userId = _currentUserId();
+
+    // ==========================================================
+    // SEM USUÁRIO
+    // ==========================================================
+    //
+    // Não reutilizamos preferências de qualquer outra conta.
+    //
+    // ==========================================================
+
+    if (userId ==
+        null) {
+      return defaultValue;
+    }
+
+    try {
+      final preferences = await _preferences();
+
+      final key = _buildUserKey(
+        userId: userId,
+
+        preference: preference,
+      );
+
+      return preferences.getBool(
+            key,
+          ) ??
+          defaultValue;
+    } catch (
+      error,
+      stackTrace
+    ) {
+      debugPrint(
+        '[DASHBOARD UI] '
+        'Erro ao carregar preferência '
+        '$preference: $error',
+      );
+
+      debugPrint(
+        '$stackTrace',
+      );
+
+      return defaultValue;
     }
   }
 
   // ============================================================
-  // SAVE AI MONTHLY CARD EXPANDED
+  // SAVE BOOL
   // ============================================================
 
-  Future<bool> saveAiMonthlyCardExpanded(bool isExpanded) async {
-    try {
-      final preferences = await SharedPreferences.getInstance();
+  Future<
+    bool
+  >
+  _saveBool({
+    required String preference,
+    required bool value,
+  }) async {
+    // ==========================================================
+    // CAPTURAR USUÁRIO
+    // ==========================================================
 
-      return await preferences.setBool(_aiMonthlyCardExpandedKey, isExpanded);
-    } catch (_) {
+    final userId = _currentUserId();
+
+    // ==========================================================
+    // SEM USUÁRIO
+    // ==========================================================
+
+    if (userId ==
+        null) {
+      debugPrint(
+        '[DASHBOARD UI] '
+        'Preferência não salva: '
+        'nenhum usuário autenticado.',
+      );
+
+      return false;
+    }
+
+    try {
+      final preferences = await _preferences();
+
+      final key = _buildUserKey(
+        userId: userId,
+
+        preference: preference,
+      );
+
+      return await preferences.setBool(
+        key,
+        value,
+      );
+    } catch (
+      error,
+      stackTrace
+    ) {
+      debugPrint(
+        '[DASHBOARD UI] '
+        'Erro ao salvar preferência '
+        '$preference: $error',
+      );
+
+      debugPrint(
+        '$stackTrace',
+      );
+
       return false;
     }
   }
 
   // ============================================================
-  // RESET AI MONTHLY CARD EXPANDED
+  // RESET BOOL
   // ============================================================
 
-  Future<bool> resetAiMonthlyCardExpanded() async {
-    try {
-      final preferences = await SharedPreferences.getInstance();
+  Future<
+    bool
+  >
+  _resetBool({
+    required String preference,
+  }) async {
+    final userId = _currentUserId();
 
-      return await preferences.remove(_aiMonthlyCardExpandedKey);
-    } catch (_) {
+    if (userId ==
+        null) {
+      return false;
+    }
+
+    try {
+      final preferences = await _preferences();
+
+      final key = _buildUserKey(
+        userId: userId,
+
+        preference: preference,
+      );
+
+      return await preferences.remove(
+        key,
+      );
+    } catch (
+      error,
+      stackTrace
+    ) {
+      debugPrint(
+        '[DASHBOARD UI] '
+        'Erro ao limpar preferência '
+        '$preference: $error',
+      );
+
+      debugPrint(
+        '$stackTrace',
+      );
+
       return false;
     }
   }
 
   // ============================================================
-  // LOAD PROFILE CARD EXPANDED
+  // AI MONTHLY CARD
   // ============================================================
 
-  Future<bool> loadProfileCardExpanded() async {
-    try {
-      final preferences = await SharedPreferences.getInstance();
+  Future<
+    bool
+  >
+  loadAiMonthlyCardExpanded() {
+    return _loadBool(
+      preference: _aiMonthlyCardExpandedPreference,
 
-      return preferences.getBool(_profileCardExpandedKey) ??
-          _defaultProfileCardExpanded;
-    } catch (_) {
-      return _defaultProfileCardExpanded;
-    }
+      defaultValue: _defaultAiMonthlyCardExpanded,
+    );
+  }
+
+  Future<
+    bool
+  >
+  saveAiMonthlyCardExpanded(
+    bool isExpanded,
+  ) {
+    return _saveBool(
+      preference: _aiMonthlyCardExpandedPreference,
+
+      value: isExpanded,
+    );
+  }
+
+  Future<
+    bool
+  >
+  resetAiMonthlyCardExpanded() {
+    return _resetBool(
+      preference: _aiMonthlyCardExpandedPreference,
+    );
   }
 
   // ============================================================
-  // SAVE PROFILE CARD EXPANDED
+  // PROFILE CARD
   // ============================================================
 
-  Future<bool> saveProfileCardExpanded(bool isExpanded) async {
-    try {
-      final preferences = await SharedPreferences.getInstance();
+  Future<
+    bool
+  >
+  loadProfileCardExpanded() {
+    return _loadBool(
+      preference: _profileCardExpandedPreference,
 
-      return await preferences.setBool(_profileCardExpandedKey, isExpanded);
-    } catch (_) {
-      return false;
-    }
+      defaultValue: _defaultProfileCardExpanded,
+    );
+  }
+
+  Future<
+    bool
+  >
+  saveProfileCardExpanded(
+    bool isExpanded,
+  ) {
+    return _saveBool(
+      preference: _profileCardExpandedPreference,
+
+      value: isExpanded,
+    );
+  }
+
+  Future<
+    bool
+  >
+  resetProfileCardExpanded() {
+    return _resetBool(
+      preference: _profileCardExpandedPreference,
+    );
   }
 
   // ============================================================
-  // RESET PROFILE CARD EXPANDED
+  // STATISTICS CARD
   // ============================================================
 
-  Future<bool> resetProfileCardExpanded() async {
-    try {
-      final preferences = await SharedPreferences.getInstance();
+  Future<
+    bool
+  >
+  loadStatisticsCardExpanded() {
+    return _loadBool(
+      preference: _statisticsCardExpandedPreference,
 
-      return await preferences.remove(_profileCardExpandedKey);
-    } catch (_) {
-      return false;
-    }
+      defaultValue: _defaultStatisticsCardExpanded,
+    );
   }
 
-  // ============================================================
-  // LOAD STATISTICS CARD EXPANDED
-  // ============================================================
+  Future<
+    bool
+  >
+  saveStatisticsCardExpanded(
+    bool isExpanded,
+  ) {
+    return _saveBool(
+      preference: _statisticsCardExpandedPreference,
 
-  Future<bool> loadStatisticsCardExpanded() async {
-    try {
-      final preferences = await SharedPreferences.getInstance();
-
-      return preferences.getBool(_statisticsCardExpandedKey) ??
-          _defaultStatisticsCardExpanded;
-    } catch (_) {
-      return _defaultStatisticsCardExpanded;
-    }
+      value: isExpanded,
+    );
   }
 
-  // ============================================================
-  // SAVE STATISTICS CARD EXPANDED
-  // ============================================================
-
-  Future<bool> saveStatisticsCardExpanded(bool isExpanded) async {
-    try {
-      final preferences = await SharedPreferences.getInstance();
-
-      return await preferences.setBool(_statisticsCardExpandedKey, isExpanded);
-    } catch (_) {
-      return false;
-    }
-  }
-
-  // ============================================================
-  // RESET STATISTICS CARD EXPANDED
-  // ============================================================
-
-  Future<bool> resetStatisticsCardExpanded() async {
-    try {
-      final preferences = await SharedPreferences.getInstance();
-
-      return await preferences.remove(_statisticsCardExpandedKey);
-    } catch (_) {
-      return false;
-    }
+  Future<
+    bool
+  >
+  resetStatisticsCardExpanded() {
+    return _resetBool(
+      preference: _statisticsCardExpandedPreference,
+    );
   }
 
   // ============================================================
   // RESET DASHBOARD PREFERENCES
   // ============================================================
+  //
+  // Remove SOMENTE as preferências da conta atual.
+  //
+  // Não altera:
+  //
+  // - preferências de outras contas;
+  // - login;
+  // - sessão;
+  // - caches de outros módulos.
+  //
+  // ============================================================
 
-  Future<void> resetDashboardPreferences() async {
+  Future<
+    bool
+  >
+  resetDashboardPreferences() async {
+    final userId = _currentUserId();
+
+    if (userId ==
+        null) {
+      return false;
+    }
+
     try {
-      final preferences = await SharedPreferences.getInstance();
+      final preferences = await _preferences();
 
-      const dashboardKeys = <String>[
-        _aiMonthlyCardExpandedKey,
-        _profileCardExpandedKey,
-        _statisticsCardExpandedKey,
-      ];
+      final keys =
+          <
+            String
+          >[
+            _buildUserKey(
+              userId: userId,
 
-      for (final key in dashboardKeys) {
-        await preferences.remove(key);
+              preference: _aiMonthlyCardExpandedPreference,
+            ),
+
+            _buildUserKey(
+              userId: userId,
+
+              preference: _profileCardExpandedPreference,
+            ),
+
+            _buildUserKey(
+              userId: userId,
+
+              preference: _statisticsCardExpandedPreference,
+            ),
+          ];
+
+      var success = true;
+
+      for (final key in keys) {
+        final removed = await preferences.remove(
+          key,
+        );
+
+        if (!removed &&
+            preferences.containsKey(
+              key,
+            )) {
+          success = false;
+        }
       }
-    } catch (_) {
-      // Uma falha ao limpar preferências visuais não deve
-      // interromper o funcionamento do aplicativo.
+
+      debugPrint(
+        '[DASHBOARD UI] '
+        'Preferências do Dashboard '
+        'da conta atual removidas.',
+      );
+
+      return success;
+    } catch (
+      error,
+      stackTrace
+    ) {
+      debugPrint(
+        '[DASHBOARD UI] '
+        'Erro ao resetar preferências '
+        'do Dashboard: $error',
+      );
+
+      debugPrint(
+        '$stackTrace',
+      );
+
+      return false;
     }
   }
 }

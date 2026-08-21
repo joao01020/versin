@@ -1,31 +1,17 @@
 import 'package:flutter/material.dart';
 
-class LyricEditor
-    extends
-        StatefulWidget {
+class LyricEditor extends StatefulWidget {
   final TextEditingController controller;
 
   final Color activeColor;
 
-  final ValueChanged<
-    String
-  >
-  onSelectionChanged;
+  final ValueChanged<String> onSelectionChanged;
 
-  final ValueChanged<
-    String
-  >
-  onAddToMap;
+  final ValueChanged<String> onAddToMap;
 
-  final ValueChanged<
-    String
-  >
-  onAddToTimeline;
+  final ValueChanged<String> onAddToTimeline;
 
-  final ValueChanged<
-    String
-  >
-  onAskChat;
+  final ValueChanged<String> onAskChat;
 
   const LyricEditor({
     super.key,
@@ -38,17 +24,10 @@ class LyricEditor
   });
 
   @override
-  State<
-    LyricEditor
-  >
-  createState() => _LyricEditorState();
+  State<LyricEditor> createState() => _LyricEditorState();
 }
 
-class _LyricEditorState
-    extends
-        State<
-          LyricEditor
-        > {
+class _LyricEditorState extends State<LyricEditor> {
   String _selectedText = '';
 
   // ============================================================
@@ -68,66 +47,43 @@ class _LyricEditorState
   void initState() {
     super.initState();
 
-    widget.controller.addListener(
-      _handleControllerChanged,
-    );
+    widget.controller.addListener(_handleControllerChanged);
 
-    WidgetsBinding.instance.addPostFrameCallback(
-      (
-        _,
-      ) {
-        if (!mounted) {
-          return;
-        }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
 
-        _updateSelection();
-      },
-    );
+      _updateSelection();
+    });
   }
 
   @override
-  void didUpdateWidget(
-    covariant LyricEditor oldWidget,
-  ) {
-    super.didUpdateWidget(
-      oldWidget,
-    );
+  void didUpdateWidget(covariant LyricEditor oldWidget) {
+    super.didUpdateWidget(oldWidget);
 
-    if (identical(
-      oldWidget.controller,
-      widget.controller,
-    )) {
+    if (identical(oldWidget.controller, widget.controller)) {
       return;
     }
 
-    oldWidget.controller.removeListener(
-      _handleControllerChanged,
-    );
+    oldWidget.controller.removeListener(_handleControllerChanged);
 
-    widget.controller.addListener(
-      _handleControllerChanged,
-    );
+    widget.controller.addListener(_handleControllerChanged);
 
     _selectedText = '';
 
-    WidgetsBinding.instance.addPostFrameCallback(
-      (
-        _,
-      ) {
-        if (!mounted) {
-          return;
-        }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
 
-        _updateSelection();
-      },
-    );
+      _updateSelection();
+    });
   }
 
   @override
   void dispose() {
-    widget.controller.removeListener(
-      _handleControllerChanged,
-    );
+    widget.controller.removeListener(_handleControllerChanged);
 
     super.dispose();
   }
@@ -147,18 +103,13 @@ class _LyricEditorState
   void _updateSelection() {
     final selection = widget.controller.selection;
 
-    if (!selection.isValid ||
-        selection.isCollapsed) {
+    if (!selection.isValid || selection.isCollapsed) {
       if (_selectedText.isNotEmpty) {
-        setState(
-          () {
-            _selectedText = '';
-          },
-        );
+        setState(() {
+          _selectedText = '';
+        });
 
-        widget.onSelectionChanged(
-          '',
-        );
+        widget.onSelectionChanged('');
       }
 
       return;
@@ -166,34 +117,21 @@ class _LyricEditorState
 
     final text = widget.controller.text;
 
-    if (selection.start <
-            0 ||
-        selection.end >
-            text.length) {
+    if (selection.start < 0 || selection.end > text.length) {
       return;
     }
 
-    final selected = text
-        .substring(
-          selection.start,
-          selection.end,
-        )
-        .trim();
+    final selected = text.substring(selection.start, selection.end).trim();
 
-    if (selected ==
-        _selectedText) {
+    if (selected == _selectedText) {
       return;
     }
 
-    setState(
-      () {
-        _selectedText = selected;
-      },
-    );
+    setState(() {
+      _selectedText = selected;
+    });
 
-    widget.onSelectionChanged(
-      selected,
-    );
+    widget.onSelectionChanged(selected);
   }
 
   // ============================================================
@@ -207,9 +145,7 @@ class _LyricEditorState
       return;
     }
 
-    widget.onAddToMap(
-      text,
-    );
+    widget.onAddToMap(text);
   }
 
   void _addToTimeline() {
@@ -219,9 +155,7 @@ class _LyricEditorState
       return;
     }
 
-    widget.onAddToTimeline(
-      text,
-    );
+    widget.onAddToTimeline(text);
   }
 
   void _askChat() {
@@ -231,9 +165,7 @@ class _LyricEditorState
       return;
     }
 
-    widget.onAskChat(
-      text,
-    );
+    widget.onAskChat(text);
   }
 
   // ============================================================
@@ -241,22 +173,12 @@ class _LyricEditorState
   // ============================================================
 
   @override
-  Widget build(
-    BuildContext context,
-  ) {
+  Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(
-          0xFF111111,
-        ),
-        borderRadius: BorderRadius.circular(
-          18,
-        ),
-        border: Border.all(
-          color: Colors.white.withValues(
-            alpha: 0.05,
-          ),
-        ),
+        color: const Color(0xFF111111),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -265,12 +187,7 @@ class _LyricEditorState
           // HEADER
           // ====================================================
           Padding(
-            padding: const EdgeInsets.fromLTRB(
-              18,
-              16,
-              18,
-              10,
-            ),
+            padding: const EdgeInsets.fromLTRB(18, 16, 18, 10),
             child: Row(
               children: [
                 const Text(
@@ -289,9 +206,7 @@ class _LyricEditorState
                   Text(
                     'Trecho selecionado',
                     style: TextStyle(
-                      color: widget.activeColor.withValues(
-                        alpha: 0.7,
-                      ),
+                      color: widget.activeColor.withValues(alpha: 0.7),
                       fontSize: 11,
                     ),
                   ),
@@ -299,36 +214,24 @@ class _LyricEditorState
             ),
           ),
 
-          const Divider(
-            height: 1,
-            color: Colors.white10,
-          ),
+          const Divider(height: 1, color: Colors.white10),
 
           // ====================================================
           // EDITOR
           // ====================================================
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.all(
-                18,
-              ),
+              padding: const EdgeInsets.all(18),
               child: Listener(
-                onPointerUp:
-                    (
-                      _,
-                    ) {
-                      WidgetsBinding.instance.addPostFrameCallback(
-                        (
-                          _,
-                        ) {
-                          if (!mounted) {
-                            return;
-                          }
+                onPointerUp: (_) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (!mounted) {
+                      return;
+                    }
 
-                          _updateSelection();
-                        },
-                      );
-                    },
+                    _updateSelection();
+                  });
+                },
                 child: TextField(
                   controller: widget.controller,
                   expands: true,
@@ -346,37 +249,27 @@ class _LyricEditorState
                   ),
                   decoration: const InputDecoration(
                     hintText: 'Comece a escrever sua música...',
-                    hintStyle: TextStyle(
-                      color: Colors.white24,
-                      fontSize: 16,
-                    ),
+                    hintStyle: TextStyle(color: Colors.white24, fontSize: 16),
                     border: InputBorder.none,
                     isCollapsed: true,
                   ),
-                  onChanged:
-                      (
-                        _,
-                      ) {
-                        // O StudioController já escuta este mesmo
-                        // TextEditingController e salva a letra no
-                        // SongProject da sessão.
-                        //
-                        // Aqui apenas mantemos a seleção visual
-                        // sincronizada após alterações no texto.
-                        _updateSelection();
-                      },
+                  onChanged: (_) {
+                    // O StudioController já escuta este mesmo
+                    // TextEditingController e salva a letra no
+                    // SongProject da sessão.
+                    //
+                    // Aqui apenas mantemos a seleção visual
+                    // sincronizada após alterações no texto.
+                    _updateSelection();
+                  },
                   onTap: () {
-                    WidgetsBinding.instance.addPostFrameCallback(
-                      (
-                        _,
-                      ) {
-                        if (!mounted) {
-                          return;
-                        }
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (!mounted) {
+                        return;
+                      }
 
-                        _updateSelection();
-                      },
-                    );
+                      _updateSelection();
+                    });
                   },
                 ),
               ),
@@ -387,27 +280,14 @@ class _LyricEditorState
           // BARRA DE AÇÕES DA SELEÇÃO
           // ====================================================
           AnimatedSwitcher(
-            duration: const Duration(
-              milliseconds: 200,
-            ),
+            duration: const Duration(milliseconds: 200),
             child: _selectedText.isEmpty
                 ? const SizedBox.shrink()
                 : Container(
-                    key: ValueKey(
-                      _selectedText,
-                    ),
-                    padding: const EdgeInsets.fromLTRB(
-                      14,
-                      10,
-                      14,
-                      14,
-                    ),
+                    key: ValueKey(_selectedText),
+                    padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
                     decoration: const BoxDecoration(
-                      border: Border(
-                        top: BorderSide(
-                          color: Colors.white10,
-                        ),
-                      ),
+                      border: Border(top: BorderSide(color: Colors.white10)),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -422,12 +302,8 @@ class _LyricEditorState
                             vertical: 8,
                           ),
                           decoration: BoxDecoration(
-                            color: widget.activeColor.withValues(
-                              alpha: 0.06,
-                            ),
-                            borderRadius: BorderRadius.circular(
-                              10,
-                            ),
+                            color: widget.activeColor.withValues(alpha: 0.06),
+                            borderRadius: BorderRadius.circular(10),
                           ),
                           child: Text(
                             '"$_selectedText"',
@@ -441,9 +317,7 @@ class _LyricEditorState
                           ),
                         ),
 
-                        const SizedBox(
-                          height: 10,
-                        ),
+                        const SizedBox(height: 10),
 
                         // ======================================
                         // BOTÕES
@@ -488,9 +362,7 @@ class _LyricEditorState
 // BOTÃO DE AÇÃO
 // ============================================================
 
-class _SelectionAction
-    extends
-        StatelessWidget {
+class _SelectionAction extends StatelessWidget {
   final IconData icon;
   final String label;
   final Color activeColor;
@@ -504,46 +376,25 @@ class _SelectionAction
   });
 
   @override
-  Widget build(
-    BuildContext context,
-  ) {
+  Widget build(BuildContext context) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(
-          10,
-        ),
+        borderRadius: BorderRadius.circular(10),
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.symmetric(
-            horizontal: 12,
-            vertical: 8,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
-            color: activeColor.withValues(
-              alpha: 0.08,
-            ),
-            borderRadius: BorderRadius.circular(
-              10,
-            ),
-            border: Border.all(
-              color: activeColor.withValues(
-                alpha: 0.18,
-              ),
-            ),
+            color: activeColor.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: activeColor.withValues(alpha: 0.18)),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                icon,
-                size: 15,
-                color: activeColor,
-              ),
+              Icon(icon, size: 15, color: activeColor),
 
-              const SizedBox(
-                width: 6,
-              ),
+              const SizedBox(width: 6),
 
               Text(
                 label,

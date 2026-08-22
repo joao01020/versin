@@ -759,27 +759,22 @@ class ChatController
     }
 
     // ========================================================
-    // PRIMEIRA ETAPA — IMAGINAÇÃO
+    // CHAT NORMAL
     // ========================================================
     //
-    // Mesmo que o Gate considere a mensagem criativa o bastante
-    // para IA, a primeira etapa continua usando o Brain/local.
-    // Isso mantém a descoberta inicial sem gastar tokens.
+    // Desde a primeira mensagem:
+    //
+    // - NÃO extraímos palavras automaticamente;
+    // - NÃO salvamos conteúdo na biblioteca;
+    // - NÃO usamos a etapa de imaginação como interceptador;
+    // - a mensagem segue o fluxo normal da conversa.
+    //
+    // Rimas explícitas continuam sendo tratadas acima pelo
+    // ChatIntent.rhymeSearch.
     //
     // ========================================================
 
-    if (creationStage ==
-        ChatCreationStage.imagination) {
-      await _processInitialImagination(
-        text,
-      );
-
-      return;
-    }
-
-    // ========================================================
-    // IA — SOMENTE QUANDO REALMENTE NECESSÁRIA
-    // ========================================================
+    creationStage = ChatCreationStage.writing;
 
     await _sendToAi(
       text,
@@ -1100,184 +1095,31 @@ class ChatController
   _processInitialImagination(
     String text,
   ) async {
-    final brainController = brain;
+    // ==========================================================
+    // COMPATIBILIDADE
+    // ==========================================================
+    //
+    // O fluxo antigo analisava a primeira mensagem e salvava
+    // palavras automaticamente na biblioteca.
+    //
+    // Isso foi removido.
+    //
+    // A biblioteca agora só deve ser alterada por ações
+    // explícitas do usuário em recursos próprios de vocabulário,
+    // rimas ou Studio.
+    //
+    // ==========================================================
 
-    if (brainController !=
-        null) {
-      final vision = brainController.analyzeCreativeInput(
-        text,
-      );
+    final normalized = text.trim();
 
-      final originalWords = vision.originalWords;
-
-      final addedCount = await rhymesController.addWords(
-        originalWords,
-      );
-
-      creationStage = ChatCreationStage.writing;
-
-      if (vision.isEmpty) {
-        messages.add(
-          ChatMessage(
-            role: ChatRole.assistant,
-            content:
-                'Ainda está bem aberto — e tudo bem.\n\n'
-                'Joga mais algumas imagens, sensações ou palavras soltas. '
-                'Não precisa rimar nem tentar encontrar um tema agora.',
-          ),
-        );
-
-        notifyListeners();
-
-        _scrollToBottom();
-
-        return;
-      }
-
-      final originalText = originalWords.isNotEmpty
-          ? originalWords.join(
-              ' • ',
-            )
-          : '';
-
-      final discoveries = brainController.creativeDiscoveries;
-
-      final discoveriesText = discoveries.isNotEmpty
-          ? discoveries
-                .take(
-                  6,
-                )
-                .join(
-                  ' • ',
-                )
-          : '';
-
-      final saveMessage =
-          addedCount >
-              0
-          ? 'Guardei $addedCount palavra${addedCount == 1 ? '' : 's'} '
-                'da sua visão na biblioteca.'
-          : 'As palavras principais dessa visão já estavam na sua biblioteca.';
-
-      final buffer = StringBuffer();
-
-      buffer.writeln(
-        'Estou começando a enxergar algo aqui.',
-      );
-
-      buffer.writeln();
-
-      if (vision.summary.trim().isNotEmpty) {
-        buffer.writeln(
-          vision.summary.trim(),
-        );
-      }
-
-      if (originalText.isNotEmpty) {
-        buffer.writeln();
-
-        buffer.writeln(
-          'O que veio de você:',
-        );
-
-        buffer.writeln(
-          originalText,
-        );
-      }
-
-      if (discoveriesText.isNotEmpty) {
-        buffer.writeln();
-
-        buffer.writeln(
-          'Alguns caminhos que apareceram:',
-        );
-
-        buffer.writeln(
-          discoveriesText,
-        );
-      }
-
-      buffer.writeln();
-
-      buffer.writeln(
-        saveMessage,
-      );
-
-      buffer.writeln();
-
-      buffer.write(
-        'Agora começa a escrever sem tentar fechar a música cedo demais. '
-        'Use esses caminhos se eles fizerem sentido — ou quebra tudo e segue outro.',
-      );
-
-      messages.add(
-        ChatMessage(
-          role: ChatRole.assistant,
-          content: buffer.toString(),
-        ),
-      );
-
-      notifyListeners();
-
-      _scrollToBottom();
-
+    if (normalized.isEmpty ||
+        _isDisposed) {
       return;
     }
-
-    final extractedWords = _extractCreativeWords(
-      text,
-    );
-
-    final addedCount = await rhymesController.addWords(
-      extractedWords,
-    );
 
     creationStage = ChatCreationStage.writing;
 
-    if (extractedWords.isEmpty) {
-      messages.add(
-        ChatMessage(
-          role: ChatRole.assistant,
-          content:
-              'Entendi o caminho.\n\n'
-              'Agora começa a transformar essa imagem em palavras. '
-              'Não precisa se preocupar em rimar ainda.',
-        ),
-      );
-
-      notifyListeners();
-
-      _scrollToBottom();
-
-      return;
-    }
-
-    final wordsText = extractedWords.join(
-      ' • ',
-    );
-
-    final saveMessage =
-        addedCount >
-            0
-        ? 'Guardei $addedCount palavra${addedCount == 1 ? '' : 's'} '
-              'nova${addedCount == 1 ? '' : 's'} na sua biblioteca.'
-        : 'Essas palavras já estavam na sua biblioteca.';
-
-    messages.add(
-      ChatMessage(
-        role: ChatRole.assistant,
-        content:
-            'Peguei algumas palavras da sua ideia:\n\n'
-            '$wordsText\n\n'
-            '$saveMessage\n\n'
-            'Agora começa a escrever. Você pode seguir essas palavras '
-            'ou deixar a música puxar outro caminho.',
-      ),
-    );
-
     notifyListeners();
-
-    _scrollToBottom();
   }
 
   // ============================================================
@@ -2159,7 +2001,13 @@ class ChatController
     }
 
     // ==========================================================
-    // CARREGAR MEMÓRIA CRIATIVA
+    // CARREGAR MEMÓRIA DO USUÁRIO
+    // ==========================================================
+    //
+    // O vocabulário continua disponível para recursos explícitos
+    // de rima/biblioteca, mas NÃO controla mais a primeira
+    // mensagem do Chat.
+    //
     // ==========================================================
 
     await rhymesController.carregarDadosUsuario();
@@ -2168,58 +2016,21 @@ class ChatController
       return;
     }
 
-    final savedWords = rhymesController.vocabularyWords;
-
     // ==========================================================
-    // RETOMAR TRABALHO EXISTENTE
+    // CHAT NORMAL DESDE O INÍCIO
     // ==========================================================
     //
-    // Se já existem palavras salvas, apenas retomamos o estágio
-    // de escrita.
-    //
-    // Não adicionamos mais mensagem automática no Chat.
-    //
-    // O restante continua igual:
-    //
-    // - vocabulário;
-    // - biblioteca;
-    // - rimas;
-    // - contexto criativo;
-    // - histórico;
+    // Nenhuma mensagem automática.
+    // Nenhum salvamento automático na biblioteca.
+    // A primeira mensagem do usuário segue para a IA normalmente.
     //
     // ==========================================================
 
-    if (savedWords.isNotEmpty) {
-      creationStage = ChatCreationStage.writing;
-
-      notifyListeners();
-
-      _scrollToBottom();
-
-      return;
-    }
-
-    // ==========================================================
-    // PRIMEIRO CONTATO
-    // ==========================================================
-
-    creationStage = ChatCreationStage.imagination;
-
-    messages.add(
-      ChatMessage(
-        role: ChatRole.assistant,
-        content:
-            'O que você enxerga?\n\n'
-            'Não precisa pensar em uma música ainda.\n'
-            'Me diga a cena, sensação ou situação que está na sua cabeça.',
-      ),
-    );
+    creationStage = ChatCreationStage.writing;
 
     notifyListeners();
 
     _scrollToBottom();
-
-    _startCreativeHelpTimer();
   }
 
   // ============================================================
@@ -2227,44 +2038,9 @@ class ChatController
   // ============================================================
 
   void _startCreativeHelpTimer() {
+    // Mensagens automáticas de ajuda inicial desativadas.
     _creativeHelpTimer?.cancel();
-
-    _creativeHelpTimer = Timer(
-      const Duration(
-        seconds: 30,
-      ),
-      () {
-        if (_isDisposed) {
-          return;
-        }
-
-        final userAlreadyAnswered = messages.any(
-          (
-            message,
-          ) => message.isUser,
-        );
-
-        if (userAlreadyAnswered) {
-          return;
-        }
-
-        messages.add(
-          ChatMessage(
-            role: ChatRole.assistant,
-            content:
-                'Travou?\n\n'
-                'Pode jogar palavras soltas também.\n\n'
-                'Não precisam rimar e nem fazer sentido ainda.\n\n'
-                'Ex:\n'
-                'madrugada • carro • chuva • mensagem • vazio',
-          ),
-        );
-
-        notifyListeners();
-
-        _scrollToBottom();
-      },
-    );
+    _creativeHelpTimer = null;
   }
 
   // ============================================================

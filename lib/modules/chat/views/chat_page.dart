@@ -11,9 +11,11 @@ import 'package:versin/modules/chat/services/ai_provider_service.dart';
 import 'package:versin/modules/chat/services/private_api_service.dart';
 import 'package:versin/modules/chat/services/private_ai_client.dart';
 import 'package:versin/modules/chat/views/components/chat/list/chat_list_view.dart';
+import 'package:versin/modules/chat/views/components/ai_guide/chat_ai_guide_modal.dart';
 import 'package:versin/modules/chat/views/private_api_onboarding/private_api_onboarding_page.dart';
 import 'package:versin/modules/chat/views/components/suggestion_balloon/suggestion_balloon.dart';
 import 'package:versin/modules/rhymelibrary/views/rhyme_library_page.dart';
+import 'package:versin/modules/profile/services/user_onboarding_preferences_service.dart';
 import 'package:versin/modules/chat/domain/repositories/chat_repository_impl.dart';
 // ============================================================
 // STUDIO
@@ -35,7 +37,7 @@ class ChatPage extends StatefulWidget {
 }
 
 class _ChatPageState extends State<ChatPage>
-    with AutomaticKeepAliveClientMixin {
+    with AutomaticKeepAliveClientMixin, SingleTickerProviderStateMixin {
   late final ChatController _controller;
 
   late final RhymesController _rhymesController;
@@ -59,6 +61,19 @@ class _ChatPageState extends State<ChatPage>
   bool _controllerCreated = false;
 
   // ============================================================
+  // GUIA DE IA - ONBOARDING
+  // ============================================================
+
+  final UserOnboardingPreferencesService _onboardingPreferences =
+      UserOnboardingPreferencesService();
+
+  late final AnimationController _guidePulseController;
+
+  late final Animation<double> _guidePulseAnimation;
+
+  bool _guidePulseCheckStarted = false;
+
+  // ============================================================
   // KEEP ALIVE
   // ============================================================
 
@@ -74,6 +89,16 @@ class _ChatPageState extends State<ChatPage>
     super.initState();
 
     _rhymesController = GetIt.I<BrainController>();
+
+    _guidePulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 650),
+    );
+
+    _guidePulseAnimation = CurvedAnimation(
+      parent: _guidePulseController,
+      curve: Curves.easeInOutCubic,
+    );
 
     _initializeChat();
   }
@@ -160,6 +185,70 @@ class _ChatPageState extends State<ChatPage>
     setState(() {
       _isReady = true;
     });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _showAiGuideHintIfNeeded();
+    });
+  }
+
+  // ============================================================
+  // GUIA DE IA - PRIMEIRA VISITA
+  // ============================================================
+
+  Future<void> _showAiGuideHintIfNeeded() async {
+    if (!mounted || _guidePulseCheckStarted) {
+      return;
+    }
+
+    _guidePulseCheckStarted = true;
+
+    if (!_onboardingPreferences.hasAuthenticatedUser) {
+      return;
+    }
+
+    final alreadySeen = await _onboardingPreferences.loadAiGuideHintSeen();
+
+    if (!mounted || alreadySeen) {
+      return;
+    }
+
+    await Future<void>.delayed(const Duration(milliseconds: 500));
+
+    if (!mounted) {
+      return;
+    }
+
+    for (var pulse = 0; pulse < 3; pulse++) {
+      await _guidePulseController.forward();
+
+      if (!mounted) {
+        return;
+      }
+
+      await _guidePulseController.reverse();
+
+      if (!mounted) {
+        return;
+      }
+
+      if (pulse < 2) {
+        await Future<void>.delayed(const Duration(milliseconds: 110));
+
+        if (!mounted) {
+          return;
+        }
+      }
+    }
+
+    _guidePulseController.value = 0;
+
+    final saved = await _onboardingPreferences.markAiGuideHintSeen();
+
+    debugPrint(
+      '[CHAT PAGE] '
+      'Destaque inicial do guia de IA concluído. '
+      'Preferência salva: $saved',
+    );
   }
 
   // ============================================================
@@ -318,6 +407,8 @@ class _ChatPageState extends State<ChatPage>
 
   @override
   void dispose() {
+    _guidePulseController.dispose();
+
     if (_controllerCreated) {
       _controller.dispose();
     }
@@ -389,6 +480,47 @@ class _ChatPageState extends State<ChatPage>
       '[CHAT PAGE] '
       'Fonte de IA sincronizada após retornar '
       'da configuração privada.',
+    );
+  }
+
+  // ============================================================
+  // ABRIR GUIA DE USO DA IA
+  // ============================================================
+  //
+  // O guia é apenas educativo.
+  //
+  // Ao clicar em "USAR":
+  //
+  // - NÃO envia a mensagem automaticamente;
+  // - apenas preenche o campo do Chat;
+  // - posiciona o cursor no final;
+  // - o usuário pode editar antes de enviar.
+  //
+  // ============================================================
+
+  Future<void> _openAiGuide() async {
+    if (!mounted || !_controllerCreated) {
+      return;
+    }
+
+    await ChatAiGuideModal.show(
+      context: context,
+      onUseExample: (example) {
+        if (!mounted) {
+          return;
+        }
+
+        final normalized = example.trim();
+
+        if (normalized.isEmpty) {
+          return;
+        }
+
+        _controller.messageController.value = TextEditingValue(
+          text: normalized,
+          selection: TextSelection.collapsed(offset: normalized.length),
+        );
+      },
     );
   }
 
@@ -520,6 +652,48 @@ class _ChatPageState extends State<ChatPage>
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
+                              // ========================================
+                              // COMO USAR A IA
+                              // ========================================
+                              AnimatedBuilder(
+                                animation: _guidePulseAnimation,
+                                child: Tooltip(
+                                  message: 'Como usar a IA',
+                                  child: IconButton(
+                                    onPressed: _openAiGuide,
+                                    icon: Icon(
+                                      Icons.info_outline_rounded,
+                                      color: activeColor,
+                                      size: 21,
+                                    ),
+                                  ),
+                                ),
+                                builder: (context, child) {
+                                  final pulse = _guidePulseAnimation.value;
+
+                                  return Transform.scale(
+                                    scale: 1.0 + (0.08 * pulse),
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: activeColor.withValues(
+                                              alpha: 0.42 * pulse,
+                                            ),
+                                            blurRadius: 18 * pulse,
+                                            spreadRadius: 3 * pulse,
+                                          ),
+                                        ],
+                                      ),
+                                      child: child,
+                                    ),
+                                  );
+                                },
+                              ),
+
+                              const SizedBox(width: 2),
+
                               // ========================================
                               // STUDIO
                               // ========================================

@@ -66,7 +66,17 @@ class SupabaseStorageRepository
   // USUÁRIO ATUAL
   // ==========================================================
 
-  String? get currentUserId => _supabase.auth.currentUser?.id;
+  String? get currentUserId {
+    final userId = _supabase.auth.currentUser?.id.trim();
+
+    if (userId ==
+            null ||
+        userId.isEmpty) {
+      return null;
+    }
+
+    return userId;
+  }
 
   // ==========================================================
   // LISTAR OBRAS
@@ -81,9 +91,9 @@ class SupabaseStorageRepository
   getWorks({
     required String userId,
   }) async {
-    final normalizedUserId = _required(
+    final normalizedUserId = _requireRequestedCurrentUserId(
       userId,
-      'userId',
+      fieldName: 'userId',
     );
 
     final response = await _supabase
@@ -121,6 +131,8 @@ class SupabaseStorageRepository
       'workId',
     );
 
+    final userId = _requireCurrentUserId();
+
     final response = await _supabase
         .from(
           _table,
@@ -129,6 +141,10 @@ class SupabaseStorageRepository
         .eq(
           'id',
           normalizedWorkId,
+        )
+        .eq(
+          'owner_user_id',
+          userId,
         )
         .maybeSingle();
 
@@ -157,6 +173,8 @@ class SupabaseStorageRepository
       contentHash,
     );
 
+    final userId = _requireCurrentUserId();
+
     final response = await _supabase
         .from(
           _table,
@@ -165,6 +183,10 @@ class SupabaseStorageRepository
         .eq(
           'content_hash',
           hash,
+        )
+        .eq(
+          'owner_user_id',
+          userId,
         )
         .maybeSingle();
 
@@ -229,9 +251,9 @@ class SupabaseStorageRepository
     required String userId,
     required StoredWorkType type,
   }) async {
-    final normalizedUserId = _required(
+    final normalizedUserId = _requireRequestedCurrentUserId(
       userId,
-      'userId',
+      fieldName: 'userId',
     );
 
     final response = await _supabase
@@ -278,6 +300,8 @@ class SupabaseStorageRepository
       work,
     );
 
+    final currentUserId = _requireCurrentUserId();
+
     // ========================================================
     // VALIDAR OBRA
     // ========================================================
@@ -291,6 +315,7 @@ class SupabaseStorageRepository
     // ========================================================
 
     final normalizedWork = work.copyWith(
+      ownerUserId: currentUserId,
       contentHash: _normalizeAndValidateHash(
         work.contentHash,
       ),
@@ -335,6 +360,8 @@ class SupabaseStorageRepository
       work,
     );
 
+    final currentUserId = _requireCurrentUserId();
+
     // ========================================================
     // VALIDAR OBRA
     // ========================================================
@@ -348,6 +375,7 @@ class SupabaseStorageRepository
     // ========================================================
 
     final normalizedWork = work.copyWith(
+      ownerUserId: currentUserId,
       contentHash: _normalizeAndValidateHash(
         work.contentHash,
       ),
@@ -553,6 +581,8 @@ class SupabaseStorageRepository
       contentHash,
     );
 
+    final userId = _requireCurrentUserId();
+
     final response = await _supabase
         .from(
           _table,
@@ -563,6 +593,10 @@ class SupabaseStorageRepository
         .eq(
           'content_hash',
           hash,
+        )
+        .eq(
+          'owner_user_id',
+          userId,
         )
         .limit(
           1,
@@ -823,6 +857,43 @@ class SupabaseStorageRepository
     }
 
     return current;
+  }
+
+  // ==========================================================
+  // VALIDAR USUÁRIO SOLICITADO
+  // ==========================================================
+  //
+  // Métodos públicos que recebem userId só podem consultar a
+  // própria conta autenticada.
+  //
+  // Isso evita:
+  //
+  // getWorks(userId: UUID_DE_OUTRA_CONTA)
+  //
+  // mesmo que uma policy RLS seja alterada incorretamente no
+  // futuro.
+  //
+  // ==========================================================
+
+  String _requireRequestedCurrentUserId(
+    String userId, {
+    required String fieldName,
+  }) {
+    final requestedUserId = _required(
+      userId,
+      fieldName,
+    );
+
+    final authenticatedUserId = _requireCurrentUserId();
+
+    if (requestedUserId !=
+        authenticatedUserId) {
+      throw StateError(
+        '$fieldName não corresponde ao usuário autenticado.',
+      );
+    }
+
+    return authenticatedUserId;
   }
 
   // ==========================================================

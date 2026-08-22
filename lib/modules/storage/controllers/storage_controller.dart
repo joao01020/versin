@@ -73,6 +73,20 @@ class StorageController
   String? _currentUserId;
 
   // ==========================================================
+  // SESSION REVISION
+  // ==========================================================
+  //
+  // Incrementado sempre que o usuário do Storage muda.
+  //
+  // Isso impede que uma requisição antiga da conta A termine
+  // depois da troca para a conta B e sobrescreva o estado local
+  // com obras pertencentes à conta anterior.
+  //
+  // ==========================================================
+
+  int _sessionRevision = 0;
+
+  // ==========================================================
   // GETTERS
   // ==========================================================
 
@@ -211,12 +225,45 @@ class StorageController
     }
 
     // ========================================================
-    // NOVA SESSÃO
+    // NOVA CONTA / NOVA SESSÃO
     // ========================================================
+    //
+    // IMPORTANTE:
+    //
+    // Antes de carregar a nova conta, eliminamos imediatamente
+    // todo estado pertencente à conta anterior.
+    //
+    // Isso evita:
+    //
+    // Conta A
+    //   ↓
+    // logout / troca de conta
+    //   ↓
+    // Conta B
+    //   ↓
+    // UI exibir temporariamente obras de A
+    //
+    // ========================================================
+
+    _sessionRevision++;
+
+    _works.clear();
+
+    _errorMessage = null;
+
+    _isLoading = false;
+
+    _isSaving = false;
+
+    _isDeleting = false;
+
+    _isTransferring = false;
 
     _currentUserId = normalizedUserId;
 
     _isInitialized = true;
+
+    notifyListeners();
 
     await loadWorks();
   }
@@ -237,7 +284,7 @@ class StorageController
   // Exemplo:
   //
   // await storageController.ensureInitialized(
-  //   userId: 'user_123',
+  //   userId: Supabase.instance.client.auth.currentUser!.id,
   // );
   //
   // ==========================================================
@@ -253,7 +300,7 @@ class StorageController
     );
 
     // ========================================================
-    // AINDA NÃO INICIALIZADO
+    // NÃO INICIALIZADO
     // ========================================================
 
     if (!_isInitialized ||
@@ -268,7 +315,7 @@ class StorageController
     }
 
     // ========================================================
-    // USUÁRIO DIFERENTE
+    // CONTA DIFERENTE
     // ========================================================
 
     if (_currentUserId !=
@@ -301,6 +348,20 @@ class StorageController
       return;
     }
 
+    _sessionRevision++;
+
+    _works.clear();
+
+    _errorMessage = null;
+
+    _isLoading = false;
+
+    _isSaving = false;
+
+    _isDeleting = false;
+
+    _isTransferring = false;
+
     _currentUserId = normalizedUserId;
 
     _isInitialized = true;
@@ -318,6 +379,8 @@ class StorageController
   loadWorks() async {
     final userId = _requireCurrentUserId();
 
+    final revision = _sessionRevision;
+
     _setLoading(
       true,
     );
@@ -331,10 +394,32 @@ class StorageController
         userId: userId,
       );
 
+      // ======================================================
+      // RESPOSTA DE SESSÃO ANTIGA
+      // ======================================================
+      //
+      // Se o usuário mudou enquanto a consulta estava em
+      // andamento, descartamos completamente o resultado.
+      //
+      // ======================================================
+
+      if (revision !=
+              _sessionRevision ||
+          _currentUserId !=
+              userId) {
+        return;
+      }
+
       _works
         ..clear()
         ..addAll(
-          result,
+          result.where(
+            (
+              work,
+            ) =>
+                work.ownerUserId ==
+                userId,
+          ),
         );
 
       _sortWorks();
@@ -342,6 +427,15 @@ class StorageController
       error,
       stackTrace
     ) {
+      if (revision !=
+              _sessionRevision ||
+          _currentUserId !=
+              userId) {
+        return;
+      }
+
+      _works.clear();
+
       _setError(
         'Não foi possível carregar as obras.',
         error: error,
@@ -349,9 +443,14 @@ class StorageController
         notify: false,
       );
     } finally {
-      _setLoading(
-        false,
-      );
+      if (revision ==
+              _sessionRevision &&
+          _currentUserId ==
+              userId) {
+        _setLoading(
+          false,
+        );
+      }
     }
   }
 
@@ -408,9 +507,23 @@ class StorageController
     // ========================================================
 
     try {
-      return await repository.getWorkById(
+      final work = await repository.getWorkById(
         workId: normalizedWorkId,
       );
+
+      if (work ==
+          null) {
+        return null;
+      }
+
+      final userId = _requireCurrentUserId();
+
+      if (work.ownerUserId !=
+          userId) {
+        return null;
+      }
+
+      return work;
     } catch (
       error,
       stackTrace
@@ -522,6 +635,17 @@ class StorageController
       return false;
     }
 
+    final userId = _currentUserId!;
+
+    if (work.ownerUserId !=
+        userId) {
+      _setError(
+        'A obra não pertence ao usuário autenticado.',
+      );
+
+      return false;
+    }
+
     _setSaving(
       true,
     );
@@ -597,6 +721,28 @@ class StorageController
     StoredWorkModel work,
   ) async {
     if (_isSaving) {
+      return false;
+    }
+
+    if (!_isInitialized ||
+        _currentUserId ==
+            null ||
+        _currentUserId!.isEmpty) {
+      _setError(
+        'StorageController ainda não foi inicializado com userId.',
+      );
+
+      return false;
+    }
+
+    final userId = _currentUserId!;
+
+    if (work.ownerUserId !=
+        userId) {
+      _setError(
+        'A obra não pertence ao usuário autenticado.',
+      );
+
       return false;
     }
 
@@ -1051,6 +1197,8 @@ class StorageController
   // ==========================================================
 
   void reset() {
+    _sessionRevision++;
+
     _works.clear();
 
     _currentUserId = null;

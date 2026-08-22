@@ -96,8 +96,24 @@ class BeatStorageService {
             200 ||
         response.statusCode >=
             300) {
+      final responseBody = response.body.trim();
+
+      debugPrint(
+        '[BEAT STORAGE] Upload recusado pelo R2.',
+      );
+
+      debugPrint(
+        '[BEAT STORAGE] HTTP: ${response.statusCode}',
+      );
+
+      debugPrint(
+        '[BEAT STORAGE] Response: $responseBody',
+      );
+
       throw StateError(
-        'Falha no upload do beat (HTTP ${response.statusCode}).',
+        'Falha no upload do beat '
+        '(HTTP ${response.statusCode}). '
+        '${responseBody.isNotEmpty ? responseBody : ''}',
       );
     }
 

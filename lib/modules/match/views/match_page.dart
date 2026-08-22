@@ -19,7 +19,15 @@ import 'package:versin/modules/match/controllers/match_search_controller.dart';
 import 'package:versin/modules/match/data/repositories/match_repository.dart';
 import 'package:versin/modules/match/models/match_discovery_mode.dart';
 import 'package:versin/modules/match/models/match_filter_state.dart';
-import 'package:versin/modules/match/services/match_availability_service.dart';
+// ============================================================
+// MATCH - AVAILABILITY
+// ============================================================
+
+import 'package:versin/modules/match/availability/controllers/match_availability_controller.dart';
+import 'package:versin/modules/match/availability/services/match_availability_service.dart';
+import 'package:versin/modules/match/availability/widgets/match_availability_card.dart';
+import 'package:versin/modules/match/availability/widgets/match_availability_duration_sheet.dart';
+
 import 'package:versin/modules/match/services/match_session_service.dart';
 import 'package:versin/modules/match/views/match_projects_view.dart';
 
@@ -140,22 +148,9 @@ class _MatchPageState extends State<MatchPage> {
 
   late final MatchLocationConsentService _locationConsentService;
 
-  late final MatchAvailabilityService _availabilityService;
+  late final MatchAvailabilityController _availabilityController;
 
   late final UserPresenceService _presenceService;
-
-  // ============================================================
-  // DISPONÍVEIS AGORA
-  // ============================================================
-
-  MatchAvailabilityState _availabilityState = const MatchAvailabilityState(
-    availableNow: false,
-    availableUntil: null,
-  );
-
-  bool _isLoadingAvailability = false;
-
-  Timer? _availabilityTicker;
 
   // ============================================================
   // SEARCH
@@ -545,7 +540,9 @@ class _MatchPageState extends State<MatchPage> {
 
     _locationConsentService = MatchLocationConsentService();
 
-    _availabilityService = sl<MatchAvailabilityService>();
+    _availabilityController = MatchAvailabilityController(
+      availabilityService: MatchAvailabilityService(),
+    );
 
     _presenceService = sl<UserPresenceService>();
 
@@ -567,6 +564,8 @@ class _MatchPageState extends State<MatchPage> {
     _matchSearchController.addListener(_handleStateChange);
 
     _publicProfileController.addListener(_handleStateChange);
+
+    _availabilityController.addListener(_handleStateChange);
 
     _matchSubscription = _matchController.matchEventStream.listen(
       _handleMatchEvent,
@@ -639,9 +638,7 @@ class _MatchPageState extends State<MatchPage> {
 
       await _loadPublicProfile();
 
-      await _loadAvailabilityState();
-
-      _startAvailabilityTicker();
+      await _availabilityController.initialize();
     } catch (error) {
       debugPrint(
         '[MATCH PAGE] '
@@ -1354,73 +1351,25 @@ class _MatchPageState extends State<MatchPage> {
   // ============================================================
   // DISPONÍVEIS AGORA
   // ============================================================
-
-  Future<void> _loadAvailabilityState() async {
-    if (!mounted) {
-      return;
-    }
-
-    try {
-      final state = await _availabilityService.loadCurrentState();
-
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {
-        _availabilityState = state;
-      });
-    } catch (error, stackTrace) {
-      debugPrint(
-        '[MATCH PAGE] '
-        'Erro ao carregar disponibilidade: $error',
-      );
-
-      debugPrint(
-        '[MATCH PAGE] '
-        'Stack trace: $stackTrace',
-      );
-    }
-  }
-
-  // ============================================================
-  // TICKER DA DISPONIBILIDADE
-  // ============================================================
-
-  void _startAvailabilityTicker() {
-    _availabilityTicker?.cancel();
-
-    _availabilityTicker = Timer.periodic(const Duration(seconds: 30), (_) {
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {});
-
-      if (!_availabilityState.isActive &&
-          _matchController.discoveryMode == MatchDiscoveryMode.global) {
-        unawaited(
-          _sessionService.changeDiscoveryMode(MatchDiscoveryMode.compatible),
-        );
-      }
-    });
-  }
-
-  // ============================================================
-  // ENTRAR EM DISPONÍVEIS AGORA
+  //
+  // A feature de disponibilidade vive em:
+  //
+  // match/availability/
+  //
+  // A MatchPage mantém somente a orquestração que depende de:
+  //
+  // - presença online;
+  // - navegação;
+  // - modo de descoberta.
+  //
+  // Estado, timer, persistência e UI pertencem ao módulo
+  // MatchAvailability.
+  //
   // ============================================================
 
   Future<bool> _ensureAvailabilityBeforeEntering() async {
     // ==========================================================
     // 1. EXIGIR PRESENÇA REAL
-    // ==========================================================
-    //
-    // "Disponíveis agora" só pode ser ativado quando:
-    //
-    // - o perfil está marcado como ONLINE;
-    // - o app está em foreground;
-    // - existe heartbeat recente.
-    //
     // ==========================================================
 
     final reallyOnline = await _presenceService.ensureReallyOnline();
@@ -1430,15 +1379,6 @@ class _MatchPageState extends State<MatchPage> {
     }
 
     if (!reallyOnline) {
-      // ========================================================
-      // SOLICITAR DESTAQUE VISUAL DO OFFLINE
-      // ========================================================
-      //
-      // A PublicProfilePage escutará esse sinal e fará o botão
-      // OFFLINE pulsar suavemente em verde.
-      //
-      // ========================================================
-
       _presenceService.requestOnlineAttention();
 
       ScaffoldMessenger.of(context)
@@ -1449,19 +1389,6 @@ class _MatchPageState extends State<MatchPage> {
             content: Text('Fique online primeiro para usar Disponíveis agora.'),
           ),
         );
-
-      // ========================================================
-      // ABRIR O PRÓPRIO PERFIL
-      // ========================================================
-      //
-      // Levamos o usuário direto ao local onde pode ativar ONLINE.
-      //
-      // Ao voltar, validamos novamente. Se estiver online,
-      // continuamos automaticamente para a escolha:
-      //
-      // 30 min / 1 hora / 2 horas.
-      //
-      // ========================================================
 
       await _openPublicProfile(highlightOnlineOnOpen: true);
 
@@ -1477,10 +1404,10 @@ class _MatchPageState extends State<MatchPage> {
     }
 
     // ==========================================================
-    // 2. JÁ POSSUI DISPONIBILIDADE ATIVA
+    // 2. JÁ ESTÁ DISPONÍVEL
     // ==========================================================
 
-    if (_availabilityState.isActive) {
+    if (_availabilityController.isActive) {
       return true;
     }
 
@@ -1488,243 +1415,53 @@ class _MatchPageState extends State<MatchPage> {
     // 3. ESCOLHER DURAÇÃO
     // ==========================================================
 
-    final selectedMinutes = await _showAvailabilityDurationDialog();
+    final selectedMinutes = await MatchAvailabilityDurationSheet.show(
+      context: context,
+      accentColor: _matchController.accentNeon,
+    );
 
     if (!mounted || selectedMinutes == null) {
       return false;
     }
 
     // ==========================================================
-    // 4. ATIVAR DISPONIBILIDADE
+    // 4. ATIVAR
     // ==========================================================
 
-    return _activateAvailability(selectedMinutes);
-  }
-
-  // ============================================================
-  // ESCOLHER TEMPO
-  // ============================================================
-
-  Future<int?> _showAvailabilityDurationDialog() {
-    final accentColor = _matchController.accentNeon;
-
-    return showModalBottomSheet<int>(
-      context: context,
-      backgroundColor: const Color(0xFF17132D),
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (sheetContext) {
-        Widget buildDurationButton({
-          required String label,
-          required String subtitle,
-          required int minutes,
-        }) {
-          return Expanded(
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(14),
-                onTap: () {
-                  Navigator.of(sheetContext).pop(minutes);
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 16,
-                  ),
-                  decoration: BoxDecoration(
-                    color: accentColor.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: accentColor.withValues(alpha: 0.24),
-                    ),
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        label,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: accentColor,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        subtitle,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: Colors.white38,
-                          fontSize: 9,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          );
-        }
-
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 38,
-                      height: 38,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: accentColor.withValues(alpha: 0.10),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        Icons.bolt_rounded,
-                        color: accentColor,
-                        size: 20,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Disponíveis agora',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                          SizedBox(height: 3),
-                          Text(
-                            'Escolha por quanto tempo você quer aparecer para conexões rápidas.',
-                            style: TextStyle(
-                              color: Colors.white54,
-                              fontSize: 10,
-                              height: 1.35,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 18),
-                const Text(
-                  'Você será mostrado somente para pessoas que procuram suas habilidades.',
-                  style: TextStyle(
-                    color: Colors.white60,
-                    fontSize: 11,
-                    height: 1.4,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    buildDurationButton(
-                      label: '30 MIN',
-                      subtitle: 'rápido',
-                      minutes: MatchAvailabilityService.thirtyMinutes,
-                    ),
-                    const SizedBox(width: 8),
-                    buildDurationButton(
-                      label: '1 HORA',
-                      subtitle: 'equilibrado',
-                      minutes: MatchAvailabilityService.oneHour,
-                    ),
-                    const SizedBox(width: 8),
-                    buildDurationButton(
-                      label: '2 HORAS',
-                      subtitle: 'máximo',
-                      minutes: MatchAvailabilityService.twoHours,
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+    final activated = await _availabilityController.activate(
+      minutes: selectedMinutes,
     );
-  }
 
-  // ============================================================
-  // ATIVAR DISPONIBILIDADE
-  // ============================================================
-
-  Future<bool> _activateAvailability(int minutes) async {
-    if (!mounted || _isLoadingAvailability) {
+    if (!mounted) {
       return false;
     }
 
-    setState(() {
-      _isLoadingAvailability = true;
-    });
-
-    try {
-      final state = await _availabilityService.setAvailableNow(
-        minutes: minutes,
-      );
-
-      if (!mounted) {
-        return false;
-      }
-
-      setState(() {
-        _availabilityState = state;
-      });
-
+    if (!activated) {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          SnackBar(
+          const SnackBar(
             behavior: SnackBarBehavior.floating,
-            content: Text('Disponível agora por ${_durationLabel(minutes)}.'),
+            content: Text('Não foi possível ativar sua disponibilidade.'),
           ),
         );
 
-      return true;
-    } catch (error, stackTrace) {
-      debugPrint(
-        '[MATCH PAGE] '
-        'Erro ao ativar Disponíveis agora: $error',
-      );
-
-      debugPrint(
-        '[MATCH PAGE] '
-        'Stack trace: $stackTrace',
-      );
-
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-          ..hideCurrentSnackBar()
-          ..showSnackBar(
-            const SnackBar(
-              behavior: SnackBarBehavior.floating,
-              content: Text('Não foi possível ativar sua disponibilidade.'),
-            ),
-          );
-      }
-
       return false;
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoadingAvailability = false;
-        });
-      }
     }
+
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text(
+            'Disponível agora por '
+            '${_availabilityController.durationLabel(selectedMinutes)}.',
+          ),
+        ),
+      );
+
+    return true;
   }
 
   // ============================================================
@@ -1732,190 +1469,45 @@ class _MatchPageState extends State<MatchPage> {
   // ============================================================
 
   Future<void> _clearAvailability() async {
-    if (!mounted || _isLoadingAvailability) {
+    if (!mounted || _availabilityController.isLoading) {
       return;
     }
 
-    setState(() {
-      _isLoadingAvailability = true;
-    });
+    final cleared = await _availabilityController.clear();
 
-    try {
-      final state = await _availabilityService.clearAvailability();
+    if (!mounted) {
+      return;
+    }
 
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {
-        _availabilityState = state;
-      });
-
-      if (_matchController.discoveryMode == MatchDiscoveryMode.global) {
-        await _sessionService.changeDiscoveryMode(
-          MatchDiscoveryMode.compatible,
-        );
-      }
-
-      if (!mounted) {
-        return;
-      }
-
+    if (!cleared) {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
           const SnackBar(
             behavior: SnackBarBehavior.floating,
-            content: Text('Disponibilidade encerrada.'),
+            content: Text('Não foi possível encerrar sua disponibilidade.'),
           ),
         );
-    } catch (error, stackTrace) {
-      debugPrint(
-        '[MATCH PAGE] '
-        'Erro ao encerrar disponibilidade: $error',
+
+      return;
+    }
+
+    if (_matchController.discoveryMode == MatchDiscoveryMode.global) {
+      await _sessionService.changeDiscoveryMode(MatchDiscoveryMode.compatible);
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text('Disponibilidade encerrada.'),
+        ),
       );
-
-      debugPrint(
-        '[MATCH PAGE] '
-        'Stack trace: $stackTrace',
-      );
-
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-          ..hideCurrentSnackBar()
-          ..showSnackBar(
-            const SnackBar(
-              behavior: SnackBarBehavior.floating,
-              content: Text('Não foi possível encerrar sua disponibilidade.'),
-            ),
-          );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoadingAvailability = false;
-        });
-      }
-    }
-  }
-
-  String _durationLabel(int minutes) {
-    switch (minutes) {
-      case MatchAvailabilityService.thirtyMinutes:
-        return '30 minutos';
-
-      case MatchAvailabilityService.oneHour:
-        return '1 hora';
-
-      case MatchAvailabilityService.twoHours:
-        return '2 horas';
-
-      default:
-        return '$minutes minutos';
-    }
-  }
-
-  // ============================================================
-  // CARD DE DISPONIBILIDADE
-  // ============================================================
-
-  Widget _buildAvailabilityCard() {
-    final accentColor = _matchController.accentNeon;
-
-    final active = _availabilityState.isActive;
-
-    if (!active &&
-        _matchController.discoveryMode != MatchDiscoveryMode.global) {
-      return const SizedBox.shrink();
-    }
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: accentColor.withValues(alpha: 0.055),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: accentColor.withValues(alpha: 0.18)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: accentColor.withValues(alpha: 0.11),
-              shape: BoxShape.circle,
-            ),
-            child: _isLoadingAvailability
-                ? SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 1.8,
-                      color: accentColor,
-                    ),
-                  )
-                : Icon(Icons.bolt_rounded, color: accentColor, size: 19),
-          ),
-          const SizedBox(width: 11),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  active
-                      ? 'Você está disponível agora'
-                      : 'Ative sua disponibilidade',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  active
-                      ? '${_availabilityState.remainingLabel}. '
-                            'Você aparece para quem procura suas habilidades.'
-                      : 'Escolha 30 min, 1 hora ou 2 horas para aparecer neste modo.',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.48),
-                    fontSize: 9.5,
-                    height: 1.35,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 10),
-          if (active)
-            TextButton(
-              onPressed: _isLoadingAvailability
-                  ? null
-                  : () {
-                      unawaited(_clearAvailability());
-                    },
-              child: const Text(
-                'ENCERRAR',
-                style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold),
-              ),
-            )
-          else
-            TextButton(
-              onPressed: _isLoadingAvailability
-                  ? null
-                  : () async {
-                      await _changeDiscoveryMode(MatchDiscoveryMode.global);
-                    },
-              child: const Text(
-                'ATIVAR',
-                style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold),
-              ),
-            ),
-        ],
-      ),
-    );
   }
 
   // ============================================================
@@ -2192,10 +1784,19 @@ class _MatchPageState extends State<MatchPage> {
             ),
 
             if (_matchController.discoveryMode == MatchDiscoveryMode.global ||
-                _availabilityState.isActive) ...[
+                _availabilityController.isActive) ...[
               const SizedBox(height: 10),
 
-              _buildAvailabilityCard(),
+              MatchAvailabilityCard(
+                controller: _availabilityController,
+                accentColor: _matchController.accentNeon,
+                onActivate: () {
+                  unawaited(_changeDiscoveryMode(MatchDiscoveryMode.global));
+                },
+                onClear: () {
+                  unawaited(_clearAvailability());
+                },
+              ),
             ],
 
             const SizedBox(height: 14),
@@ -3057,13 +2658,11 @@ class _MatchPageState extends State<MatchPage> {
 
     _publicProfileController.removeListener(_handleStateChange);
 
+    _availabilityController.removeListener(_handleStateChange);
+
     _usernameDebounce?.cancel();
 
     _usernameDebounce = null;
-
-    _availabilityTicker?.cancel();
-
-    _availabilityTicker = null;
 
     _usernameController.dispose();
 
@@ -3076,6 +2675,8 @@ class _MatchPageState extends State<MatchPage> {
     _matchSearchController.dispose();
 
     _publicProfileController.dispose();
+
+    _availabilityController.dispose();
 
     unawaited(_matchSubscription?.cancel());
 

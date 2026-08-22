@@ -32,11 +32,11 @@ import 'package:versin/modules/profile/models/music_role.dart';
 //
 // Regra de visibilidade:
 //
-// is_online = true
+// is_online = true + last_seen_at recente
 //     ↓
 // perfil pode aparecer na busca, Discovery e Recomendados.
 //
-// is_online = false
+// is_online = false OU heartbeat expirado
 //     ↓
 // perfil deve ser ignorado pelo Match.
 //
@@ -64,6 +64,8 @@ class MatchRepository {
   // ============================================================
 
   static const int _searchLimit = 20;
+
+  static const Duration _onlinePresenceWindow = Duration(seconds: 90);
 
   // ============================================================
   // STREAM
@@ -156,9 +158,11 @@ class MatchRepository {
                 bio,
                 showcase_url,
                 showcase_desc,
-                is_online
+                is_online,
+                last_seen_at
                 ''')
           .eq('is_online', true)
+          .gte('last_seen_at', _onlineCutoffIso())
           .or(
             'username.ilike.%$normalizedQuery%,'
             'artist_name.ilike.%$normalizedQuery%,'
@@ -208,14 +212,12 @@ class MatchRepository {
       // CONVERTER PARA ENTITY
       // ========================================================
 
+      final now = DateTime.now().toUtc();
+
       final users = rows
-          .where((row) {
-            return row['is_online'] == true;
-          })
+          .where((row) => _isProfileReallyOnline(row, now: now))
           .map(_mapMapToEntity)
-          .where((user) {
-            return user.id.isNotEmpty && user.isOnline;
-          })
+          .where((user) => user.id.isNotEmpty && user.isOnline)
           .toList();
 
       // ========================================================
@@ -468,12 +470,20 @@ class MatchRepository {
         .eq('is_online', true)
         .listen(
           (data) async {
+            final now = DateTime.now().toUtc();
+
+            final activeProfiles = data
+                .where((profile) => _isProfileReallyOnline(profile, now: now))
+                .map((profile) => Map<String, dynamic>.from(profile))
+                .toList(growable: false);
+
             debugPrint(
               '[MATCH REALTIME] '
-              '${data.length} perfil(is) recebido(s).',
+              '${data.length} perfil(is) recebido(s); '
+              '${activeProfiles.length} com presença ativa.',
             );
 
-            for (final profile in data) {
+            for (final profile in activeProfiles) {
               debugPrint(
                 '[MATCH REALTIME] '
                 '----------------------------------------',
@@ -517,7 +527,10 @@ class MatchRepository {
               );
             }
 
-            await _processProfiles(controller: controller, data: data);
+            await _processProfiles(
+              controller: controller,
+              data: activeProfiles,
+            );
           },
           onError: (error) {
             debugPrint(
@@ -726,10 +739,11 @@ class MatchRepository {
       // SOMENTE ONLINE
       // ========================================================
 
-      if (profile['is_online'] != true) {
+      if (!_isProfileReallyOnline(profile)) {
         debugPrint(
           '[MATCH REPOSITORY] '
-          'Perfil $profileId ignorado: offline.',
+          'Perfil $profileId ignorado: '
+          'sem presença recente.',
         );
 
         continue;
@@ -1286,7 +1300,7 @@ class MatchRepository {
     // ONLINE
     // ==========================================================
 
-    if (profile['is_online'] == true) {
+    if (_isProfileReallyOnline(profile)) {
       score += 1;
     }
 
@@ -1310,6 +1324,68 @@ class MatchRepository {
     }
 
     return false;
+  }
+
+  // ============================================================
+  // PRESENÇA REAL
+  // ============================================================
+  //
+  // is_online é apenas a preferência do usuário.
+  //
+  // ONLINE AGORA exige:
+  //
+  // - is_online == true;
+  // - last_seen_at válido;
+  // - heartbeat nos últimos 90 segundos.
+  //
+  // ============================================================
+
+  String _onlineCutoffIso() {
+    return DateTime.now()
+        .toUtc()
+        .subtract(_onlinePresenceWindow)
+        .toIso8601String();
+  }
+
+  bool _isProfileReallyOnline(Map<String, dynamic> profile, {DateTime? now}) {
+    if (profile['is_online'] != true) {
+      return false;
+    }
+
+    final lastSeenAt = _readNullableDateTime(profile['last_seen_at']);
+
+    if (lastSeenAt == null) {
+      return false;
+    }
+
+    final reference = (now ?? DateTime.now()).toUtc();
+
+    final difference = reference.difference(lastSeenAt);
+
+    // Pequena tolerância para relógio do servidor/cliente.
+    if (difference.isNegative) {
+      return true;
+    }
+
+    return difference <= _onlinePresenceWindow;
+  }
+
+  DateTime? _readNullableDateTime(dynamic value) {
+    if (value == null) {
+      return null;
+    }
+
+    if (value is DateTime) {
+      return value.toUtc();
+    }
+
+    final normalized = value.toString().trim();
+
+    if (normalized.isEmpty) {
+      return null;
+    }
+
+    return DateTime.tryParse(normalized)?.toUtc();
   }
 
   // ============================================================
@@ -1385,7 +1461,7 @@ class MatchRepository {
 
       distanceKm: _readDouble(map['distance']),
 
-      isOnline: map['is_online'] == true,
+      isOnline: _isProfileReallyOnline(map),
     );
   }
 

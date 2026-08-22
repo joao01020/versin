@@ -11,8 +11,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 // Responsabilidades:
 //
 // - consultar profiles no Supabase;
-// - pesquisar usuários ONLINE;
-// - observar usuários ONLINE via Realtime.
+// - pesquisar usuários realmente ONLINE;
+// - observar usuários realmente ONLINE via Realtime.
 //
 // Esta camada NÃO:
 //
@@ -27,12 +27,14 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 // Regra de visibilidade:
 //
 // is_online = true
+// +
+// last_seen_at recente
 //     ↓
 // perfil pode aparecer no Match
 //
-// is_online = false
+// Qualquer outro caso
 //     ↓
-// perfil não aparece no Match
+// perfil não aparece como ONLINE AGORA
 //
 // Fluxo:
 //
@@ -63,15 +65,7 @@ abstract class MatchRemoteDatasource {
   //
   // ==========================================================
 
-  Stream<
-    List<
-      Map<
-        String,
-        dynamic
-      >
-    >
-  >
-  watchOnlineProfiles();
+  Stream<List<Map<String, dynamic>>> watchOnlineProfiles();
 
   // ==========================================================
   // PESQUISAR PERFIS
@@ -87,15 +81,7 @@ abstract class MatchRemoteDatasource {
   //
   // ==========================================================
 
-  Future<
-    List<
-      Map<
-        String,
-        dynamic
-      >
-    >
-  >
-  searchProfiles({
+  Future<List<Map<String, dynamic>>> searchProfiles({
     required String query,
     String? currentUserId,
     int limit = 20,
@@ -106,9 +92,7 @@ abstract class MatchRemoteDatasource {
 // MATCH REMOTE DATASOURCE IMPLEMENTATION
 // ============================================================
 
-class MatchRemoteDatasourceImpl
-    implements
-        MatchRemoteDatasource {
+class MatchRemoteDatasourceImpl implements MatchRemoteDatasource {
   // ============================================================
   // SUPABASE
   // ============================================================
@@ -121,15 +105,14 @@ class MatchRemoteDatasourceImpl
 
   static const String _profilesTable = 'profiles';
 
+  static const Duration _onlinePresenceWindow = Duration(seconds: 90);
+
   // ============================================================
   // CONSTRUTOR
   // ============================================================
 
-  MatchRemoteDatasourceImpl({
-    SupabaseClient? supabase,
-  }) : _supabase =
-           supabase ??
-           Supabase.instance.client;
+  MatchRemoteDatasourceImpl({SupabaseClient? supabase})
+    : _supabase = supabase ?? Supabase.instance.client;
 
   // ============================================================
   // COLUNAS DE PROFILE UTILIZADAS PELO MATCH
@@ -147,7 +130,8 @@ class MatchRemoteDatasourceImpl
     bio,
     showcase_url,
     showcase_desc,
-    is_online
+    is_online,
+    last_seen_at
   ''';
 
   // ============================================================
@@ -155,78 +139,35 @@ class MatchRemoteDatasourceImpl
   // ============================================================
 
   @override
-  Stream<
-    List<
-      Map<
-        String,
-        dynamic
-      >
-    >
-  >
-  watchOnlineProfiles() {
+  Stream<List<Map<String, dynamic>>> watchOnlineProfiles() {
     debugPrint(
       '[MATCH REMOTE] '
-      'Iniciando stream de usuários online.',
+      'Iniciando stream de usuários com presença ativa.',
     );
 
     return _supabase
-        .from(
-          _profilesTable,
-        )
-        .stream(
-          primaryKey: [
-            'id',
-          ],
-        )
-        .eq(
-          'is_online',
-          true,
-        )
-        .map(
-          (
-            rows,
-          ) {
-            // ==================================================
-            // PROTEÇÃO EXTRA
-            // ==================================================
-            //
-            // O Supabase já aplica:
-            //
-            // is_online = true
-            //
-            // mas mantemos a validação local para garantir que
-            // nenhum registro offline seja propagado caso o
-            // estado do realtime mude inesperadamente.
-            //
-            // ==================================================
+        .from(_profilesTable)
+        .stream(primaryKey: ['id'])
+        .eq('is_online', true)
+        .map((rows) {
+          final now = DateTime.now().toUtc();
 
-            final onlineRows = rows.where(
-              (
-                row,
-              ) {
-                return row['is_online'] ==
-                    true;
-              },
-            );
+          final onlineRows = rows
+              .where((row) {
+                return _isRowReallyOnline(row, now: now);
+              })
+              .map((row) {
+                return Map<String, dynamic>.from(row);
+              })
+              .toList(growable: false);
 
-            return onlineRows
-                .map(
-                  (
-                    row,
-                  ) {
-                    return Map<
-                      String,
-                      dynamic
-                    >.from(
-                      row,
-                    );
-                  },
-                )
-                .toList(
-                  growable: false,
-                );
-          },
-        );
+          debugPrint(
+            '[MATCH REMOTE] '
+            '${onlineRows.length} perfil(is) realmente online no stream.',
+          );
+
+          return onlineRows;
+        });
   }
 
   // ============================================================
@@ -234,15 +175,7 @@ class MatchRemoteDatasourceImpl
   // ============================================================
 
   @override
-  Future<
-    List<
-      Map<
-        String,
-        dynamic
-      >
-    >
-  >
-  searchProfiles({
+  Future<List<Map<String, dynamic>>> searchProfiles({
     required String query,
     String? currentUserId,
     int limit = 20,
@@ -251,17 +184,10 @@ class MatchRemoteDatasourceImpl
     // NORMALIZAR QUERY
     // ==========================================================
 
-    final normalizedQuery = _normalizeSearchQuery(
-      query,
-    );
+    final normalizedQuery = _normalizeSearchQuery(query);
 
     if (normalizedQuery.isEmpty) {
-      return const <
-        Map<
-          String,
-          dynamic
-        >
-      >[];
+      return const <Map<String, dynamic>>[];
     }
 
     // ==========================================================
@@ -274,10 +200,7 @@ class MatchRemoteDatasourceImpl
     // NORMALIZAR LIMITE
     // ==========================================================
 
-    final safeLimit = limit.clamp(
-      1,
-      100,
-    );
+    final safeLimit = limit.clamp(1, 100);
 
     // ==========================================================
     // LOG
@@ -302,17 +225,16 @@ class MatchRemoteDatasourceImpl
       //
       // ========================================================
 
+      final cutoff = DateTime.now()
+          .toUtc()
+          .subtract(_onlinePresenceWindow)
+          .toIso8601String();
+
       var request = _supabase
-          .from(
-            _profilesTable,
-          )
-          .select(
-            _profileColumns,
-          )
-          .eq(
-            'is_online',
-            true,
-          )
+          .from(_profilesTable)
+          .select(_profileColumns)
+          .eq('is_online', true)
+          .gte('last_seen_at', cutoff)
           .or(
             'username.ilike.%$normalizedQuery%,'
             'artist_name.ilike.%$normalizedQuery%,'
@@ -323,65 +245,37 @@ class MatchRemoteDatasourceImpl
       // REMOVER O PRÓPRIO USUÁRIO
       // ========================================================
 
-      if (normalizedCurrentUserId !=
-              null &&
+      if (normalizedCurrentUserId != null &&
           normalizedCurrentUserId.isNotEmpty) {
-        request = request.neq(
-          'id',
-          normalizedCurrentUserId,
-        );
+        request = request.neq('id', normalizedCurrentUserId);
       }
 
       // ========================================================
       // EXECUTAR
       // ========================================================
 
-      final response = await request.limit(
-        safeLimit,
-      );
+      final response = await request.limit(safeLimit);
 
       // ========================================================
       // NORMALIZAR RESPOSTA
       // ========================================================
 
-      final rows =
-          List<
-            Map<
-              String,
-              dynamic
-            >
-          >.from(
-            response,
-          );
+      final rows = List<Map<String, dynamic>>.from(response);
 
       // ========================================================
       // PROTEÇÃO EXTRA LOCAL
       // ========================================================
 
+      final now = DateTime.now().toUtc();
+
       final onlineRows = rows
-          .where(
-            (
-              row,
-            ) {
-              return row['is_online'] ==
-                  true;
-            },
-          )
-          .map(
-            (
-              row,
-            ) {
-              return Map<
-                String,
-                dynamic
-              >.from(
-                row,
-              );
-            },
-          )
-          .toList(
-            growable: false,
-          );
+          .where((row) {
+            return _isRowReallyOnline(row, now: now);
+          })
+          .map((row) {
+            return Map<String, dynamic>.from(row);
+          })
+          .toList(growable: false);
 
       debugPrint(
         '[MATCH REMOTE] '
@@ -389,9 +283,7 @@ class MatchRemoteDatasourceImpl
       );
 
       return onlineRows;
-    } on PostgrestException catch (
-      error
-    ) {
+    } on PostgrestException catch (error) {
       debugPrint(
         '[MATCH REMOTE] '
         'Erro Supabase ao pesquisar perfis.',
@@ -413,9 +305,7 @@ class MatchRemoteDatasourceImpl
       );
 
       rethrow;
-    } catch (
-      error
-    ) {
+    } catch (error) {
       debugPrint(
         '[MATCH REMOTE] '
         'Erro inesperado ao pesquisar perfis: '
@@ -424,6 +314,56 @@ class MatchRemoteDatasourceImpl
 
       rethrow;
     }
+  }
+
+  // ============================================================
+  // PRESENÇA REAL
+  // ============================================================
+  //
+  // Um perfil só é considerado realmente online quando:
+  //
+  // - is_online == true;
+  // - last_seen_at existe;
+  // - last_seen_at ocorreu nos últimos 90 segundos.
+  //
+  // ============================================================
+
+  bool _isRowReallyOnline(Map<String, dynamic> row, {required DateTime now}) {
+    if (row['is_online'] != true) {
+      return false;
+    }
+
+    final lastSeenAt = _readNullableDateTime(row['last_seen_at']);
+
+    if (lastSeenAt == null) {
+      return false;
+    }
+
+    final difference = now.toUtc().difference(lastSeenAt.toUtc());
+
+    if (difference.isNegative) {
+      return true;
+    }
+
+    return difference <= _onlinePresenceWindow;
+  }
+
+  DateTime? _readNullableDateTime(dynamic value) {
+    if (value == null) {
+      return null;
+    }
+
+    if (value is DateTime) {
+      return value.toUtc();
+    }
+
+    final normalized = value.toString().trim();
+
+    if (normalized.isEmpty) {
+      return null;
+    }
+
+    return DateTime.tryParse(normalized)?.toUtc();
   }
 
   // ============================================================
@@ -442,14 +382,7 @@ class MatchRemoteDatasourceImpl
   //
   // ============================================================
 
-  String _normalizeSearchQuery(
-    String value,
-  ) {
-    return value.trim().toLowerCase().replaceFirst(
-      RegExp(
-        r'^@+',
-      ),
-      '',
-    );
+  String _normalizeSearchQuery(String value) {
+    return value.trim().toLowerCase().replaceFirst(RegExp(r'^@+'), '');
   }
 }

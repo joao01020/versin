@@ -67,7 +67,7 @@ import 'package:versin/modules/storage/services/work_storage_service.dart';
 
 import '../modules/match/data/repositories/match_repository.dart';
 
-import 'package:versin/modules/match/services/match_availability_service.dart';
+import 'package:versin/modules/match/availability/services/match_availability_service.dart';
 
 // ============================================================
 // PUBLIC PROFILE / PRESENCE

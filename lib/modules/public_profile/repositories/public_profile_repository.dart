@@ -22,7 +22,8 @@ import '../models/public_profile_model.dart';
 //
 // - carregar perfil;
 // - atualizar perfil;
-// - alterar visibilidade ONLINE / OFFLINE;
+// - alterar preferência ONLINE / OFFLINE;
+// - atualizar heartbeat de presença real;
 // - carregar demos;
 // - criar demos;
 // - atualizar demos;
@@ -55,6 +56,8 @@ abstract class PublicProfileRepository {
   // - bio;
   // - demais campos editáveis do perfil.
   //
+  // Não deve atualizar last_seen_at.
+  //
   // ============================================================
 
   Future<
@@ -65,25 +68,37 @@ abstract class PublicProfileRepository {
   });
 
   // ============================================================
-  // ATUALIZAR VISIBILIDADE
+  // ATUALIZAR PREFERÊNCIA ONLINE / OFFLINE
   // ============================================================
   //
-  // Atualiza somente:
+  // IMPORTANTE:
   //
-  // public.profiles.is_online
+  // isOnline NÃO representa sozinho a presença real.
+  //
+  // Ele representa a preferência do usuário:
   //
   // true:
   //
-  // - perfil ONLINE;
-  // - pode aparecer no Match;
-  // - pode aparecer em Discovery;
-  // - pode aparecer em buscas públicas.
+  // - permite aparecer online;
+  // - quando houver heartbeat recente, poderá aparecer como
+  //   "ONLINE AGORA".
   //
   // false:
   //
-  // - perfil OFFLINE;
-  // - deve ser ocultado para outros usuários;
-  // - o próprio dono continua podendo acessar o perfil.
+  // - permanece offline/invisível;
+  // - mesmo se o aplicativo estiver aberto.
+  //
+  // No backend, o fluxo esperado é:
+  //
+  // set_my_online_preference(true)
+  //
+  //   is_online = true
+  //   last_seen_at = now()
+  //
+  // set_my_online_preference(false)
+  //
+  //   is_online = false
+  //   last_seen_at = null
   //
   // ============================================================
 
@@ -94,6 +109,45 @@ abstract class PublicProfileRepository {
     required String userId,
     required bool isOnline,
   });
+
+  // ============================================================
+  // HEARTBEAT DE PRESENÇA
+  // ============================================================
+  //
+  // Registra atividade real do usuário autenticado.
+  //
+  // Backend:
+  //
+  // public.update_my_presence()
+  //
+  // Atualiza:
+  //
+  // public.profiles.last_seen_at
+  //
+  // NÃO altera:
+  //
+  // public.profiles.is_online
+  //
+  // Portanto:
+  //
+  // is_online
+  //   = preferência do usuário
+  //
+  // last_seen_at
+  //   = atividade real do aplicativo
+  //
+  // Presença real:
+  //
+  // is_online == true
+  // &&
+  // last_seen_at recente
+  //
+  // ============================================================
+
+  Future<
+    DateTime
+  >
+  updateMyPresence();
 
   // ============================================================
   // TRACKS

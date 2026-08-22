@@ -2,11 +2,13 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:get_it/get_it.dart';
 
 import 'package:versin/modules/public_profile/models/profile_track_model.dart';
 import 'package:versin/modules/public_profile/models/public_profile_model.dart';
 import 'package:versin/modules/public_profile/repositories/public_profile_repository.dart';
 import 'package:versin/modules/public_profile/services/profile_track_service.dart';
+import 'package:versin/modules/profile/services/presence/user_presence_service.dart';
 
 // ============================================================
 // PUBLIC PROFILE CONTROLLER
@@ -17,7 +19,8 @@ import 'package:versin/modules/public_profile/services/profile_track_service.dar
 // - carregar perfil público;
 // - carregar demos;
 // - atualizar perfil;
-// - alterar visibilidade ONLINE / OFFLINE;
+// - alterar preferência ONLINE / OFFLINE;
+// - iniciar e sincronizar heartbeat de presença real;
 // - publicar demo;
 // - excluir demo;
 // - buscar demo de outro usuário;
@@ -51,6 +54,31 @@ class PublicProfileController
   final PublicProfileRepository _repository;
 
   final ProfileTrackService _trackService;
+
+  // ============================================================
+  // PRESENÇA
+  // ============================================================
+  //
+  // O UserPresenceService é singleton de sessão registrado no
+  // GetIt. O Controller não cria nem descarta essa instância.
+  //
+  // Isso é importante porque a presença precisa continuar ativa
+  // mesmo quando a página de perfil for fechada.
+  //
+  // ============================================================
+
+  UserPresenceService? get _presenceService {
+    if (!GetIt.I
+        .isRegistered<
+          UserPresenceService
+        >()) {
+      return null;
+    }
+
+    return GetIt.I<
+      UserPresenceService
+    >();
+  }
 
   // ============================================================
   // PERFIL
@@ -244,6 +272,24 @@ class PublicProfileController
       _profile = await _repository.getProfile(
         userId: normalizedUserId,
       );
+
+      if (_disposed) {
+        return;
+      }
+
+      // ========================================================
+      // PRESENÇA DA CONTA AUTENTICADA
+      // ========================================================
+      //
+      // Só iniciamos heartbeat quando o perfil carregado pertence
+      // à própria conta autenticada.
+      //
+      // Ao abrir o perfil de outra pessoa, jamais usamos a
+      // preferência is_online dela para controlar nossa sessão.
+      //
+      // ========================================================
+
+      await _startPresenceForCurrentProfile();
 
       if (_disposed) {
         return;
@@ -477,24 +523,25 @@ class PublicProfileController
   // ONLINE / OFFLINE
   // ============================================================
   //
-  // Altera a visibilidade pública do perfil.
+  // isOnline agora representa a PREFERÊNCIA do usuário.
   //
-  // true:
+  // ONLINE:
   //
-  // - perfil ONLINE;
-  // - elegível para aparecer no Match / Discovery.
+  // set_my_online_preference(true)
+  //        ↓
+  // is_online = true
+  // last_seen_at = now()
+  //        ↓
+  // UserPresenceService mantém heartbeat a cada 30 s.
   //
-  // false:
+  // OFFLINE:
   //
-  // - perfil OFFLINE;
-  // - deve ser ocultado das consultas públicas;
-  // - o próprio dono continua conseguindo abrir o perfil.
-  //
-  // IMPORTANTE:
-  //
-  // O Controller apenas persiste is_online.
-  // O filtro que realmente remove usuários OFFLINE do Match
-  // deve existir também no datasource/repository do Match.
+  // set_my_online_preference(false)
+  //        ↓
+  // is_online = false
+  // last_seen_at = null
+  //        ↓
+  // heartbeat é interrompido imediatamente.
   //
   // ============================================================
 
@@ -515,17 +562,27 @@ class PublicProfileController
     }
 
     // ==========================================================
-    // NADA PARA ALTERAR
+    // MESMO VALOR
+    // ==========================================================
+    //
+    // Mesmo sem alteração no banco, sincronizamos o serviço.
+    //
+    // Isso é importante depois de:
+    //
+    // - reiniciar o app;
+    // - reconstruir o controller;
+    // - carregar uma sessão já marcada como online.
+    //
     // ==========================================================
 
     if (currentProfile.isOnline ==
         value) {
+      await _syncPresencePreference(
+        value,
+      );
+
       return true;
     }
-
-    // ==========================================================
-    // LOADING
-    // ==========================================================
 
     _setUpdatingOnlineStatus(
       true,
@@ -540,7 +597,6 @@ class PublicProfileController
 
       final updatedProfile = await _repository.updateOnlineStatus(
         userId: currentProfile.userId,
-
         isOnline: value,
       );
 
@@ -554,11 +610,26 @@ class PublicProfileController
 
       _profile = updatedProfile;
 
+      // ========================================================
+      // HEARTBEAT
+      // ========================================================
+
+      await _syncPresencePreference(
+        updatedProfile.isOnline,
+      );
+
+      if (_disposed) {
+        return false;
+      }
+
       _notify();
 
       debugPrint(
         '[PUBLIC PROFILE] '
-        'Perfil ${updatedProfile.isOnline ? 'ONLINE' : 'OFFLINE'}.',
+        'Preferência de presença: '
+        '${updatedProfile.isOnline ? 'ONLINE' : 'OFFLINE'}. '
+        'Presença real: '
+        '${updatedProfile.isReallyOnline ? 'ONLINE' : 'OFFLINE'}.',
       );
 
       return true;
@@ -573,7 +644,7 @@ class PublicProfileController
 
       debugPrint(
         '[PUBLIC PROFILE] '
-        'Erro ao alterar visibilidade: '
+        'Erro ao alterar preferência de presença: '
         '$error',
       );
 
@@ -1112,7 +1183,6 @@ class PublicProfileController
 
     return TrackPlaybackData(
       track: track,
-
       url: url,
     );
   }
@@ -1195,6 +1265,138 @@ class PublicProfileController
                 );
               },
         );
+  }
+
+  // ============================================================
+  // INICIAR PRESENÇA DO PERFIL ATUAL
+  // ============================================================
+
+  Future<
+    void
+  >
+  _startPresenceForCurrentProfile() async {
+    final currentProfile = _profile;
+
+    if (_disposed ||
+        currentProfile ==
+            null) {
+      return;
+    }
+
+    final authenticatedUserId = currentUserId;
+
+    if (authenticatedUserId ==
+            null ||
+        authenticatedUserId !=
+            currentProfile.userId.trim()) {
+      return;
+    }
+
+    final service = _presenceService;
+
+    if (service ==
+        null) {
+      debugPrint(
+        '[PUBLIC PROFILE] '
+        'UserPresenceService não registrado.',
+      );
+
+      return;
+    }
+
+    await service.start(
+      wantsToAppearOnline: currentProfile.isOnline,
+    );
+
+    if (_disposed) {
+      return;
+    }
+
+    // Se o start enviou um heartbeat imediato, refletimos esse
+    // timestamp também no estado local do perfil.
+    final heartbeatAt = service.lastHeartbeatAt;
+
+    if (currentProfile.isOnline &&
+        heartbeatAt !=
+            null) {
+      _profile = currentProfile.copyWithLastSeenAt(
+        heartbeatAt,
+      );
+    }
+
+    debugPrint(
+      '[PUBLIC PROFILE] '
+      'Presença inicial sincronizada. '
+      'Preferência: '
+      '${currentProfile.isOnline ? 'ONLINE' : 'OFFLINE'}.',
+    );
+  }
+
+  // ============================================================
+  // SINCRONIZAR PREFERÊNCIA COM HEARTBEAT
+  // ============================================================
+
+  Future<
+    void
+  >
+  _syncPresencePreference(
+    bool value,
+  ) async {
+    final service = _presenceService;
+
+    if (service ==
+        null) {
+      debugPrint(
+        '[PUBLIC PROFILE] '
+        'UserPresenceService não registrado; '
+        'preferência foi salva no banco, '
+        'mas o heartbeat local não foi sincronizado.',
+      );
+
+      return;
+    }
+
+    // Caso o serviço ainda não tenha sido iniciado nesta sessão,
+    // start() configura lifecycle + timer.
+    if (!service.isStarted) {
+      await service.start(
+        wantsToAppearOnline: value,
+      );
+    } else {
+      await service.setOnlinePreference(
+        value,
+      );
+    }
+
+    if (_disposed) {
+      return;
+    }
+
+    // Mantemos o modelo local coerente logo após um heartbeat
+    // manual disparado pelo serviço.
+    final currentProfile = _profile;
+
+    if (currentProfile ==
+        null) {
+      return;
+    }
+
+    if (!value) {
+      _profile = currentProfile.copyWithLastSeenAt(
+        null,
+      );
+
+      return;
+    }
+
+    final heartbeatAt = service.lastHeartbeatAt;
+
+    if (heartbeatAt !=
+        null) {
+      _profile = currentProfile.copyWithLastSeenAt(
+        heartbeatAt,
+      );
+    }
   }
 
   // ============================================================
@@ -1364,6 +1566,13 @@ class PublicProfileController
 
   @override
   void dispose() {
+    // UserPresenceService NÃO é descartado aqui.
+    //
+    // Ele é singleton da sessão e deve continuar mantendo o
+    // heartbeat mesmo quando esta página/controller sair da tela.
+    //
+    // O stop() deve acontecer no logout/troca de conta.
+
     if (_disposed) {
       return;
     }

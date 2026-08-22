@@ -15,7 +15,8 @@ import '../datasources/public_profile_remote_datasource.dart';
 // - converter Map -> Model;
 // - converter Model -> Map;
 // - delegar operações de banco ao Datasource;
-// - atualizar visibilidade ONLINE / OFFLINE.
+// - atualizar preferência ONLINE / OFFLINE;
+// - registrar heartbeat de presença real.
 //
 // Arquitetura:
 //
@@ -145,16 +146,21 @@ class PublicProfileRepositoryImpl
   // ONLINE / OFFLINE
   // ============================================================
   //
-  // Atualiza somente:
+  // isOnline representa a preferência do usuário.
   //
-  // public.profiles.is_online
+  // O Datasource chama:
   //
-  // Isso evita reenviar:
+  // set_my_online_preference(...)
   //
-  // - nome;
-  // - username;
-  // - bio;
-  // - avatar.
+  // ONLINE:
+  //
+  // - is_online = true;
+  // - last_seen_at = now().
+  //
+  // OFFLINE:
+  //
+  // - is_online = false;
+  // - last_seen_at = null.
   //
   // ============================================================
 
@@ -176,13 +182,39 @@ class PublicProfileRepositoryImpl
 
     final data = await _remoteDatasource.updateOnlineStatus(
       userId: normalizedUserId,
-
       isOnline: isOnline,
     );
 
-    return PublicProfileModel.fromMap(
+    final profile = PublicProfileModel.fromMap(
       data,
     );
+
+    await _syncProfileNameCache(
+      data: data,
+      fallbackUserId: normalizedUserId,
+    );
+
+    return profile;
+  }
+
+  // ============================================================
+  // HEARTBEAT DE PRESENÇA
+  // ============================================================
+  //
+  // Atualiza public.profiles.last_seen_at através da RPC:
+  //
+  // update_my_presence()
+  //
+  // Não altera a preferência is_online.
+  //
+  // ============================================================
+
+  @override
+  Future<
+    DateTime
+  >
+  updateMyPresence() {
+    return _remoteDatasource.updateMyPresence();
   }
 
   // ============================================================

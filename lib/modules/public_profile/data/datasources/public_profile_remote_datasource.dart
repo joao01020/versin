@@ -13,7 +13,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 //
 // - buscar perfil;
 // - atualizar perfil;
-// - atualizar status ONLINE / OFFLINE.
+// - atualizar preferência ONLINE / OFFLINE;
+// - registrar heartbeat de presença real.
 //
 // TRACKS
 //
@@ -83,9 +84,9 @@ abstract class PublicProfileRemoteDatasource {
   // ONLINE / OFFLINE
   // ============================================================
   //
-  // Atualiza somente:
+  // is_online representa a preferência do usuário.
   //
-  // public.profiles.is_online
+  // A presença real depende também de last_seen_at.
   //
   // ============================================================
 
@@ -99,6 +100,15 @@ abstract class PublicProfileRemoteDatasource {
     required String userId,
     required bool isOnline,
   });
+
+  // ============================================================
+  // HEARTBEAT DE PRESENÇA
+  // ============================================================
+
+  Future<
+    DateTime
+  >
+  updateMyPresence();
 
   // ============================================================
   // TRACKS
@@ -230,6 +240,7 @@ class PublicProfileRemoteDatasourceImpl
     avatar_url,
     bio,
     is_online,
+    last_seen_at,
     created_at,
     updated_at
   ''';
@@ -371,6 +382,21 @@ class PublicProfileRemoteDatasourceImpl
     );
 
     // ==========================================================
+    // PRESENÇA
+    // ==========================================================
+    //
+    // last_seen_at é controlado exclusivamente pelo heartbeat.
+    //
+    // Isso evita que uma edição de nome/bio/avatar sobrescreva
+    // a presença real do usuário.
+    //
+    // ==========================================================
+
+    normalizedData.remove(
+      'last_seen_at',
+    );
+
+    // ==========================================================
     // UPDATED AT
     // ==========================================================
 
@@ -414,6 +440,29 @@ class PublicProfileRemoteDatasourceImpl
   // ============================================================
   // ATUALIZAR ONLINE / OFFLINE
   // ============================================================
+  //
+  // IMPORTANTE:
+  //
+  // Não fazemos mais UPDATE direto em is_online.
+  //
+  // O banco possui a RPC:
+  //
+  // public.set_my_online_preference(p_online boolean)
+  //
+  // Ela garante:
+  //
+  // ONLINE:
+  //   is_online = true
+  //   last_seen_at = now()
+  //
+  // OFFLINE:
+  //   is_online = false
+  //   last_seen_at = null
+  //
+  // Também usa auth.uid() no servidor, então não é possível
+  // alterar o status de outro usuário por engano.
+  //
+  // ============================================================
 
   @override
   Future<
@@ -434,42 +483,94 @@ class PublicProfileRemoteDatasourceImpl
       );
     }
 
+    final authenticatedUserId = _requireCurrentUserId();
+
+    if (authenticatedUserId !=
+        normalizedUserId) {
+      throw StateError(
+        'Não é permitido alterar o status de outro usuário.',
+      );
+    }
+
     try {
-      final response = await _supabase
-          .from(
-            _profilesTable,
-          )
-          .update(
-            {
-              'is_online': isOnline,
-              'updated_at': DateTime.now().toUtc().toIso8601String(),
-            },
-          )
-          .eq(
-            'id',
-            normalizedUserId,
-          )
-          .select(
-            _profileFields,
-          )
-          .single();
+      await _supabase.rpc(
+        'set_my_online_preference',
+        params: {
+          'p_online': isOnline,
+        },
+      );
+
+      final profile = await getProfile(
+        userId: authenticatedUserId,
+      );
+
+      if (profile ==
+          null) {
+        throw StateError(
+          'Perfil não encontrado após atualizar presença.',
+        );
+      }
 
       debugPrint(
         '[PUBLIC PROFILE REMOTE] '
-        'Perfil ${isOnline ? 'ONLINE' : 'OFFLINE'}.',
+        'Preferência de presença alterada: '
+        '${isOnline ? 'ONLINE' : 'OFFLINE'}.',
       );
 
-      return Map<
-        String,
-        dynamic
-      >.from(
-        response,
-      );
+      return profile;
     } on PostgrestException catch (
       error
     ) {
       _logPostgrestError(
-        operation: 'alterar status online',
+        operation: 'alterar preferência de presença',
+        error: error,
+      );
+
+      rethrow;
+    }
+  }
+
+  // ============================================================
+  // HEARTBEAT DE PRESENÇA
+  // ============================================================
+  //
+  // Atualiza somente last_seen_at usando:
+  //
+  // public.update_my_presence()
+  //
+  // A função SQL utiliza auth.uid(), por isso o aplicativo não
+  // envia userId e não consegue atualizar outra conta.
+  //
+  // ============================================================
+
+  @override
+  Future<
+    DateTime
+  >
+  updateMyPresence() async {
+    _requireCurrentUserId();
+
+    try {
+      final response = await _supabase.rpc(
+        'update_my_presence',
+      );
+
+      final parsed = _parseRpcDateTime(
+        response,
+      );
+
+      debugPrint(
+        '[PUBLIC PROFILE REMOTE] '
+        'Heartbeat de presença atualizado: '
+        '${parsed.toIso8601String()}',
+      );
+
+      return parsed;
+    } on PostgrestException catch (
+      error
+    ) {
+      _logPostgrestError(
+        operation: 'atualizar heartbeat de presença',
         error: error,
       );
 
@@ -1327,6 +1428,67 @@ class PublicProfileRemoteDatasourceImpl
     return DateTime.fromMillisecondsSinceEpoch(
       0,
     );
+  }
+
+  // ============================================================
+  // USUÁRIO AUTENTICADO
+  // ============================================================
+
+  String _requireCurrentUserId() {
+    final userId = _supabase.auth.currentUser?.id.trim();
+
+    if (userId ==
+            null ||
+        userId.isEmpty) {
+      throw StateError(
+        'Usuário não autenticado.',
+      );
+    }
+
+    return userId;
+  }
+
+  // ============================================================
+  // PARSE DATETIME DE RPC
+  // ============================================================
+  //
+  // update_my_presence() retorna timestamptz.
+  //
+  // Dependendo da versão do client, o retorno pode chegar como
+  // String ou DateTime.
+  //
+  // ============================================================
+
+  DateTime _parseRpcDateTime(
+    dynamic value,
+  ) {
+    if (value
+        is DateTime) {
+      return value.toUtc();
+    }
+
+    final normalized = value?.toString().trim();
+
+    if (normalized ==
+            null ||
+        normalized.isEmpty) {
+      throw StateError(
+        'Heartbeat retornou data inválida.',
+      );
+    }
+
+    final parsed = DateTime.tryParse(
+      normalized,
+    );
+
+    if (parsed ==
+        null) {
+      throw StateError(
+        'Não foi possível interpretar last_seen_at retornado pelo servidor.',
+      );
+    }
+
+    return parsed.toUtc();
   }
 
   // ============================================================

@@ -13,7 +13,9 @@
 // - armazenar dados do perfil público;
 // - converter Map -> Model;
 // - converter Model -> Map;
-// - controlar is_online;
+// - controlar preferência is_online;
+// - representar last_seen_at;
+// - calcular presença real;
 // - fornecer helpers de apresentação;
 // - permitir cópias imutáveis.
 //
@@ -56,24 +58,28 @@ class PublicProfileModel {
   // STATUS / VISIBILIDADE
   // ============================================================
   //
-  // true:
+  // isOnline representa a PREFERÊNCIA do usuário:
   //
-  // - perfil visível;
-  // - pode aparecer no Match;
-  // - pode aparecer em buscas públicas.
+  // true  -> permite aparecer online enquanto houver heartbeat;
+  // false -> permanece offline/invisível mesmo com o app aberto.
   //
-  // false:
-  //
-  // - perfil fica offline;
-  // - deve ser ignorado pelo Discovery;
-  // - continua acessível pelo próprio dono.
-  //
-  // A filtragem real de outros usuários é responsabilidade
-  // do repository/datasource do Match.
+  // A presença real depende também de lastSeenAt.
   //
   // ============================================================
 
   final bool isOnline;
+
+  // ============================================================
+  // ÚLTIMA PRESENÇA
+  // ============================================================
+  //
+  // Banco:
+  //
+  // public.profiles.last_seen_at
+  //
+  // ============================================================
+
+  final DateTime? lastSeenAt;
 
   // ============================================================
   // DATAS
@@ -94,6 +100,7 @@ class PublicProfileModel {
     this.avatarUrl,
     this.bio = '',
     this.isOnline = false,
+    this.lastSeenAt,
     this.createdAt,
     this.updatedAt,
   });
@@ -111,6 +118,7 @@ class PublicProfileModel {
       displayName: '',
       bio: '',
       isOnline: false,
+      lastSeenAt: null,
     );
   }
 
@@ -142,12 +150,55 @@ class PublicProfileModel {
       hasDisplayName;
 
   // ============================================================
-  // VISIBILIDADE
+  // PRESENÇA REAL
   // ============================================================
 
-  bool get isOffline => !isOnline;
+  static const Duration onlinePresenceWindow = Duration(
+    seconds: 90,
+  );
 
-  String get onlineStatusLabel => isOnline
+  bool get wantsToAppearOnline => isOnline;
+
+  bool get wantsToAppearOffline => !isOnline;
+
+  bool get isReallyOnline {
+    return isReallyOnlineAt(
+      DateTime.now().toUtc(),
+    );
+  }
+
+  bool isReallyOnlineAt(
+    DateTime now, {
+    Duration presenceWindow = onlinePresenceWindow,
+  }) {
+    if (!isOnline) {
+      return false;
+    }
+
+    final seenAt = lastSeenAt?.toUtc();
+
+    if (seenAt ==
+        null) {
+      return false;
+    }
+
+    final current = now.toUtc();
+
+    final difference = current.difference(
+      seenAt,
+    );
+
+    if (difference.isNegative) {
+      return true;
+    }
+
+    return difference <=
+        presenceWindow;
+  }
+
+  bool get isOffline => !isReallyOnline;
+
+  String get onlineStatusLabel => isReallyOnline
       ? 'ONLINE'
       : 'OFFLINE';
 
@@ -321,6 +372,10 @@ class PublicProfileModel {
         map['is_online'],
       ),
 
+      lastSeenAt: _readDateTime(
+        map['last_seen_at'],
+      ),
+
       createdAt: _readDateTime(
         map['created_at'],
       ),
@@ -359,6 +414,8 @@ class PublicProfileModel {
 
       'is_online': isOnline,
 
+      'last_seen_at': lastSeenAt?.toUtc().toIso8601String(),
+
       if (createdAt !=
           null)
         'created_at': createdAt!.toUtc().toIso8601String(),
@@ -378,12 +435,16 @@ class PublicProfileModel {
   // - editar perfil;
   // - mudar ONLINE / OFFLINE.
   //
-  // Agora is_online também é persistido.
+  // is_online continua persistido como preferência do usuário.
+  //
+  // last_seen_at NÃO é enviado aqui.
+  // O heartbeat deve atualizá-lo separadamente.
   //
   // NÃO envia:
   //
   // - id;
-  // - created_at.
+  // - created_at;
+  // - last_seen_at.
   //
   // ============================================================
 
@@ -451,6 +512,8 @@ class PublicProfileModel {
     bool clearAvatar = false,
     String? bio,
     bool? isOnline,
+    DateTime? lastSeenAt,
+    bool clearLastSeenAt = false,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -480,6 +543,11 @@ class PublicProfileModel {
           isOnline ??
           this.isOnline,
 
+      lastSeenAt: clearLastSeenAt
+          ? null
+          : lastSeenAt ??
+                this.lastSeenAt,
+
       createdAt:
           createdAt ??
           this.createdAt,
@@ -500,7 +568,24 @@ class PublicProfileModel {
     return copyWith(
       isOnline: value,
 
-      updatedAt: DateTime.now(),
+      clearLastSeenAt: !value,
+
+      updatedAt: DateTime.now().toUtc(),
+    );
+  }
+
+  // ============================================================
+  // COPY LAST SEEN
+  // ============================================================
+
+  PublicProfileModel copyWithLastSeenAt(
+    DateTime? value,
+  ) {
+    return copyWith(
+      lastSeenAt: value?.toUtc(),
+      clearLastSeenAt:
+          value ==
+          null,
     );
   }
 
@@ -626,7 +711,9 @@ class PublicProfileModel {
         'displayName: $displayName, '
         'hasAvatar: $hasAvatar, '
         'hasBio: $hasBio, '
-        'isOnline: $isOnline'
+        'isOnlinePreference: $isOnline, '
+        'lastSeenAt: $lastSeenAt, '
+        'isReallyOnline: $isReallyOnline'
         ')';
   }
 }

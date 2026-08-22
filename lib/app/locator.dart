@@ -68,6 +68,14 @@ import 'package:versin/modules/storage/services/work_storage_service.dart';
 import '../modules/match/data/repositories/match_repository.dart';
 
 // ============================================================
+// PUBLIC PROFILE / PRESENCE
+// ============================================================
+
+import 'package:versin/modules/public_profile/data/repositories/public_profile_repository_impl.dart';
+import 'package:versin/modules/public_profile/repositories/public_profile_repository.dart';
+import 'package:versin/modules/profile/services/presence/user_presence_service.dart';
+
+// ============================================================
 // SERVICE LOCATOR
 // ============================================================
 
@@ -77,79 +85,72 @@ final sl = GetIt.instance;
 // SETUP
 // ============================================================
 
-void
-setupLocator() {
+void setupLocator() {
   // ==========================================================
   // CORE & DASHBOARD
   // ==========================================================
 
-  sl.registerLazySingleton<
-    DashboardController
-  >(
-    () => DashboardController(),
-  );
+  sl.registerLazySingleton<DashboardController>(() => DashboardController());
 
   // ==========================================================
   // PROFESSIONAL PROFILE MODULE
   // ==========================================================
 
-  sl.registerLazySingleton<
-    ProfessionalProfileController
-  >(
+  sl.registerLazySingleton<ProfessionalProfileController>(
     () => ProfessionalProfileController(),
+  );
+
+  // ==========================================================
+  // PUBLIC PROFILE / PRESENCE MODULE
+  // ==========================================================
+  //
+  // PublicProfileRepository
+  //        ↓
+  // PublicProfileRepositoryImpl
+  //        ↓
+  // PublicProfileRemoteDatasource
+  //        ↓
+  // Supabase
+  //
+  // UserPresenceService usa a mesma instância do repository
+  // para enviar heartbeat através de updateMyPresence().
+  //
+  // ==========================================================
+
+  sl.registerLazySingleton<PublicProfileRepository>(
+    () => PublicProfileRepositoryImpl(),
+  );
+
+  sl.registerLazySingleton<UserPresenceService>(
+    () => UserPresenceService(repository: sl<PublicProfileRepository>()),
   );
 
   // ==========================================================
   // ACTIVITIES MODULE
   // ==========================================================
 
-  sl.registerLazySingleton<
-    RecentActivityRepository
-  >(
+  sl.registerLazySingleton<RecentActivityRepository>(
     () => RecentActivityRepositoryImpl(),
   );
 
-  sl.registerLazySingleton<
-    RecentActivityController
-  >(
-    () => RecentActivityController(
-      repository:
-          sl<
-            RecentActivityRepository
-          >(),
-    ),
+  sl.registerLazySingleton<RecentActivityController>(
+    () => RecentActivityController(repository: sl<RecentActivityRepository>()),
   );
 
-  sl.registerLazySingleton<
-    RecentActivityService
-  >(
-    () => RecentActivityService(
-      controller:
-          sl<
-            RecentActivityController
-          >(),
-    ),
+  sl.registerLazySingleton<RecentActivityService>(
+    () => RecentActivityService(controller: sl<RecentActivityController>()),
   );
 
   // ==========================================================
   // NOTIFICATIONS MODULE
   // ==========================================================
 
-  sl.registerLazySingleton<
-    NotificationRepository
-  >(
+  sl.registerLazySingleton<NotificationRepository>(
     () => NotificationRepositoryImpl(),
   );
 
-  sl.registerLazySingleton<
-    NotificationController
-  >(
-    () => NotificationController(
-      repository:
-          sl<
-            NotificationRepository
-          >(),
-    ),
+  sl.registerLazySingleton<NotificationController>(
+    () => NotificationController(repository: sl<NotificationRepository>()),
   );
 
   // ==========================================================
@@ -166,87 +167,44 @@ setupLocator() {
   //
   // ==========================================================
 
-  sl.registerLazySingleton<
-    ProjectInvitationService
-  >(
+  sl.registerLazySingleton<ProjectInvitationService>(
     () => ProjectInvitationService(),
   );
 
-  sl.registerLazySingleton<
-    ProjectInvitationController
-  >(
-    () => ProjectInvitationController(
-      service:
-          sl<
-            ProjectInvitationService
-          >(),
-    ),
+  sl.registerLazySingleton<ProjectInvitationController>(
+    () => ProjectInvitationController(service: sl<ProjectInvitationService>()),
   );
 
   // ==========================================================
   // MATCH MODULE
   // ==========================================================
 
-  sl.registerLazySingleton<
-    MatchRepository
-  >(
-    () => MatchRepository(),
-  );
+  sl.registerLazySingleton<MatchRepository>(() => MatchRepository());
 
-  sl.registerFactory<
-    MatchController
-  >(
-    () => MatchController(),
-  );
+  sl.registerFactory<MatchController>(() => MatchController());
 
   // ==========================================================
   // WALLET MODULE
   // ==========================================================
 
-  sl.registerLazySingleton<
-    WalletController
-  >(
-    () => WalletController(),
-  );
+  sl.registerLazySingleton<WalletController>(() => WalletController());
 
-  sl.registerLazySingleton<
-    RoyaltiesController
-  >(
-    () => RoyaltiesController(),
-  );
+  sl.registerLazySingleton<RoyaltiesController>(() => RoyaltiesController());
 
   // ==========================================================
   // BRAIN & RHYMES MODULE
   // ==========================================================
 
-  sl.registerLazySingleton<
-    BrainController
-  >(
-    () => BrainController(),
-  );
+  sl.registerLazySingleton<BrainController>(() => BrainController());
 
-  sl.registerLazySingleton<
-    RhymesController
-  >(
-    () =>
-        sl<
-          BrainController
-        >(),
-  );
+  sl.registerLazySingleton<RhymesController>(() => sl<BrainController>());
 
   // ==========================================================
   // STUDIO MODULE
   // ==========================================================
 
-  sl.registerLazySingleton<
-    StudioController
-  >(
-    () => StudioController(
-      rhymesController:
-          sl<
-            BrainController
-          >(),
-    ),
+  sl.registerLazySingleton<StudioController>(
+    () => StudioController(rhymesController: sl<BrainController>()),
   );
 
   // ==========================================================
@@ -289,11 +247,7 @@ setupLocator() {
   //
   // ==========================================================
 
-  sl.registerLazySingleton<
-    StorageHashService
-  >(
-    () => StorageHashService(),
-  );
+  sl.registerLazySingleton<StorageHashService>(() => StorageHashService());
 
   // ==========================================================
   // STORAGE FILE SERVICE
@@ -313,11 +267,7 @@ setupLocator() {
   //
   // ==========================================================
 
-  sl.registerLazySingleton<
-    StorageFileService
-  >(
-    () => StorageFileService(),
-  );
+  sl.registerLazySingleton<StorageFileService>(() => StorageFileService());
 
   // ==========================================================
   // STORAGE REPOSITORY
@@ -339,15 +289,8 @@ setupLocator() {
   //
   // ==========================================================
 
-  sl.registerLazySingleton<
-    StorageRepository
-  >(
-    () => SupabaseStorageRepository(
-      hashService:
-          sl<
-            StorageHashService
-          >(),
-    ),
+  sl.registerLazySingleton<StorageRepository>(
+    () => SupabaseStorageRepository(hashService: sl<StorageHashService>()),
   );
 
   // ==========================================================
@@ -366,11 +309,7 @@ setupLocator() {
   //
   // ==========================================================
 
-  sl.registerLazySingleton<
-    BeatStorageService
-  >(
-    () => BeatStorageService(),
-  );
+  sl.registerLazySingleton<BeatStorageService>(() => BeatStorageService());
 
   // ==========================================================
   // WORK STORAGE SERVICE
@@ -401,19 +340,11 @@ setupLocator() {
   //
   // ==========================================================
 
-  sl.registerLazySingleton<
-    WorkStorageService
-  >(
+  sl.registerLazySingleton<WorkStorageService>(
     () => WorkStorageService(
-      repository:
-          sl<
-            StorageRepository
-          >(),
+      repository: sl<StorageRepository>(),
 
-      beatStorageService:
-          sl<
-            BeatStorageService
-          >(),
+      beatStorageService: sl<BeatStorageService>(),
     ),
   );
 
@@ -432,14 +363,7 @@ setupLocator() {
   //
   // ==========================================================
 
-  sl.registerLazySingleton<
-    StorageController
-  >(
-    () => StorageController(
-      repository:
-          sl<
-            StorageRepository
-          >(),
-    ),
+  sl.registerLazySingleton<StorageController>(
+    () => StorageController(repository: sl<StorageRepository>()),
   );
 }

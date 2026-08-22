@@ -11,6 +11,7 @@ import 'package:versin/modules/profile/views/professional_profile_settings_page.
 import 'package:versin/modules/public_profile/controllers/public_profile_controller.dart';
 import 'package:versin/modules/public_profile/data/repositories/public_profile_repository_impl.dart';
 import 'package:versin/modules/public_profile/services/profile_track_service.dart';
+import 'package:versin/modules/profile/services/presence/user_presence_service.dart';
 import 'package:versin/modules/public_profile/views/public_profile_page.dart';
 import 'package:versin/modules/settings/widgets/settings_tile.dart';
 import 'package:versin/modules/settings/views/private_api_settings_page.dart';
@@ -668,14 +669,71 @@ class _SettingsPageState
       },
     );
 
+    // ==========================================================
+    // PRESENÇA DA SESSÃO
+    // ==========================================================
+    //
+    // O serviço precisa ser interrompido ANTES do signOut.
+    //
+    // Não alteramos is_online para false aqui:
+    //
+    // - is_online é a preferência persistente do usuário;
+    // - o heartbeat é o que representa presença real;
+    // - ao parar o heartbeat, last_seen_at envelhece;
+    // - após a janela de presença o usuário passa a ser offline.
+    //
+    // Também guardamos o estado atual para restaurar o serviço
+    // caso o logout falhe e a sessão continue autenticada.
+    //
+    // ==========================================================
+
+    UserPresenceService? presenceService;
+
+    var presenceWasStarted = false;
+
+    var presencePreference = false;
+
+    if (sl
+        .isRegistered<
+          UserPresenceService
+        >()) {
+      presenceService =
+          sl<
+            UserPresenceService
+          >();
+
+      presenceWasStarted = presenceService.isStarted;
+
+      presencePreference = presenceService.userWantsToAppearOnline;
+
+      presenceService.stop();
+
+      debugPrint(
+        '[SETTINGS] '
+        'Heartbeat de presença interrompido antes do logout.',
+      );
+    }
+
     try {
+      // ========================================================
+      // AUTH
+      // ========================================================
+
       await _authRepository.signOut();
+
+      // ========================================================
+      // DASHBOARD
+      // ========================================================
 
       _dashboardController.resetNavigation();
 
       if (!mounted) {
         return;
       }
+
+      // ========================================================
+      // LOGIN
+      // ========================================================
 
       Navigator.of(
         context,
@@ -688,6 +746,41 @@ class _SettingsPageState
     } catch (
       error
     ) {
+      // ========================================================
+      // RESTAURAR PRESENÇA SE O LOGOUT FALHOU
+      // ========================================================
+      //
+      // Se signOut() falhar, a conta pode continuar autenticada.
+      // Nesse caso voltamos a iniciar o heartbeat exatamente com
+      // a preferência que existia antes da tentativa de logout.
+      //
+      // ========================================================
+
+      if (presenceService !=
+              null &&
+          presenceWasStarted &&
+          Supabase.instance.client.auth.currentUser !=
+              null) {
+        try {
+          await presenceService.start(
+            wantsToAppearOnline: presencePreference,
+          );
+
+          debugPrint(
+            '[SETTINGS] '
+            'Presença restaurada porque o logout falhou.',
+          );
+        } catch (
+          presenceError
+        ) {
+          debugPrint(
+            '[SETTINGS] '
+            'Não foi possível restaurar a presença: '
+            '$presenceError',
+          );
+        }
+      }
+
       if (!mounted) {
         return;
       }

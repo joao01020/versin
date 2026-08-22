@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:versin/app/locator.dart';
 
@@ -40,7 +41,10 @@ class _StoragePageState
 
   late final TabController _tabController;
 
-  static const String _temporaryUserId = 'user_123';
+  bool _isInitializingStorage = true;
+
+  String? _initializationError;
+
   static const Color _accentColor = Color(
     0xFFE100FF,
   );
@@ -80,18 +84,126 @@ class _StoragePageState
     void
   >
   _initializeStorage() async {
-    final userId = controller.currentUserId;
-
-    if (userId ==
-            null ||
-        userId.trim().isEmpty) {
-      await controller.init(
-        userId: _temporaryUserId,
-      );
+    if (!mounted) {
       return;
     }
 
-    await controller.refresh();
+    setState(
+      () {
+        _isInitializingStorage = true;
+        _initializationError = null;
+      },
+    );
+
+    try {
+      // ========================================================
+      // USUÁRIO AUTENTICADO REAL
+      // ========================================================
+      //
+      // A coluna owner_user_id em public.stored_works é UUID.
+      //
+      // Portanto, nunca devemos usar identificadores temporários
+      // como "user_123".
+      //
+      // A fonte da verdade é o Supabase Auth.
+      //
+      // ========================================================
+
+      final authUser = Supabase.instance.client.auth.currentUser;
+
+      final authenticatedUserId = authUser?.id.trim();
+
+      if (authenticatedUserId ==
+              null ||
+          authenticatedUserId.isEmpty) {
+        throw StateError(
+          'Nenhum usuário autenticado. '
+          'Faça login novamente para acessar suas obras.',
+        );
+      }
+
+      // ========================================================
+      // CONTROLLER AINDA NÃO INICIALIZADO
+      // ========================================================
+      //
+      // Ou pertence a outra conta.
+      //
+      // Isso também protege contra troca de usuário no mesmo
+      // dispositivo/sessão do aplicativo.
+      //
+      // ========================================================
+
+      final controllerUserId = controller.currentUserId?.trim();
+
+      if (controllerUserId ==
+              null ||
+          controllerUserId.isEmpty ||
+          controllerUserId !=
+              authenticatedUserId) {
+        await controller.init(
+          userId: authenticatedUserId,
+        );
+      } else {
+        // ======================================================
+        // MESMA CONTA
+        // ======================================================
+
+        await controller.refresh();
+      }
+
+      if (!mounted) {
+        return;
+      }
+
+      // ========================================================
+      // ERRO DO CONTROLLER
+      // ========================================================
+      //
+      // O controller pode concluir a operação e manter uma
+      // mensagem de erro própria.
+      //
+      // ========================================================
+
+      if (controller.errorMessage !=
+              null &&
+          controller.errorMessage!.trim().isNotEmpty) {
+        _initializationError = controller.errorMessage!.trim();
+      }
+    } catch (
+      error,
+      stackTrace
+    ) {
+      debugPrint(
+        '[STORAGE PAGE] '
+        'Não foi possível inicializar o armazenamento.',
+      );
+
+      debugPrint(
+        '[STORAGE PAGE] '
+        'Erro: $error',
+      );
+
+      debugPrint(
+        '[STORAGE PAGE] '
+        'StackTrace: $stackTrace',
+      );
+
+      if (mounted) {
+        _initializationError =
+            error
+                is StateError
+            ? error.message
+            : 'Não foi possível carregar suas obras.';
+      }
+    } finally {
+      if (mounted) {
+        setState(
+          () {
+            _isInitializingStorage = false;
+          },
+        );
+      }
+    }
   }
 
   @override
@@ -112,48 +224,155 @@ class _StoragePageState
             ],
           ),
         ),
-        child: ListenableBuilder(
-          listenable: controller,
-          builder:
-              (
-                context,
-                _,
-              ) {
-                if (controller.isLoading) {
-                  return const Center(
-                    child: CircularProgressIndicator(
-                      color: _accentColor,
-                    ),
-                  );
-                }
-
-                return Column(
-                  children: [
-                    _buildHeader(),
-                    _buildSummary(),
-                    const SizedBox(
-                      height: 18,
-                    ),
-                    _buildTabs(),
-                    const SizedBox(
-                      height: 8,
-                    ),
-                    Expanded(
-                      child: TabBarView(
-                        controller: _tabController,
-                        children: [
-                          _buildWorksList(
-                            StoredWorkType.beat,
+        child: _isInitializingStorage
+            ? const Center(
+                child: CircularProgressIndicator(
+                  color: _accentColor,
+                ),
+              )
+            : _initializationError !=
+                  null
+            ? _buildInitializationError()
+            : ListenableBuilder(
+                listenable: controller,
+                builder:
+                    (
+                      context,
+                      _,
+                    ) {
+                      if (controller.isLoading) {
+                        return const Center(
+                          child: CircularProgressIndicator(
+                            color: _accentColor,
                           ),
-                          _buildWorksList(
-                            StoredWorkType.lyrics,
+                        );
+                      }
+
+                      return Column(
+                        children: [
+                          _buildHeader(),
+                          _buildSummary(),
+                          const SizedBox(
+                            height: 18,
+                          ),
+                          _buildTabs(),
+                          const SizedBox(
+                            height: 8,
+                          ),
+                          Expanded(
+                            child: TabBarView(
+                              controller: _tabController,
+                              children: [
+                                _buildWorksList(
+                                  StoredWorkType.beat,
+                                ),
+                                _buildWorksList(
+                                  StoredWorkType.lyrics,
+                                ),
+                              ],
+                            ),
                           ),
                         ],
-                      ),
+                      );
+                    },
+              ),
+      ),
+    );
+  }
+
+  // ============================================================
+  // ERRO DE INICIALIZAÇÃO
+  // ============================================================
+
+  Widget _buildInitializationError() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(
+          24,
+        ),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(
+            maxWidth: 460,
+          ),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(
+              20,
+            ),
+            decoration: BoxDecoration(
+              color: _surfaceColor,
+              borderRadius: BorderRadius.circular(
+                18,
+              ),
+              border: Border.all(
+                color: Colors.redAccent.withValues(
+                  alpha: 0.22,
+                ),
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.cloud_off_rounded,
+                  color: Colors.redAccent,
+                  size: 34,
+                ),
+
+                const SizedBox(
+                  height: 12,
+                ),
+
+                const Text(
+                  'Não foi possível carregar o armazenamento',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+
+                const SizedBox(
+                  height: 8,
+                ),
+
+                Text(
+                  _initializationError ??
+                      'Tente novamente.',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white54,
+                    fontSize: 11,
+                    height: 1.4,
+                  ),
+                ),
+
+                const SizedBox(
+                  height: 16,
+                ),
+
+                FilledButton.icon(
+                  onPressed: _initializeStorage,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: _accentColor,
+                    foregroundColor: Colors.black,
+                  ),
+                  icon: const Icon(
+                    Icons.refresh_rounded,
+                    size: 17,
+                  ),
+                  label: const Text(
+                    'TENTAR NOVAMENTE',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
                     ),
-                  ],
-                );
-              },
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

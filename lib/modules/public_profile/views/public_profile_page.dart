@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import 'package:versin/app/locator.dart';
 import 'package:versin/modules/match/widgets/profile_track_player_sheet.dart';
+import 'package:versin/modules/profile/services/presence/user_presence_service.dart';
 
 import 'package:versin/modules/public_profile/controllers/public_profile_controller.dart';
 import 'package:versin/modules/public_profile/models/profile_track_model.dart';
@@ -59,6 +61,23 @@ class PublicProfilePage
   final PublicProfileController controller;
 
   // ============================================================
+  // DESTAQUE ONLINE AO ABRIR
+  // ============================================================
+  //
+  // Usado principalmente pelo Match.
+  //
+  // Quando true:
+  //
+  // - a página carrega o perfil;
+  // - verifica se é o próprio usuário;
+  // - verifica se está OFFLINE;
+  // - executa 3 pulsos verdes suaves no controle OFFLINE.
+  //
+  // ============================================================
+
+  final bool highlightOnlineOnOpen;
+
+  // ============================================================
   // CONSTRUTOR
   // ============================================================
 
@@ -66,6 +85,7 @@ class PublicProfilePage
     super.key,
     required this.userId,
     required this.controller,
+    this.highlightOnlineOnOpen = false,
   });
 
   @override
@@ -83,7 +103,9 @@ class _PublicProfilePageState
     extends
         State<
           PublicProfilePage
-        > {
+        >
+    with
+        SingleTickerProviderStateMixin {
   // ============================================================
   // CONSTANTES
   // ============================================================
@@ -97,6 +119,23 @@ class _PublicProfilePageState
   // ============================================================
 
   PublicProfileController get controller => widget.controller;
+
+  // ============================================================
+  // PRESENÇA / DESTAQUE ONLINE
+  // ============================================================
+
+  late final UserPresenceService _presenceService;
+
+  late final AnimationController _onlinePulseController;
+
+  late final Animation<
+    double
+  >
+  _onlinePulseAnimation;
+
+  int _lastHandledOnlineAttentionRequest = 0;
+
+  bool _didHandleHighlightOnlineOnOpen = false;
 
   // ============================================================
   // PLAYBACK
@@ -118,6 +157,29 @@ class _PublicProfilePageState
   void initState() {
     super.initState();
 
+    _presenceService =
+        sl<
+          UserPresenceService
+        >();
+
+    _onlinePulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(
+        milliseconds: 700,
+      ),
+    );
+
+    _onlinePulseAnimation = CurvedAnimation(
+      parent: _onlinePulseController,
+      curve: Curves.easeInOut,
+    );
+
+    _lastHandledOnlineAttentionRequest = _presenceService.onlineAttentionRequest.value;
+
+    _presenceService.onlineAttentionRequest.addListener(
+      _handleOnlineAttentionRequest,
+    );
+
     controller.addListener(
       _onControllerChanged,
     );
@@ -125,16 +187,124 @@ class _PublicProfilePageState
     WidgetsBinding.instance.addPostFrameCallback(
       (
         _,
-      ) {
+      ) async {
         if (!mounted) {
           return;
         }
 
-        controller.load(
+        await controller.load(
           userId: widget.userId,
         );
+
+        if (!mounted) {
+          return;
+        }
+
+        await _handleHighlightOnlineOnOpen();
       },
     );
+  }
+
+  // ============================================================
+  // DESTAQUE ONLINE AO ABRIR
+  // ============================================================
+
+  Future<
+    void
+  >
+  _handleHighlightOnlineOnOpen() async {
+    if (_didHandleHighlightOnlineOnOpen ||
+        !widget.highlightOnlineOnOpen ||
+        !mounted) {
+      return;
+    }
+
+    final profile = controller.profile;
+
+    if (profile ==
+        null) {
+      return;
+    }
+
+    if (!controller.isOwner) {
+      return;
+    }
+
+    if (profile.isOnline) {
+      _didHandleHighlightOnlineOnOpen = true;
+
+      return;
+    }
+
+    _didHandleHighlightOnlineOnOpen = true;
+
+    await _pulseOnlineControl();
+  }
+
+  // ============================================================
+  // ATENÇÃO PARA ATIVAR ONLINE
+  // ============================================================
+
+  Future<
+    void
+  >
+  _handleOnlineAttentionRequest() async {
+    if (!mounted ||
+        !controller.isOwner) {
+      return;
+    }
+
+    final requestValue = _presenceService.onlineAttentionRequest.value;
+
+    if (requestValue ==
+        _lastHandledOnlineAttentionRequest) {
+      return;
+    }
+
+    _lastHandledOnlineAttentionRequest = requestValue;
+
+    final profile = controller.profile;
+
+    if (profile?.isOnline ==
+        true) {
+      return;
+    }
+
+    await _pulseOnlineControl();
+  }
+
+  // ============================================================
+  // PULSO SUAVE
+  // ============================================================
+  //
+  // Executa 3 pulsos verdes suaves no controle OFFLINE.
+  //
+  // ============================================================
+
+  Future<
+    void
+  >
+  _pulseOnlineControl() async {
+    for (
+      var index = 0;
+      index <
+          3;
+      index++
+    ) {
+      if (!mounted) {
+        return;
+      }
+
+      await _onlinePulseController.forward(
+        from: 0,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      await _onlinePulseController.reverse();
+    }
   }
 
   // ============================================================
@@ -169,9 +339,32 @@ class _PublicProfilePageState
     // ==========================================================
 
     if (oldWidget.userId !=
-        widget.userId) {
-      widget.controller.load(
-        userId: widget.userId,
+            widget.userId ||
+        oldWidget.highlightOnlineOnOpen !=
+            widget.highlightOnlineOnOpen) {
+      _didHandleHighlightOnlineOnOpen = false;
+
+      WidgetsBinding.instance.addPostFrameCallback(
+        (
+          _,
+        ) async {
+          if (!mounted) {
+            return;
+          }
+
+          if (oldWidget.userId !=
+              widget.userId) {
+            await widget.controller.load(
+              userId: widget.userId,
+            );
+          }
+
+          if (!mounted) {
+            return;
+          }
+
+          await _handleHighlightOnlineOnOpen();
+        },
       );
     }
   }
@@ -188,6 +381,23 @@ class _PublicProfilePageState
     setState(
       () {},
     );
+
+    if (widget.highlightOnlineOnOpen &&
+        !_didHandleHighlightOnlineOnOpen &&
+        controller.profile !=
+            null) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (
+          _,
+        ) {
+          if (!mounted) {
+            return;
+          }
+
+          _handleHighlightOnlineOnOpen();
+        },
+      );
+    }
   }
 
   // ============================================================
@@ -375,6 +585,12 @@ class _PublicProfilePageState
       return;
     }
 
+    if (!wasOnline) {
+      _onlinePulseController.stop();
+
+      _onlinePulseController.value = 0;
+    }
+
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(
@@ -555,17 +771,15 @@ class _PublicProfilePageState
         ),
       );
     } finally {
-      if (!mounted) {
-        return;
+      if (mounted) {
+        setState(
+          () {
+            _loadingTrackIds.remove(
+              trackId,
+            );
+          },
+        );
       }
-
-      setState(
-        () {
-          _loadingTrackIds.remove(
-            trackId,
-          );
-        },
-      );
     }
   }
 
@@ -793,20 +1007,42 @@ class _PublicProfilePageState
                   // ============================================
                   // HEADER
                   // ============================================
-                  PublicProfileHeaderWidget(
-                    profile: profile,
+                  AnimatedBuilder(
+                    animation: _onlinePulseAnimation,
+                    builder:
+                        (
+                          context,
+                          _,
+                        ) {
+                          final shouldHighlightOnline =
+                              controller.isOwner &&
+                              !profile.isOnline &&
+                              _onlinePulseController.isAnimating;
 
-                    isOwner: controller.isOwner,
+                          return PublicProfileHeaderWidget(
+                            profile: profile,
 
-                    isUpdatingOnlineStatus: controller.isUpdatingOnlineStatus,
+                            isOwner: controller.isOwner,
 
-                    onEdit: controller.isOwner
-                        ? _openEditProfile
-                        : null,
+                            isUpdatingOnlineStatus: controller.isUpdatingOnlineStatus,
 
-                    onToggleOnline: controller.isOwner
-                        ? _toggleOnlineStatus
-                        : null,
+                            onlineAttentionProgress: shouldHighlightOnline
+                                ? _onlinePulseAnimation.value
+                                : 0,
+
+                            onlineAttentionColor: const Color(
+                              0xFF35E88B,
+                            ),
+
+                            onEdit: controller.isOwner
+                                ? _openEditProfile
+                                : null,
+
+                            onToggleOnline: controller.isOwner
+                                ? _toggleOnlineStatus
+                                : null,
+                          );
+                        },
                   ),
 
                   const SizedBox(
@@ -1111,6 +1347,12 @@ class _PublicProfilePageState
 
   @override
   void dispose() {
+    _presenceService.onlineAttentionRequest.removeListener(
+      _handleOnlineAttentionRequest,
+    );
+
+    _onlinePulseController.dispose();
+
     controller.removeListener(
       _onControllerChanged,
     );

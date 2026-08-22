@@ -52,6 +52,22 @@ class PublicProfileHeaderWidget
   final bool isUpdatingOnlineStatus;
 
   // ============================================================
+  // DESTAQUE PARA ATIVAR ONLINE
+  // ============================================================
+  //
+  // Recebido da PublicProfilePage quando o usuário tentou entrar
+  // em "Disponíveis agora" estando offline.
+  //
+  // 0.0 = estado normal
+  // 1.0 = pico do pulso verde
+  //
+  // ============================================================
+
+  final double onlineAttentionProgress;
+
+  final Color onlineAttentionColor;
+
+  // ============================================================
   // CALLBACKS
   // ============================================================
 
@@ -78,6 +94,10 @@ class PublicProfileHeaderWidget
     required this.profile,
     required this.isOwner,
     this.isUpdatingOnlineStatus = false,
+    this.onlineAttentionProgress = 0,
+    this.onlineAttentionColor = const Color(
+      0xFF35E88B,
+    ),
     this.onAvatarTap,
     this.onEdit,
     this.onConnect,
@@ -243,47 +263,141 @@ class PublicProfileHeaderWidget
         !isUpdatingOnlineStatus;
 
     // ==========================================================
+    // PROGRESSO DE ATENÇÃO
+    // ==========================================================
+    //
+    // Só aplicamos o pulso quando:
+    //
+    // - é o próprio perfil;
+    // - está OFFLINE;
+    // - existe animação ativa.
+    //
+    // ==========================================================
+
+    final attention =
+        isOwner &&
+            !online
+        ? onlineAttentionProgress
+              .clamp(
+                0.0,
+                1.0,
+              )
+              .toDouble()
+        : 0.0;
+
+    final hasAttention =
+        attention >
+        0;
+
+    // ==========================================================
+    // CORES BASE
+    // ==========================================================
+
+    const onlineColor = Colors.greenAccent;
+
+    final offlineTextColor = Colors.white38;
+
+    final offlineDotColor = Colors.white24;
+
+    final offlineBorderColor = Colors.white.withValues(
+      alpha: 0.08,
+    );
+
+    final offlineBackgroundColor = Colors.white.withValues(
+      alpha: 0.04,
+    );
+
+    // ==========================================================
+    // CORES DURANTE O PULSO
+    // ==========================================================
+
+    final statusColor = online
+        ? onlineColor
+        : Color.lerp(
+                offlineTextColor,
+                onlineAttentionColor,
+                attention,
+              ) ??
+              offlineTextColor;
+
+    final dotColor = online
+        ? onlineColor
+        : Color.lerp(
+                offlineDotColor,
+                onlineAttentionColor,
+                attention,
+              ) ??
+              offlineDotColor;
+
+    final borderColor = online
+        ? onlineColor.withValues(
+            alpha: 0.20,
+          )
+        : Color.lerp(
+                offlineBorderColor,
+                onlineAttentionColor.withValues(
+                  alpha: 0.72,
+                ),
+                attention,
+              ) ??
+              offlineBorderColor;
+
+    final backgroundColor = online
+        ? onlineColor.withValues(
+            alpha: 0.08,
+          )
+        : Color.lerp(
+                offlineBackgroundColor,
+                onlineAttentionColor.withValues(
+                  alpha: 0.13,
+                ),
+                attention,
+              ) ??
+              offlineBackgroundColor;
+
+    final glowColor = onlineAttentionColor.withValues(
+      alpha:
+          0.30 *
+          attention,
+    );
+
+    // ==========================================================
     // CONTEÚDO
     // ==========================================================
 
     final content = AnimatedContainer(
       duration: const Duration(
-        milliseconds: 180,
+        milliseconds: 120,
       ),
-
+      curve: Curves.easeInOut,
       padding: const EdgeInsets.symmetric(
         horizontal: 10,
-
         vertical: 6,
       ),
-
       decoration: BoxDecoration(
-        color: online
-            ? Colors.greenAccent.withValues(
-                alpha: 0.08,
-              )
-            : Colors.white.withValues(
-                alpha: 0.04,
-              ),
-
+        color: backgroundColor,
         borderRadius: BorderRadius.circular(
           20,
         ),
-
         border: Border.all(
-          color: online
-              ? Colors.greenAccent.withValues(
-                  alpha: 0.20,
-                )
-              : Colors.white.withValues(
-                  alpha: 0.08,
-                ),
+          color: borderColor,
         ),
+        boxShadow: hasAttention
+            ? [
+                BoxShadow(
+                  color: glowColor,
+                  blurRadius:
+                      18 *
+                      attention,
+                  spreadRadius:
+                      1.5 *
+                      attention,
+                ),
+              ]
+            : const [],
       ),
-
       child: Row(
         mainAxisSize: MainAxisSize.min,
-
         children: [
           // ====================================================
           // LOADING
@@ -291,29 +405,38 @@ class PublicProfileHeaderWidget
           if (isUpdatingOnlineStatus)
             SizedBox(
               width: 9,
-
               height: 9,
-
               child: CircularProgressIndicator(
                 strokeWidth: 1.5,
-
                 color: online
-                    ? Colors.greenAccent
-                    : Colors.white54,
+                    ? onlineColor
+                    : statusColor,
               ),
             )
           else
             Container(
               width: 7,
-
               height: 7,
-
               decoration: BoxDecoration(
-                color: online
-                    ? Colors.greenAccent
-                    : Colors.white24,
-
+                color: dotColor,
                 shape: BoxShape.circle,
+                boxShadow: hasAttention
+                    ? [
+                        BoxShadow(
+                          color: onlineAttentionColor.withValues(
+                            alpha:
+                                0.55 *
+                                attention,
+                          ),
+                          blurRadius:
+                              8 *
+                              attention,
+                          spreadRadius:
+                              1 *
+                              attention,
+                        ),
+                      ]
+                    : const [],
               ),
             ),
 
@@ -330,16 +453,10 @@ class PublicProfileHeaderWidget
                 : online
                 ? 'ONLINE'
                 : 'OFFLINE',
-
             style: TextStyle(
-              color: online
-                  ? Colors.greenAccent
-                  : Colors.white38,
-
+              color: statusColor,
               fontSize: 8,
-
               fontWeight: FontWeight.bold,
-
               letterSpacing: 0.7,
             ),
           ),
@@ -352,19 +469,18 @@ class PublicProfileHeaderWidget
             const SizedBox(
               width: 5,
             ),
-
             Icon(
               online
                   ? Icons.visibility_rounded
                   : Icons.visibility_off_rounded,
-
               size: 11,
-
               color: online
-                  ? Colors.greenAccent.withValues(
+                  ? onlineColor.withValues(
                       alpha: 0.65,
                     )
-                  : Colors.white24,
+                  : statusColor.withValues(
+                      alpha: 0.75,
+                    ),
             ),
           ],
         ],
@@ -387,19 +503,15 @@ class PublicProfileHeaderWidget
       message: online
           ? 'Deixar perfil offline'
           : 'Deixar perfil online',
-
       child: Material(
         color: Colors.transparent,
-
         child: InkWell(
           onTap: canToggle
               ? onToggleOnline
               : null,
-
           borderRadius: BorderRadius.circular(
             20,
           ),
-
           child: content,
         ),
       ),

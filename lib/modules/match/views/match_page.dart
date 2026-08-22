@@ -43,6 +43,7 @@ import 'package:versin/modules/match/widgets/profile_track_player_sheet.dart';
 // ============================================================
 
 import 'package:versin/modules/profile/controllers/professional_profile_controller.dart';
+import 'package:versin/modules/profile/services/presence/user_presence_service.dart';
 import 'package:versin/modules/profile/views/professional_profile_settings_page.dart';
 
 // ============================================================
@@ -140,6 +141,8 @@ class _MatchPageState extends State<MatchPage> {
   late final MatchLocationConsentService _locationConsentService;
 
   late final MatchAvailabilityService _availabilityService;
+
+  late final UserPresenceService _presenceService;
 
   // ============================================================
   // DISPONÍVEIS AGORA
@@ -544,6 +547,8 @@ class _MatchPageState extends State<MatchPage> {
 
     _availabilityService = sl<MatchAvailabilityService>();
 
+    _presenceService = sl<UserPresenceService>();
+
     _publicProfileController = PublicProfileController(
       repository: PublicProfileRepositoryImpl(),
       trackService: ProfileTrackService(),
@@ -789,7 +794,7 @@ class _MatchPageState extends State<MatchPage> {
   // OPEN PUBLIC PROFILE
   // ============================================================
 
-  Future<void> _openPublicProfile() async {
+  Future<void> _openPublicProfile({bool highlightOnlineOnOpen = false}) async {
     if (!_ensureMatchUnlockedForInteraction()) {
       return;
     }
@@ -814,6 +819,7 @@ class _MatchPageState extends State<MatchPage> {
           return PublicProfilePage(
             userId: userId,
             controller: _publicProfileController,
+            highlightOnlineOnOpen: highlightOnlineOnOpen,
           );
         },
       ),
@@ -1405,15 +1411,92 @@ class _MatchPageState extends State<MatchPage> {
   // ============================================================
 
   Future<bool> _ensureAvailabilityBeforeEntering() async {
+    // ==========================================================
+    // 1. EXIGIR PRESENÇA REAL
+    // ==========================================================
+    //
+    // "Disponíveis agora" só pode ser ativado quando:
+    //
+    // - o perfil está marcado como ONLINE;
+    // - o app está em foreground;
+    // - existe heartbeat recente.
+    //
+    // ==========================================================
+
+    final reallyOnline = await _presenceService.ensureReallyOnline();
+
+    if (!mounted) {
+      return false;
+    }
+
+    if (!reallyOnline) {
+      // ========================================================
+      // SOLICITAR DESTAQUE VISUAL DO OFFLINE
+      // ========================================================
+      //
+      // A PublicProfilePage escutará esse sinal e fará o botão
+      // OFFLINE pulsar suavemente em verde.
+      //
+      // ========================================================
+
+      _presenceService.requestOnlineAttention();
+
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            behavior: SnackBarBehavior.floating,
+            content: Text('Fique online primeiro para usar Disponíveis agora.'),
+          ),
+        );
+
+      // ========================================================
+      // ABRIR O PRÓPRIO PERFIL
+      // ========================================================
+      //
+      // Levamos o usuário direto ao local onde pode ativar ONLINE.
+      //
+      // Ao voltar, validamos novamente. Se estiver online,
+      // continuamos automaticamente para a escolha:
+      //
+      // 30 min / 1 hora / 2 horas.
+      //
+      // ========================================================
+
+      await _openPublicProfile(highlightOnlineOnOpen: true);
+
+      if (!mounted) {
+        return false;
+      }
+
+      final onlineAfterProfile = await _presenceService.ensureReallyOnline();
+
+      if (!mounted || !onlineAfterProfile) {
+        return false;
+      }
+    }
+
+    // ==========================================================
+    // 2. JÁ POSSUI DISPONIBILIDADE ATIVA
+    // ==========================================================
+
     if (_availabilityState.isActive) {
       return true;
     }
+
+    // ==========================================================
+    // 3. ESCOLHER DURAÇÃO
+    // ==========================================================
 
     final selectedMinutes = await _showAvailabilityDurationDialog();
 
     if (!mounted || selectedMinutes == null) {
       return false;
     }
+
+    // ==========================================================
+    // 4. ATIVAR DISPONIBILIDADE
+    // ==========================================================
 
     return _activateAvailability(selectedMinutes);
   }
@@ -1823,18 +1906,6 @@ class _MatchPageState extends State<MatchPage> {
               onPressed: _isLoadingAvailability
                   ? null
                   : () async {
-                      final minutes = await _showAvailabilityDurationDialog();
-
-                      if (!mounted || minutes == null) {
-                        return;
-                      }
-
-                      final activated = await _activateAvailability(minutes);
-
-                      if (!mounted || !activated) {
-                        return;
-                      }
-
                       await _changeDiscoveryMode(MatchDiscoveryMode.global);
                     },
               child: const Text(

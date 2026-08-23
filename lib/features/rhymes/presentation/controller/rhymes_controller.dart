@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 
 import 'package:versin/core/models/rhyme_model.dart';
 import 'package:versin/features/rhymes/domain/services/audio_service.dart';
-import 'package:versin/modules/chat/controllers/ai_quota_controller.dart';
-import 'package:versin/modules/chat/controllers/ai_source_controller.dart';
-import 'package:versin/modules/chat/controllers/vocabulary_controller.dart';
-import 'package:versin/modules/chat/services/rhyme_suggestion_service.dart';
-import 'package:versin/modules/chat/services/rhymes_ai_service.dart';
-import 'package:versin/modules/chat/services/vocabulary_service.dart';
+import 'package:versin/modules/chat/ai/controllers/ai_quota_controller.dart';
+import 'package:versin/modules/chat/ai/controllers/ai_source_controller.dart';
+import 'package:versin/modules/chat/vocabulary/controllers/vocabulary_controller.dart';
+import 'package:versin/modules/chat/rhymes/services/rhyme_suggestion_service.dart';
+import 'package:versin/modules/chat/rhymes/services/rhymes_ai_service.dart';
+import 'package:versin/modules/chat/vocabulary/services/vocabulary_service.dart';
 import 'package:versin/modules/chat/views/components/suggestion_balloon/controllers/suggestion_controller.dart';
 
 // ============================================================

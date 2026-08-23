@@ -8,7 +8,7 @@ import '../call/data/repositories/project_call_repository_impl.dart';
 import '../call/views/call_view.dart';
 import '../call/views/widgets/global_call_banner.dart';
 import '../chat/controllers/global_chat_controller.dart';
-import '../widgets/global_chat_banner.dart';
+import '../chat/widgets/global_chat_banner.dart';
 
 import '../core/controllers/networking_controller.dart';
 

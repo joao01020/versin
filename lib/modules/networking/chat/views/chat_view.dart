@@ -6,7 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../controllers/project_chat_controller.dart';
 import '../models/project_message_model.dart';
 import '../services/chat_audio_recorder_service.dart';
-import '../../widgets/chat_audio_player.dart';
+import '../widgets/chat_audio_player.dart';
 
 class ChatView
     extends

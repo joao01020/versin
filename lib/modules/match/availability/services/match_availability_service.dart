@@ -7,20 +7,28 @@ import '../models/match_availability_state.dart';
 // MATCH AVAILABILITY SERVICE
 // ============================================================
 //
-// Responsável exclusivamente por:
+// Responsável pela persistência da disponibilidade temporária.
 //
-// - carregar disponibilidade do usuário;
-// - ativar disponibilidade;
-// - encerrar disponibilidade;
-// - persistir dados no Supabase.
+// BACKEND REAL DO PROJETO:
+//
+// public.profiles
+//
+// campos:
+//
+// - available_now
+// - available_until
+//
+// RPC:
+//
+// - set_my_available_now
+// - clear_my_available_now
 //
 // NÃO:
 //
-// - controla Widgets;
-// - usa BuildContext;
-// - mostra SnackBars;
-// - abre páginas;
-// - controla Timer.
+// - conhece Widgets;
+// - controla Timer;
+// - controla estado visual;
+// - mostra SnackBar.
 //
 // ============================================================
 
@@ -34,12 +42,6 @@ class MatchAvailabilityService {
   static const int oneHour = 60;
 
   static const int twoHours = 120;
-
-  // ============================================================
-  // TABLE
-  // ============================================================
-
-  static const String _tableName = 'match_availability';
 
   // ============================================================
   // SUPABASE
@@ -58,19 +60,19 @@ class MatchAvailabilityService {
            Supabase.instance.client;
 
   // ============================================================
-  // CURRENT USER ID
+  // CURRENT USER
   // ============================================================
 
   String? get _currentUserId {
-    final id = _supabase.auth.currentUser?.id.trim();
+    final userId = _supabase.auth.currentUser?.id.trim();
 
-    if (id ==
+    if (userId ==
             null ||
-        id.isEmpty) {
+        userId.isEmpty) {
       return null;
     }
 
-    return id;
+    return userId;
   }
 
   // ============================================================
@@ -97,25 +99,34 @@ class MatchAvailabilityService {
     }
 
     try {
+      // ========================================================
+      // PROFILE
+      // ========================================================
+
       final response = await _supabase
           .from(
-            _tableName,
+            'profiles',
           )
           .select(
             'available_now, available_until',
           )
           .eq(
-            'user_id',
+            'id',
             userId,
           )
           .maybeSingle();
 
       // ========================================================
-      // NO RECORD
+      // PROFILE NOT FOUND
       // ========================================================
 
       if (response ==
           null) {
+        debugPrint(
+          '[MATCH AVAILABILITY SERVICE] '
+          'Perfil não encontrado.',
+        );
+
         return const MatchAvailabilityState(
           availableNow: false,
           availableUntil: null,
@@ -131,7 +142,18 @@ class MatchAvailabilityService {
       );
 
       // ========================================================
-      // EXPIRED
+      // NOT ACTIVE
+      // ========================================================
+
+      if (!availableNow) {
+        return const MatchAvailabilityState(
+          availableNow: false,
+          availableUntil: null,
+        );
+      }
+
+      // ========================================================
+      // INVALID / EXPIRED
       // ========================================================
 
       if (availableUntil ==
@@ -139,9 +161,24 @@ class MatchAvailabilityService {
           !availableUntil.isAfter(
             DateTime.now(),
           )) {
-        if (availableNow) {
-          await _expireAvailability(
-            userId,
+        debugPrint(
+          '[MATCH AVAILABILITY SERVICE] '
+          'Disponibilidade expirada.',
+        );
+
+        // ======================================================
+        // TENTA LIMPAR NO BACKEND
+        // ======================================================
+
+        try {
+          await clearAvailability();
+        } catch (
+          error
+        ) {
+          debugPrint(
+            '[MATCH AVAILABILITY SERVICE] '
+            'Não foi possível limpar disponibilidade expirada: '
+            '$error',
           );
         }
 
@@ -151,10 +188,22 @@ class MatchAvailabilityService {
         );
       }
 
-      return MatchAvailabilityState(
-        availableNow: availableNow,
+      // ========================================================
+      // ACTIVE
+      // ========================================================
+
+      final state = MatchAvailabilityState(
+        availableNow: true,
         availableUntil: availableUntil,
       );
+
+      debugPrint(
+        '[MATCH AVAILABILITY SERVICE] '
+        'Disponibilidade carregada. '
+        'Até: ${state.availableUntil}',
+      );
+
+      return state;
     } catch (
       error,
       stackTrace
@@ -185,50 +234,66 @@ class MatchAvailabilityService {
   setAvailableNow({
     required int minutes,
   }) async {
-    final userId = _requireUserId();
+    _requireAuthenticatedUser();
 
-    _validateMinutes(
+    _validateDuration(
       minutes,
     );
 
-    final now = DateTime.now().toUtc();
-
-    final availableUntil = now.add(
-      Duration(
-        minutes: minutes,
-      ),
-    );
-
     try {
-      await _supabase
-          .from(
-            _tableName,
-          )
-          .upsert(
-            {
-              'user_id': userId,
-
-              'available_now': true,
-
-              'available_until': availableUntil.toIso8601String(),
-
-              'updated_at': now.toIso8601String(),
-            },
-
-            onConflict: 'user_id',
-          );
-
       debugPrint(
         '[MATCH AVAILABILITY SERVICE] '
-        'Disponibilidade ativada. '
-        'Usuário: $userId | '
-        'Até: $availableUntil',
+        'Ativando disponibilidade por '
+        '$minutes minutos.',
       );
 
-      return MatchAvailabilityState(
-        availableNow: true,
-        availableUntil: availableUntil.toLocal(),
+      // ========================================================
+      // RPC REAL
+      // ========================================================
+      //
+      // A função SQL deve ser responsável por:
+      //
+      // available_now = true
+      // available_until = now() + intervalo
+      //
+      // ========================================================
+
+      final response = await _supabase.rpc(
+        'set_my_available_now',
+        params: {
+          'p_minutes': minutes,
+        },
       );
+
+      // ========================================================
+      // TENTAR LER RESULTADO DA RPC
+      // ========================================================
+
+      final state = _parseRpcState(
+        response,
+      );
+
+      if (state !=
+          null) {
+        debugPrint(
+          '[MATCH AVAILABILITY SERVICE] '
+          'RPC retornou disponibilidade até '
+          '${state.availableUntil}.',
+        );
+
+        return state;
+      }
+
+      // ========================================================
+      // FALLBACK
+      // ========================================================
+      //
+      // Caso a RPC não retorne row/json, carregamos novamente
+      // diretamente do profiles.
+      //
+      // ========================================================
+
+      return loadCurrentState();
     } catch (
       error,
       stackTrace
@@ -257,33 +322,25 @@ class MatchAvailabilityService {
     MatchAvailabilityState
   >
   clearAvailability() async {
-    final userId = _requireUserId();
-
-    final now = DateTime.now().toUtc();
+    _requireAuthenticatedUser();
 
     try {
-      await _supabase
-          .from(
-            _tableName,
-          )
-          .upsert(
-            {
-              'user_id': userId,
+      debugPrint(
+        '[MATCH AVAILABILITY SERVICE] '
+        'Encerrando disponibilidade.',
+      );
 
-              'available_now': false,
+      // ========================================================
+      // RPC REAL
+      // ========================================================
 
-              'available_until': null,
-
-              'updated_at': now.toIso8601String(),
-            },
-
-            onConflict: 'user_id',
-          );
+      await _supabase.rpc(
+        'clear_my_available_now',
+      );
 
       debugPrint(
         '[MATCH AVAILABILITY SERVICE] '
-        'Disponibilidade encerrada. '
-        'Usuário: $userId',
+        'Disponibilidade encerrada.',
       );
 
       return const MatchAvailabilityState(
@@ -311,54 +368,10 @@ class MatchAvailabilityService {
   }
 
   // ============================================================
-  // EXPIRE AVAILABILITY
+  // REQUIRE AUTH
   // ============================================================
 
-  Future<
-    void
-  >
-  _expireAvailability(
-    String userId,
-  ) async {
-    try {
-      await _supabase
-          .from(
-            _tableName,
-          )
-          .update(
-            {
-              'available_now': false,
-
-              'available_until': null,
-
-              'updated_at': DateTime.now().toUtc().toIso8601String(),
-            },
-          )
-          .eq(
-            'user_id',
-            userId,
-          );
-
-      debugPrint(
-        '[MATCH AVAILABILITY SERVICE] '
-        'Disponibilidade expirada automaticamente.',
-      );
-    } catch (
-      error
-    ) {
-      debugPrint(
-        '[MATCH AVAILABILITY SERVICE] '
-        'Erro ao expirar disponibilidade: '
-        '$error',
-      );
-    }
-  }
-
-  // ============================================================
-  // REQUIRE USER ID
-  // ============================================================
-
-  String _requireUserId() {
+  String _requireAuthenticatedUser() {
     final userId = _currentUserId;
 
     if (userId ==
@@ -372,10 +385,10 @@ class MatchAvailabilityService {
   }
 
   // ============================================================
-  // VALIDATE MINUTES
+  // VALIDATE DURATION
   // ============================================================
 
-  void _validateMinutes(
+  void _validateDuration(
     int minutes,
   ) {
     final valid =
@@ -401,26 +414,150 @@ class MatchAvailabilityService {
   // ============================================================
 
   DateTime? _parseDateTime(
-    dynamic value,
+    dynamic raw,
   ) {
-    if (value ==
+    if (raw ==
         null) {
       return null;
     }
 
-    if (value
+    if (raw
         is DateTime) {
-      return value.toLocal();
+      return raw.toLocal();
     }
 
-    final raw = value.toString().trim();
+    final value = raw.toString().trim();
 
-    if (raw.isEmpty) {
+    if (value.isEmpty) {
       return null;
     }
 
     return DateTime.tryParse(
-      raw,
+      value,
     )?.toLocal();
+  }
+
+  // ============================================================
+  // PARSE RPC STATE
+  // ============================================================
+
+  MatchAvailabilityState? _parseRpcState(
+    dynamic response,
+  ) {
+    if (response ==
+        null) {
+      return null;
+    }
+
+    // ==========================================================
+    // MAP
+    // ==========================================================
+
+    if (response
+        is Map<
+          String,
+          dynamic
+        >) {
+      return _stateFromMap(
+        response,
+      );
+    }
+
+    if (response
+        is Map) {
+      return _stateFromMap(
+        Map<
+          String,
+          dynamic
+        >.from(
+          response,
+        ),
+      );
+    }
+
+    // ==========================================================
+    // LIST
+    // ==========================================================
+
+    if (response
+            is List &&
+        response.isNotEmpty) {
+      final first = response.first;
+
+      if (first
+          is Map<
+            String,
+            dynamic
+          >) {
+        return _stateFromMap(
+          first,
+        );
+      }
+
+      if (first
+          is Map) {
+        return _stateFromMap(
+          Map<
+            String,
+            dynamic
+          >.from(
+            first,
+          ),
+        );
+      }
+    }
+
+    return null;
+  }
+
+  // ============================================================
+  // STATE FROM MAP
+  // ============================================================
+
+  MatchAvailabilityState? _stateFromMap(
+    Map<
+      String,
+      dynamic
+    >
+    map,
+  ) {
+    final rawAvailableNow = map['available_now'];
+
+    final rawAvailableUntil = map['available_until'];
+
+    // ==========================================================
+    // RPC SEM CAMPOS CONHECIDOS
+    // ==========================================================
+
+    if (!map.containsKey(
+          'available_now',
+        ) &&
+        !map.containsKey(
+          'available_until',
+        )) {
+      return null;
+    }
+
+    final availableNow =
+        rawAvailableNow ==
+        true;
+
+    final availableUntil = _parseDateTime(
+      rawAvailableUntil,
+    );
+
+    if (!availableNow ||
+        availableUntil ==
+            null) {
+      return const MatchAvailabilityState(
+        availableNow: false,
+        availableUntil: null,
+      );
+    }
+
+    return MatchAvailabilityState(
+      availableNow: true,
+      availableUntil: availableUntil,
+    );
   }
 }

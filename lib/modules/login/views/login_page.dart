@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'package:versin/modules/login/controllers/login_controller.dart';
+import 'package:versin/modules/login/recovery/views/forgot_password_page.dart';
 import 'package:versin/modules/login/views/create_account_page.dart';
 import 'package:versin/modules/login/views/artist_name_page.dart';
 import 'package:versin/modules/login/widgets/custom_social_button.dart';
@@ -257,7 +258,13 @@ class _LoginPageState
           _buildPasswordField(),
 
           const SizedBox(
-            height: 10,
+            height: 6,
+          ),
+
+          _buildForgotPasswordButton(),
+
+          const SizedBox(
+            height: 6,
           ),
 
           _buildError(),
@@ -337,6 +344,64 @@ class _LoginPageState
               ),
             ),
           ),
+    );
+  }
+
+  // ============================================================
+  // ESQUECI MINHA SENHA
+  // ============================================================
+
+  Widget _buildForgotPasswordButton() {
+    return ValueListenableBuilder<
+      bool
+    >(
+      valueListenable: _controller.isLoading,
+      builder:
+          (
+            context,
+            loading,
+            _,
+          ) {
+            return Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: loading
+                    ? null
+                    : _openForgotPassword,
+                style: TextButton.styleFrom(
+                  foregroundColor: accentNeon,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 6,
+                  ),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                icon: Icon(
+                  Icons.lock_reset_rounded,
+                  color: loading
+                      ? Colors.white24
+                      : accentNeon.withValues(
+                          alpha: 0.78,
+                        ),
+                  size: 16,
+                ),
+                label: Text(
+                  'Esqueci minha senha',
+                  style: TextStyle(
+                    color: loading
+                        ? Colors.white24
+                        : accentNeon.withValues(
+                            alpha: 0.78,
+                          ),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+              ),
+            );
+          },
     );
   }
 
@@ -652,6 +717,38 @@ class _LoginPageState
       context,
       '/dashboard',
     );
+  }
+
+  // ============================================================
+  // ABRIR RECUPERAÇÃO DE SENHA
+  // ============================================================
+
+  Future<
+    void
+  >
+  _openForgotPassword() async {
+    FocusScope.of(
+      context,
+    ).unfocus();
+
+    _controller.clearError();
+
+    await Navigator.of(
+      context,
+    ).push(
+      MaterialPageRoute(
+        builder:
+            (
+              context,
+            ) => const ForgotPasswordPage(),
+      ),
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    _controller.clearError();
   }
 
   Future<

@@ -12,7 +12,7 @@ import 'package:versin/modules/calendar/views/calendar_page.dart';
 import 'package:versin/modules/dashboard/services/dashboard_ui_preferences_service.dart';
 import 'package:versin/modules/notifications/widgets/notification_button_widget.dart';
 import 'package:versin/modules/profile/controllers/professional_profile_controller.dart';
-import 'package:versin/modules/public_profile/data/repositories/public_profile_repository_impl.dart';
+import 'package:versin/modules/profile/public_profile/data/repositories/public_profile_repository_impl.dart';
 import 'package:versin/modules/match/views/match_projects_view.dart';
 
 import 'package:versin/modules/networking/invitations/controllers/project_invitation_controller.dart';

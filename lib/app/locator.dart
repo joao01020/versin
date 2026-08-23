@@ -73,8 +73,8 @@ import 'package:versin/modules/match/availability/services/match_availability_se
 // PUBLIC PROFILE / PRESENCE
 // ============================================================
 
-import 'package:versin/modules/public_profile/data/repositories/public_profile_repository_impl.dart';
-import 'package:versin/modules/public_profile/repositories/public_profile_repository.dart';
+import 'package:versin/modules/profile/public_profile/data/repositories/public_profile_repository_impl.dart';
+import 'package:versin/modules/profile/public_profile/repositories/public_profile_repository.dart';
 import 'package:versin/modules/profile/services/presence/user_presence_service.dart';
 
 // ============================================================

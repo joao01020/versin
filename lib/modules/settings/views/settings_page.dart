@@ -8,11 +8,11 @@ import 'package:versin/modules/login/domain/repositories/auth_repository.dart';
 import 'package:versin/modules/dashboard/controllers/dashboard_controller.dart';
 import 'package:versin/modules/profile/views/account_information_page.dart';
 import 'package:versin/modules/profile/views/professional_profile_settings_page.dart';
-import 'package:versin/modules/public_profile/controllers/public_profile_controller.dart';
-import 'package:versin/modules/public_profile/data/repositories/public_profile_repository_impl.dart';
-import 'package:versin/modules/public_profile/services/profile_track_service.dart';
+import 'package:versin/modules/profile/public_profile/controllers/public_profile_controller.dart';
+import 'package:versin/modules/profile/public_profile/data/repositories/public_profile_repository_impl.dart';
+import 'package:versin/modules/profile/public_profile/services/profile_track_service.dart';
 import 'package:versin/modules/profile/services/presence/user_presence_service.dart';
-import 'package:versin/modules/public_profile/views/public_profile_page.dart';
+import 'package:versin/modules/profile/public_profile/views/public_profile_page.dart';
 import 'package:versin/modules/settings/widgets/settings_tile.dart';
 import 'package:versin/modules/settings/views/private_api_settings_page.dart';
 

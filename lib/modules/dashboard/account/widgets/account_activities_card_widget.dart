@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -12,7 +14,6 @@ import 'package:versin/modules/calendar/views/calendar_page.dart';
 import 'package:versin/modules/dashboard/services/dashboard_ui_preferences_service.dart';
 import 'package:versin/modules/notifications/widgets/notification_button_widget.dart';
 import 'package:versin/modules/profile/controllers/professional_profile_controller.dart';
-import 'package:versin/modules/profile/public_profile/data/repositories/public_profile_repository_impl.dart';
 import 'package:versin/modules/match/views/projects/match_projects_view.dart';
 
 import 'package:versin/modules/networking/invitations/controllers/project_invitation_controller.dart';
@@ -41,9 +42,7 @@ import '../../controllers/dashboard_controller.dart';
 //
 // ============================================================
 
-class AccountActivitiesCardWidget
-    extends
-        StatefulWidget {
+class AccountActivitiesCardWidget extends StatefulWidget {
   // ============================================================
   // DEPENDÊNCIAS
   // ============================================================
@@ -63,10 +62,8 @@ class AccountActivitiesCardWidget
   });
 
   @override
-  State<
-    AccountActivitiesCardWidget
-  >
-  createState() => _AccountActivitiesCardWidgetState();
+  State<AccountActivitiesCardWidget> createState() =>
+      _AccountActivitiesCardWidgetState();
 }
 
 // ============================================================
@@ -74,10 +71,7 @@ class AccountActivitiesCardWidget
 // ============================================================
 
 class _AccountActivitiesCardWidgetState
-    extends
-        State<
-          AccountActivitiesCardWidget
-        > {
+    extends State<AccountActivitiesCardWidget> {
   // ============================================================
   // PROFILE CONTROLLER
   // ============================================================
@@ -106,8 +100,6 @@ class _AccountActivitiesCardWidgetState
 
   final FocusNode _displayNameFocusNode = FocusNode();
 
-  final PublicProfileRepositoryImpl _publicProfileRepository = PublicProfileRepositoryImpl();
-
   bool _isSavingDisplayName = false;
 
   String? _displayNameError;
@@ -123,9 +115,7 @@ class _AccountActivitiesCardWidgetState
 
     final value = widget.controller.artistName.trim();
 
-    return value.isEmpty ||
-        value ==
-            'Membro';
+    return value.isEmpty || value == 'Membro';
   }
 
   // ============================================================
@@ -136,20 +126,11 @@ class _AccountActivitiesCardWidgetState
   void initState() {
     super.initState();
 
-    _profileController =
-        sl<
-          ProfessionalProfileController
-        >();
+    _profileController = sl<ProfessionalProfileController>();
 
-    _activityController =
-        sl<
-          RecentActivityController
-        >();
+    _activityController = sl<RecentActivityController>();
 
-    _projectInvitationController =
-        sl<
-          ProjectInvitationController
-        >();
+    _projectInvitationController = sl<ProjectInvitationController>();
 
     _projectInvitationController.init();
 
@@ -159,18 +140,13 @@ class _AccountActivitiesCardWidgetState
 
     _loadProfileCardPreference();
 
-    WidgetsBinding.instance.addPostFrameCallback(
-      (
-        _,
-      ) {
-        if (!mounted ||
-            !_requiresDisplayName) {
-          return;
-        }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_requiresDisplayName) {
+        return;
+      }
 
-        _displayNameFocusNode.requestFocus();
-      },
-    );
+      _displayNameFocusNode.requestFocus();
+    });
   }
 
   // ============================================================
@@ -184,10 +160,7 @@ class _AccountActivitiesCardWidgetState
   //
   // ============================================================
 
-  Future<
-    void
-  >
-  _loadProfileCardPreference() async {
+  Future<void> _loadProfileCardPreference() async {
     final isExpanded = await _uiPreferencesService.loadProfileCardExpanded();
 
     if (!mounted) {
@@ -206,8 +179,7 @@ class _AccountActivitiesCardWidgetState
       return;
     }
 
-    if (widget.controller.isProfileCardExpanded ==
-        isExpanded) {
+    if (widget.controller.isProfileCardExpanded == isExpanded) {
       return;
     }
 
@@ -220,10 +192,7 @@ class _AccountActivitiesCardWidgetState
   // TOGGLE PROFILE CARD
   // ============================================================
 
-  Future<
-    void
-  >
-  _toggleProfileCard() async {
+  Future<void> _toggleProfileCard() async {
     if (_requiresDisplayName) {
       return;
     }
@@ -249,264 +218,197 @@ class _AccountActivitiesCardWidgetState
   // ============================================================
 
   @override
-  Widget build(
-    BuildContext context,
-  ) {
+  Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: Listenable.merge(
-        [
-          widget.controller,
-          _profileController,
-          _activityController,
-          _projectInvitationController,
-        ],
-      ),
-      builder:
-          (
-            context,
-            _,
-          ) {
-            final requiresDisplayName = _requiresDisplayName;
+      animation: Listenable.merge([
+        widget.controller,
+        _profileController,
+        _activityController,
+        _projectInvitationController,
+      ]),
+      builder: (context, _) {
+        final requiresDisplayName = _requiresDisplayName;
 
-            return Container(
-              padding: const EdgeInsets.all(
-                20,
-              ),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Color(
-                      0xFF1F1A3A,
-                    ),
-                    Color(
-                      0xFF0D0B1F,
+        return Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFF1F1A3A), Color(0xFF0D0B1F)],
+            ),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // ==================================================
+              // EXPANDIR / RECOLHER
+              // ==================================================
+              if (!requiresDisplayName)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    GestureDetector(
+                      onTap: _toggleProfileCard,
+                      child: Icon(
+                        widget.controller.isProfileCardExpanded
+                            ? Icons.keyboard_arrow_up
+                            : Icons.keyboard_arrow_down,
+                        color: Colors.white54,
+                        size: 22,
+                      ),
                     ),
                   ],
-                ),
-                borderRadius: BorderRadius.circular(
-                  24,
-                ),
-                border: Border.all(
-                  color: Colors.white.withValues(
-                    alpha: 0.05,
-                  ),
-                ),
+                )
+              else
+                const SizedBox(height: 22),
+
+              // ==================================================
+              // AVATAR
+              // ==================================================
+              Builder(
+                builder: (context) {
+                  final validProfileImageUrl =
+                      NetworkImageUrlHelper.validUrlOrNull(
+                        widget.controller.profileImagePath,
+                      );
+
+                  return GestureDetector(
+                    onTap: requiresDisplayName
+                        ? null
+                        : widget.controller.pickProfileImage,
+                    child: CircleAvatar(
+                      radius: 36,
+                      backgroundColor: const Color(0xFFFFCC80),
+                      backgroundImage: validProfileImageUrl != null
+                          ? NetworkImage(validProfileImageUrl)
+                          : null,
+                      child: validProfileImageUrl == null
+                          ? const Icon(
+                              Icons.person,
+                              color: Color(0xFF2E1A47),
+                              size: 40,
+                            )
+                          : null,
+                    ),
+                  );
+                },
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  // ==================================================
-                  // EXPANDIR / RECOLHER
-                  // ==================================================
-                  if (!requiresDisplayName)
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        GestureDetector(
-                          onTap: _toggleProfileCard,
-                          child: Icon(
-                            widget.controller.isProfileCardExpanded
-                                ? Icons.keyboard_arrow_up
-                                : Icons.keyboard_arrow_down,
-                            color: Colors.white54,
-                            size: 22,
-                          ),
-                        ),
-                      ],
-                    )
-                  else
-                    const SizedBox(
-                      height: 22,
-                    ),
 
-                  // ==================================================
-                  // AVATAR
-                  // ==================================================
-                  Builder(
-                    builder:
-                        (
-                          context,
-                        ) {
-                          final validProfileImageUrl = NetworkImageUrlHelper.validUrlOrNull(
-                            widget.controller.profileImagePath,
-                          );
+              const SizedBox(height: 14),
 
-                          return GestureDetector(
-                            onTap: requiresDisplayName
-                                ? null
-                                : widget.controller.pickProfileImage,
-                            child: CircleAvatar(
-                              radius: 36,
-                              backgroundColor: const Color(
-                                0xFFFFCC80,
-                              ),
-                              backgroundImage:
-                                  validProfileImageUrl !=
-                                      null
-                                  ? NetworkImage(
-                                      validProfileImageUrl,
-                                    )
-                                  : null,
-                              child:
-                                  validProfileImageUrl ==
-                                      null
-                                  ? const Icon(
-                                      Icons.person,
-                                      color: Color(
-                                        0xFF2E1A47,
-                                      ),
-                                      size: 40,
-                                    )
-                                  : null,
-                            ),
-                          );
-                        },
+              // ==================================================
+              // NOME / ONBOARDING OBRIGATÓRIO
+              // ==================================================
+              if (requiresDisplayName)
+                _buildRequiredNameOnboarding(context)
+              else ...[
+                Text(
+                  widget.controller.artistName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.5,
                   ),
+                ),
 
+                const SizedBox(height: 4),
+
+                // ==================================================
+                // FUNÇÃO PROFISSIONAL PRINCIPAL
+                // ==================================================
+                if (_profileController.isLoading)
                   const SizedBox(
+                    width: 14,
                     height: 14,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 1.5,
+                      color: Colors.white38,
+                    ),
+                  )
+                else
+                  Text(
+                    _profileController.primaryRoleLabel,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white54,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w400,
+                    ),
                   ),
 
-                  // ==================================================
-                  // NOME / ONBOARDING OBRIGATÓRIO
-                  // ==================================================
-                  if (requiresDisplayName)
-                    _buildRequiredNameOnboarding(
+                const SizedBox(height: 20),
+
+                // ==================================================
+                // AÇÕES
+                // ==================================================
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _buildCircularActionIcon(
                       context,
-                    )
-                  else ...[
-                    Text(
-                      widget.controller.artistName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0.5,
-                      ),
+                      Icons.description_outlined,
+                      route: AppRoutes.contracts,
                     ),
 
-                    const SizedBox(
-                      height: 4,
+                    const SizedBox(width: 16),
+
+                    _buildCircularActionIcon(
+                      context,
+                      Icons.calendar_today_outlined,
+                      onTap: () {
+                        _openCalendarPage(context);
+                      },
                     ),
 
-                    // ==================================================
-                    // FUNÇÃO PROFISSIONAL PRINCIPAL
-                    // ==================================================
-                    if (_profileController.isLoading)
-                      const SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 1.5,
-                          color: Colors.white38,
-                        ),
-                      )
-                    else
-                      Text(
-                        _profileController.primaryRoleLabel,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: Colors.white54,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w400,
-                        ),
-                      ),
+                    const SizedBox(width: 16),
 
-                    const SizedBox(
-                      height: 20,
+                    _buildProjectInvitationButton(context),
+
+                    const SizedBox(width: 16),
+
+                    _buildCircularActionIcon(
+                      context,
+                      Icons.workspaces_outline,
+                      onTap: () {
+                        _openActiveProjectsPage(context);
+                      },
                     ),
 
-                    // ==================================================
-                    // AÇÕES
-                    // ==================================================
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        _buildCircularActionIcon(
-                          context,
-                          Icons.description_outlined,
-                          route: AppRoutes.contracts,
-                        ),
+                    const SizedBox(width: 16),
 
-                        const SizedBox(
-                          width: 16,
-                        ),
+                    const NotificationButtonWidget(size: 44),
+                  ],
+                ),
 
-                        _buildCircularActionIcon(
-                          context,
-                          Icons.calendar_today_outlined,
-                          onTap: () {
-                            _openCalendarPage(
-                              context,
-                            );
-                          },
-                        ),
+                // ==================================================
+                // ATIVIDADES RECENTES
+                // ==================================================
+                if (widget.controller.isProfileCardExpanded) ...[
+                  const SizedBox(height: 28),
 
-                        const SizedBox(
-                          width: 16,
-                        ),
+                  RecentActivitiesCardWidget(
+                    controller: _activityController,
+                    accentColor: widget.controller.accentNeon,
+                  ),
 
-                        _buildProjectInvitationButton(
-                          context,
-                        ),
+                  if (_activityController.hasActivities) ...[
+                    const SizedBox(height: 12),
 
-                        const SizedBox(
-                          width: 16,
-                        ),
-
-                        _buildCircularActionIcon(
-                          context,
-                          Icons.workspaces_outline,
-                          onTap: () {
-                            _openActiveProjectsPage(
-                              context,
-                            );
-                          },
-                        ),
-
-                        const SizedBox(
-                          width: 16,
-                        ),
-
-                        const NotificationButtonWidget(
-                          size: 44,
-                        ),
-                      ],
-                    ),
-
-                    // ==================================================
-                    // ATIVIDADES RECENTES
-                    // ==================================================
-                    if (widget.controller.isProfileCardExpanded) ...[
-                      const SizedBox(
-                        height: 28,
-                      ),
-
-                      RecentActivitiesCardWidget(
-                        controller: _activityController,
-                        accentColor: widget.controller.accentNeon,
-                      ),
-
-                      if (_activityController.hasActivities) ...[
-                        const SizedBox(
-                          height: 12,
-                        ),
-
-                        _buildViewMoreButton(
-                          context,
-                        ),
-                      ],
-                    ],
+                    _buildViewMoreButton(context),
                   ],
                 ],
-              ),
-            );
-          },
+              ],
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -514,13 +416,9 @@ class _AccountActivitiesCardWidgetState
   // REQUIRED NAME ONBOARDING
   // ============================================================
 
-  Widget _buildRequiredNameOnboarding(
-    BuildContext context,
-  ) {
+  Widget _buildRequiredNameOnboarding(BuildContext context) {
     return ConstrainedBox(
-      constraints: const BoxConstraints(
-        maxWidth: 360,
-      ),
+      constraints: const BoxConstraints(maxWidth: 360),
       child: Column(
         children: [
           const Text(
@@ -533,24 +431,16 @@ class _AccountActivitiesCardWidgetState
             ),
           ),
 
-          const SizedBox(
-            height: 7,
-          ),
+          const SizedBox(height: 7),
 
           const Text(
             'Defina o nome que será exibido no Versin. '
             'Você poderá alterar essa informação depois.',
             textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.white38,
-              fontSize: 11,
-              height: 1.4,
-            ),
+            style: TextStyle(color: Colors.white38, fontSize: 11, height: 1.4),
           ),
 
-          const SizedBox(
-            height: 18,
-          ),
+          const SizedBox(height: 18),
 
           TextField(
             controller: _displayNameController,
@@ -559,27 +449,18 @@ class _AccountActivitiesCardWidgetState
             textInputAction: TextInputAction.done,
             textCapitalization: TextCapitalization.words,
             maxLength: 60,
-            onChanged:
-                (
-                  _,
-                ) {
-                  if (_displayNameError ==
-                      null) {
-                    return;
-                  }
+            onChanged: (_) {
+              if (_displayNameError == null) {
+                return;
+              }
 
-                  setState(
-                    () {
-                      _displayNameError = null;
-                    },
-                  );
-                },
-            onSubmitted:
-                (
-                  _,
-                ) {
-                  _saveRequiredDisplayName();
-                },
+              setState(() {
+                _displayNameError = null;
+              });
+            },
+            onSubmitted: (_) {
+              _saveRequiredDisplayName();
+            },
             style: const TextStyle(
               color: Colors.white,
               fontSize: 14,
@@ -588,70 +469,44 @@ class _AccountActivitiesCardWidgetState
             decoration: InputDecoration(
               counterText: '',
               hintText: 'Digite seu nome',
-              hintStyle: const TextStyle(
-                color: Colors.white30,
-                fontSize: 12,
-              ),
+              hintStyle: const TextStyle(color: Colors.white30, fontSize: 12),
               errorText: _displayNameError,
-              prefixIcon: const Icon(
-                Icons.badge_outlined,
-                size: 18,
-              ),
+              prefixIcon: const Icon(Icons.badge_outlined, size: 18),
               filled: true,
-              fillColor: Colors.white.withValues(
-                alpha: 0.045,
-              ),
+              fillColor: Colors.white.withValues(alpha: 0.045),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(
-                  14,
-                ),
+                borderRadius: BorderRadius.circular(14),
                 borderSide: BorderSide(
-                  color: Colors.white.withValues(
-                    alpha: 0.08,
-                  ),
+                  color: Colors.white.withValues(alpha: 0.08),
                 ),
               ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(
-                  14,
-                ),
+                borderRadius: BorderRadius.circular(14),
                 borderSide: BorderSide(
-                  color: Colors.white.withValues(
-                    alpha: 0.08,
-                  ),
+                  color: Colors.white.withValues(alpha: 0.08),
                 ),
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(
-                  14,
-                ),
+                borderRadius: BorderRadius.circular(14),
                 borderSide: BorderSide(
-                  color: widget.controller.accentNeon.withValues(
-                    alpha: 0.75,
-                  ),
+                  color: widget.controller.accentNeon.withValues(alpha: 0.75),
                 ),
               ),
             ),
           ),
 
-          const SizedBox(
-            height: 12,
-          ),
+          const SizedBox(height: 12),
 
           SizedBox(
             width: double.infinity,
             height: 44,
             child: FilledButton(
-              onPressed: _isSavingDisplayName
-                  ? null
-                  : _saveRequiredDisplayName,
+              onPressed: _isSavingDisplayName ? null : _saveRequiredDisplayName,
               style: FilledButton.styleFrom(
                 backgroundColor: widget.controller.accentNeon,
                 foregroundColor: Colors.black,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(
-                    14,
-                  ),
+                  borderRadius: BorderRadius.circular(14),
                 ),
               ),
               child: _isSavingDisplayName
@@ -674,29 +529,18 @@ class _AccountActivitiesCardWidgetState
             ),
           ),
 
-          const SizedBox(
-            height: 10,
-          ),
+          const SizedBox(height: 10),
 
           const Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                Icons.lock_outline,
-                size: 12,
-                color: Colors.white24,
-              ),
-              SizedBox(
-                width: 5,
-              ),
+              Icon(Icons.lock_outline, size: 12, color: Colors.white24),
+              SizedBox(width: 5),
               Flexible(
                 child: Text(
                   'Complete seu nome para liberar o restante do aplicativo.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.white24,
-                    fontSize: 9,
-                  ),
+                  style: TextStyle(color: Colors.white24, fontSize: 9),
                 ),
               ),
             ],
@@ -710,137 +554,260 @@ class _AccountActivitiesCardWidgetState
   // SAVE REQUIRED DISPLAY NAME
   // ============================================================
 
-  Future<
-    void
-  >
-  _saveRequiredDisplayName() async {
+  Future<void> _saveRequiredDisplayName() async {
     if (_isSavingDisplayName) {
       return;
     }
 
     final displayName = _displayNameController.text.trim();
 
-    if (displayName.length <
-        2) {
-      setState(
-        () {
-          _displayNameError = 'Digite pelo menos 2 caracteres.';
-        },
-      );
+    if (displayName.length < 2) {
+      setState(() {
+        _displayNameError = 'Digite pelo menos 2 caracteres.';
+      });
 
       return;
     }
 
-    if (displayName.length >
-        60) {
-      setState(
-        () {
-          _displayNameError = 'O nome pode ter no máximo 60 caracteres.';
-        },
-      );
+    if (displayName.length > 60) {
+      setState(() {
+        _displayNameError = 'O nome pode ter no máximo 60 caracteres.';
+      });
 
       return;
     }
 
-    final userId = Supabase.instance.client.auth.currentUser?.id.trim();
-
-    if (userId ==
-            null ||
-        userId.isEmpty) {
-      setState(
-        () {
-          _displayNameError = 'Não foi possível identificar sua conta.';
-        },
-      );
-
-      return;
-    }
-
-    setState(
-      () {
-        _isSavingDisplayName = true;
-
-        _displayNameError = null;
-      },
-    );
+    setState(() {
+      _isSavingDisplayName = true;
+      _displayNameError = null;
+    });
 
     try {
-      final profile = await _publicProfileRepository.getProfile(
-        userId: userId,
-      );
+      // ======================================================
+      // RESOLVER SESSÃO AUTENTICADA
+      // ======================================================
+      //
+      // No Web, especialmente logo após OAuth (GitHub), a URL
+      // pode abrir o Dashboard enquanto o Supabase ainda está
+      // terminando de restaurar a sessão.
+      //
+      // Por isso não dependemos apenas de currentUser em uma
+      // única leitura instantânea.
+      //
+      // ======================================================
 
-      if (profile ==
-          null) {
-        throw StateError(
-          'Perfil público não encontrado.',
-        );
+      final userId = await _resolveAuthenticatedUserId();
+
+      if (userId == null || userId.isEmpty) {
+        if (!mounted) {
+          return;
+        }
+
+        setState(() {
+          _displayNameError =
+              'Sua sessão ainda não está pronta. '
+              'Aguarde um instante e tente novamente.';
+        });
+
+        return;
       }
 
-      final updatedProfile = profile.copyWith(
-        displayName: displayName,
-      );
+      // ======================================================
+      // UPSERT DO PERFIL
+      // ======================================================
+      //
+      // Contas OAuth antigas podem existir em auth.users sem
+      // possuir ainda uma linha em public.profiles.
+      //
+      // update() falharia silenciosamente nesse cenário.
+      // upsert() atende tanto:
+      //
+      // - perfil existente;
+      // - perfil ainda não criado.
+      //
+      // ======================================================
 
-      await _publicProfileRepository.updateProfile(
-        profile: updatedProfile,
-      );
+      final response = await Supabase.instance.client
+          .from('profiles')
+          .upsert({
+            'id': userId,
+            'artist_name': displayName,
+            'artist_name_updated_at': DateTime.now().toUtc().toIso8601String(),
+            'updated_at': DateTime.now().toUtc().toIso8601String(),
+          }, onConflict: 'id')
+          .select('artist_name')
+          .maybeSingle();
+
+      final savedName = response?['artist_name']?.toString().trim() ?? '';
+
+      if (savedName.isEmpty) {
+        throw StateError('O banco não confirmou o nome salvo.');
+      }
 
       if (!mounted) {
         return;
       }
 
-      widget.controller.updateArtistName(
-        displayName,
-      );
+      // ======================================================
+      // ESTADO LOCAL DO DASHBOARD
+      // ======================================================
+
+      widget.controller.updateArtistName(savedName);
 
       widget.onStateChanged();
 
-      FocusScope.of(
-        context,
-      ).unfocus();
+      FocusScope.of(context).unfocus();
 
-      ScaffoldMessenger.of(
-          context,
-        )
+      ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
           const SnackBar(
-            content: Text(
-              'Nome salvo com sucesso.',
-            ),
+            content: Text('Nome salvo com sucesso.'),
             behavior: SnackBarBehavior.floating,
           ),
         );
-    } catch (
-      error,
-      stackTrace
-    ) {
+
+      debugPrint(
+        '[DASHBOARD PROFILE] '
+        'Nome obrigatório salvo para $userId.',
+      );
+    } on PostgrestException catch (error, stackTrace) {
+      debugPrint(
+        '[DASHBOARD PROFILE] '
+        'Erro Supabase ao salvar nome obrigatório: '
+        '${error.message}',
+      );
+
+      debugPrint(
+        '[DASHBOARD PROFILE] '
+        'Código: ${error.code}',
+      );
+
+      debugPrint('$stackTrace');
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _displayNameError = 'Não foi possível salvar seu nome agora.';
+      });
+    } catch (error, stackTrace) {
       debugPrint(
         '[DASHBOARD PROFILE] '
         'Erro ao salvar nome obrigatório: '
         '$error',
       );
 
-      debugPrint(
-        '$stackTrace',
-      );
+      debugPrint('$stackTrace');
 
       if (!mounted) {
         return;
       }
 
-      setState(
-        () {
-          _displayNameError = 'Não foi possível salvar seu nome.';
-        },
-      );
+      setState(() {
+        _displayNameError = 'Não foi possível salvar seu nome.';
+      });
     } finally {
       if (mounted) {
-        setState(
-          () {
-            _isSavingDisplayName = false;
-          },
-        );
+        setState(() {
+          _isSavingDisplayName = false;
+        });
       }
+    }
+  }
+
+  // ============================================================
+  // RESOLVER USUÁRIO AUTENTICADO
+  // ============================================================
+  //
+  // Faz uma leitura imediata e, se necessário, aguarda por um
+  // curto período um evento de autenticação do Supabase.
+  //
+  // Isso deixa o onboarding mais resiliente após OAuth Web.
+  //
+  // ============================================================
+
+  Future<String?> _resolveAuthenticatedUserId() async {
+    final auth = Supabase.instance.client.auth;
+
+    String? readCurrentUserId() {
+      final userId = auth.currentUser?.id.trim();
+
+      if (userId == null || userId.isEmpty) {
+        return null;
+      }
+
+      return userId;
+    }
+
+    final immediateUserId = readCurrentUserId();
+
+    if (immediateUserId != null) {
+      debugPrint(
+        '[DASHBOARD PROFILE] '
+        'Sessão disponível imediatamente: '
+        '$immediateUserId',
+      );
+
+      return immediateUserId;
+    }
+
+    final sessionUserId = auth.currentSession?.user.id.trim();
+
+    if (sessionUserId != null && sessionUserId.isNotEmpty) {
+      debugPrint(
+        '[DASHBOARD PROFILE] '
+        'Usuário resolvido pela sessão atual: '
+        '$sessionUserId',
+      );
+
+      return sessionUserId;
+    }
+
+    debugPrint(
+      '[DASHBOARD PROFILE] '
+      'Aguardando restauração da sessão OAuth.',
+    );
+
+    try {
+      final authState = await auth.onAuthStateChange
+          .firstWhere((state) {
+            final userId = state.session?.user.id.trim();
+
+            return userId != null && userId.isNotEmpty;
+          })
+          .timeout(const Duration(seconds: 4));
+
+      final userId = authState.session?.user.id.trim();
+
+      if (userId == null || userId.isEmpty) {
+        return null;
+      }
+
+      debugPrint(
+        '[DASHBOARD PROFILE] '
+        'Sessão OAuth restaurada: $userId',
+      );
+
+      return userId;
+    } on TimeoutException {
+      debugPrint(
+        '[DASHBOARD PROFILE] '
+        'Tempo limite aguardando sessão OAuth.',
+      );
+
+      return null;
+    } catch (error, stackTrace) {
+      debugPrint(
+        '[DASHBOARD PROFILE] '
+        'Erro ao resolver sessão autenticada: '
+        '$error',
+      );
+
+      debugPrint('$stackTrace');
+
+      return null;
     }
   }
 
@@ -848,27 +815,18 @@ class _AccountActivitiesCardWidgetState
   // VER MAIS
   // ============================================================
 
-  Widget _buildViewMoreButton(
-    BuildContext context,
-  ) {
+  Widget _buildViewMoreButton(BuildContext context) {
     return Align(
       alignment: Alignment.centerRight,
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(
-            12,
-          ),
+          borderRadius: BorderRadius.circular(12),
           onTap: () {
-            _openActivitiesPage(
-              context,
-            );
+            _openActivitiesPage(context);
           },
           child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 10,
-              vertical: 7,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -882,9 +840,7 @@ class _AccountActivitiesCardWidgetState
                   ),
                 ),
 
-                const SizedBox(
-                  width: 5,
-                ),
+                const SizedBox(width: 5),
 
                 Icon(
                   Icons.arrow_forward_rounded,
@@ -903,23 +859,17 @@ class _AccountActivitiesCardWidgetState
   // BOTÃO DE CONVITES DE PROJETO
   // ============================================================
 
-  Widget _buildProjectInvitationButton(
-    BuildContext context,
-  ) {
+  Widget _buildProjectInvitationButton(BuildContext context) {
     final count = _projectInvitationController.pendingCount;
 
     return Tooltip(
-      message:
-          count >
-              0
+      message: count > 0
           ? 'Convites de projetos • $count'
           : 'Convites de projetos',
 
       child: GestureDetector(
         onTap: () {
-          _openProjectInvitations(
-            context,
-          );
+          _openProjectInvitations(context);
         },
 
         child: Stack(
@@ -931,42 +881,25 @@ class _AccountActivitiesCardWidgetState
               height: 44,
 
               decoration: BoxDecoration(
-                color: Colors.white.withValues(
-                  alpha: 0.05,
-                ),
+                color: Colors.white.withValues(alpha: 0.05),
 
                 shape: BoxShape.circle,
 
                 border: Border.all(
-                  color:
-                      count >
-                          0
-                      ? const Color(
-                          0xFF8B5CF6,
-                        ).withValues(
-                          alpha: 0.45,
-                        )
-                      : Colors.white.withValues(
-                          alpha: 0.08,
-                        ),
+                  color: count > 0
+                      ? const Color(0xFF8B5CF6).withValues(alpha: 0.45)
+                      : Colors.white.withValues(alpha: 0.08),
                 ),
               ),
 
               child: Icon(
                 Icons.group_add_outlined,
-                color:
-                    count >
-                        0
-                    ? const Color(
-                        0xFFA78BFA,
-                      )
-                    : Colors.white70,
+                color: count > 0 ? const Color(0xFFA78BFA) : Colors.white70,
                 size: 20,
               ),
             ),
 
-            if (count >
-                0)
+            if (count > 0)
               Positioned(
                 top: -4,
                 right: -4,
@@ -977,24 +910,17 @@ class _AccountActivitiesCardWidgetState
                     minHeight: 18,
                   ),
 
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 5,
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 5),
 
                   alignment: Alignment.center,
 
                   decoration: const BoxDecoration(
-                    color: Color(
-                      0xFF8B5CF6,
-                    ),
+                    color: Color(0xFF8B5CF6),
                     shape: BoxShape.circle,
                   ),
 
                   child: Text(
-                    count >
-                            99
-                        ? '99+'
-                        : '$count',
+                    count > 99 ? '99+' : '$count',
 
                     style: const TextStyle(
                       color: Colors.white,
@@ -1014,12 +940,7 @@ class _AccountActivitiesCardWidgetState
   // ABRIR CONVITES
   // ============================================================
 
-  Future<
-    void
-  >
-  _openProjectInvitations(
-    BuildContext context,
-  ) async {
+  Future<void> _openProjectInvitations(BuildContext context) async {
     if (!_projectInvitationController.initialized) {
       await _projectInvitationController.init();
     }
@@ -1028,198 +949,151 @@ class _AccountActivitiesCardWidgetState
       return;
     }
 
-    await showModalBottomSheet<
-      void
-    >(
+    await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
 
-      builder:
-          (
-            sheetContext,
-          ) {
-            return FractionallySizedBox(
-              heightFactor: 0.72,
+      builder: (sheetContext) {
+        return FractionallySizedBox(
+          heightFactor: 0.72,
 
-              child: Container(
-                decoration: const BoxDecoration(
-                  color: Color(
-                    0xFF0D0B14,
-                  ),
+          child: Container(
+            decoration: const BoxDecoration(
+              color: Color(0xFF0D0B14),
 
-                  borderRadius: BorderRadius.vertical(
-                    top: Radius.circular(
-                      24,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+
+            child: SafeArea(
+              top: false,
+
+              child: Column(
+                children: [
+                  const SizedBox(height: 10),
+
+                  Container(
+                    width: 42,
+                    height: 4,
+
+                    decoration: BoxDecoration(
+                      color: Colors.white24,
+                      borderRadius: BorderRadius.circular(10),
                     ),
                   ),
-                ),
 
-                child: SafeArea(
-                  top: false,
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(20, 18, 20, 14),
 
-                  child: Column(
-                    children: [
-                      const SizedBox(
-                        height: 10,
-                      ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.group_add_outlined,
+                          color: Color(0xFFA78BFA),
+                          size: 20,
+                        ),
 
-                      Container(
-                        width: 42,
-                        height: 4,
+                        SizedBox(width: 10),
 
-                        decoration: BoxDecoration(
-                          color: Colors.white24,
-                          borderRadius: BorderRadius.circular(
-                            10,
+                        Text(
+                          'Convites de projetos',
+
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
-                      ),
+                      ],
+                    ),
+                  ),
 
-                      const Padding(
-                        padding: EdgeInsets.fromLTRB(
-                          20,
-                          18,
-                          20,
-                          14,
-                        ),
+                  Expanded(
+                    child: ListenableBuilder(
+                      listenable: _projectInvitationController,
 
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.group_add_outlined,
-                              color: Color(
-                                0xFFA78BFA,
-                              ),
-                              size: 20,
-                            ),
+                      builder: (context, _) {
+                        if (_projectInvitationController.isLoading &&
+                            !_projectInvitationController
+                                .hasPendingInvitations) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
+                        }
 
-                            SizedBox(
-                              width: 10,
-                            ),
+                        final invitations =
+                            _projectInvitationController.pendingInvitations;
 
-                            Text(
-                              'Convites de projetos',
+                        if (invitations.isEmpty) {
+                          return const Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(24),
 
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
 
-                      Expanded(
-                        child: ListenableBuilder(
-                          listenable: _projectInvitationController,
-
-                          builder:
-                              (
-                                context,
-                                _,
-                              ) {
-                                if (_projectInvitationController.isLoading &&
-                                    !_projectInvitationController.hasPendingInvitations) {
-                                  return const Center(
-                                    child: CircularProgressIndicator(),
-                                  );
-                                }
-
-                                final invitations = _projectInvitationController.pendingInvitations;
-
-                                if (invitations.isEmpty) {
-                                  return const Center(
-                                    child: Padding(
-                                      padding: EdgeInsets.all(
-                                        24,
-                                      ),
-
-                                      child: Column(
-                                        mainAxisSize: MainAxisSize.min,
-
-                                        children: [
-                                          Icon(
-                                            Icons.mark_email_read_outlined,
-                                            color: Colors.white24,
-                                            size: 36,
-                                          ),
-
-                                          SizedBox(
-                                            height: 12,
-                                          ),
-
-                                          Text(
-                                            'Nenhum convite pendente',
-
-                                            style: TextStyle(
-                                              color: Colors.white54,
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-
-                                          SizedBox(
-                                            height: 5,
-                                          ),
-
-                                          Text(
-                                            'Novos convites para Studio Sessions aparecerão aqui.',
-
-                                            textAlign: TextAlign.center,
-
-                                            style: TextStyle(
-                                              color: Colors.white30,
-                                              fontSize: 10,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  );
-                                }
-
-                                return ListView.separated(
-                                  padding: const EdgeInsets.fromLTRB(
-                                    16,
-                                    0,
-                                    16,
-                                    24,
+                                children: [
+                                  Icon(
+                                    Icons.mark_email_read_outlined,
+                                    color: Colors.white24,
+                                    size: 36,
                                   ),
 
-                                  itemCount: invitations.length,
+                                  SizedBox(height: 12),
 
-                                  separatorBuilder:
-                                      (
-                                        _,
-                                        __,
-                                      ) {
-                                        return const SizedBox(
-                                          height: 10,
-                                        );
-                                      },
+                                  Text(
+                                    'Nenhum convite pendente',
 
-                                  itemBuilder:
-                                      (
-                                        context,
-                                        index,
-                                      ) {
-                                        return _buildProjectInvitationCard(
-                                          sheetContext,
-                                          invitations[index],
-                                        );
-                                      },
-                                );
-                              },
-                        ),
-                      ),
-                    ],
+                                    style: TextStyle(
+                                      color: Colors.white54,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+
+                                  SizedBox(height: 5),
+
+                                  Text(
+                                    'Novos convites para Studio Sessions aparecerão aqui.',
+
+                                    textAlign: TextAlign.center,
+
+                                    style: TextStyle(
+                                      color: Colors.white30,
+                                      fontSize: 10,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        }
+
+                        return ListView.separated(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+
+                          itemCount: invitations.length,
+
+                          separatorBuilder: (_, __) {
+                            return const SizedBox(height: 10);
+                          },
+
+                          itemBuilder: (context, index) {
+                            return _buildProjectInvitationCard(
+                              sheetContext,
+                              invitations[index],
+                            );
+                          },
+                        );
+                      },
+                    ),
                   ),
-                ),
+                ],
               ),
-            );
-          },
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -1234,26 +1108,15 @@ class _AccountActivitiesCardWidgetState
     final busy = _projectInvitationController.isBusy;
 
     return Container(
-      padding: const EdgeInsets.all(
-        14,
-      ),
+      padding: const EdgeInsets.all(14),
 
       decoration: BoxDecoration(
-        color: Colors.white.withValues(
-          alpha: 0.035,
-        ),
+        color: Colors.white.withValues(alpha: 0.035),
 
-        borderRadius: BorderRadius.circular(
-          18,
-        ),
+        borderRadius: BorderRadius.circular(18),
 
         border: Border.all(
-          color:
-              const Color(
-                0xFF8B5CF6,
-              ).withValues(
-                alpha: 0.18,
-              ),
+          color: const Color(0xFF8B5CF6).withValues(alpha: 0.18),
         ),
       ),
 
@@ -1270,30 +1133,19 @@ class _AccountActivitiesCardWidgetState
                 alignment: Alignment.center,
 
                 decoration: BoxDecoration(
-                  color:
-                      const Color(
-                        0xFF8B5CF6,
-                      ).withValues(
-                        alpha: 0.12,
-                      ),
+                  color: const Color(0xFF8B5CF6).withValues(alpha: 0.12),
 
-                  borderRadius: BorderRadius.circular(
-                    13,
-                  ),
+                  borderRadius: BorderRadius.circular(13),
                 ),
 
                 child: const Icon(
                   Icons.groups_2_outlined,
-                  color: Color(
-                    0xFFA78BFA,
-                  ),
+                  color: Color(0xFFA78BFA),
                   size: 20,
                 ),
               ),
 
-              const SizedBox(
-                width: 11,
-              ),
+              const SizedBox(width: 11),
 
               Expanded(
                 child: Column(
@@ -1313,9 +1165,7 @@ class _AccountActivitiesCardWidgetState
                       ),
                     ),
 
-                    const SizedBox(
-                      height: 3,
-                    ),
+                    const SizedBox(height: 3),
 
                     Text(
                       '${invitation.inviterName} convidou você para participar.',
@@ -1335,9 +1185,7 @@ class _AccountActivitiesCardWidgetState
             ],
           ),
 
-          const SizedBox(
-            height: 13,
-          ),
+          const SizedBox(height: 13),
 
           Row(
             children: [
@@ -1346,105 +1194,77 @@ class _AccountActivitiesCardWidgetState
                   onPressed: busy
                       ? null
                       : () async {
-                          final rejected = await _projectInvitationController.rejectInvitation(
-                            invitation,
-                          );
+                          final rejected = await _projectInvitationController
+                              .rejectInvitation(invitation);
 
-                          if (!mounted ||
-                              !rejected) {
+                          if (!mounted || !rejected) {
                             return;
                           }
 
-                          _showInvitationMessage(
-                            'Convite recusado.',
-                          );
+                          _showInvitationMessage('Convite recusado.');
                         },
 
                   style: OutlinedButton.styleFrom(
                     foregroundColor: Colors.redAccent,
 
                     side: BorderSide(
-                      color: Colors.redAccent.withValues(
-                        alpha: 0.30,
-                      ),
+                      color: Colors.redAccent.withValues(alpha: 0.30),
                     ),
 
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(
-                        12,
-                      ),
+                      borderRadius: BorderRadius.circular(12),
                     ),
                   ),
 
                   child: const Text(
                     'Recusar',
 
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                    ),
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700),
                   ),
                 ),
               ),
 
-              const SizedBox(
-                width: 8,
-              ),
+              const SizedBox(width: 8),
 
               Expanded(
                 child: FilledButton(
                   onPressed: busy
                       ? null
                       : () async {
-                          final projectId = await _projectInvitationController.acceptInvitation(
-                            invitation,
-                          );
+                          final projectId = await _projectInvitationController
+                              .acceptInvitation(invitation);
 
                           if (!mounted ||
-                              projectId ==
-                                  null ||
+                              projectId == null ||
                               projectId.trim().isEmpty) {
                             return;
                           }
 
                           if (sheetContext.mounted) {
-                            Navigator.of(
-                              sheetContext,
-                            ).pop();
+                            Navigator.of(sheetContext).pop();
                           }
 
                           _showInvitationMessage(
                             'Você entrou em ${invitation.projectTitle}.',
                           );
 
-                          await Navigator.of(
-                            this.context,
-                          ).push(
-                            MaterialPageRoute<
-                              void
-                            >(
-                              builder:
-                                  (
-                                    _,
-                                  ) {
-                                    return NetworkingSessionView(
-                                      projectId: projectId.trim(),
-                                    );
-                                  },
+                          await Navigator.of(this.context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) {
+                                return NetworkingSessionView(
+                                  projectId: projectId.trim(),
+                                );
+                              },
                             ),
                           );
                         },
 
                   style: FilledButton.styleFrom(
-                    backgroundColor: const Color(
-                      0xFF8B5CF6,
-                    ),
+                    backgroundColor: const Color(0xFF8B5CF6),
                     foregroundColor: Colors.white,
 
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(
-                        12,
-                      ),
+                      borderRadius: BorderRadius.circular(12),
                     ),
                   ),
 
@@ -1479,26 +1299,18 @@ class _AccountActivitiesCardWidgetState
   // MENSAGEM DE CONVITE
   // ============================================================
 
-  void _showInvitationMessage(
-    String message,
-  ) {
+  void _showInvitationMessage(String message) {
     if (!mounted) {
       return;
     }
 
-    ScaffoldMessenger.of(
-        context,
-      )
+    ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
-          content: Text(
-            message,
-          ),
+          content: Text(message),
 
-          backgroundColor: const Color(
-            0xFF15151D,
-          ),
+          backgroundColor: const Color(0xFF15151D),
 
           behavior: SnackBarBehavior.floating,
         ),
@@ -1509,24 +1321,12 @@ class _AccountActivitiesCardWidgetState
   // ABRIR PROJETOS ATIVOS
   // ============================================================
 
-  Future<
-    void
-  >
-  _openActiveProjectsPage(
-    BuildContext context,
-  ) async {
-    await Navigator.of(
-      context,
-    ).push(
-      MaterialPageRoute<
-        void
-      >(
-        builder:
-            (
-              _,
-            ) {
-              return const MatchProjectsView();
-            },
+  Future<void> _openActiveProjectsPage(BuildContext context) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) {
+          return const MatchProjectsView();
+        },
       ),
     );
   }
@@ -1535,24 +1335,12 @@ class _AccountActivitiesCardWidgetState
   // ABRIR CALENDÁRIO
   // ============================================================
 
-  Future<
-    void
-  >
-  _openCalendarPage(
-    BuildContext context,
-  ) async {
-    await Navigator.of(
-      context,
-    ).push(
-      MaterialPageRoute<
-        void
-      >(
-        builder:
-            (
-              context,
-            ) {
-              return const CalendarPage();
-            },
+  Future<void> _openCalendarPage(BuildContext context) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) {
+          return const CalendarPage();
+        },
       ),
     );
 
@@ -1560,33 +1348,19 @@ class _AccountActivitiesCardWidgetState
       return;
     }
 
-    setState(
-      () {},
-    );
+    setState(() {});
   }
 
   // ============================================================
   // ABRIR HISTÓRICO DE ATIVIDADES
   // ============================================================
 
-  Future<
-    void
-  >
-  _openActivitiesPage(
-    BuildContext context,
-  ) async {
-    await Navigator.of(
-      context,
-    ).push(
-      MaterialPageRoute<
-        void
-      >(
-        builder:
-            (
-              context,
-            ) {
-              return const RecentActivitiesPage();
-            },
+  Future<void> _openActivitiesPage(BuildContext context) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) {
+          return const RecentActivitiesPage();
+        },
       ),
     );
   }
@@ -1607,8 +1381,7 @@ class _AccountActivitiesCardWidgetState
         // CALLBACK PERSONALIZADO
         // ======================================================
 
-        if (onTap !=
-            null) {
+        if (onTap != null) {
           onTap();
 
           return;
@@ -1618,34 +1391,19 @@ class _AccountActivitiesCardWidgetState
         // ROTA
         // ======================================================
 
-        if (route !=
-            null) {
-          Navigator.of(
-            context,
-          ).pushNamed(
-            route,
-          );
+        if (route != null) {
+          Navigator.of(context).pushNamed(route);
         }
       },
       child: Container(
         width: 44,
         height: 44,
         decoration: BoxDecoration(
-          color: Colors.white.withValues(
-            alpha: 0.05,
-          ),
+          color: Colors.white.withValues(alpha: 0.05),
           shape: BoxShape.circle,
-          border: Border.all(
-            color: Colors.white.withValues(
-              alpha: 0.08,
-            ),
-          ),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
         ),
-        child: Icon(
-          icon,
-          color: Colors.white70,
-          size: 20,
-        ),
+        child: Icon(icon, color: Colors.white70, size: 20),
       ),
     );
   }

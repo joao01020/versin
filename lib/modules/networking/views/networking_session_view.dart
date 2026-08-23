@@ -7,10 +7,10 @@ import 'package:versin/modules/dashboard/controllers/dashboard_controller.dart';
 import '../call/data/repositories/project_call_repository_impl.dart';
 import '../call/views/call_view.dart';
 import '../call/views/widgets/global_call_banner.dart';
-import '../controllers/global_chat_controller.dart';
+import '../chat/controllers/global_chat_controller.dart';
 import '../widgets/global_chat_banner.dart';
 
-import '../controllers/networking_controller.dart';
+import '../core/controllers/networking_controller.dart';
 
 // ============================================================
 // PROJECT INVITATIONS
@@ -20,9 +20,9 @@ import '../invitations/controllers/project_invitation_controller.dart';
 import '../invitations/models/project_invitation_model.dart';
 import '../invitations/widgets/project_invitation_banner.dart';
 
-import 'sub_features/chat_view.dart';
+import '../chat/views/chat_view.dart';
 import 'sub_features/contract_view.dart';
-import 'sub_features/members_view.dart';
+import '../members/views/members_view.dart';
 import 'package:versin/modules/networking/royalties/controllers/royalties_controller.dart';
 import 'package:versin/modules/networking/royalties/data/repositories/royalties_repository_impl.dart';
 import 'package:versin/modules/networking/royalties/views/royalties_view.dart';

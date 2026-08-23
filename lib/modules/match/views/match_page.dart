@@ -8,8 +8,8 @@ import 'package:versin/app/locator.dart';
 // ============================================================
 // MATCH - CONSENTIMENTO
 // ============================================================
-import 'package:versin/modules/match/views/location_privacy_page.dart';
-import 'package:versin/modules/match/services/match_location_consent_service.dart';
+import 'package:versin/modules/match/location/views/location_privacy_page.dart';
+import 'package:versin/modules/match/location/service/match_location_consent_service.dart';
 // ============================================================
 // MATCH
 // ============================================================
@@ -46,14 +46,14 @@ import 'package:versin/modules/match/team_expansion/services/match_team_invitati
 import 'package:versin/modules/match/team_expansion/widgets/team_expansion_notice.dart';
 
 import 'package:versin/modules/match/services/match_session_service.dart';
-import 'package:versin/modules/match/views/match_projects_view.dart';
+import 'package:versin/modules/match/views/projects/match_projects_view.dart';
 
 // ============================================================
 // MATCH WIDGETS
 // ============================================================
 
-import 'package:versin/modules/match/widgets/connection_profile_card_widget.dart';
-import 'package:versin/modules/match/widgets/match_filter_sheet.dart';
+import 'package:versin/modules/match/profile/widgets/connection_profile_card_widget.dart';
+import 'package:versin/modules/match/filters/widgets/match_filter_sheet.dart';
 import 'package:versin/modules/match/search/widgets/match_search_panel_widget.dart';
 import 'package:versin/modules/match/search/widgets/match_search_results_widget.dart';
 // ============================================================

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:versin/modules/match/controllers/match_controllers.dart';
 import 'package:versin/modules/match/models/match_user_entity.dart';
-import 'package:versin/modules/match/widgets/profile_tile_widget.dart';
+import 'package:versin/modules/match/profile/widgets/profile_tile_widget.dart';
 
 // ============================================================
 // MATCH SEARCH RESULTS WIDGET

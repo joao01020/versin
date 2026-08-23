@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:versin/modules/match/controllers/match_controllers.dart';
 import 'package:versin/modules/match/data/repositories/match_repository.dart';
 import 'package:versin/modules/match/models/match_discovery_mode.dart';
-import 'package:versin/modules/match/services/match_location_service.dart';
+import 'package:versin/modules/match/location/service/match_location_service.dart';
 
 import 'package:versin/modules/profile/controllers/professional_profile_controller.dart';
 
@@ -72,10 +72,13 @@ class MatchSessionService {
     required MatchRepository matchRepository,
     required ProfessionalProfileController professionalProfileController,
     MatchLocationService? matchLocationService,
-  }) : _matchController = matchController,
+  }) : _matchController =
+           matchController,
        _matchRepository = matchRepository,
        _professionalProfileController = professionalProfileController,
-       _matchLocationService = matchLocationService ?? MatchLocationService();
+       _matchLocationService =
+           matchLocationService ??
+           MatchLocationService();
 
   // ============================================================
   // GETTERS
@@ -103,8 +106,13 @@ class MatchSessionService {
   //
   // ============================================================
 
-  Future<void> initialize() async {
-    if (_isDisposed || _isInitializing || _isInitialized) {
+  Future<
+    void
+  >
+  initialize() async {
+    if (_isDisposed ||
+        _isInitializing ||
+        _isInitialized) {
       return;
     }
 
@@ -173,7 +181,10 @@ class MatchSessionService {
         '[MATCH SESSION] '
         'Sessão inicializada.',
       );
-    } catch (error, stackTrace) {
+    } catch (
+      error,
+      stackTrace
+    ) {
       _isInitialized = false;
 
       _logError(
@@ -202,8 +213,12 @@ class MatchSessionService {
   //
   // ============================================================
 
-  Future<void> restart() async {
-    if (_isDisposed || _isRestarting) {
+  Future<
+    void
+  >
+  restart() async {
+    if (_isDisposed ||
+        _isRestarting) {
       return;
     }
 
@@ -276,7 +291,10 @@ class MatchSessionService {
         '[MATCH SESSION] '
         'Sessão reiniciada.',
       );
-    } catch (error, stackTrace) {
+    } catch (
+      error,
+      stackTrace
+    ) {
       _isInitialized = false;
 
       _logError(
@@ -313,14 +331,22 @@ class MatchSessionService {
   //
   // ============================================================
 
-  Future<void> changeDiscoveryMode(MatchDiscoveryMode mode) async {
-    if (_isDisposed || _isRestarting) {
+  Future<
+    void
+  >
+  changeDiscoveryMode(
+    MatchDiscoveryMode mode,
+  ) async {
+    if (_isDisposed ||
+        _isRestarting) {
       return;
     }
 
     final currentMode = _matchController.discoveryMode;
 
-    final sameMode = currentMode == mode;
+    final sameMode =
+        currentMode ==
+        mode;
 
     // ==========================================================
     // MESMO MODO
@@ -338,7 +364,9 @@ class MatchSessionService {
     //
     // ==========================================================
 
-    if (sameMode && mode != MatchDiscoveryMode.nearby) {
+    if (sameMode &&
+        mode !=
+            MatchDiscoveryMode.nearby) {
       return;
     }
 
@@ -368,7 +396,9 @@ class MatchSessionService {
       // ========================================================
 
       if (!sameMode) {
-        _matchController.setDiscoveryMode(mode);
+        _matchController.setDiscoveryMode(
+          mode,
+        );
       }
 
       if (_isDisposed) {
@@ -430,7 +460,10 @@ class MatchSessionService {
         'Modo ativo: '
         '${_matchController.discoveryMode.name}',
       );
-    } catch (error, stackTrace) {
+    } catch (
+      error,
+      stackTrace
+    ) {
       _logError(
         operation: 'alterar modo de descoberta',
         error: error,
@@ -459,7 +492,10 @@ class MatchSessionService {
   //
   // ============================================================
 
-  Future<void> refreshProfileAndRestart() async {
+  Future<
+    void
+  >
+  refreshProfileAndRestart() async {
     if (_isDisposed) {
       return;
     }
@@ -492,7 +528,10 @@ class MatchSessionService {
   // PARAR
   // ============================================================
 
-  Future<void> stop() async {
+  Future<
+    void
+  >
+  stop() async {
     if (_isDisposed) {
       return;
     }
@@ -511,7 +550,10 @@ class MatchSessionService {
         '[MATCH SESSION] '
         'Sessão parada.',
       );
-    } catch (error, stackTrace) {
+    } catch (
+      error,
+      stackTrace
+    ) {
       _logError(
         operation: 'parar sessão',
         error: error,
@@ -532,7 +574,10 @@ class MatchSessionService {
   //
   // ============================================================
 
-  Future<bool> _prepareLocationForCurrentMode() async {
+  Future<
+    bool
+  >
+  _prepareLocationForCurrentMode() async {
     if (_isDisposed) {
       return false;
     }
@@ -541,7 +586,8 @@ class MatchSessionService {
     // OUTROS MODOS
     // ==========================================================
 
-    if (_matchController.discoveryMode != MatchDiscoveryMode.nearby) {
+    if (_matchController.discoveryMode !=
+        MatchDiscoveryMode.nearby) {
       return true;
     }
 
@@ -581,7 +627,8 @@ class MatchSessionService {
       // FALHA
       // ========================================================
 
-      if (position == null) {
+      if (position ==
+          null) {
         debugPrint(
           '[MATCH SESSION] '
           'Falha ao capturar localização para nearby.',
@@ -620,7 +667,10 @@ class MatchSessionService {
       );
 
       return true;
-    } catch (error, stackTrace) {
+    } catch (
+      error,
+      stackTrace
+    ) {
       debugPrint(
         '[MATCH SESSION] '
         'Erro ao preparar localização para nearby: $error',
@@ -650,7 +700,9 @@ class MatchSessionService {
       '${_matchController.discoveryMode.name}.',
     );
 
-    _matchRepository.streamCrossRoleMatches(_matchController);
+    _matchRepository.streamCrossRoleMatches(
+      _matchController,
+    );
   }
 
   // ============================================================
@@ -663,19 +715,32 @@ class MatchSessionService {
     }
 
     final primaryRole =
-        _professionalProfileController.primaryRole?.key ?? 'não informado';
+        _professionalProfileController.primaryRole?.key ??
+        'não informado';
 
     final roles = _professionalProfileController.selectedRoles
-        .map((role) {
-          return role.key;
-        })
-        .toList(growable: false);
+        .map(
+          (
+            role,
+          ) {
+            return role.key;
+          },
+        )
+        .toList(
+          growable: false,
+        );
 
     final lookingFor = _professionalProfileController.lookingForRoles
-        .map((role) {
-          return role.key;
-        })
-        .toList(growable: false);
+        .map(
+          (
+            role,
+          ) {
+            return role.key;
+          },
+        )
+        .toList(
+          growable: false,
+        );
 
     debugPrint(
       '[MATCH SESSION] '
@@ -743,7 +808,10 @@ class MatchSessionService {
   //
   // ============================================================
 
-  Future<void> dispose() async {
+  Future<
+    void
+  >
+  dispose() async {
     if (_isDisposed) {
       return;
     }
@@ -760,7 +828,9 @@ class MatchSessionService {
 
     try {
       await _matchRepository.stopStreaming();
-    } catch (error) {
+    } catch (
+      error
+    ) {
       debugPrint(
         '[MATCH SESSION] '
         'Erro ao encerrar stream: '

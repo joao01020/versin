@@ -1759,35 +1759,26 @@ class _MatchPageState
             // ==================================================
             // SEARCH
             // ==================================================
-            AnimatedSize(
-              duration: const Duration(
-                milliseconds: 180,
+            if (_isSearchPanelOpen)
+              Padding(
+                padding: const EdgeInsets.only(
+                  top: 16,
+                ),
+
+                child: MatchSearchPanelWidget(
+                  textController: _searchTextController,
+
+                  focusNode: _searchFocusNode,
+
+                  isActive: searchState.isActive,
+
+                  accentColor: _matchController.accentNeon,
+
+                  onChanged: _handleSearchChanged,
+
+                  onClear: _clearSearch,
+                ),
               ),
-
-              curve: Curves.easeOut,
-
-              child: _isSearchPanelOpen
-                  ? Padding(
-                      padding: const EdgeInsets.only(
-                        top: 16,
-                      ),
-
-                      child: MatchSearchPanelWidget(
-                        textController: _searchTextController,
-
-                        focusNode: _searchFocusNode,
-
-                        isActive: searchState.isActive,
-
-                        accentColor: _matchController.accentNeon,
-
-                        onChanged: _handleSearchChanged,
-
-                        onClear: _clearSearch,
-                      ),
-                    )
-                  : const SizedBox.shrink(),
-            ),
 
             // ==================================================
             // SEARCH RESULTS

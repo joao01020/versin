@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:versin/app/locator.dart';
-import 'package:versin/modules/match/widgets/profile_track_player_sheet.dart';
+import 'package:versin/modules/match/demo/widgets/profile_track_player_sheet.dart';
 import 'package:versin/modules/profile/services/presence/user_presence_service.dart';
 
 import 'package:versin/modules/public_profile/controllers/public_profile_controller.dart';

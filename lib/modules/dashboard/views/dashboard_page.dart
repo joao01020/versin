@@ -315,10 +315,32 @@ class _DashboardPageState
       }
 
       if (quota.isEmpty) {
+        // ====================================================
+        // USUÁRIO NOVO / QUOTA AINDA NÃO CRIADA
+        // ====================================================
+        //
+        // Uma resposta vazia do backend é diferente de uma
+        // requisição ainda em andamento.
+        //
+        // Para contas novas, o backend pode ainda não possuir
+        // uma quota persistida. Nesse cenário encerramos o
+        // estado visual com uma quota zerada explícita.
+        //
+        // IMPORTANTE:
+        //
+        // Não inventamos um limite mensal no Flutter.
+        // O limite real continua sendo responsabilidade do
+        // backend / Redis.
+        //
+        // ====================================================
+
         debugPrint(
           '[DASHBOARD] '
-          'Backend retornou quota vazia. Mantendo cache atual.',
+          'Backend retornou quota vazia. '
+          'Aplicando estado inicial zerado para a conta.',
         );
+
+        _applyEmptyAiQuotaState();
 
         return;
       }
@@ -365,6 +387,49 @@ class _DashboardPageState
         '$stackTrace',
       );
     }
+  }
+
+  // ============================================================
+  // APLICAR ESTADO INICIAL DE QUOTA VAZIA
+  // ============================================================
+  //
+  // Usado quando o backend responde com um Map vazio.
+  //
+  // Esse cenário pode ocorrer em contas recém-criadas que ainda
+  // não possuem uma quota persistida.
+  //
+  // O objetivo aqui é somente representar um estado final
+  // conhecido na interface e impedir que 0 / 0 / 0 seja tratado
+  // como "carregando".
+  //
+  // NÃO definimos um limite mensal padrão no cliente.
+  //
+  // ============================================================
+
+  void _applyEmptyAiQuotaState() {
+    _rhymesController.updateAiQuotaFromMap(
+      <
+        String,
+        dynamic
+      >{
+        'usage_percentage': 0.0,
+        'progress': 0.0,
+        'level': 'normal',
+        'message': 'Cota ainda não inicializada.',
+        'blocked': false,
+        'can_use_ai': true,
+        'used_tokens': 0,
+        'remaining_tokens': 0,
+        'limit_tokens': 0,
+      },
+      notify: true,
+    );
+
+    debugPrint(
+      '[DASHBOARD] '
+      'Estado inicial da quota aplicado: '
+      '0 usados | 0 restantes | 0 limite.',
+    );
   }
 
   // ============================================================

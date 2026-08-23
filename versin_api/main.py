@@ -3,6 +3,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 
 # ============================================================
@@ -217,6 +218,111 @@ app = FastAPI(
 
 
 # ============================================================
+# CORS
+# ============================================================
+#
+# Permite que o Flutter Web faça requisições para a API
+# hospedada no Render.
+#
+# Sem esta configuração:
+#
+# Flutter Web
+#     ↓
+# https://versin.onrender.com
+#     ↓
+# navegador bloqueia por CORS
+#
+# Mesmo que o backend responda HTTP 200.
+#
+# IMPORTANTE:
+#
+# Não utilizamos:
+#
+# allow_origins=["*"]
+#
+# porque o Versin envia Authorization: Bearer <JWT> e é melhor
+# manter uma allowlist explícita.
+#
+# Adicione aqui o domínio Web de produção quando ele existir.
+#
+# ============================================================
+
+CORS_ALLOWED_ORIGINS = [
+    # ========================================================
+    # DESENVOLVIMENTO LOCAL
+    # ========================================================
+
+    "http://localhost:8080",
+    "http://127.0.0.1:8080",
+
+    # ========================================================
+    # PRODUÇÃO
+    # ========================================================
+    #
+    # Exemplos futuros:
+    #
+    # "https://versin.com",
+    # "https://app.versin.com",
+    #
+    # ========================================================
+]
+
+
+app.add_middleware(
+    CORSMiddleware,
+
+    # ========================================================
+    # ORIGENS
+    # ========================================================
+
+    allow_origins=CORS_ALLOWED_ORIGINS,
+
+    # ========================================================
+    # CREDENCIAIS
+    # ========================================================
+    #
+    # Mantemos habilitado para permitir fluxos autenticados.
+    #
+    # ========================================================
+
+    allow_credentials=True,
+
+    # ========================================================
+    # MÉTODOS HTTP
+    # ========================================================
+    #
+    # GET
+    # POST
+    # PUT
+    # PATCH
+    # DELETE
+    # OPTIONS
+    #
+    # ========================================================
+
+    allow_methods=[
+        "*",
+    ],
+
+    # ========================================================
+    # HEADERS
+    # ========================================================
+    #
+    # Necessário principalmente para:
+    #
+    # Authorization
+    # Content-Type
+    # Accept
+    #
+    # ========================================================
+
+    allow_headers=[
+        "*",
+    ],
+)
+
+
+# ============================================================
 # DISPONIBILIZAR CHAT SERVICE
 # ============================================================
 #
@@ -317,6 +423,21 @@ async def health():
         "redis": {
             "available":
                 quota_service.redis_available,
+        },
+
+        # ====================================================
+        # CORS
+        # ====================================================
+        #
+        # Útil para diagnóstico.
+        #
+        # Não contém segredo.
+        #
+        # ====================================================
+
+        "cors": {
+            "allowed_origins":
+                CORS_ALLOWED_ORIGINS,
         },
     }
 

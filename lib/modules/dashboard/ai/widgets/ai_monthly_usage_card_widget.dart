@@ -28,32 +28,21 @@ import 'package:versin/modules/dashboard/services/dashboard_ui_preferences_servi
 //
 // ============================================================
 
-class AiMonthlyUsageCardWidget
-    extends
-        StatefulWidget {
+class AiMonthlyUsageCardWidget extends StatefulWidget {
   final RhymesController controller;
 
-  const AiMonthlyUsageCardWidget({
-    super.key,
-    required this.controller,
-  });
+  const AiMonthlyUsageCardWidget({super.key, required this.controller});
 
   @override
-  State<
-    AiMonthlyUsageCardWidget
-  >
-  createState() => _AiMonthlyUsageCardWidgetState();
+  State<AiMonthlyUsageCardWidget> createState() =>
+      _AiMonthlyUsageCardWidgetState();
 }
 
 // ============================================================
 // STATE
 // ============================================================
 
-class _AiMonthlyUsageCardWidgetState
-    extends
-        State<
-          AiMonthlyUsageCardWidget
-        > {
+class _AiMonthlyUsageCardWidgetState extends State<AiMonthlyUsageCardWidget> {
   // ============================================================
   // EXPANSÃO
   // ============================================================
@@ -108,27 +97,22 @@ class _AiMonthlyUsageCardWidgetState
   // LOAD EXPANSION PREFERENCE
   // ============================================================
 
-  Future<
-    void
-  >
-  _loadExpansionPreference() async {
+  Future<void> _loadExpansionPreference() async {
     final isExpanded = await _uiPreferencesService.loadAiMonthlyCardExpanded();
 
     if (!mounted) {
       return;
     }
 
-    setState(
-      () {
-        _isExpanded = isExpanded;
+    setState(() {
+      _isExpanded = isExpanded;
 
-        _hasLoadedExpansionPreference = true;
+      _hasLoadedExpansionPreference = true;
 
-        // A restauração inicial não deve parecer uma interação
-        // feita pelo usuário.
-        _animateExpansion = false;
-      },
-    );
+      // A restauração inicial não deve parecer uma interação
+      // feita pelo usuário.
+      _animateExpansion = false;
+    });
 
     // ==========================================================
     // ENABLE USER ANIMATIONS
@@ -139,17 +123,13 @@ class _AiMonthlyUsageCardWidgetState
     //
     // ==========================================================
 
-    WidgetsBinding.instance.addPostFrameCallback(
-      (
-        _,
-      ) {
-        if (!mounted) {
-          return;
-        }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
 
-        _animateExpansion = true;
-      },
-    );
+      _animateExpansion = true;
+    });
   }
 
   // ============================================================
@@ -163,18 +143,10 @@ class _AiMonthlyUsageCardWidgetState
   // ============================================================
 
   @override
-  Widget build(
-    BuildContext context,
-  ) {
-    final percentage = controller.aiUsagePercentage.clamp(
-      0.0,
-      100.0,
-    );
+  Widget build(BuildContext context) {
+    final percentage = controller.aiUsagePercentage.clamp(0.0, 100.0);
 
-    final progress = controller.aiUsageProgress.clamp(
-      0.0,
-      1.0,
-    );
+    final progress = controller.aiUsageProgress.clamp(0.0, 1.0);
 
     final level = controller.aiUsageLevel;
 
@@ -187,70 +159,47 @@ class _AiMonthlyUsageCardWidgetState
     final limitTokens = controller.aiLimitTokens;
 
     // ==========================================================
-    // CACHE / CARREGAMENTO INICIAL
+    // CARREGAMENTO INICIAL DA COTA
     // ==========================================================
     //
-    // O AiQuotaController restaura a última quota conhecida do
-    // cache local. Enquanto isso ainda não aconteceu, não devemos
-    // exibir 0 / 0 / 0 como se fossem valores reais.
+    // O estado de loading depende SOMENTE do estado explícito
+    // mantido pelo AiQuotaController.
     //
-    // Se não existir cache, permanecemos no estado de carregamento
-    // até chegar uma quota válida do backend (normalmente com
-    // limitTokens > 0).
+    // Não inferimos loading através de 0 / 0 / 0, porque esses
+    // valores podem representar um estado final legítimo,
+    // principalmente para contas novas ou ainda sem quota criada
+    // pelo backend.
+    //
+    // O AiQuotaController já diferencia corretamente:
+    //
+    // - quota ainda sendo restaurada;
+    // - restauração concluída sem cache;
+    // - quota realmente zerada.
     //
     // ==========================================================
 
     final quotaController = controller.aiQuotaController;
 
-    final isWaitingForQuota =
-        quotaController.isLoadingInitialQuota ||
-        (!quotaController.hasCachedQuota &&
-            usedTokens ==
-                0 &&
-            remainingTokens ==
-                0 &&
-            limitTokens ==
-                0);
+    final isWaitingForQuota = quotaController.isLoadingInitialQuota;
 
     final accentColor = isWaitingForQuota
-        ? const Color(
-            0xFFE100FF,
-          )
-        : _accentForLevel(
-            level,
-            percentage,
-          );
+        ? const Color(0xFFE100FF)
+        : _accentForLevel(level, percentage);
 
     final statusText = isWaitingForQuota
         ? 'Carregando sua cota...'
-        : _statusText(
-            level,
-            percentage,
-          );
+        : _statusText(level, percentage);
 
     return AnimatedContainer(
-      duration: const Duration(
-        milliseconds: 220,
-      ),
+      duration: const Duration(milliseconds: 220),
       curve: Curves.easeOutCubic,
       width: double.infinity,
-      padding: const EdgeInsets.all(
-        16,
-      ),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(
-          0.035,
-        ),
-        borderRadius: BorderRadius.circular(
-          16,
-        ),
+        color: Colors.white.withOpacity(0.035),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: accentColor.withOpacity(
-            percentage >=
-                    80
-                ? 0.30
-                : 0.12,
-          ),
+          color: accentColor.withOpacity(percentage >= 80 ? 0.30 : 0.12),
         ),
       ),
       child: Column(
@@ -270,13 +219,9 @@ class _AiMonthlyUsageCardWidgetState
           // ====================================================
           AnimatedCrossFade(
             duration: _animateExpansion
-                ? const Duration(
-                    milliseconds: 220,
-                  )
+                ? const Duration(milliseconds: 220)
                 : Duration.zero,
-            crossFadeState:
-                _hasLoadedExpansionPreference &&
-                    _isExpanded
+            crossFadeState: _hasLoadedExpansionPreference && _isExpanded
                 ? CrossFadeState.showFirst
                 : CrossFadeState.showSecond,
             firstChild: _buildExpandedContent(
@@ -323,28 +268,14 @@ class _AiMonthlyUsageCardWidgetState
           width: 40,
           height: 40,
           decoration: BoxDecoration(
-            color: accentColor.withOpacity(
-              0.10,
-            ),
-            borderRadius: BorderRadius.circular(
-              12,
-            ),
-            border: Border.all(
-              color: accentColor.withOpacity(
-                0.22,
-              ),
-            ),
+            color: accentColor.withOpacity(0.10),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: accentColor.withOpacity(0.22)),
           ),
-          child: Icon(
-            Icons.auto_awesome_rounded,
-            color: accentColor,
-            size: 20,
-          ),
+          child: Icon(Icons.auto_awesome_rounded, color: accentColor, size: 20),
         ),
 
-        const SizedBox(
-          width: 12,
-        ),
+        const SizedBox(width: 12),
 
         // ======================================================
         // TÍTULO
@@ -362,53 +293,32 @@ class _AiMonthlyUsageCardWidgetState
                 ),
               ),
 
-              if (_hasLoadedExpansionPreference &&
-                  _isExpanded) ...[
-                const SizedBox(
-                  height: 2,
-                ),
+              if (_hasLoadedExpansionPreference && _isExpanded) ...[
+                const SizedBox(height: 2),
 
                 const Text(
                   'Uso da sua cota mensal de inteligência artificial',
-                  style: TextStyle(
-                    color: Colors.white54,
-                    fontSize: 11,
-                  ),
+                  style: TextStyle(color: Colors.white54, fontSize: 11),
                 ),
               ],
             ],
           ),
         ),
 
-        const SizedBox(
-          width: 10,
-        ),
+        const SizedBox(width: 10),
 
         // ======================================================
         // PERCENTUAL
         // ======================================================
         Container(
-          padding: const EdgeInsets.symmetric(
-            horizontal: 10,
-            vertical: 6,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
-            color: accentColor.withOpacity(
-              0.10,
-            ),
-            borderRadius: BorderRadius.circular(
-              20,
-            ),
-            border: Border.all(
-              color: accentColor.withOpacity(
-                0.22,
-              ),
-            ),
+            color: accentColor.withOpacity(0.10),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: accentColor.withOpacity(0.22)),
           ),
           child: Text(
-            isLoadingQuota
-                ? '—'
-                : '${_formatPercentage(percentage)}%',
+            isLoadingQuota ? '—' : '${_formatPercentage(percentage)}%',
             style: TextStyle(
               color: accentColor,
               fontSize: 12,
@@ -418,9 +328,7 @@ class _AiMonthlyUsageCardWidgetState
           ),
         ),
 
-        const SizedBox(
-          width: 6,
-        ),
+        const SizedBox(width: 6),
 
         // ======================================================
         // EXPANDIR / RECOLHER
@@ -428,24 +336,16 @@ class _AiMonthlyUsageCardWidgetState
         Material(
           color: Colors.transparent,
           child: InkWell(
-            borderRadius: BorderRadius.circular(
-              20,
-            ),
-            onTap: _hasLoadedExpansionPreference
-                ? _toggleExpanded
-                : null,
+            borderRadius: BorderRadius.circular(20),
+            onTap: _hasLoadedExpansionPreference ? _toggleExpanded : null,
             child: Container(
               width: 34,
               height: 34,
               alignment: Alignment.center,
               child: AnimatedRotation(
-                turns: _isExpanded
-                    ? 0
-                    : 0.5,
+                turns: _isExpanded ? 0 : 0.5,
                 duration: _animateExpansion
-                    ? const Duration(
-                        milliseconds: 220,
-                      )
+                    ? const Duration(milliseconds: 220)
                     : Duration.zero,
                 child: const Icon(
                   Icons.keyboard_arrow_up_rounded,
@@ -479,9 +379,7 @@ class _AiMonthlyUsageCardWidgetState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(
-          height: 16,
-        ),
+        const SizedBox(height: 16),
 
         // ======================================================
         // STATUS
@@ -494,17 +392,13 @@ class _AiMonthlyUsageCardWidgetState
           isLoadingQuota: isLoadingQuota,
         ),
 
-        const SizedBox(
-          height: 9,
-        ),
+        const SizedBox(height: 9),
 
         // ======================================================
         // CARREGANDO
         // ======================================================
         if (isLoadingQuota) ...[
-          _buildLoadingContent(
-            accentColor,
-          ),
+          _buildLoadingContent(accentColor),
         ] else ...[
           // ====================================================
           // BARRA
@@ -515,110 +409,61 @@ class _AiMonthlyUsageCardWidgetState
             height: 10,
           ),
 
-          const SizedBox(
-            height: 6,
-          ),
+          const SizedBox(height: 6),
 
           // ====================================================
           // MARCADORES
           // ====================================================
           const Row(
             children: [
-              Text(
-                '0%',
-                style: TextStyle(
-                  color: Colors.white24,
-                  fontSize: 9,
-                ),
-              ),
+              Text('0%', style: TextStyle(color: Colors.white24, fontSize: 9)),
 
               Spacer(),
 
-              Text(
-                '80%',
-                style: TextStyle(
-                  color: Colors.white24,
-                  fontSize: 9,
-                ),
-              ),
+              Text('80%', style: TextStyle(color: Colors.white24, fontSize: 9)),
 
-              SizedBox(
-                width: 24,
-              ),
+              SizedBox(width: 24),
 
-              Text(
-                '90%',
-                style: TextStyle(
-                  color: Colors.white24,
-                  fontSize: 9,
-                ),
-              ),
+              Text('90%', style: TextStyle(color: Colors.white24, fontSize: 9)),
 
-              SizedBox(
-                width: 18,
-              ),
+              SizedBox(width: 18),
 
               Text(
                 '100%',
-                style: TextStyle(
-                  color: Colors.white24,
-                  fontSize: 9,
-                ),
+                style: TextStyle(color: Colors.white24, fontSize: 9),
               ),
             ],
           ),
 
-          const SizedBox(
-            height: 12,
-          ),
+          const SizedBox(height: 12),
 
           // ====================================================
           // MENSAGEM
           // ====================================================
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(
-              horizontal: 12,
-              vertical: 10,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
-              color: accentColor.withOpacity(
-                0.06,
-              ),
-              borderRadius: BorderRadius.circular(
-                10,
-              ),
-              border: Border.all(
-                color: accentColor.withOpacity(
-                  0.12,
-                ),
-              ),
+              color: accentColor.withOpacity(0.06),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: accentColor.withOpacity(0.12)),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Icon(
                   Icons.info_outline_rounded,
-                  color: accentColor.withOpacity(
-                    0.90,
-                  ),
+                  color: accentColor.withOpacity(0.90),
                   size: 15,
                 ),
 
-                const SizedBox(
-                  width: 8,
-                ),
+                const SizedBox(width: 8),
 
                 Expanded(
                   child: Text(
-                    _normalizeMessage(
-                      message,
-                      percentage,
-                    ),
+                    _normalizeMessage(message, percentage),
                     style: TextStyle(
-                      color: accentColor.withOpacity(
-                        0.92,
-                      ),
+                      color: accentColor.withOpacity(0.92),
                       fontSize: 11,
                       height: 1.35,
                       fontWeight: FontWeight.w500,
@@ -629,9 +474,7 @@ class _AiMonthlyUsageCardWidgetState
             ),
           ),
 
-          const SizedBox(
-            height: 14,
-          ),
+          const SizedBox(height: 14),
 
           // ====================================================
           // TOKENS
@@ -641,35 +484,25 @@ class _AiMonthlyUsageCardWidgetState
               Expanded(
                 child: _buildMetric(
                   label: 'USADOS',
-                  value: _formatTokens(
-                    usedTokens,
-                  ),
+                  value: _formatTokens(usedTokens),
                 ),
               ),
 
-              const SizedBox(
-                width: 8,
-              ),
+              const SizedBox(width: 8),
 
               Expanded(
                 child: _buildMetric(
                   label: 'RESTANTES',
-                  value: _formatTokens(
-                    remainingTokens,
-                  ),
+                  value: _formatTokens(remainingTokens),
                 ),
               ),
 
-              const SizedBox(
-                width: 8,
-              ),
+              const SizedBox(width: 8),
 
               Expanded(
                 child: _buildMetric(
                   label: 'LIMITE',
-                  value: _formatTokens(
-                    limitTokens,
-                  ),
+                  value: _formatTokens(limitTokens),
                 ),
               ),
             ],
@@ -708,9 +541,7 @@ class _AiMonthlyUsageCardWidgetState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(
-          height: 12,
-        ),
+        const SizedBox(height: 12),
 
         // ======================================================
         // STATUS
@@ -723,18 +554,13 @@ class _AiMonthlyUsageCardWidgetState
           isLoadingQuota: isLoadingQuota,
         ),
 
-        const SizedBox(
-          height: 9,
-        ),
+        const SizedBox(height: 9),
 
         // ======================================================
         // BARRA
         // ======================================================
         if (isLoadingQuota)
-          _buildLoadingBar(
-            accentColor,
-            height: 7,
-          )
+          _buildLoadingBar(accentColor, height: 7)
         else
           _buildProgressBar(
             progress: progress,
@@ -761,17 +587,12 @@ class _AiMonthlyUsageCardWidgetState
         Icon(
           isLoadingQuota
               ? Icons.sync_rounded
-              : _iconForLevel(
-                  level,
-                  percentage,
-                ),
+              : _iconForLevel(level, percentage),
           size: 15,
           color: accentColor,
         ),
 
-        const SizedBox(
-          width: 7,
-        ),
+        const SizedBox(width: 7),
 
         Text(
           statusText,
@@ -795,21 +616,12 @@ class _AiMonthlyUsageCardWidgetState
     required double height,
   }) {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(
-        20,
-      ),
+      borderRadius: BorderRadius.circular(20),
       child: LinearProgressIndicator(
         value: progress,
         minHeight: height,
-        backgroundColor: Colors.white.withOpacity(
-          0.07,
-        ),
-        valueColor:
-            AlwaysStoppedAnimation<
-              Color
-            >(
-              accentColor,
-            ),
+        backgroundColor: Colors.white.withOpacity(0.07),
+        valueColor: AlwaysStoppedAnimation<Color>(accentColor),
       ),
     );
   }
@@ -818,39 +630,21 @@ class _AiMonthlyUsageCardWidgetState
   // CONTEÚDO DE CARREGAMENTO
   // ============================================================
 
-  Widget _buildLoadingContent(
-    Color accentColor,
-  ) {
+  Widget _buildLoadingContent(Color accentColor) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildLoadingBar(
-          accentColor,
-          height: 10,
-        ),
+        _buildLoadingBar(accentColor, height: 10),
 
-        const SizedBox(
-          height: 12,
-        ),
+        const SizedBox(height: 12),
 
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.symmetric(
-            horizontal: 12,
-            vertical: 10,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
-            color: accentColor.withOpacity(
-              0.05,
-            ),
-            borderRadius: BorderRadius.circular(
-              10,
-            ),
-            border: Border.all(
-              color: accentColor.withOpacity(
-                0.10,
-              ),
-            ),
+            color: accentColor.withOpacity(0.05),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: accentColor.withOpacity(0.10)),
           ),
           child: Row(
             children: [
@@ -863,9 +657,7 @@ class _AiMonthlyUsageCardWidgetState
                 ),
               ),
 
-              const SizedBox(
-                width: 9,
-              ),
+              const SizedBox(width: 9),
 
               const Expanded(
                 child: Text(
@@ -881,37 +673,19 @@ class _AiMonthlyUsageCardWidgetState
           ),
         ),
 
-        const SizedBox(
-          height: 14,
-        ),
+        const SizedBox(height: 14),
 
         const Row(
           children: [
-            Expanded(
-              child: _LoadingMetricPlaceholder(
-                label: 'USADOS',
-              ),
-            ),
+            Expanded(child: _LoadingMetricPlaceholder(label: 'USADOS')),
 
-            SizedBox(
-              width: 8,
-            ),
+            SizedBox(width: 8),
 
-            Expanded(
-              child: _LoadingMetricPlaceholder(
-                label: 'RESTANTES',
-              ),
-            ),
+            Expanded(child: _LoadingMetricPlaceholder(label: 'RESTANTES')),
 
-            SizedBox(
-              width: 8,
-            ),
+            SizedBox(width: 8),
 
-            Expanded(
-              child: _LoadingMetricPlaceholder(
-                label: 'LIMITE',
-              ),
-            ),
+            Expanded(child: _LoadingMetricPlaceholder(label: 'LIMITE')),
           ],
         ),
       ],
@@ -922,19 +696,12 @@ class _AiMonthlyUsageCardWidgetState
   // BARRA DE CARREGAMENTO
   // ============================================================
 
-  Widget _buildLoadingBar(
-    Color accentColor, {
-    required double height,
-  }) {
+  Widget _buildLoadingBar(Color accentColor, {required double height}) {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(
-        20,
-      ),
+      borderRadius: BorderRadius.circular(20),
       child: LinearProgressIndicator(
         minHeight: height,
-        backgroundColor: Colors.white.withOpacity(
-          0.07,
-        ),
+        backgroundColor: Colors.white.withOpacity(0.07),
         color: accentColor,
       ),
     );
@@ -944,23 +711,18 @@ class _AiMonthlyUsageCardWidgetState
   // EXPANDIR / RECOLHER
   // ============================================================
 
-  Future<
-    void
-  >
-  _toggleExpanded() async {
+  Future<void> _toggleExpanded() async {
     if (!_hasLoadedExpansionPreference) {
       return;
     }
 
     final nextIsExpanded = !_isExpanded;
 
-    setState(
-      () {
-        _animateExpansion = true;
+    setState(() {
+      _animateExpansion = true;
 
-        _isExpanded = nextIsExpanded;
-      },
-    );
+      _isExpanded = nextIsExpanded;
+    });
 
     final saved = await _uiPreferencesService.saveAiMonthlyCardExpanded(
       nextIsExpanded,
@@ -978,27 +740,13 @@ class _AiMonthlyUsageCardWidgetState
   // MÉTRICA
   // ============================================================
 
-  Widget _buildMetric({
-    required String label,
-    required String value,
-  }) {
+  Widget _buildMetric({required String label, required String value}) {
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 10,
-        vertical: 9,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(
-          0.18,
-        ),
-        borderRadius: BorderRadius.circular(
-          10,
-        ),
-        border: Border.all(
-          color: Colors.white.withOpacity(
-            0.04,
-          ),
-        ),
+        color: Colors.black.withOpacity(0.18),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.white.withOpacity(0.04)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1013,9 +761,7 @@ class _AiMonthlyUsageCardWidgetState
             ),
           ),
 
-          const SizedBox(
-            height: 3,
-          ),
+          const SizedBox(height: 3),
 
           Text(
             value,
@@ -1037,66 +783,40 @@ class _AiMonthlyUsageCardWidgetState
   // COR POR NÍVEL
   // ============================================================
 
-  Color _accentForLevel(
-    String level,
-    double percentage,
-  ) {
+  Color _accentForLevel(String level, double percentage) {
     final normalizedLevel = level.toLowerCase();
 
-    if (percentage >=
-            100 ||
-        normalizedLevel ==
-            'blocked') {
+    if (percentage >= 100 || normalizedLevel == 'blocked') {
       return Colors.redAccent;
     }
 
-    if (percentage >=
-            90 ||
-        normalizedLevel ==
-            'critical') {
+    if (percentage >= 90 || normalizedLevel == 'critical') {
       return Colors.orangeAccent;
     }
 
-    if (percentage >=
-            80 ||
-        normalizedLevel ==
-            'warning') {
+    if (percentage >= 80 || normalizedLevel == 'warning') {
       return Colors.amberAccent;
     }
 
-    return const Color(
-      0xFFE100FF,
-    );
+    return const Color(0xFFE100FF);
   }
 
   // ============================================================
   // ÍCONE POR NÍVEL
   // ============================================================
 
-  IconData _iconForLevel(
-    String level,
-    double percentage,
-  ) {
+  IconData _iconForLevel(String level, double percentage) {
     final normalizedLevel = level.toLowerCase();
 
-    if (percentage >=
-            100 ||
-        normalizedLevel ==
-            'blocked') {
+    if (percentage >= 100 || normalizedLevel == 'blocked') {
       return Icons.block_rounded;
     }
 
-    if (percentage >=
-            90 ||
-        normalizedLevel ==
-            'critical') {
+    if (percentage >= 90 || normalizedLevel == 'critical') {
       return Icons.warning_amber_rounded;
     }
 
-    if (percentage >=
-            80 ||
-        normalizedLevel ==
-            'warning') {
+    if (percentage >= 80 || normalizedLevel == 'warning') {
       return Icons.info_outline_rounded;
     }
 
@@ -1107,30 +827,18 @@ class _AiMonthlyUsageCardWidgetState
   // STATUS
   // ============================================================
 
-  String _statusText(
-    String level,
-    double percentage,
-  ) {
+  String _statusText(String level, double percentage) {
     final normalizedLevel = level.toLowerCase();
 
-    if (percentage >=
-            100 ||
-        normalizedLevel ==
-            'blocked') {
+    if (percentage >= 100 || normalizedLevel == 'blocked') {
       return 'Cota Versin utilizada';
     }
 
-    if (percentage >=
-            90 ||
-        normalizedLevel ==
-            'critical') {
+    if (percentage >= 90 || normalizedLevel == 'critical') {
       return 'Continuidade disponível';
     }
 
-    if (percentage >=
-            80 ||
-        normalizedLevel ==
-            'warning') {
+    if (percentage >= 80 || normalizedLevel == 'warning') {
       return 'Uso avançado';
     }
 
@@ -1141,24 +849,18 @@ class _AiMonthlyUsageCardWidgetState
   // MENSAGEM
   // ============================================================
 
-  String _normalizeMessage(
-    String message,
-    double percentage,
-  ) {
+  String _normalizeMessage(String message, double percentage) {
     final normalized = message.trim();
 
-    if (percentage >=
-        100) {
+    if (percentage >= 100) {
       return 'A cota Versin deste ciclo foi utilizada. Recursos locais continuam disponíveis.';
     }
 
-    if (percentage >=
-        90) {
+    if (percentage >= 90) {
       return 'Você pode conectar uma API própria para manter a IA sempre disponível.';
     }
 
-    if (percentage >=
-        80) {
+    if (percentage >= 80) {
       return 'Uso avançado da cota Versin neste ciclo.';
     }
 
@@ -1173,48 +875,33 @@ class _AiMonthlyUsageCardWidgetState
   // FORMATAR PERCENTUAL
   // ============================================================
 
-  static String _formatPercentage(
-    double percentage,
-  ) {
-    if (percentage ==
-        percentage.roundToDouble()) {
+  static String _formatPercentage(double percentage) {
+    if (percentage == percentage.roundToDouble()) {
       return percentage.toInt().toString();
     }
 
-    return percentage.toStringAsFixed(
-      1,
-    );
+    return percentage.toStringAsFixed(1);
   }
 
   // ============================================================
   // FORMATAR TOKENS
   // ============================================================
 
-  String _formatTokens(
-    int value,
-  ) {
-    if (value >=
-        1000000) {
-      final millions =
-          value /
-          1000000;
+  String _formatTokens(int value) {
+    if (value >= 1000000) {
+      final millions = value / 1000000;
 
-      if (millions ==
-          millions.roundToDouble()) {
+      if (millions == millions.roundToDouble()) {
         return '${millions.toInt()}M';
       }
 
       return '${millions.toStringAsFixed(1)}M';
     }
 
-    if (value >=
-        1000) {
-      final thousands =
-          value /
-          1000;
+    if (value >= 1000) {
+      final thousands = value / 1000;
 
-      if (thousands ==
-          thousands.roundToDouble()) {
+      if (thousands == thousands.roundToDouble()) {
         return '${thousands.toInt()}k';
       }
 
@@ -1229,43 +916,27 @@ class _AiMonthlyUsageCardWidgetState
 // LOADING METRIC PLACEHOLDER
 // ============================================================
 //
-// Usado somente enquanto ainda não existe uma quota local ou
-// resposta válida do backend.
+// Usado somente enquanto o AiQuotaController ainda está
+// restaurando o estado inicial da cota.
 //
-// Evita mostrar 0 como se fosse um dado confirmado.
+// Depois que isLoadingInitialQuota fica false, o card exibe os
+// valores disponíveis, inclusive 0 / 0 / 0.
 //
 // ============================================================
 
-class _LoadingMetricPlaceholder
-    extends
-        StatelessWidget {
+class _LoadingMetricPlaceholder extends StatelessWidget {
   final String label;
 
-  const _LoadingMetricPlaceholder({
-    required this.label,
-  });
+  const _LoadingMetricPlaceholder({required this.label});
 
   @override
-  Widget build(
-    BuildContext context,
-  ) {
+  Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 10,
-        vertical: 9,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(
-          0.18,
-        ),
-        borderRadius: BorderRadius.circular(
-          10,
-        ),
-        border: Border.all(
-          color: Colors.white.withOpacity(
-            0.04,
-          ),
-        ),
+        color: Colors.black.withOpacity(0.18),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.white.withOpacity(0.04)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1280,9 +951,7 @@ class _LoadingMetricPlaceholder
             ),
           ),
 
-          const SizedBox(
-            height: 3,
-          ),
+          const SizedBox(height: 3),
 
           const Text(
             '—',

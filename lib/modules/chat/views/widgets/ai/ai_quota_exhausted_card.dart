@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../models/ai_quota_warning_state.dart';
-import '../../services/ai_quota_warning_service.dart';
+import '../../../ai/models/ai_quota_warning_state.dart';
+import '../../../ai/services/quota/ai_quota_warning_service.dart';
 
 // ============================================================
 // AI QUOTA EXHAUSTED CARD

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'package:versin/modules/chat/controllers/chat_controller.dart';
+import 'package:versin/modules/chat/conversation/controllers/chat_controller.dart';
 
 // ============================================================
 // CHAT BOTTOM BAR

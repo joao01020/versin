@@ -10,6 +10,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 //
 // Responsabilidades:
 //
+// - decidir automaticamente o redirect correto;
 // - solicitar email de recuperação;
 // - atualizar a senha do usuário autenticado pela sessão
 //   de recuperação.
@@ -41,13 +42,71 @@ class PasswordRecoveryService {
            Supabase.instance.client;
 
   // ==========================================================
+  // PASSWORD RECOVERY REDIRECT
+  // ==========================================================
+  //
+  // WEB
+  //
+  // Desenvolvimento:
+  //
+  // http://localhost:8080/reset-password
+  //
+  // Produção:
+  //
+  // https://seu-dominio.com/reset-password
+  //
+  // Uri.base.origin permite que isso mude automaticamente
+  // conforme o domínio onde o Flutter Web estiver rodando.
+  //
+  //
+  // DESKTOP
+  //
+  // Linux / Windows / macOS:
+  //
+  // versin://auth/reset-password
+  //
+  // O sistema operacional precisa estar configurado para
+  // encaminhar o protocolo versin:// para o aplicativo.
+  //
+  // ==========================================================
+
+  String get passwordRecoveryRedirectUrl {
+    // ========================================================
+    // WEB
+    // ========================================================
+
+    if (kIsWeb) {
+      final origin = Uri.base.origin.trim();
+
+      if (origin.isEmpty) {
+        throw StateError(
+          'Não foi possível determinar a origem do aplicativo Web.',
+        );
+      }
+
+      return '$origin/reset-password';
+    }
+
+    // ========================================================
+    // DESKTOP / MOBILE
+    // ========================================================
+
+    return 'versin://auth/reset-password';
+  }
+
+  // ==========================================================
   // REQUEST PASSWORD RESET
   // ==========================================================
   //
   // Solicita ao Supabase o envio do email de recuperação.
   //
-  // redirectTo deve ser uma URL permitida nas configurações
-  // de autenticação do projeto Supabase.
+  // A URL de redirect é definida automaticamente pelo service.
+  //
+  // Portanto:
+  //
+  // - Controller não precisa saber a plataforma;
+  // - View não precisa saber a plataforma;
+  // - ForgotPasswordPage não recebe redirectTo.
   //
   // ==========================================================
 
@@ -56,9 +115,16 @@ class PasswordRecoveryService {
   >
   requestPasswordReset({
     required String email,
-    required String redirectTo,
   }) async {
+    // ========================================================
+    // NORMALIZAR EMAIL
+    // ========================================================
+
     final normalizedEmail = email.trim().toLowerCase();
+
+    // ========================================================
+    // VALIDAR EMAIL
+    // ========================================================
 
     if (normalizedEmail.isEmpty) {
       throw ArgumentError(
@@ -66,22 +132,45 @@ class PasswordRecoveryService {
       );
     }
 
-    if (redirectTo.trim().isEmpty) {
-      throw ArgumentError(
-        'redirectTo não pode ficar vazio.',
-      );
-    }
+    // ========================================================
+    // RESOLVER REDIRECT
+    // ========================================================
+
+    final redirectUrl = passwordRecoveryRedirectUrl;
+
+    // ========================================================
+    // LOG
+    // ========================================================
+
+    debugPrint(
+      '[PASSWORD RECOVERY SERVICE] '
+      'Solicitando recuperação de senha.',
+    );
+
+    debugPrint(
+      '[PASSWORD RECOVERY SERVICE] '
+      'Plataforma: '
+      '${kIsWeb ? 'WEB' : 'APP'}',
+    );
+
+    debugPrint(
+      '[PASSWORD RECOVERY SERVICE] '
+      'Redirect: $redirectUrl',
+    );
 
     try {
-      debugPrint(
-        '[PASSWORD RECOVERY SERVICE] '
-        'Solicitando recuperação de senha.',
-      );
+      // ======================================================
+      // SUPABASE
+      // ======================================================
 
       await _supabase.auth.resetPasswordForEmail(
         normalizedEmail,
-        redirectTo: redirectTo.trim(),
+        redirectTo: redirectUrl,
       );
+
+      // ======================================================
+      // SUCCESS
+      // ======================================================
 
       debugPrint(
         '[PASSWORD RECOVERY SERVICE] '
@@ -91,6 +180,10 @@ class PasswordRecoveryService {
       error,
       stackTrace
     ) {
+      // ======================================================
+      // AUTH ERROR
+      // ======================================================
+
       debugPrint(
         '[PASSWORD RECOVERY SERVICE] '
         'AuthException ao solicitar recuperação: '
@@ -107,6 +200,10 @@ class PasswordRecoveryService {
       error,
       stackTrace
     ) {
+      // ======================================================
+      // UNKNOWN ERROR
+      // ======================================================
+
       debugPrint(
         '[PASSWORD RECOVERY SERVICE] '
         'Erro inesperado ao solicitar recuperação: '
@@ -140,6 +237,16 @@ class PasswordRecoveryService {
   updatePassword({
     required String newPassword,
   }) async {
+    // ========================================================
+    // VALIDAR SENHA
+    // ========================================================
+    //
+    // Não usamos trim() aqui.
+    //
+    // Espaços podem fazer parte de uma senha válida.
+    //
+    // ========================================================
+
     if (newPassword.isEmpty) {
       throw ArgumentError(
         'Nova senha não pode ficar vazia.',
@@ -166,6 +273,10 @@ class PasswordRecoveryService {
         'Atualizando senha.',
       );
 
+      // ======================================================
+      // SESSION
+      // ======================================================
+
       final session = _supabase.auth.currentSession;
 
       if (session ==
@@ -175,11 +286,19 @@ class PasswordRecoveryService {
         );
       }
 
+      // ======================================================
+      // UPDATE USER
+      // ======================================================
+
       await _supabase.auth.updateUser(
         UserAttributes(
           password: newPassword,
         ),
       );
+
+      // ======================================================
+      // SUCCESS
+      // ======================================================
 
       debugPrint(
         '[PASSWORD RECOVERY SERVICE] '
@@ -189,6 +308,10 @@ class PasswordRecoveryService {
       error,
       stackTrace
     ) {
+      // ======================================================
+      // AUTH ERROR
+      // ======================================================
+
       debugPrint(
         '[PASSWORD RECOVERY SERVICE] '
         'AuthException ao atualizar senha: '
@@ -205,6 +328,10 @@ class PasswordRecoveryService {
       error,
       stackTrace
     ) {
+      // ======================================================
+      // UNKNOWN ERROR
+      // ======================================================
+
       debugPrint(
         '[PASSWORD RECOVERY SERVICE] '
         'Erro inesperado ao atualizar senha: '

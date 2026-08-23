@@ -23,9 +23,11 @@ import '../services/password_recovery_service.dart';
 // - conhece BuildContext;
 // - navega entre páginas;
 // - exibe SnackBar;
-// - acessa Supabase diretamente.
+// - acessa Supabase diretamente;
+// - decide URL de redirect;
+// - conhece Web, Linux, Windows ou macOS.
 //
-// A comunicação com Supabase fica exclusivamente no:
+// A decisão da URL de recuperação pertence ao:
 //
 // PasswordRecoveryService
 //
@@ -81,13 +83,31 @@ class PasswordRecoveryController
   // ==========================================================
   // REQUEST PASSWORD RESET
   // ==========================================================
+  //
+  // A UI informa somente o email.
+  //
+  // O controller:
+  //
+  // - normaliza;
+  // - valida;
+  // - controla loading;
+  // - chama o service.
+  //
+  // O service decide automaticamente:
+  //
+  // Web:
+  //   http(s)://host/reset-password
+  //
+  // Desktop:
+  //   versin://auth/reset-password
+  //
+  // ==========================================================
 
   Future<
     bool
   >
   requestReset({
     required String email,
-    required String redirectTo,
   }) async {
     // ========================================================
     // EVITA REQUISIÇÕES DUPLICADAS
@@ -98,7 +118,7 @@ class PasswordRecoveryController
     }
 
     // ========================================================
-    // NORMALIZA EMAIL
+    // NORMALIZAR EMAIL
     // ========================================================
 
     final normalizedEmail = email.trim().toLowerCase();
@@ -134,10 +154,16 @@ class PasswordRecoveryController
       // ======================================================
       // SERVICE
       // ======================================================
+      //
+      // O redirect não é mais informado aqui.
+      //
+      // PasswordRecoveryService resolve automaticamente
+      // de acordo com a plataforma.
+      //
+      // ======================================================
 
       await service.requestPasswordReset(
         email: normalizedEmail,
-        redirectTo: redirectTo,
       );
 
       // ======================================================
@@ -180,8 +206,7 @@ class PasswordRecoveryController
       // MENSAGEM GENÉRICA
       // ======================================================
       //
-      // Não informamos para a interface se determinado email
-      // existe ou não.
+      // Não informamos se determinado email existe.
       //
       // Isso evita enumeração de contas.
       //
@@ -216,8 +241,10 @@ class PasswordRecoveryController
     }
 
     // ========================================================
-    // NÃO USAMOS trim() NA SENHA
+    // VALIDAR NOVA SENHA
     // ========================================================
+    //
+    // Não usamos trim() na senha.
     //
     // Espaços podem fazer parte de uma senha válida.
     //
@@ -347,10 +374,20 @@ class PasswordRecoveryController
       return 'Informe um email válido.';
     }
 
+    final localPart = email.substring(
+      0,
+      atIndex,
+    );
+
     final domain = email.substring(
       atIndex +
           1,
     );
+
+    if (localPart.isEmpty ||
+        domain.isEmpty) {
+      return 'Informe um email válido.';
+    }
 
     if (!domain.contains(
       '.',
@@ -364,6 +401,12 @@ class PasswordRecoveryController
         domain.endsWith(
           '.',
         )) {
+      return 'Informe um email válido.';
+    }
+
+    if (domain.contains(
+      '..',
+    )) {
       return 'Informe um email válido.';
     }
 
@@ -413,11 +456,6 @@ class PasswordRecoveryController
   // ==========================================================
 
   void reset() {
-    if (_state ==
-        PasswordRecoveryState.initial) {
-      return;
-    }
-
     _setState(
       PasswordRecoveryState.initial,
     );
@@ -433,7 +471,8 @@ class PasswordRecoveryController
     _setState(
       PasswordRecoveryState(
         step: PasswordRecoveryStep.error,
-        errorMessage: message,
+
+        errorMessage: message.trim(),
       ),
     );
   }

@@ -1,7 +1,4 @@
-import 'package:flutter/foundation.dart'
-    show
-        debugPrint,
-        kIsWeb;
+import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -14,18 +11,12 @@ abstract class AuthRemoteDatasource {
   // EMAIL
   // ==========================================================
 
-  Future<
-    AuthResponse
-  >
-  signInWithEmail({
+  Future<AuthResponse> signInWithEmail({
     required String email,
     required String password,
   });
 
-  Future<
-    AuthResponse
-  >
-  signUpWithEmail({
+  Future<AuthResponse> signUpWithEmail({
     required String email,
     required String password,
     String? username,
@@ -36,71 +27,37 @@ abstract class AuthRemoteDatasource {
   // OAUTH
   // ==========================================================
 
-  Future<
-    void
-  >
-  signInWithOAuth(
-    OAuthProvider provider,
-  );
+  Future<void> signInWithOAuth(OAuthProvider provider);
 
   // ==========================================================
   // SESSÃO
   // ==========================================================
 
-  Future<
-    void
-  >
-  signOut();
+  Future<void> signOut();
 
-  Future<
-    User?
-  >
-  getCurrentUser();
+  Future<User?> getCurrentUser();
 
   // ==========================================================
   // PERFIL
   // ==========================================================
 
-  Future<
-    Map<
-      String,
-      dynamic
-    >?
-  >
-  getRemoteProfile(
-    String userId,
-  );
+  Future<Map<String, dynamic>?> getRemoteProfile(String userId);
 
-  Future<
-    String?
-  >
-  getArtistName(
-    String userId,
-  );
+  Future<String?> getArtistName(String userId);
 
-  Future<
-    void
-  >
-  saveArtistName({
+  Future<void> saveArtistName({
     required String userId,
     required String artistName,
   });
 
-  Future<
-    bool
-  >
-  isUsernameTaken(
-    String username,
-  );
+  Future<bool> isUsernameTaken(String username);
 }
 
 // ============================================================
 // IMPLEMENTAÇÃO
 // ============================================================
 
-class AuthRemoteDatasourceImpl
-    implements
-        AuthRemoteDatasource {
+class AuthRemoteDatasourceImpl implements AuthRemoteDatasource {
   final SupabaseClient _supabase = Supabase.instance.client;
 
   // ==========================================================
@@ -108,18 +65,13 @@ class AuthRemoteDatasourceImpl
   // ==========================================================
 
   @override
-  Future<
-    AuthResponse
-  >
-  signInWithEmail({
+  Future<AuthResponse> signInWithEmail({
     required String email,
     required String password,
   }) async {
     final normalizedEmail = email.trim().toLowerCase();
 
-    debugPrint(
-      '[VERSIN AUTH] Tentando login: $normalizedEmail',
-    );
+    debugPrint('[VERSIN AUTH] Tentando login: $normalizedEmail');
 
     try {
       final response = await _supabase.auth.signInWithPassword(
@@ -127,45 +79,25 @@ class AuthRemoteDatasourceImpl
         password: password,
       );
 
-      debugPrint(
-        '[VERSIN AUTH] Login realizado.',
-      );
+      debugPrint('[VERSIN AUTH] Login realizado.');
 
-      debugPrint(
-        '[VERSIN AUTH] User ID: ${response.user?.id}',
-      );
+      debugPrint('[VERSIN AUTH] User ID: ${response.user?.id}');
 
-      debugPrint(
-        '[VERSIN AUTH] Email: ${response.user?.email}',
-      );
+      debugPrint('[VERSIN AUTH] Email: ${response.user?.email}');
 
-      debugPrint(
-        '[VERSIN AUTH] Sessão: ${response.session != null}',
-      );
+      debugPrint('[VERSIN AUTH] Sessão: ${response.session != null}');
 
       return response;
-    } on AuthException catch (
-      error
-    ) {
-      debugPrint(
-        '[VERSIN AUTH] Login AuthException:',
-      );
+    } on AuthException catch (error) {
+      debugPrint('[VERSIN AUTH] Login AuthException:');
 
-      debugPrint(
-        '[VERSIN AUTH] Mensagem: ${error.message}',
-      );
+      debugPrint('[VERSIN AUTH] Mensagem: ${error.message}');
 
-      debugPrint(
-        '[VERSIN AUTH] Status: ${error.statusCode}',
-      );
+      debugPrint('[VERSIN AUTH] Status: ${error.statusCode}');
 
       rethrow;
-    } catch (
-      error
-    ) {
-      debugPrint(
-        '[VERSIN AUTH] Erro inesperado no login: $error',
-      );
+    } catch (error) {
+      debugPrint('[VERSIN AUTH] Erro inesperado no login: $error');
 
       rethrow;
     }
@@ -176,10 +108,7 @@ class AuthRemoteDatasourceImpl
   // ==========================================================
 
   @override
-  Future<
-    AuthResponse
-  >
-  signUpWithEmail({
+  Future<AuthResponse> signUpWithEmail({
     required String email,
     required String password,
     String? username,
@@ -187,35 +116,23 @@ class AuthRemoteDatasourceImpl
   }) async {
     final normalizedEmail = email.trim().toLowerCase();
 
-    debugPrint(
-      '[VERSIN AUTH] ========================================',
-    );
+    debugPrint('[VERSIN AUTH] ========================================');
 
-    debugPrint(
-      '[VERSIN AUTH] INICIANDO CADASTRO',
-    );
+    debugPrint('[VERSIN AUTH] INICIANDO CADASTRO');
 
-    debugPrint(
-      '[VERSIN AUTH] Email: $normalizedEmail',
-    );
+    debugPrint('[VERSIN AUTH] Email: $normalizedEmail');
 
-    debugPrint(
-      '[VERSIN AUTH] ========================================',
-    );
+    debugPrint('[VERSIN AUTH] ========================================');
 
     try {
       final response = await _supabase.auth.signUp(
         email: normalizedEmail,
         password: password,
         data: {
-          if (username !=
-                  null &&
-              username.trim().isNotEmpty)
+          if (username != null && username.trim().isNotEmpty)
             'username': username.trim(),
 
-          if (displayName !=
-                  null &&
-              displayName.trim().isNotEmpty)
+          if (displayName != null && displayName.trim().isNotEmpty)
             'display_name': displayName.trim(),
         },
       );
@@ -224,103 +141,58 @@ class AuthRemoteDatasourceImpl
 
       final session = response.session;
 
-      debugPrint(
-        '[VERSIN AUTH] Cadastro retornado pelo Supabase.',
-      );
+      debugPrint('[VERSIN AUTH] Cadastro retornado pelo Supabase.');
 
-      debugPrint(
-        '[VERSIN AUTH] User ID: ${user?.id}',
-      );
+      debugPrint('[VERSIN AUTH] User ID: ${user?.id}');
 
-      debugPrint(
-        '[VERSIN AUTH] Email: ${user?.email}',
-      );
+      debugPrint('[VERSIN AUTH] Email: ${user?.email}');
 
-      debugPrint(
-        '[VERSIN AUTH] Usuário criado: ${user != null}',
-      );
+      debugPrint('[VERSIN AUTH] Usuário criado: ${user != null}');
 
-      debugPrint(
-        '[VERSIN AUTH] Sessão criada: ${session != null}',
-      );
+      debugPrint('[VERSIN AUTH] Sessão criada: ${session != null}');
 
       debugPrint(
         '[VERSIN AUTH] Email confirmado: '
         '${user?.emailConfirmedAt != null}',
       );
 
-      if (user ==
-          null) {
-        debugPrint(
-          '[VERSIN AUTH] ATENÇÃO: Supabase não retornou usuário.',
-        );
+      if (user == null) {
+        debugPrint('[VERSIN AUTH] ATENÇÃO: Supabase não retornou usuário.');
       }
 
-      if (user !=
-              null &&
-          session ==
-              null) {
+      if (user != null && session == null) {
         debugPrint(
           '[VERSIN AUTH] Conta criada aguardando confirmação de email.',
         );
       }
 
-      if (user !=
-              null &&
-          session !=
-              null) {
-        debugPrint(
-          '[VERSIN AUTH] Conta criada e autenticada.',
-        );
+      if (user != null && session != null) {
+        debugPrint('[VERSIN AUTH] Conta criada e autenticada.');
       }
 
-      debugPrint(
-        '[VERSIN AUTH] ========================================',
-      );
+      debugPrint('[VERSIN AUTH] ========================================');
 
       return response;
-    } on AuthException catch (
-      error
-    ) {
-      debugPrint(
-        '[VERSIN AUTH] ========================================',
-      );
+    } on AuthException catch (error) {
+      debugPrint('[VERSIN AUTH] ========================================');
 
-      debugPrint(
-        '[VERSIN AUTH] CADASTRO FALHOU',
-      );
+      debugPrint('[VERSIN AUTH] CADASTRO FALHOU');
 
-      debugPrint(
-        '[VERSIN AUTH] Mensagem: ${error.message}',
-      );
+      debugPrint('[VERSIN AUTH] Mensagem: ${error.message}');
 
-      debugPrint(
-        '[VERSIN AUTH] Status: ${error.statusCode}',
-      );
+      debugPrint('[VERSIN AUTH] Status: ${error.statusCode}');
 
-      debugPrint(
-        '[VERSIN AUTH] ========================================',
-      );
+      debugPrint('[VERSIN AUTH] ========================================');
 
       rethrow;
-    } catch (
-      error
-    ) {
-      debugPrint(
-        '[VERSIN AUTH] ========================================',
-      );
+    } catch (error) {
+      debugPrint('[VERSIN AUTH] ========================================');
 
-      debugPrint(
-        '[VERSIN AUTH] ERRO INESPERADO NO CADASTRO',
-      );
+      debugPrint('[VERSIN AUTH] ERRO INESPERADO NO CADASTRO');
 
-      debugPrint(
-        '[VERSIN AUTH] $error',
-      );
+      debugPrint('[VERSIN AUTH] $error');
 
-      debugPrint(
-        '[VERSIN AUTH] ========================================',
-      );
+      debugPrint('[VERSIN AUTH] ========================================');
 
       rethrow;
     }
@@ -331,25 +203,77 @@ class AuthRemoteDatasourceImpl
   // ==========================================================
 
   @override
-  Future<
-    void
-  >
-  signInWithOAuth(
-    OAuthProvider provider,
-  ) async {
+  Future<void> signInWithOAuth(OAuthProvider provider) async {
+    // ========================================================
+    // REDIRECT OAUTH
+    // ========================================================
+    //
+    // WEB:
+    //
+    // O callback volta para a raiz do Versin:
+    //
+    // http://localhost:8080
+    //
+    // Em produção, Uri.base.origin passa automaticamente a
+    // representar o domínio real.
+    //
+    // A raiz é controlada pelo AuthWrapper, que decide entre:
+    //
+    // - LoginPage;
+    // - DashboardPage.
+    //
+    // Isso evita retornar diretamente para /dashboard antes de
+    // a sessão OAuth estar restaurada.
+    //
+    // DESKTOP:
+    //
+    // O callback utiliza o protocolo customizado do Versin:
+    //
+    // versin://auth/callback
+    //
+    // ========================================================
+
+    final redirectTo = kIsWeb ? Uri.base.origin : 'versin://auth/callback';
+
+    debugPrint(
+      '[VERSIN AUTH] '
+      'Iniciando OAuth com ${provider.name}.',
+    );
+
+    debugPrint(
+      '[VERSIN AUTH] '
+      'OAuth redirect: $redirectTo',
+    );
+
     try {
-      await _supabase.auth.signInWithOAuth(
+      final started = await _supabase.auth.signInWithOAuth(
         provider,
-        redirectTo: kIsWeb
-            ? null
-            : 'io.supabase.versin://callback',
+        redirectTo: redirectTo,
       );
-    } on AuthException catch (
-      error
-    ) {
+
       debugPrint(
-        '[VERSIN AUTH] OAuth falhou: ${error.message}',
+        '[VERSIN AUTH] '
+        'OAuth iniciado: $started',
       );
+    } on AuthException catch (error) {
+      debugPrint(
+        '[VERSIN AUTH] '
+        'OAuth falhou: ${error.message}',
+      );
+
+      debugPrint(
+        '[VERSIN AUTH] '
+        'Status: ${error.statusCode}',
+      );
+
+      rethrow;
+    } catch (error, stackTrace) {
+      debugPrint(
+        '[VERSIN AUTH] '
+        'Erro inesperado ao iniciar OAuth: $error',
+      );
+
+      debugPrint('$stackTrace');
 
       rethrow;
     }
@@ -360,22 +284,13 @@ class AuthRemoteDatasourceImpl
   // ==========================================================
 
   @override
-  Future<
-    void
-  >
-  signOut() async {
+  Future<void> signOut() async {
     try {
       await _supabase.auth.signOut();
 
-      debugPrint(
-        '[VERSIN AUTH] Logout realizado.',
-      );
-    } on AuthException catch (
-      error
-    ) {
-      debugPrint(
-        '[VERSIN AUTH] Logout falhou: ${error.message}',
-      );
+      debugPrint('[VERSIN AUTH] Logout realizado.');
+    } on AuthException catch (error) {
+      debugPrint('[VERSIN AUTH] Logout falhou: ${error.message}');
 
       rethrow;
     }
@@ -386,10 +301,7 @@ class AuthRemoteDatasourceImpl
   // ==========================================================
 
   @override
-  Future<
-    User?
-  >
-  getCurrentUser() async {
+  Future<User?> getCurrentUser() async {
     return _supabase.auth.currentUser;
   }
 
@@ -398,37 +310,20 @@ class AuthRemoteDatasourceImpl
   // ==========================================================
 
   @override
-  Future<
-    Map<
-      String,
-      dynamic
-    >?
-  >
-  getRemoteProfile(
-    String userId,
-  ) async {
+  Future<Map<String, dynamic>?> getRemoteProfile(String userId) async {
     try {
       return await _supabase
-          .from(
-            'profiles',
-          )
+          .from('profiles')
           .select(
             'username, '
             'artist_name, '
             'artist_name_updated_at, '
             'wallet_address',
           )
-          .eq(
-            'id',
-            userId,
-          )
+          .eq('id', userId)
           .maybeSingle();
-    } catch (
-      error
-    ) {
-      debugPrint(
-        '[VERSIN AUTH] Erro ao buscar perfil: $error',
-      );
+    } catch (error) {
+      debugPrint('[VERSIN AUTH] Erro ao buscar perfil: $error');
 
       rethrow;
     }
@@ -439,35 +334,21 @@ class AuthRemoteDatasourceImpl
   // ==========================================================
 
   @override
-  Future<
-    String?
-  >
-  getArtistName(
-    String userId,
-  ) async {
+  Future<String?> getArtistName(String userId) async {
     try {
       final result = await _supabase
-          .from(
-            'profiles',
-          )
-          .select(
-            'artist_name',
-          )
-          .eq(
-            'id',
-            userId,
-          )
+          .from('profiles')
+          .select('artist_name')
+          .eq('id', userId)
           .maybeSingle();
 
-      if (result ==
-          null) {
+      if (result == null) {
         return null;
       }
 
       final value = result['artist_name'];
 
-      if (value ==
-          null) {
+      if (value == null) {
         return null;
       }
 
@@ -478,12 +359,8 @@ class AuthRemoteDatasourceImpl
       }
 
       return artistName;
-    } catch (
-      error
-    ) {
-      debugPrint(
-        '[VERSIN AUTH] Erro ao buscar nome artístico: $error',
-      );
+    } catch (error) {
+      debugPrint('[VERSIN AUTH] Erro ao buscar nome artístico: $error');
 
       rethrow;
     }
@@ -494,61 +371,41 @@ class AuthRemoteDatasourceImpl
   // ==========================================================
 
   @override
-  Future<
-    void
-  >
-  saveArtistName({
+  Future<void> saveArtistName({
     required String userId,
     required String artistName,
   }) async {
     final normalizedArtistName = artistName.trim().replaceAll(
-      RegExp(
-        r'\s+',
-      ),
+      RegExp(r'\s+'),
       ' ',
     );
 
     if (normalizedArtistName.isEmpty) {
-      throw ArgumentError(
-        'O nome artístico não pode ser vazio.',
-      );
+      throw ArgumentError('O nome artístico não pode ser vazio.');
     }
 
     try {
-      await _supabase
-          .from(
-            'profiles',
-          )
-          .upsert(
-            {
-              'id': userId,
+      await _supabase.from('profiles').upsert({
+        'id': userId,
 
-              'artist_name': normalizedArtistName,
+        'artist_name': normalizedArtistName,
 
-              'artist_name_updated_at': DateTime.now().toUtc().toIso8601String(),
-            },
-            onConflict: 'id',
-          );
+        'artist_name_updated_at': DateTime.now().toUtc().toIso8601String(),
+      }, onConflict: 'id');
 
       debugPrint(
         '[VERSIN AUTH] Nome artístico salvo remotamente: '
         '$normalizedArtistName',
       );
-    } on PostgrestException catch (
-      error
-    ) {
+    } on PostgrestException catch (error) {
       debugPrint(
         '[VERSIN AUTH] Erro Supabase ao salvar '
         'nome artístico: ${error.message}',
       );
 
       rethrow;
-    } catch (
-      error
-    ) {
-      debugPrint(
-        '[VERSIN AUTH] Erro ao salvar nome artístico: $error',
-      );
+    } catch (error) {
+      debugPrint('[VERSIN AUTH] Erro ao salvar nome artístico: $error');
 
       rethrow;
     }
@@ -559,12 +416,7 @@ class AuthRemoteDatasourceImpl
   // ==========================================================
 
   @override
-  Future<
-    bool
-  >
-  isUsernameTaken(
-    String username,
-  ) async {
+  Future<bool> isUsernameTaken(String username) async {
     final normalizedUsername = username.trim().toLowerCase();
 
     if (normalizedUsername.isEmpty) {
@@ -573,26 +425,14 @@ class AuthRemoteDatasourceImpl
 
     try {
       final result = await _supabase
-          .from(
-            'profiles',
-          )
-          .select(
-            'username',
-          )
-          .eq(
-            'username',
-            normalizedUsername,
-          )
+          .from('profiles')
+          .select('username')
+          .eq('username', normalizedUsername)
           .maybeSingle();
 
-      return result !=
-          null;
-    } catch (
-      error
-    ) {
-      debugPrint(
-        '[VERSIN AUTH] Erro ao verificar username: $error',
-      );
+      return result != null;
+    } catch (error) {
+      debugPrint('[VERSIN AUTH] Erro ao verificar username: $error');
 
       rethrow;
     }

@@ -6,46 +6,34 @@ import '../controllers/password_recovery_controller.dart';
 // FORGOT PASSWORD PAGE
 // ============================================================
 
-class ForgotPasswordPage
-    extends
-        StatefulWidget {
+class ForgotPasswordPage extends StatefulWidget {
   // ==========================================================
-  // REDIRECT
+  // CONSTRUCTOR
   // ==========================================================
   //
-  // IMPORTANTE:
+  // A página não conhece mais a URL de redirect.
   //
-  // Essa URL precisa existir também na configuração de
-  // Redirect URLs do Supabase Auth.
+  // Essa decisão pertence ao PasswordRecoveryService:
   //
-  // Depois configuraremos o deep link do Versin para receber
-  // esse callback.
+  // Web:
+  //   ${Uri.base.origin}/reset-password
+  //
+  // App/Desktop:
+  //   versin://auth/reset-password
   //
   // ==========================================================
 
-  final String redirectTo;
-
-  const ForgotPasswordPage({
-    super.key,
-    this.redirectTo = 'versin://auth/reset-password',
-  });
+  const ForgotPasswordPage({super.key});
 
   @override
-  State<
-    ForgotPasswordPage
-  >
-  createState() => _ForgotPasswordPageState();
+  State<ForgotPasswordPage> createState() => _ForgotPasswordPageState();
 }
 
 // ============================================================
 // STATE
 // ============================================================
 
-class _ForgotPasswordPageState
-    extends
-        State<
-          ForgotPasswordPage
-        > {
+class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
   // ==========================================================
   // CONTROLLER
   // ==========================================================
@@ -60,17 +48,11 @@ class _ForgotPasswordPageState
   // COLORS
   // ==========================================================
 
-  static const Color deepBg = Color(
-    0xFF0D0B1F,
-  );
+  static const Color deepBg = Color(0xFF0D0B1F);
 
-  static const Color primaryPurple = Color(
-    0xFF6A1B9A,
-  );
+  static const Color primaryPurple = Color(0xFF6A1B9A);
 
-  static const Color accentNeon = Color(
-    0xFFE040FB,
-  );
+  static const Color accentNeon = Color(0xFFE040FB);
 
   // ==========================================================
   // INIT
@@ -82,9 +64,7 @@ class _ForgotPasswordPageState
 
     _controller = PasswordRecoveryController();
 
-    _controller.addListener(
-      _onControllerChanged,
-    );
+    _controller.addListener(_onControllerChanged);
   }
 
   // ==========================================================
@@ -96,9 +76,7 @@ class _ForgotPasswordPageState
       return;
     }
 
-    setState(
-      () {},
-    );
+    setState(() {});
   }
 
   // ==========================================================
@@ -107,9 +85,7 @@ class _ForgotPasswordPageState
 
   @override
   void dispose() {
-    _controller.removeListener(
-      _onControllerChanged,
-    );
+    _controller.removeListener(_onControllerChanged);
 
     _controller.dispose();
 
@@ -125,9 +101,7 @@ class _ForgotPasswordPageState
   // ==========================================================
 
   @override
-  Widget build(
-    BuildContext context,
-  ) {
+  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
       body: Container(
@@ -137,13 +111,7 @@ class _ForgotPasswordPageState
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
-              Color(
-                0xFF1A0B2E,
-              ),
-              deepBg,
-              Colors.black,
-            ],
+            colors: [Color(0xFF1A0B2E), deepBg, Colors.black],
           ),
         ),
         child: SafeArea(
@@ -158,9 +126,7 @@ class _ForgotPasswordPageState
                 child: IconButton(
                   tooltip: 'Voltar',
                   onPressed: () {
-                    Navigator.of(
-                      context,
-                    ).pop();
+                    Navigator.of(context).pop();
                   },
                   icon: const Icon(
                     Icons.arrow_back_rounded,
@@ -179,9 +145,7 @@ class _ForgotPasswordPageState
                     vertical: 32,
                   ),
                   child: ConstrainedBox(
-                    constraints: const BoxConstraints(
-                      maxWidth: 460,
-                    ),
+                    constraints: const BoxConstraints(maxWidth: 460),
                     child: _buildCard(),
                   ),
                 ),
@@ -200,37 +164,20 @@ class _ForgotPasswordPageState
   Widget _buildCard() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(
-        24,
-      ),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(
-          alpha: 0.035,
-        ),
-        borderRadius: BorderRadius.circular(
-          22,
-        ),
-        border: Border.all(
-          color: Colors.white.withValues(
-            alpha: 0.06,
-          ),
-        ),
+        color: Colors.white.withValues(alpha: 0.035),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(
-              alpha: 0.30,
-            ),
+            color: Colors.black.withValues(alpha: 0.30),
             blurRadius: 28,
-            offset: const Offset(
-              0,
-              12,
-            ),
+            offset: const Offset(0, 12),
           ),
         ],
       ),
-      child: _controller.emailSent
-          ? _buildSuccess()
-          : _buildForm(),
+      child: _controller.emailSent ? _buildSuccess() : _buildForm(),
     );
   }
 
@@ -250,17 +197,9 @@ class _ForgotPasswordPageState
           width: 48,
           height: 48,
           decoration: BoxDecoration(
-            color: primaryPurple.withValues(
-              alpha: 0.18,
-            ),
-            borderRadius: BorderRadius.circular(
-              14,
-            ),
-            border: Border.all(
-              color: accentNeon.withValues(
-                alpha: 0.25,
-              ),
-            ),
+            color: primaryPurple.withValues(alpha: 0.18),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: accentNeon.withValues(alpha: 0.25)),
           ),
           child: const Icon(
             Icons.lock_reset_rounded,
@@ -269,9 +208,7 @@ class _ForgotPasswordPageState
           ),
         ),
 
-        const SizedBox(
-          height: 18,
-        ),
+        const SizedBox(height: 18),
 
         // ====================================================
         // TITLE
@@ -285,23 +222,15 @@ class _ForgotPasswordPageState
           ),
         ),
 
-        const SizedBox(
-          height: 7,
-        ),
+        const SizedBox(height: 7),
 
         const Text(
           'Informe o email associado à sua conta. '
           'Enviaremos as instruções para criar uma nova senha.',
-          style: TextStyle(
-            color: Colors.white38,
-            fontSize: 12,
-            height: 1.5,
-          ),
+          style: TextStyle(color: Colors.white38, fontSize: 12, height: 1.5),
         ),
 
-        const SizedBox(
-          height: 24,
-        ),
+        const SizedBox(height: 24),
 
         // ====================================================
         // EMAIL
@@ -311,25 +240,15 @@ class _ForgotPasswordPageState
           focusNode: _emailFocusNode,
           enabled: !_controller.isLoading,
           keyboardType: TextInputType.emailAddress,
-          autofillHints: const [
-            AutofillHints.email,
-          ],
+          autofillHints: const [AutofillHints.email],
           textInputAction: TextInputAction.done,
-          onChanged:
-              (
-                _,
-              ) {
-                _controller.clearError();
-              },
-          onSubmitted:
-              (
-                _,
-              ) {
-                _submit();
-              },
-          style: const TextStyle(
-            color: Colors.white,
-          ),
+          onChanged: (_) {
+            _controller.clearError();
+          },
+          onSubmitted: (_) {
+            _submit();
+          },
+          style: const TextStyle(color: Colors.white),
           decoration: _inputDecoration(
             label: 'EMAIL',
             hint: 'voce@email.com',
@@ -341,15 +260,11 @@ class _ForgotPasswordPageState
         // ERROR
         // ====================================================
         if (_controller.hasError) ...[
-          const SizedBox(
-            height: 12,
-          ),
+          const SizedBox(height: 12),
           _buildError(),
         ],
 
-        const SizedBox(
-          height: 20,
-        ),
+        const SizedBox(height: 20),
 
         // ====================================================
         // SEND
@@ -358,28 +273,18 @@ class _ForgotPasswordPageState
           width: double.infinity,
           height: 52,
           child: ElevatedButton(
-            onPressed: _controller.isLoading
-                ? null
-                : _submit,
+            onPressed: _controller.isLoading ? null : _submit,
             style: ElevatedButton.styleFrom(
-              backgroundColor: primaryPurple.withValues(
-                alpha: 0.35,
-              ),
+              backgroundColor: primaryPurple.withValues(alpha: 0.35),
               foregroundColor: Colors.white,
-              disabledBackgroundColor: primaryPurple.withValues(
-                alpha: 0.10,
-              ),
+              disabledBackgroundColor: primaryPurple.withValues(alpha: 0.10),
               elevation: 0,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(
-                  14,
-                ),
+                borderRadius: BorderRadius.circular(14),
               ),
               side: BorderSide(
                 color: accentNeon.withValues(
-                  alpha: _controller.isLoading
-                      ? 0.12
-                      : 0.55,
+                  alpha: _controller.isLoading ? 0.12 : 0.55,
                 ),
               ),
             ),
@@ -400,9 +305,7 @@ class _ForgotPasswordPageState
                         color: accentNeon,
                         size: 18,
                       ),
-                      SizedBox(
-                        width: 10,
-                      ),
+                      SizedBox(width: 10),
                       Text(
                         'ENVIAR INSTRUÇÕES',
                         style: TextStyle(
@@ -416,9 +319,7 @@ class _ForgotPasswordPageState
           ),
         ),
 
-        const SizedBox(
-          height: 10,
-        ),
+        const SizedBox(height: 10),
 
         // ====================================================
         // BACK TO LOGIN
@@ -429,16 +330,11 @@ class _ForgotPasswordPageState
             onPressed: _controller.isLoading
                 ? null
                 : () {
-                    Navigator.of(
-                      context,
-                    ).pop();
+                    Navigator.of(context).pop();
                   },
             child: const Text(
               'Voltar para entrar',
-              style: TextStyle(
-                color: Colors.white54,
-                fontSize: 11,
-              ),
+              style: TextStyle(color: Colors.white54, fontSize: 11),
             ),
           ),
         ),
@@ -458,15 +354,9 @@ class _ForgotPasswordPageState
           width: 64,
           height: 64,
           decoration: BoxDecoration(
-            color: accentNeon.withValues(
-              alpha: 0.10,
-            ),
+            color: accentNeon.withValues(alpha: 0.10),
             shape: BoxShape.circle,
-            border: Border.all(
-              color: accentNeon.withValues(
-                alpha: 0.30,
-              ),
-            ),
+            border: Border.all(color: accentNeon.withValues(alpha: 0.30)),
           ),
           child: const Icon(
             Icons.mark_email_read_rounded,
@@ -475,9 +365,7 @@ class _ForgotPasswordPageState
           ),
         ),
 
-        const SizedBox(
-          height: 20,
-        ),
+        const SizedBox(height: 20),
 
         const Text(
           'Verifique seu email',
@@ -489,60 +377,38 @@ class _ForgotPasswordPageState
           ),
         ),
 
-        const SizedBox(
-          height: 10,
-        ),
+        const SizedBox(height: 10),
 
         const Text(
           'Se existir uma conta associada a esse email, '
           'você receberá as instruções para redefinir sua senha.',
           textAlign: TextAlign.center,
-          style: TextStyle(
-            color: Colors.white54,
-            fontSize: 12,
-            height: 1.5,
-          ),
+          style: TextStyle(color: Colors.white54, fontSize: 12, height: 1.5),
         ),
 
-        const SizedBox(
-          height: 8,
-        ),
+        const SizedBox(height: 8),
 
         const Text(
           'O link de recuperação pode expirar. '
           'Se necessário, solicite um novo.',
           textAlign: TextAlign.center,
-          style: TextStyle(
-            color: Colors.white30,
-            fontSize: 10,
-            height: 1.4,
-          ),
+          style: TextStyle(color: Colors.white30, fontSize: 10, height: 1.4),
         ),
 
-        const SizedBox(
-          height: 24,
-        ),
+        const SizedBox(height: 24),
 
         SizedBox(
           width: double.infinity,
           height: 48,
           child: OutlinedButton(
             onPressed: () {
-              Navigator.of(
-                context,
-              ).pop();
+              Navigator.of(context).pop();
             },
             style: OutlinedButton.styleFrom(
               foregroundColor: accentNeon,
-              side: BorderSide(
-                color: accentNeon.withValues(
-                  alpha: 0.30,
-                ),
-              ),
+              side: BorderSide(color: accentNeon.withValues(alpha: 0.30)),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(
-                  14,
-                ),
+                borderRadius: BorderRadius.circular(14),
               ),
             ),
             child: const Text(
@@ -566,21 +432,11 @@ class _ForgotPasswordPageState
   Widget _buildError() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(
-        11,
-      ),
+      padding: const EdgeInsets.all(11),
       decoration: BoxDecoration(
-        color: Colors.redAccent.withValues(
-          alpha: 0.08,
-        ),
-        borderRadius: BorderRadius.circular(
-          10,
-        ),
-        border: Border.all(
-          color: Colors.redAccent.withValues(
-            alpha: 0.18,
-          ),
-        ),
+        color: Colors.redAccent.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.redAccent.withValues(alpha: 0.18)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -591,14 +447,11 @@ class _ForgotPasswordPageState
             size: 17,
           ),
 
-          const SizedBox(
-            width: 8,
-          ),
+          const SizedBox(width: 8),
 
           Expanded(
             child: Text(
-              _controller.errorMessage ??
-                  'Não foi possível continuar.',
+              _controller.errorMessage ?? 'Não foi possível continuar.',
               style: const TextStyle(
                 color: Colors.white70,
                 fontSize: 10,
@@ -628,55 +481,27 @@ class _ForgotPasswordPageState
         fontSize: 10,
         letterSpacing: 1,
       ),
-      hintStyle: const TextStyle(
-        color: Colors.white24,
-        fontSize: 12,
-      ),
+      hintStyle: const TextStyle(color: Colors.white24, fontSize: 12),
       prefixIcon: Icon(
         icon,
-        color: accentNeon.withValues(
-          alpha: 0.70,
-        ),
+        color: accentNeon.withValues(alpha: 0.70),
         size: 19,
       ),
       filled: true,
-      fillColor: Colors.black.withValues(
-        alpha: 0.20,
-      ),
+      fillColor: Colors.black.withValues(alpha: 0.20),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(
-          14,
-        ),
-        borderSide: BorderSide(
-          color: Colors.white.withValues(
-            alpha: 0.07,
-          ),
-        ),
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.07)),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(
-          14,
-        ),
-        borderSide: BorderSide(
-          color: accentNeon.withValues(
-            alpha: 0.65,
-          ),
-        ),
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: accentNeon.withValues(alpha: 0.65)),
       ),
       errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(
-          14,
-        ),
-        borderSide: BorderSide(
-          color: Colors.redAccent.withValues(
-            alpha: 0.45,
-          ),
-        ),
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: Colors.redAccent.withValues(alpha: 0.45)),
       ),
-      contentPadding: const EdgeInsets.symmetric(
-        horizontal: 16,
-        vertical: 16,
-      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
     );
   }
 
@@ -684,17 +509,22 @@ class _ForgotPasswordPageState
   // SUBMIT
   // ==========================================================
 
-  Future<
-    void
-  >
-  _submit() async {
-    FocusScope.of(
-      context,
-    ).unfocus();
+  Future<void> _submit() async {
+    FocusScope.of(context).unfocus();
 
-    await _controller.requestReset(
-      email: _emailController.text,
-      redirectTo: widget.redirectTo,
-    );
+    // ========================================================
+    // REQUEST
+    // ========================================================
+    //
+    // A UI envia somente o email.
+    //
+    // O PasswordRecoveryService escolhe automaticamente:
+    //
+    // - Web -> ${Uri.base.origin}/reset-password
+    // - App -> versin://auth/reset-password
+    //
+    // ========================================================
+
+    await _controller.requestReset(email: _emailController.text);
   }
 }

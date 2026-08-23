@@ -1,39 +1,119 @@
 import 'package:flutter/material.dart';
-import 'package:versin/app/routes/app_routes.dart'; // IMPORTAÇÃO QUE FALTAVA ADICIONADA AQUI
-import 'package:versin/app/auth_wrapper.dart';
 
-/// [MyApp] é o chassi e orquestrador global da interface do aplicativo.
-/// Ele define as configurações básicas de inicialização, identidade visual
-/// e o ecossistema de navegação por rotas nomeadas.
+import 'package:versin/app/auth_wrapper.dart';
+import 'package:versin/app/routes/app_routes.dart';
+
+// ============================================================
+// MY APP
+// ============================================================
+//
+// Widget raiz da aplicação principal.
+//
+// Responsabilidades:
+//
+// - configurar o MaterialApp;
+// - definir o tema global;
+// - disponibilizar as rotas;
+// - iniciar o AuthWrapper;
+// - encaminhar o deep link inicial recebido pelo sistema.
+//
+// O processamento do deep link NÃO acontece aqui.
+//
+// O fluxo é:
+//
+// main.dart
+//     ↓
+// captura versin://...
+//     ↓
+// MyApp
+//     ↓
+// AuthWrapper
+//     ↓
+// Supabase getSessionFromUrl()
+//     ↓
+// AuthChangeEvent.passwordRecovery
+//     ↓
+// ResetPasswordPage
+//
+// ============================================================
+
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  // ==========================================================
+  // DEEP LINK INICIAL
+  // ==========================================================
+  //
+  // Exemplo:
+  //
+  // versin://auth/reset-password#access_token=...
+  //
+  // O main.dart é responsável apenas por capturar o URI.
+  //
+  // O AuthWrapper será responsável por processá-lo.
+  //
+  // ==========================================================
+
+  final Uri? initialDeepLink;
+
+  // ==========================================================
+  // CONSTRUTOR
+  // ==========================================================
+
+  const MyApp({super.key, this.initialDeepLink});
+
+  // ==========================================================
+  // BUILD
+  // ==========================================================
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      // ======================================================
+      // IDENTIDADE
+      // ======================================================
       title: 'Versin',
-      
-      // Remove a bandeira de debug no canto superior direito para um visual limpo
+
       debugShowCheckedModeBanner: false,
-      
-      // Configuração base do Tema (Identidade Visual)
+
+      // ======================================================
+      // TEMA
+      // ======================================================
       theme: ThemeData(
         useMaterial3: true,
+
         brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF0D0B1F), // Fundo padrão unificado
-        primaryColor: const Color(0xFFE040FB), // Cor primária (Roxo Hacker)
+
+        scaffoldBackgroundColor: const Color(0xFF0D0B1F),
+
+        primaryColor: const Color(0xFFE040FB),
+
         colorScheme: const ColorScheme.dark(
           primary: Color(0xFFE040FB),
+
           secondary: Color(0xFF00E5FF),
+
           surface: Color(0xFF0D0B1F),
         ),
       ),
 
-      // Ponto de Entrada Seguro: O app sempre inicia validando o estado
-      // de autenticação do usuário através do AuthWrapper.
-      home: const AuthWrapper(),
+      // ======================================================
+      // AUTH GATE
+      // ======================================================
+      //
+      // O AuthWrapper decide entre:
+      //
+      // - LoginPage;
+      // - DashboardPage;
+      // - ResetPasswordPage.
+      //
+      // Se o aplicativo foi iniciado através de um deep link,
+      // ele também será entregue ao AuthWrapper.
+      //
+      // ======================================================
+      home: AuthWrapper(initialDeepLink: initialDeepLink),
 
-      // Tabela descentralizada de caminhos de navegação (Rotas Nomeadas)
+      // ======================================================
+      // ROTAS
+      // ======================================================
       routes: AppRoutes.routes,
     );
   }

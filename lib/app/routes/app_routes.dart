@@ -1,10 +1,19 @@
 import 'package:flutter/material.dart';
 
 // ============================================================
-// LOGIN
+// APP
+// ============================================================
+
+import 'package:versin/app/auth_guard.dart';
+
+// ============================================================
+// LOGIN / AUTH
 // ============================================================
 
 import 'package:versin/modules/login/views/login_page.dart';
+
+import 'package:versin/modules/login/recovery/views/forgot_password_page.dart';
+import 'package:versin/modules/login/recovery/views/reset_password_page.dart';
 
 // ============================================================
 // DASHBOARD
@@ -71,15 +80,60 @@ import 'package:versin/modules/settings/views/settings_page.dart';
 // ============================================================
 // APP ROUTES
 // ============================================================
+//
+// Centraliza os nomes das rotas do Versin.
+//
+// As rotas são divididas em:
+//
+// PÚBLICAS:
+//
+// - login;
+// - recuperação de senha;
+// - redefinição de senha.
+//
+// PRIVADAS:
+//
+// - dashboard;
+// - contratos;
+// - calendário;
+// - chat;
+// - hub;
+// - match;
+// - wallet;
+// - royalties;
+// - market;
+// - storage;
+// - vnode;
+// - settings.
+//
+// As rotas privadas passam obrigatoriamente por:
+//
+// AuthGuard
+//
+// Portanto, acessar diretamente:
+//
+// http://localhost:8080/dashboard
+//
+// sem sessão válida NÃO abre mais o Dashboard.
+//
+// ============================================================
 
 class AppRoutes {
   AppRoutes._();
 
   // ==========================================================
-  // ROTAS PRINCIPAIS
+  // AUTH
   // ==========================================================
 
   static const String login = '/login';
+
+  static const String forgotPassword = '/forgot-password';
+
+  static const String resetPassword = '/reset-password';
+
+  // ==========================================================
+  // ROTAS PRINCIPAIS
+  // ==========================================================
 
   static const String dashboard = '/dashboard';
 
@@ -88,7 +142,7 @@ class AppRoutes {
   static const String calendar = '/calendar';
 
   // ==========================================================
-  // ROTAS DO ECOSSISTEMA
+  // ECOSSISTEMA
   // ==========================================================
 
   static const String chat = '/chat';
@@ -110,7 +164,7 @@ class AppRoutes {
   static const String settings = '/settings';
 
   // ==========================================================
-  // MAPA DE ROTAS
+  // ROUTES
   // ==========================================================
 
   static Map<
@@ -118,122 +172,178 @@ class AppRoutes {
     WidgetBuilder
   >
   get routes => {
-    // ====================================================
+    // ========================================================
+    // ROTAS PÚBLICAS
+    // ========================================================
+
+    // ========================================================
     // LOGIN
-    // ====================================================
+    // ========================================================
     login:
         (
           context,
         ) => const LoginPage(),
 
-    // ====================================================
+    // ========================================================
+    // FORGOT PASSWORD
+    // ========================================================
+    forgotPassword:
+        (
+          context,
+        ) => const ForgotPasswordPage(),
+
+    // ========================================================
+    // RESET PASSWORD
+    // ========================================================
+    //
+    // Precisa continuar pública porque o usuário ainda está
+    // entrando através de uma sessão especial de recovery.
+    //
+    // O Supabase/AuthWrapper continuam responsáveis por validar
+    // a sessão de recuperação.
+    //
+    // ========================================================
+    resetPassword:
+        (
+          context,
+        ) => const ResetPasswordPage(),
+
+    // ========================================================
+    // ROTAS PRIVADAS
+    // ========================================================
+    //
+    // Todas passam obrigatoriamente pelo AuthGuard.
+    //
+    // ========================================================
+
+    // ========================================================
     // DASHBOARD
-    // ====================================================
+    // ========================================================
     dashboard:
         (
           context,
-        ) => const DashboardPage(),
+        ) => const AuthGuard(
+          child: DashboardPage(),
+        ),
 
-    // ====================================================
-    // CONTRATOS
-    // ====================================================
+    // ========================================================
+    // CONTRACTS
+    // ========================================================
     contracts:
         (
           context,
-        ) => const ContractsPage(),
+        ) => const AuthGuard(
+          child: ContractsPage(),
+        ),
 
-    // ====================================================
-    // CALENDÁRIO
-    // ====================================================
-    //
-    // Novo módulo:
-    //
-    // lib/modules/calendar/views/calendar_page.dart
-    //
-    // Inclui:
-    //
-    // - eventos reais;
-    // - compromissos colaborativos;
-    // - convites;
-    // - anotações por dia;
-    // - Supabase.
-    //
-    // ====================================================
+    // ========================================================
+    // CALENDAR
+    // ========================================================
     calendar:
         (
           context,
-        ) => const CalendarPage(),
+        ) => const AuthGuard(
+          child: CalendarPage(),
+        ),
 
-    // ====================================================
-    // CHAT / IA
-    // ====================================================
+    // ========================================================
+    // CHAT
+    // ========================================================
     chat:
         (
           context,
-        ) => const ChatPage(),
+        ) => const AuthGuard(
+          child: ChatPage(),
+        ),
 
-    // ====================================================
+    // ========================================================
     // HUB
-    // ====================================================
+    // ========================================================
     hub:
         (
           context,
-        ) => const HubPage(),
+        ) => const AuthGuard(
+          child: HubPage(),
+        ),
 
-    // ====================================================
-    // MATCH / CONECTAR
-    // ====================================================
+    // ========================================================
+    // MATCH
+    // ========================================================
     match:
         (
           context,
-        ) => const MatchPage(),
+        ) => const AuthGuard(
+          child: MatchPage(),
+        ),
 
-    // ====================================================
+    // ========================================================
     // WALLET
-    // ====================================================
+    // ========================================================
     wallet:
         (
           context,
-        ) => const WalletPage(),
+        ) => const AuthGuard(
+          child: WalletPage(),
+        ),
 
-    // ====================================================
+    // ========================================================
     // ROYALTIES
-    // ====================================================
+    // ========================================================
     royalties:
         (
           context,
-        ) => const RoyaltiesPage(),
+        ) => const AuthGuard(
+          child: RoyaltiesPage(),
+        ),
 
-    // ====================================================
+    // ========================================================
     // MARKET
-    // ====================================================
+    // ========================================================
+    //
+    // MarketPage não está sendo criada como const no seu
+    // projeto atual, então o AuthGuard também não pode ser
+    // const nesta rota.
+    //
+    // ========================================================
     market:
         (
           context,
-        ) => MarketPage(),
+        ) => AuthGuard(
+          child: MarketPage(),
+        ),
 
-    // ====================================================
+    // ========================================================
     // STORAGE
-    // ====================================================
+    // ========================================================
     storage:
         (
           context,
-        ) => const StoragePage(),
+        ) => const AuthGuard(
+          child: StoragePage(),
+        ),
 
-    // ====================================================
+    // ========================================================
     // VNODE
-    // ====================================================
+    // ========================================================
+    //
+    // VNodePage também não está sendo criada como const.
+    //
+    // ========================================================
     vnode:
         (
           context,
-        ) => VNodePage(),
+        ) => AuthGuard(
+          child: VNodePage(),
+        ),
 
-    // ====================================================
+    // ========================================================
     // SETTINGS
-    // ====================================================
+    // ========================================================
     settings:
         (
           context,
-        ) => const SettingsPage(),
+        ) => const AuthGuard(
+          child: SettingsPage(),
+        ),
   };
 }

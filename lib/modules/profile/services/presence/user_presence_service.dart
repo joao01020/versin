@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
-import 'package:versin/modules/public_profile/repositories/public_profile_repository.dart';
+import 'package:versin/modules/profile/public_profile/repositories/public_profile_repository.dart';
 
 // ============================================================
 // USER PRESENCE SERVICE
@@ -46,7 +46,9 @@ import 'package:versin/modules/public_profile/repositories/public_profile_reposi
 //
 // ============================================================
 
-class UserPresenceService with WidgetsBindingObserver {
+class UserPresenceService
+    with
+        WidgetsBindingObserver {
   // ============================================================
   // CONFIGURAÇÃO
   // ============================================================
@@ -58,9 +60,13 @@ class UserPresenceService with WidgetsBindingObserver {
   //
   // ============================================================
 
-  static const Duration heartbeatInterval = Duration(seconds: 30);
+  static const Duration heartbeatInterval = Duration(
+    seconds: 30,
+  );
 
-  static const Duration presenceValidityWindow = Duration(seconds: 90);
+  static const Duration presenceValidityWindow = Duration(
+    seconds: 90,
+  );
 
   // ============================================================
   // DEPENDÊNCIAS
@@ -110,14 +116,23 @@ class UserPresenceService with WidgetsBindingObserver {
   //
   // ============================================================
 
-  final ValueNotifier<int> onlineAttentionRequest = ValueNotifier<int>(0);
+  final ValueNotifier<
+    int
+  >
+  onlineAttentionRequest =
+      ValueNotifier<
+        int
+      >(
+        0,
+      );
 
   // ============================================================
   // CONSTRUTOR
   // ============================================================
 
-  UserPresenceService({required PublicProfileRepository repository})
-    : _repository = repository;
+  UserPresenceService({
+    required PublicProfileRepository repository,
+  }) : _repository = repository;
 
   // ============================================================
   // GETTERS
@@ -136,7 +151,10 @@ class UserPresenceService with WidgetsBindingObserver {
   DateTime? get lastHeartbeatAt => _lastHeartbeatAt;
 
   bool get shouldSendHeartbeat =>
-      !_disposed && _started && _userWantsToAppearOnline && _appIsActive;
+      !_disposed &&
+      _started &&
+      _userWantsToAppearOnline &&
+      _appIsActive;
 
   // ============================================================
   // PRESENÇA REAL - ESTADO LOCAL
@@ -153,23 +171,30 @@ class UserPresenceService with WidgetsBindingObserver {
   // ============================================================
 
   bool get isReallyOnlineNow {
-    if (_disposed || !_started || !_userWantsToAppearOnline || !_appIsActive) {
+    if (_disposed ||
+        !_started ||
+        !_userWantsToAppearOnline ||
+        !_appIsActive) {
       return false;
     }
 
     final heartbeatAt = _lastHeartbeatAt;
 
-    if (heartbeatAt == null) {
+    if (heartbeatAt ==
+        null) {
       return false;
     }
 
-    final difference = DateTime.now().toUtc().difference(heartbeatAt.toUtc());
+    final difference = DateTime.now().toUtc().difference(
+      heartbeatAt.toUtc(),
+    );
 
     if (difference.isNegative) {
       return true;
     }
 
-    return difference <= presenceValidityWindow;
+    return difference <=
+        presenceValidityWindow;
   }
 
   // ============================================================
@@ -185,8 +210,14 @@ class UserPresenceService with WidgetsBindingObserver {
   //
   // ============================================================
 
-  Future<bool> ensureReallyOnline() async {
-    if (_disposed || !_started || !_userWantsToAppearOnline || !_appIsActive) {
+  Future<
+    bool
+  >
+  ensureReallyOnline() async {
+    if (_disposed ||
+        !_started ||
+        !_userWantsToAppearOnline ||
+        !_appIsActive) {
       return false;
     }
 
@@ -206,7 +237,9 @@ class UserPresenceService with WidgetsBindingObserver {
       return;
     }
 
-    onlineAttentionRequest.value = onlineAttentionRequest.value + 1;
+    onlineAttentionRequest.value =
+        onlineAttentionRequest.value +
+        1;
 
     debugPrint(
       '[PRESENCE] '
@@ -232,7 +265,12 @@ class UserPresenceService with WidgetsBindingObserver {
   //
   // ============================================================
 
-  Future<void> start({required bool wantsToAppearOnline}) async {
+  Future<
+    void
+  >
+  start({
+    required bool wantsToAppearOnline,
+  }) async {
     if (_disposed) {
       return;
     }
@@ -242,7 +280,9 @@ class UserPresenceService with WidgetsBindingObserver {
     if (!_started) {
       _started = true;
 
-      WidgetsBinding.instance.addObserver(this);
+      WidgetsBinding.instance.addObserver(
+        this,
+      );
     }
 
     _appIsActive = _resolveCurrentAppActiveState();
@@ -278,13 +318,20 @@ class UserPresenceService with WidgetsBindingObserver {
   //
   // ============================================================
 
-  Future<void> setOnlinePreference(bool value) async {
+  Future<
+    void
+  >
+  setOnlinePreference(
+    bool value,
+  ) async {
     if (_disposed) {
       return;
     }
 
-    if (_userWantsToAppearOnline == value) {
-      if (value && shouldSendHeartbeat) {
+    if (_userWantsToAppearOnline ==
+        value) {
+      if (value &&
+          shouldSendHeartbeat) {
         await sendHeartbeat();
       }
 
@@ -336,7 +383,10 @@ class UserPresenceService with WidgetsBindingObserver {
   // HEARTBEAT
   // ============================================================
 
-  Future<void> sendHeartbeat() async {
+  Future<
+    void
+  >
+  sendHeartbeat() async {
     if (!shouldSendHeartbeat) {
       return;
     }
@@ -364,7 +414,10 @@ class UserPresenceService with WidgetsBindingObserver {
         '[PRESENCE] Heartbeat enviado: '
         '${_lastHeartbeatAt!.toIso8601String()}',
       );
-    } catch (error, stackTrace) {
+    } catch (
+      error,
+      stackTrace
+    ) {
       // ========================================================
       // IMPORTANTE
       // ========================================================
@@ -403,9 +456,14 @@ class UserPresenceService with WidgetsBindingObserver {
       return;
     }
 
-    _heartbeatTimer = Timer.periodic(heartbeatInterval, (_) {
-      sendHeartbeat();
-    });
+    _heartbeatTimer = Timer.periodic(
+      heartbeatInterval,
+      (
+        _,
+      ) {
+        sendHeartbeat();
+      },
+    );
   }
 
   void _cancelHeartbeatTimer() {
@@ -438,8 +496,11 @@ class UserPresenceService with WidgetsBindingObserver {
   // ============================================================
 
   @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (_disposed || !_started) {
+  void didChangeAppLifecycleState(
+    AppLifecycleState state,
+  ) {
+    if (_disposed ||
+        !_started) {
       return;
     }
 
@@ -503,11 +564,13 @@ class UserPresenceService with WidgetsBindingObserver {
   bool _resolveCurrentAppActiveState() {
     final lifecycleState = WidgetsBinding.instance.lifecycleState;
 
-    if (lifecycleState == null) {
+    if (lifecycleState ==
+        null) {
       return true;
     }
 
-    return lifecycleState == AppLifecycleState.resumed;
+    return lifecycleState ==
+        AppLifecycleState.resumed;
   }
 
   // ============================================================
@@ -528,7 +591,9 @@ class UserPresenceService with WidgetsBindingObserver {
     _cancelHeartbeatTimer();
 
     if (_started) {
-      WidgetsBinding.instance.removeObserver(this);
+      WidgetsBinding.instance.removeObserver(
+        this,
+      );
     }
 
     _started = false;
@@ -539,7 +604,9 @@ class UserPresenceService with WidgetsBindingObserver {
 
     _lastHeartbeatAt = null;
 
-    debugPrint('[PRESENCE] Service parado.');
+    debugPrint(
+      '[PRESENCE] Service parado.',
+    );
   }
 
   // ============================================================
@@ -556,7 +623,9 @@ class UserPresenceService with WidgetsBindingObserver {
     _cancelHeartbeatTimer();
 
     if (_started) {
-      WidgetsBinding.instance.removeObserver(this);
+      WidgetsBinding.instance.removeObserver(
+        this,
+      );
     }
 
     _started = false;
@@ -567,6 +636,8 @@ class UserPresenceService with WidgetsBindingObserver {
 
     onlineAttentionRequest.dispose();
 
-    debugPrint('[PRESENCE] Service descartado.');
+    debugPrint(
+      '[PRESENCE] Service descartado.',
+    );
   }
 }

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
 import 'package:versin/modules/chat/models/private_api_config.dart';
-import 'package:versin/modules/chat/services/ai_provider_service.dart';
-import 'package:versin/modules/chat/services/private_ai_client.dart';
-import 'package:versin/modules/chat/services/private_api_service.dart';
+import 'package:versin/modules/chat/ai/services/provider/ai_provider_service.dart';
+import 'package:versin/modules/chat/ai/services/private_api/private_ai_client.dart';
+import 'package:versin/modules/chat/ai/services/private_api/private_api_service.dart';
 
 // ============================================================
 // PRIVATE API SETTINGS PAGE

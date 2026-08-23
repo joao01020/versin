@@ -10,7 +10,7 @@ import 'package:versin/features/rhymes/presentation/controller/rhymes_controller
 // DASHBOARD
 // ============================================================
 
-import '../config/dashboard_menu_config.dart';
+import '../config/menu/dashboard_menu_config.dart';
 import '../controllers/dashboard_controller.dart';
 import '../layouts/dashboard_home_layout.dart';
 import '../navigation/dashboard_bottom_navigation.dart';
@@ -77,27 +77,44 @@ import 'package:versin/modules/networking/views/sub_features/chat_view.dart';
 //
 // ============================================================
 
-class DashboardPage extends StatefulWidget {
+class DashboardPage
+    extends
+        StatefulWidget {
   static const String routeName = '/';
 
-  const DashboardPage({super.key});
+  const DashboardPage({
+    super.key,
+  });
 
   @override
-  State<DashboardPage> createState() => _DashboardPageState();
+  State<
+    DashboardPage
+  >
+  createState() => _DashboardPageState();
 }
 
 // ============================================================
 // STATE
 // ============================================================
 
-class _DashboardPageState extends State<DashboardPage> {
+class _DashboardPageState
+    extends
+        State<
+          DashboardPage
+        > {
   // ============================================================
   // CONTROLLERS
   // ============================================================
 
-  final DashboardController _controller = sl<DashboardController>();
+  final DashboardController _controller =
+      sl<
+        DashboardController
+      >();
 
-  final RhymesController _rhymesController = sl<RhymesController>();
+  final RhymesController _rhymesController =
+      sl<
+        RhymesController
+      >();
 
   // ============================================================
   // GLOBAL CHAT
@@ -153,7 +170,9 @@ class _DashboardPageState extends State<DashboardPage> {
 
     final value = _controller.artistName.trim();
 
-    return value.isEmpty || value == 'Membro';
+    return value.isEmpty ||
+        value ==
+            'Membro';
   }
 
   // ============================================================
@@ -175,7 +194,9 @@ class _DashboardPageState extends State<DashboardPage> {
   void initState() {
     super.initState();
 
-    unawaited(_initializeDashboard());
+    unawaited(
+      _initializeDashboard(),
+    );
 
     _globalChatController = DashboardGlobalChatController()..init();
 
@@ -183,38 +204,55 @@ class _DashboardPageState extends State<DashboardPage> {
 
     _invitationController = DashboardInvitationController();
 
-    unawaited(_invitationController.init());
+    unawaited(
+      _invitationController.init(),
+    );
   }
 
   // ============================================================
   // INITIALIZE DASHBOARD
   // ============================================================
 
-  Future<void> _initializeDashboard() async {
+  Future<
+    void
+  >
+  _initializeDashboard() async {
     await _controller.init();
 
     if (!mounted) {
       return;
     }
 
-    if (_requiresDisplayName && _controller.currentIndex != 0) {
-      _controller.navigationTap(0);
+    if (_requiresDisplayName &&
+        _controller.currentIndex !=
+            0) {
+      _controller.navigationTap(
+        0,
+      );
     }
 
-    setState(() {});
+    setState(
+      () {},
+    );
 
     // Atualiza a quota real sem bloquear a abertura do Dashboard.
-    unawaited(_refreshAiQuota());
+    unawaited(
+      _refreshAiQuota(),
+    );
   }
 
   // ============================================================
   // REFRESH AI QUOTA
   // ============================================================
 
-  Future<void> _refreshAiQuota() async {
+  Future<
+    void
+  >
+  _refreshAiQuota() async {
     final user = _supabase.auth.currentUser;
 
-    if (user == null) {
+    if (user ==
+        null) {
       debugPrint(
         '[DASHBOARD] '
         'Quota não atualizada: usuário não autenticado.',
@@ -266,7 +304,8 @@ class _DashboardPageState extends State<DashboardPage> {
 
       final currentUserId = _supabase.auth.currentUser?.id.trim();
 
-      if (currentUserId != userId) {
+      if (currentUserId !=
+          userId) {
         debugPrint(
           '[DASHBOARD] '
           'Resposta de quota descartada: a conta autenticada mudou.',
@@ -284,7 +323,10 @@ class _DashboardPageState extends State<DashboardPage> {
         return;
       }
 
-      _rhymesController.updateAiQuotaFromMap(quota, notify: true);
+      _rhymesController.updateAiQuotaFromMap(
+        quota,
+        notify: true,
+      );
 
       debugPrint(
         '[DASHBOARD] '
@@ -305,7 +347,10 @@ class _DashboardPageState extends State<DashboardPage> {
         '[DASHBOARD] '
         'Limite: ${_rhymesController.aiLimitTokens}',
       );
-    } catch (error, stackTrace) {
+    } catch (
+      error,
+      stackTrace
+    ) {
       debugPrint(
         '[DASHBOARD] '
         'Não foi possível atualizar a quota real: $error',
@@ -316,7 +361,9 @@ class _DashboardPageState extends State<DashboardPage> {
         'Mantendo quota/cache atual.',
       );
 
-      debugPrint('$stackTrace');
+      debugPrint(
+        '$stackTrace',
+      );
     }
   }
 
@@ -324,7 +371,9 @@ class _DashboardPageState extends State<DashboardPage> {
   // NAVEGAÇÃO
   // ============================================================
 
-  void _onNavigationTap(int visibleIndex) {
+  void _onNavigationTap(
+    int visibleIndex,
+  ) {
     if (_requiresDisplayName) {
       _showCompleteNameMessage();
 
@@ -336,13 +385,18 @@ class _DashboardPageState extends State<DashboardPage> {
       visibleIndex: visibleIndex,
     );
 
-    if (originalIndex == null) {
+    if (originalIndex ==
+        null) {
       return;
     }
 
-    setState(() {
-      _controller.navigationTap(originalIndex);
-    });
+    setState(
+      () {
+        _controller.navigationTap(
+          originalIndex,
+        );
+      },
+    );
   }
 
   // ============================================================
@@ -354,7 +408,9 @@ class _DashboardPageState extends State<DashboardPage> {
       return;
     }
 
-    ScaffoldMessenger.of(context)
+    ScaffoldMessenger.of(
+        context,
+      )
       ..hideCurrentSnackBar()
       ..showSnackBar(
         const SnackBar(
@@ -377,7 +433,10 @@ class _DashboardPageState extends State<DashboardPage> {
   //
   // ============================================================
 
-  Future<void> _openCalendarPage() async {
+  Future<
+    void
+  >
+  _openCalendarPage() async {
     if (!mounted) {
       return;
     }
@@ -388,11 +447,16 @@ class _DashboardPageState extends State<DashboardPage> {
       return;
     }
 
-    await Navigator.of(context).push(
+    await Navigator.of(
+      context,
+    ).push(
       MaterialPageRoute(
-        builder: (_) {
-          return const CalendarPage();
-        },
+        builder:
+            (
+              _,
+            ) {
+              return const CalendarPage();
+            },
       ),
     );
 
@@ -400,7 +464,9 @@ class _DashboardPageState extends State<DashboardPage> {
       return;
     }
 
-    setState(() {});
+    setState(
+      () {},
+    );
   }
 
   // ============================================================
@@ -408,48 +474,66 @@ class _DashboardPageState extends State<DashboardPage> {
   // ============================================================
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(
+    BuildContext context,
+  ) {
     return AnimatedBuilder(
       animation: _controller,
 
-      builder: (context, _) {
-        return LayoutBuilder(
-          builder: (context, constraints) {
-            final isMobile = constraints.maxWidth < 800;
+      builder:
+          (
+            context,
+            _,
+          ) {
+            return LayoutBuilder(
+              builder:
+                  (
+                    context,
+                    constraints,
+                  ) {
+                    final isMobile =
+                        constraints.maxWidth <
+                        800;
 
-            final locked = _requiresDisplayName;
+                    final locked = _requiresDisplayName;
 
-            return Scaffold(
-              backgroundColor: Colors.black,
+                    return Scaffold(
+                      backgroundColor: Colors.black,
 
-              // ====================================================
-              // NAVEGAÇÃO MOBILE
-              // ====================================================
-              bottomNavigationBar: isMobile
-                  ? IgnorePointer(
-                      ignoring: locked,
+                      // ====================================================
+                      // NAVEGAÇÃO MOBILE
+                      // ====================================================
+                      bottomNavigationBar: isMobile
+                          ? IgnorePointer(
+                              ignoring: locked,
 
-                      child: AnimatedOpacity(
-                        duration: const Duration(milliseconds: 180),
-                        opacity: locked ? 0.28 : 1.0,
-                        child: DashboardBottomNavigation(
-                          controller: _controller,
-                          items: _visibleMenuItems,
-                          currentVisibleIndex: _visibleCurrentIndex,
-                          onTap: _onNavigationTap,
-                        ),
+                              child: AnimatedOpacity(
+                                duration: const Duration(
+                                  milliseconds: 180,
+                                ),
+                                opacity: locked
+                                    ? 0.28
+                                    : 1.0,
+                                child: DashboardBottomNavigation(
+                                  controller: _controller,
+                                  items: _visibleMenuItems,
+                                  currentVisibleIndex: _visibleCurrentIndex,
+                                  onTap: _onNavigationTap,
+                                ),
+                              ),
+                            )
+                          : null,
+
+                      // ====================================================
+                      // BODY
+                      // ====================================================
+                      body: _buildBody(
+                        isMobile: isMobile,
                       ),
-                    )
-                  : null,
-
-              // ====================================================
-              // BODY
-              // ====================================================
-              body: _buildBody(isMobile: isMobile),
+                    );
+                  },
             );
           },
-        );
-      },
     );
   }
 
@@ -457,13 +541,21 @@ class _DashboardPageState extends State<DashboardPage> {
   // BODY
   // ============================================================
 
-  Widget _buildBody({required bool isMobile}) {
+  Widget _buildBody({
+    required bool isMobile,
+  }) {
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [const Color(0xFF2E1A47), _controller.deepBg, Colors.black],
+          colors: [
+            const Color(
+              0xFF2E1A47,
+            ),
+            _controller.deepBg,
+            Colors.black,
+          ],
         ),
       ),
       child: Row(
@@ -476,8 +568,12 @@ class _DashboardPageState extends State<DashboardPage> {
               ignoring: _requiresDisplayName,
 
               child: AnimatedOpacity(
-                duration: const Duration(milliseconds: 180),
-                opacity: _requiresDisplayName ? 0.28 : 1.0,
+                duration: const Duration(
+                  milliseconds: 180,
+                ),
+                opacity: _requiresDisplayName
+                    ? 0.28
+                    : 1.0,
                 child: DashboardSideRail(
                   controller: _controller,
                   items: _visibleMenuItems,
@@ -497,9 +593,13 @@ class _DashboardPageState extends State<DashboardPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      DashboardHeaderWidget(controller: _controller),
+                      DashboardHeaderWidget(
+                        controller: _controller,
+                      ),
 
-                      Expanded(child: _buildPageView()),
+                      Expanded(
+                        child: _buildPageView(),
+                      ),
                     ],
                   ),
                 ),
@@ -549,7 +649,12 @@ class _DashboardPageState extends State<DashboardPage> {
   // OPEN INVITED PROJECT
   // ============================================================
 
-  Future<void> _openInvitedProject(String projectId) async {
+  Future<
+    void
+  >
+  _openInvitedProject(
+    String projectId,
+  ) async {
     if (_requiresDisplayName) {
       _showCompleteNameMessage();
 
@@ -558,15 +663,23 @@ class _DashboardPageState extends State<DashboardPage> {
 
     final normalizedProjectId = projectId.trim();
 
-    if (!mounted || normalizedProjectId.isEmpty) {
+    if (!mounted ||
+        normalizedProjectId.isEmpty) {
       return;
     }
 
-    await Navigator.of(context).push(
+    await Navigator.of(
+      context,
+    ).push(
       MaterialPageRoute(
-        builder: (_) {
-          return NetworkingSessionView(projectId: normalizedProjectId);
-        },
+        builder:
+            (
+              _,
+            ) {
+              return NetworkingSessionView(
+                projectId: normalizedProjectId,
+              );
+            },
       ),
     );
   }
@@ -575,7 +688,12 @@ class _DashboardPageState extends State<DashboardPage> {
   // OPEN GLOBAL CHAT
   // ============================================================
 
-  Future<void> _openGlobalChat(String projectId) async {
+  Future<
+    void
+  >
+  _openGlobalChat(
+    String projectId,
+  ) async {
     if (_requiresDisplayName) {
       _showCompleteNameMessage();
       return;
@@ -583,20 +701,30 @@ class _DashboardPageState extends State<DashboardPage> {
 
     final normalizedProjectId = projectId.trim();
 
-    if (!mounted || normalizedProjectId.isEmpty) {
+    if (!mounted ||
+        normalizedProjectId.isEmpty) {
       return;
     }
 
-    final prepared = _globalChatController.prepareOpen(normalizedProjectId);
+    final prepared = _globalChatController.prepareOpen(
+      normalizedProjectId,
+    );
 
     if (!prepared) {
       return;
     }
 
     try {
-      await Navigator.of(context).push(
+      await Navigator.of(
+        context,
+      ).push(
         MaterialPageRoute(
-          builder: (_) => ChatView(projectId: normalizedProjectId),
+          builder:
+              (
+                _,
+              ) => ChatView(
+                projectId: normalizedProjectId,
+              ),
         ),
       );
     } finally {
@@ -608,20 +736,35 @@ class _DashboardPageState extends State<DashboardPage> {
   // OPEN CALL
   // ============================================================
 
-  Future<void> _openCallPage(String projectId) async {
+  Future<
+    void
+  >
+  _openCallPage(
+    String projectId,
+  ) async {
     if (_requiresDisplayName) {
       _showCompleteNameMessage();
 
       return;
     }
 
-    if (!mounted || projectId.trim().isEmpty) {
+    if (!mounted ||
+        projectId.trim().isEmpty) {
       return;
     }
 
     await Navigator.of(
       context,
-    ).push(MaterialPageRoute(builder: (_) => CallView(projectId: projectId)));
+    ).push(
+      MaterialPageRoute(
+        builder:
+            (
+              _,
+            ) => CallView(
+              projectId: projectId,
+            ),
+      ),
+    );
   }
 
   // ============================================================
@@ -654,27 +797,42 @@ class _DashboardPageState extends State<DashboardPage> {
 
       physics: const NeverScrollableScrollPhysics(),
 
-      onPageChanged: (index) {
-        if (!mounted) {
-          return;
-        }
-
-        if (_requiresDisplayName && index != 0) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
+      onPageChanged:
+          (
+            index,
+          ) {
             if (!mounted) {
               return;
             }
 
-            _controller.navigationTap(0);
-          });
+            if (_requiresDisplayName &&
+                index !=
+                    0) {
+              WidgetsBinding.instance.addPostFrameCallback(
+                (
+                  _,
+                ) {
+                  if (!mounted) {
+                    return;
+                  }
 
-          return;
-        }
+                  _controller.navigationTap(
+                    0,
+                  );
+                },
+              );
 
-        setState(() {
-          _controller.handlePageChange(index);
-        });
-      },
+              return;
+            }
+
+            setState(
+              () {
+                _controller.handlePageChange(
+                  index,
+                );
+              },
+            );
+          },
 
       children: [
         // ======================================================

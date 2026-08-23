@@ -15,7 +15,7 @@ import 'package:versin/modules/match/services/match_location_consent_service.dar
 // ============================================================
 
 import 'package:versin/modules/match/controllers/match_controllers.dart';
-import 'package:versin/modules/match/controllers/match_search_controller.dart';
+import 'package:versin/modules/match/search/controllers/match_search_controller.dart';
 import 'package:versin/modules/match/data/repositories/match_repository.dart';
 import 'package:versin/modules/match/models/match_discovery_mode.dart';
 import 'package:versin/modules/match/models/match_filter_state.dart';
@@ -28,6 +28,14 @@ import 'package:versin/modules/match/availability/services/match_availability_se
 import 'package:versin/modules/match/availability/widgets/match_availability_card.dart';
 import 'package:versin/modules/match/availability/widgets/match_availability_duration_sheet.dart';
 
+// ============================================================
+// MATCH - TEAM EXPANSION
+// ============================================================
+
+import 'package:versin/modules/match/team_expansion/controllers/match_team_expansion_controller.dart';
+import 'package:versin/modules/match/team_expansion/services/match_team_invitation_service.dart';
+import 'package:versin/modules/match/team_expansion/widgets/team_expansion_notice.dart';
+
 import 'package:versin/modules/match/services/match_session_service.dart';
 import 'package:versin/modules/match/views/match_projects_view.dart';
 
@@ -38,9 +46,14 @@ import 'package:versin/modules/match/views/match_projects_view.dart';
 import 'package:versin/modules/match/widgets/connection_profile_card_widget.dart';
 import 'package:versin/modules/match/widgets/discovery_section_widget.dart';
 import 'package:versin/modules/match/widgets/match_filter_sheet.dart';
-import 'package:versin/modules/match/widgets/match_search_panel_widget.dart';
-import 'package:versin/modules/match/widgets/match_search_results_widget.dart';
-import 'package:versin/modules/match/widgets/profile_track_player_sheet.dart';
+import 'package:versin/modules/match/search/widgets/match_search_panel_widget.dart';
+import 'package:versin/modules/match/search/widgets/match_search_results_widget.dart';
+// ============================================================
+// MATCH - DEMO
+// ============================================================
+
+import 'package:versin/modules/match/demo/controllers/match_demo_controller.dart';
+import 'package:versin/modules/match/demo/widgets/profile_track_player_sheet.dart';
 
 // ============================================================
 // NETWORKING
@@ -87,7 +100,9 @@ import 'package:versin/modules/public_profile/views/public_profile_page.dart';
 //
 // ============================================================
 
-class MatchPage extends StatefulWidget {
+class MatchPage
+    extends
+        StatefulWidget {
   static const String routeName = '/match';
 
   // ============================================================
@@ -109,23 +124,36 @@ class MatchPage extends StatefulWidget {
 
   final String? targetProjectTitle;
 
-  const MatchPage({super.key, this.targetProjectId, this.targetProjectTitle});
+  const MatchPage({
+    super.key,
+    this.targetProjectId,
+    this.targetProjectTitle,
+  });
 
   bool get isTeamExpansionMode {
     final projectId = targetProjectId?.trim();
 
-    return projectId != null && projectId.isNotEmpty;
+    return projectId !=
+            null &&
+        projectId.isNotEmpty;
   }
 
   @override
-  State<MatchPage> createState() => _MatchPageState();
+  State<
+    MatchPage
+  >
+  createState() => _MatchPageState();
 }
 
 // ============================================================
 // STATE
 // ============================================================
 
-class _MatchPageState extends State<MatchPage> {
+class _MatchPageState
+    extends
+        State<
+          MatchPage
+        > {
   // ============================================================
   // CONTROLLERS
   // ============================================================
@@ -137,6 +165,10 @@ class _MatchPageState extends State<MatchPage> {
   late final ProfessionalProfileController _professionalProfileController;
 
   late final PublicProfileController _publicProfileController;
+
+  late final MatchTeamExpansionController _teamExpansionController;
+
+  late final MatchDemoController _demoController;
 
   // ============================================================
   // SERVICES
@@ -176,8 +208,13 @@ class _MatchPageState extends State<MatchPage> {
   // CONFIRMAR MODO POR PROXIMIDADE
   // ============================================================
 
-  Future<void> _confirmNearbyDiscovery() async {
-    if (!mounted || _isInitializingMatch || _sessionService.isRestarting) {
+  Future<
+    void
+  >
+  _confirmNearbyDiscovery() async {
+    if (!mounted ||
+        _isInitializingMatch ||
+        _sessionService.isRestarting) {
       return;
     }
 
@@ -186,8 +223,7 @@ class _MatchPageState extends State<MatchPage> {
     // ==========================================================
 
     try {
-      final alreadyAccepted = await _locationConsentService
-          .hasAcceptedNearbyLocation();
+      final alreadyAccepted = await _locationConsentService.hasAcceptedNearbyLocation();
 
       if (!mounted) {
         return;
@@ -199,11 +235,16 @@ class _MatchPageState extends State<MatchPage> {
           'Consentimento de localização já registrado.',
         );
 
-        await _changeDiscoveryMode(MatchDiscoveryMode.nearby);
+        await _changeDiscoveryMode(
+          MatchDiscoveryMode.nearby,
+        );
 
         return;
       }
-    } catch (error, stackTrace) {
+    } catch (
+      error,
+      stackTrace
+    ) {
       debugPrint(
         '[MATCH PAGE] '
         'Erro ao consultar consentimento: $error',
@@ -218,7 +259,9 @@ class _MatchPageState extends State<MatchPage> {
         return;
       }
 
-      ScaffoldMessenger.of(context)
+      ScaffoldMessenger.of(
+          context,
+        )
         ..hideCurrentSnackBar()
         ..showSnackBar(
           const SnackBar(
@@ -242,136 +285,181 @@ class _MatchPageState extends State<MatchPage> {
       'Exibindo confirmação inicial de localização.',
     );
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
+    final confirmed =
+        await showDialog<
+          bool
+        >(
+          context: context,
+          barrierDismissible: false,
 
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              backgroundColor: const Color(0xFF17132D),
-
-              surfaceTintColor: Colors.transparent,
-
-              title: const Text(
-                'Encontrar profissionais próximos',
-
-                style: TextStyle(
-                  color: Colors.white,
-
-                  fontSize: 16,
-
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-
-                crossAxisAlignment: CrossAxisAlignment.start,
-
-                children: [
-                  const Text(
-                    'Usamos sua localização apenas para '
-                    'encontrar profissionais próximos de você.\n\n'
-                    'Sua posição é usada para calcular a '
-                    'distância entre perfis e melhorar os '
-                    'resultados do modo Próximos.',
-
-                    style: TextStyle(
-                      color: Colors.white60,
-
-                      fontSize: 12,
-
-                      height: 1.5,
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
-                  Align(
-                    alignment: Alignment.centerLeft,
-
-                    child: TextButton.icon(
-                      onPressed: () async {
-                        await Navigator.of(dialogContext).push(
-                          MaterialPageRoute(
-                            builder: (_) {
-                              return const LocationPrivacyPage();
-                            },
+          builder:
+              (
+                dialogContext,
+              ) {
+                return StatefulBuilder(
+                  builder:
+                      (
+                        context,
+                        setDialogState,
+                      ) {
+                        return AlertDialog(
+                          backgroundColor: const Color(
+                            0xFF17132D,
                           ),
+
+                          surfaceTintColor: Colors.transparent,
+
+                          title: const Text(
+                            'Encontrar profissionais próximos',
+
+                            style: TextStyle(
+                              color: Colors.white,
+
+                              fontSize: 16,
+
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+
+                          content: Column(
+                            mainAxisSize: MainAxisSize.min,
+
+                            crossAxisAlignment: CrossAxisAlignment.start,
+
+                            children: [
+                              const Text(
+                                'Usamos sua localização apenas para '
+                                'encontrar profissionais próximos de você.\n\n'
+                                'Sua posição é usada para calcular a '
+                                'distância entre perfis e melhorar os '
+                                'resultados do modo Próximos.',
+
+                                style: TextStyle(
+                                  color: Colors.white60,
+
+                                  fontSize: 12,
+
+                                  height: 1.5,
+                                ),
+                              ),
+
+                              const SizedBox(
+                                height: 16,
+                              ),
+                              Align(
+                                alignment: Alignment.centerLeft,
+
+                                child: TextButton.icon(
+                                  onPressed: () async {
+                                    await Navigator.of(
+                                      dialogContext,
+                                    ).push(
+                                      MaterialPageRoute(
+                                        builder:
+                                            (
+                                              _,
+                                            ) {
+                                              return const LocationPrivacyPage();
+                                            },
+                                      ),
+                                    );
+                                  },
+
+                                  icon: const Icon(
+                                    Icons.open_in_new_rounded,
+                                    size: 15,
+                                  ),
+
+                                  label: const Text(
+                                    'Como usamos sua localização',
+                                  ),
+                                ),
+                              ),
+                              CheckboxListTile(
+                                contentPadding: EdgeInsets.zero,
+
+                                controlAffinity: ListTileControlAffinity.leading,
+
+                                value: accepted,
+
+                                activeColor: _matchController.accentNeon,
+
+                                checkColor: Colors.black,
+
+                                title: const Text(
+                                  'Confirmo que entendi e permito '
+                                  'o uso da minha localização para '
+                                  'encontrar profissionais próximos.',
+
+                                  style: TextStyle(
+                                    color: Colors.white70,
+
+                                    fontSize: 11,
+
+                                    height: 1.4,
+                                  ),
+                                ),
+
+                                onChanged:
+                                    (
+                                      value,
+                                    ) {
+                                      setDialogState(
+                                        () {
+                                          accepted =
+                                              value ??
+                                              false;
+                                        },
+                                      );
+                                    },
+                              ),
+                            ],
+                          ),
+
+                          actions: [
+                            TextButton(
+                              onPressed: () {
+                                Navigator.of(
+                                  dialogContext,
+                                ).pop(
+                                  false,
+                                );
+                              },
+
+                              child: const Text(
+                                'CANCELAR',
+                              ),
+                            ),
+
+                            FilledButton(
+                              onPressed: accepted
+                                  ? () {
+                                      Navigator.of(
+                                        dialogContext,
+                                      ).pop(
+                                        true,
+                                      );
+                                    }
+                                  : null,
+
+                              child: const Text(
+                                'CONTINUAR',
+                              ),
+                            ),
+                          ],
                         );
                       },
-
-                      icon: const Icon(Icons.open_in_new_rounded, size: 15),
-
-                      label: const Text('Como usamos sua localização'),
-                    ),
-                  ),
-                  CheckboxListTile(
-                    contentPadding: EdgeInsets.zero,
-
-                    controlAffinity: ListTileControlAffinity.leading,
-
-                    value: accepted,
-
-                    activeColor: _matchController.accentNeon,
-
-                    checkColor: Colors.black,
-
-                    title: const Text(
-                      'Confirmo que entendi e permito '
-                      'o uso da minha localização para '
-                      'encontrar profissionais próximos.',
-
-                      style: TextStyle(
-                        color: Colors.white70,
-
-                        fontSize: 11,
-
-                        height: 1.4,
-                      ),
-                    ),
-
-                    onChanged: (value) {
-                      setDialogState(() {
-                        accepted = value ?? false;
-                      });
-                    },
-                  ),
-                ],
-              ),
-
-              actions: [
-                TextButton(
-                  onPressed: () {
-                    Navigator.of(dialogContext).pop(false);
-                  },
-
-                  child: const Text('CANCELAR'),
-                ),
-
-                FilledButton(
-                  onPressed: accepted
-                      ? () {
-                          Navigator.of(dialogContext).pop(true);
-                        }
-                      : null,
-
-                  child: const Text('CONTINUAR'),
-                ),
-              ],
-            );
-          },
+                );
+              },
         );
-      },
-    );
 
     // ==========================================================
     // CANCELADO
     // ==========================================================
 
-    if (!mounted || confirmed != true) {
+    if (!mounted ||
+        confirmed !=
+            true) {
       debugPrint(
         '[MATCH PAGE] '
         'Consentimento de localização não confirmado.',
@@ -391,7 +479,10 @@ class _MatchPageState extends State<MatchPage> {
         '[MATCH PAGE] '
         'Consentimento de localização salvo.',
       );
-    } catch (error, stackTrace) {
+    } catch (
+      error,
+      stackTrace
+    ) {
       debugPrint(
         '[MATCH PAGE] '
         'Erro ao salvar consentimento: $error',
@@ -406,11 +497,15 @@ class _MatchPageState extends State<MatchPage> {
         return;
       }
 
-      ScaffoldMessenger.of(context)
+      ScaffoldMessenger.of(
+          context,
+        )
         ..hideCurrentSnackBar()
         ..showSnackBar(
           const SnackBar(
-            content: Text('Não foi possível salvar sua confirmação.'),
+            content: Text(
+              'Não foi possível salvar sua confirmação.',
+            ),
           ),
         );
 
@@ -425,7 +520,9 @@ class _MatchPageState extends State<MatchPage> {
     // ENTRAR NO MODO PRÓXIMOS
     // ==========================================================
 
-    await _changeDiscoveryMode(MatchDiscoveryMode.nearby);
+    await _changeDiscoveryMode(
+      MatchDiscoveryMode.nearby,
+    );
   }
 
   // ============================================================
@@ -440,17 +537,16 @@ class _MatchPageState extends State<MatchPage> {
 
   bool _isInitializingMatch = true;
 
-  bool _isLoadingDemo = false;
-
-  bool _isCreatingProjectInvitation = false;
-
   bool _usernameWasSeeded = false;
 
   // ============================================================
   // STREAM
   // ============================================================
 
-  StreamSubscription<String>? _matchSubscription;
+  StreamSubscription<
+    String
+  >?
+  _matchSubscription;
 
   // ============================================================
   // PAGE MODE
@@ -461,7 +557,9 @@ class _MatchPageState extends State<MatchPage> {
   String? get _targetProjectId {
     final value = widget.targetProjectId?.trim();
 
-    if (value == null || value.isEmpty) {
+    if (value ==
+            null ||
+        value.isEmpty) {
       return null;
     }
 
@@ -471,7 +569,9 @@ class _MatchPageState extends State<MatchPage> {
   String get _targetProjectTitle {
     final value = widget.targetProjectTitle?.trim();
 
-    if (value != null && value.isNotEmpty) {
+    if (value !=
+            null &&
+        value.isNotEmpty) {
       return value;
     }
 
@@ -485,7 +585,9 @@ class _MatchPageState extends State<MatchPage> {
   String? get _authenticatedUserId {
     final id = Supabase.instance.client.auth.currentUser?.id.trim();
 
-    if (id == null || id.isEmpty) {
+    if (id ==
+            null ||
+        id.isEmpty) {
       return null;
     }
 
@@ -511,7 +613,9 @@ class _MatchPageState extends State<MatchPage> {
       '${_targetProjectId != null ? " | projeto: $_targetProjectId" : ""}',
     );
 
-    unawaited(_initializeMatch());
+    unawaited(
+      _initializeMatch(),
+    );
   }
 
   // ============================================================
@@ -519,11 +623,20 @@ class _MatchPageState extends State<MatchPage> {
   // ============================================================
 
   void _setupDependencies() {
-    _matchController = sl<MatchController>();
+    _matchController =
+        sl<
+          MatchController
+        >();
 
-    _professionalProfileController = sl<ProfessionalProfileController>();
+    _professionalProfileController =
+        sl<
+          ProfessionalProfileController
+        >();
 
-    _matchRepository = sl<MatchRepository>();
+    _matchRepository =
+        sl<
+          MatchRepository
+        >();
 
     _matchSearchController = MatchSearchController(
       repository: _matchRepository,
@@ -544,11 +657,24 @@ class _MatchPageState extends State<MatchPage> {
       availabilityService: MatchAvailabilityService(),
     );
 
-    _presenceService = sl<UserPresenceService>();
+    _teamExpansionController = MatchTeamExpansionController(
+      invitationService: MatchTeamInvitationService(),
+      projectId: _targetProjectId,
+      projectTitle: _targetProjectTitle,
+    );
+
+    _presenceService =
+        sl<
+          UserPresenceService
+        >();
 
     _publicProfileController = PublicProfileController(
       repository: PublicProfileRepositoryImpl(),
       trackService: ProfileTrackService(),
+    );
+
+    _demoController = MatchDemoController(
+      publicProfileController: _publicProfileController,
     );
   }
 
@@ -557,25 +683,46 @@ class _MatchPageState extends State<MatchPage> {
   // ============================================================
 
   void _setupListeners() {
-    _matchController.addListener(_handleStateChange);
+    _matchController.addListener(
+      _handleStateChange,
+    );
 
-    _professionalProfileController.addListener(_handleStateChange);
+    _professionalProfileController.addListener(
+      _handleStateChange,
+    );
 
-    _matchSearchController.addListener(_handleStateChange);
+    _matchSearchController.addListener(
+      _handleStateChange,
+    );
 
-    _publicProfileController.addListener(_handleStateChange);
+    _publicProfileController.addListener(
+      _handleStateChange,
+    );
 
-    _availabilityController.addListener(_handleStateChange);
+    _availabilityController.addListener(
+      _handleStateChange,
+    );
+
+    _teamExpansionController.addListener(
+      _handleStateChange,
+    );
+
+    _demoController.addListener(
+      _handleStateChange,
+    );
 
     _matchSubscription = _matchController.matchEventStream.listen(
       _handleMatchEvent,
-      onError: (error) {
-        debugPrint(
-          '[MATCH PAGE] '
-          'Erro no stream: '
-          '$error',
-        );
-      },
+      onError:
+          (
+            error,
+          ) {
+            debugPrint(
+              '[MATCH PAGE] '
+              'Erro no stream: '
+              '$error',
+            );
+          },
     );
   }
 
@@ -590,7 +737,9 @@ class _MatchPageState extends State<MatchPage> {
 
     _syncUsernameFieldFromController();
 
-    setState(() {});
+    setState(
+      () {},
+    );
   }
 
   // ============================================================
@@ -608,7 +757,9 @@ class _MatchPageState extends State<MatchPage> {
       return;
     }
 
-    if (_usernameWasSeeded && _usernameController.text.trim() == username) {
+    if (_usernameWasSeeded &&
+        _usernameController.text.trim() ==
+            username) {
       return;
     }
 
@@ -616,7 +767,9 @@ class _MatchPageState extends State<MatchPage> {
 
     _usernameController.value = TextEditingValue(
       text: username,
-      selection: TextSelection.collapsed(offset: username.length),
+      selection: TextSelection.collapsed(
+        offset: username.length,
+      ),
     );
   }
 
@@ -624,11 +777,16 @@ class _MatchPageState extends State<MatchPage> {
   // INITIALIZE
   // ============================================================
 
-  Future<void> _initializeMatch() async {
+  Future<
+    void
+  >
+  _initializeMatch() async {
     if (mounted) {
-      setState(() {
-        _isInitializingMatch = true;
-      });
+      setState(
+        () {
+          _isInitializingMatch = true;
+        },
+      );
     }
 
     try {
@@ -639,7 +797,9 @@ class _MatchPageState extends State<MatchPage> {
       await _loadPublicProfile();
 
       await _availabilityController.initialize();
-    } catch (error) {
+    } catch (
+      error
+    ) {
       debugPrint(
         '[MATCH PAGE] '
         'Erro ao inicializar: '
@@ -647,9 +807,11 @@ class _MatchPageState extends State<MatchPage> {
       );
     } finally {
       if (mounted) {
-        setState(() {
-          _isInitializingMatch = false;
-        });
+        setState(
+          () {
+            _isInitializingMatch = false;
+          },
+        );
       }
     }
   }
@@ -658,10 +820,14 @@ class _MatchPageState extends State<MatchPage> {
   // LOAD PUBLIC PROFILE
   // ============================================================
 
-  Future<void> _loadPublicProfile() async {
+  Future<
+    void
+  >
+  _loadPublicProfile() async {
     final userId = _authenticatedUserId;
 
-    if (userId == null) {
+    if (userId ==
+        null) {
       debugPrint(
         '[PUBLIC PROFILE] '
         'Usuário não autenticado.',
@@ -670,11 +836,14 @@ class _MatchPageState extends State<MatchPage> {
       return;
     }
 
-    await _publicProfileController.load(userId: userId);
+    await _publicProfileController.load(
+      userId: userId,
+    );
 
     final profile = _publicProfileController.profile;
 
-    if (profile == null) {
+    if (profile ==
+        null) {
       debugPrint(
         '[PUBLIC PROFILE] '
         'Perfil não encontrado.',
@@ -732,43 +901,67 @@ class _MatchPageState extends State<MatchPage> {
   // USERNAME CHANGED
   // ============================================================
 
-  void _handleUsernameChanged(String value) {
+  void _handleUsernameChanged(
+    String value,
+  ) {
     _usernameDebounce?.cancel();
 
     _matchController.resetUsernameCheck();
 
-    final validationError = _matchController.validateUsername(value);
+    final validationError = _matchController.validateUsername(
+      value,
+    );
 
-    if (validationError != null) {
+    if (validationError !=
+        null) {
       // O próprio controller já exibirá o erro assim que
       // checkUsernameAvailability() for chamado.
       //
       // Fazemos a chamada imediatamente apenas para manter
       // a mensagem visual consistente.
-      unawaited(_matchController.checkUsernameAvailability(value));
+      unawaited(
+        _matchController.checkUsernameAvailability(
+          value,
+        ),
+      );
 
       return;
     }
 
-    _usernameDebounce = Timer(const Duration(milliseconds: 450), () {
-      if (!mounted) {
-        return;
-      }
+    _usernameDebounce = Timer(
+      const Duration(
+        milliseconds: 450,
+      ),
+      () {
+        if (!mounted) {
+          return;
+        }
 
-      unawaited(_matchController.checkUsernameAvailability(value));
-    });
+        unawaited(
+          _matchController.checkUsernameAvailability(
+            value,
+          ),
+        );
+      },
+    );
   }
 
   // ============================================================
   // SALVAR USERNAME
   // ============================================================
 
-  Future<void> _saveUsername() async {
-    if (!mounted || !_matchController.canSubmitUsername) {
+  Future<
+    void
+  >
+  _saveUsername() async {
+    if (!mounted ||
+        !_matchController.canSubmitUsername) {
       return;
     }
 
-    final saved = await _matchController.saveUsername(_usernameController.text);
+    final saved = await _matchController.saveUsername(
+      _usernameController.text,
+    );
 
     if (!mounted) {
       return;
@@ -784,41 +977,58 @@ class _MatchPageState extends State<MatchPage> {
     // ser o perfil profissional.
     _matchController.requestProfessionalProfileAttention();
 
-    setState(() {});
+    setState(
+      () {},
+    );
   }
 
   // ============================================================
   // OPEN PUBLIC PROFILE
   // ============================================================
 
-  Future<void> _openPublicProfile({bool highlightOnlineOnOpen = false}) async {
+  Future<
+    void
+  >
+  _openPublicProfile({
+    bool highlightOnlineOnOpen = false,
+  }) async {
     if (!_ensureMatchUnlockedForInteraction()) {
       return;
     }
 
     final userId = _authenticatedUserId;
 
-    if (userId == null || !mounted) {
+    if (userId ==
+            null ||
+        !mounted) {
       return;
     }
 
-    if (_publicProfileController.loadedUserId != userId) {
-      await _publicProfileController.load(userId: userId);
+    if (_publicProfileController.loadedUserId !=
+        userId) {
+      await _publicProfileController.load(
+        userId: userId,
+      );
     }
 
     if (!mounted) {
       return;
     }
 
-    await Navigator.of(context).push(
+    await Navigator.of(
+      context,
+    ).push(
       MaterialPageRoute(
-        builder: (_) {
-          return PublicProfilePage(
-            userId: userId,
-            controller: _publicProfileController,
-            highlightOnlineOnOpen: highlightOnlineOnOpen,
-          );
-        },
+        builder:
+            (
+              _,
+            ) {
+              return PublicProfilePage(
+                userId: userId,
+                controller: _publicProfileController,
+                highlightOnlineOnOpen: highlightOnlineOnOpen,
+              );
+            },
       ),
     );
 
@@ -833,16 +1043,27 @@ class _MatchPageState extends State<MatchPage> {
   // OPEN MATCH PROJECTS
   // ============================================================
 
-  Future<void> _openMatchProjects() async {
-    if (!mounted || !_ensureMatchUnlockedForInteraction()) {
+  Future<
+    void
+  >
+  _openMatchProjects() async {
+    if (!mounted ||
+        !_ensureMatchUnlockedForInteraction()) {
       return;
     }
 
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) {
-          return const MatchProjectsView();
-        },
+    await Navigator.of(
+      context,
+    ).push(
+      MaterialPageRoute<
+        void
+      >(
+        builder:
+            (
+              _,
+            ) {
+              return const MatchProjectsView();
+            },
       ),
     );
   }
@@ -869,26 +1090,24 @@ class _MatchPageState extends State<MatchPage> {
   //
   // ============================================================
 
-  Future<void> _openUserDemo(String userId) async {
+  Future<
+    void
+  >
+  _openUserDemo(
+    String userId,
+  ) async {
     if (!_ensureMatchUnlockedForInteraction()) {
       return;
     }
 
     final normalizedUserId = userId.trim();
 
-    // ==========================================================
-    // VALIDATION
-    // ==========================================================
-
-    if (normalizedUserId.isEmpty || !mounted) {
+    if (normalizedUserId.isEmpty ||
+        !mounted) {
       return;
     }
 
-    // ==========================================================
-    // PREVENT DUPLICATE REQUEST
-    // ==========================================================
-
-    if (_isLoadingDemo) {
+    if (_demoController.isLoading) {
       debugPrint(
         '[MATCH DEMO] '
         'Solicitação ignorada: '
@@ -898,117 +1117,39 @@ class _MatchPageState extends State<MatchPage> {
       return;
     }
 
-    // ==========================================================
-    // DISPLAY NAME
-    // ==========================================================
-
     final discoveryUser = _matchController.discoveryUser;
 
     final displayName =
-        discoveryUser != null && discoveryUser.id == normalizedUserId
-        ? discoveryUser.name
+        discoveryUser !=
+                null &&
+            discoveryUser.id ==
+                normalizedUserId &&
+            discoveryUser.name.trim().isNotEmpty
+        ? discoveryUser.name.trim()
         : 'Profissional';
 
-    // ==========================================================
-    // LOADING
-    // ==========================================================
-
-    setState(() {
-      _isLoadingDemo = true;
-    });
-
     try {
-      debugPrint(
-        '[MATCH DEMO] '
-        'Buscando demo de: '
-        '$normalizedUserId',
+      final demo = await _demoController.load(
+        userId: normalizedUserId,
       );
 
-      // ========================================================
-      // TRACK + PLAYBACK URL
-      // ========================================================
-      //
-      // IMPORTANTE:
-      //
-      // Não chamar:
-      //
-      // getFirstTrack()
-      // +
-      // getPlaybackUrl()
-      //
-      // separadamente aqui.
-      //
-      // Este método já retorna os dois de uma vez e deve gerar
-      // somente UMA URL temporária.
-      //
-      // ========================================================
-
-      final playback = await _publicProfileController
-          .getFirstTrackPlaybackForUser(userId: normalizedUserId);
-
-      if (!mounted) {
+      if (!mounted ||
+          demo ==
+              null) {
         return;
       }
-
-      // ========================================================
-      // NO TRACK
-      // ========================================================
-
-      if (playback == null) {
-        debugPrint(
-          '[MATCH DEMO] '
-          'Usuário sem demo.',
-        );
-
-        await ProfileTrackPlayerSheet.show(
-          context: context,
-          track: null,
-          playbackUrl: null,
-          displayName: displayName,
-          accentColor: _matchController.accentNeon,
-        );
-
-        return;
-      }
-
-      // ========================================================
-      // TRACK FOUND
-      // ========================================================
-
-      debugPrint(
-        '[MATCH DEMO] '
-        'Track encontrada: '
-        '${playback.track.title}',
-      );
-
-      // ========================================================
-      // URL
-      // ========================================================
-
-      if (!playback.hasUrl) {
-        debugPrint(
-          '[MATCH DEMO] '
-          'Playback URL indisponível.',
-        );
-      } else {
-        debugPrint(
-          '[MATCH DEMO] '
-          'Playback URL disponível.',
-        );
-      }
-
-      // ========================================================
-      // PLAYER
-      // ========================================================
 
       await ProfileTrackPlayerSheet.show(
         context: context,
-        track: playback.track,
-        playbackUrl: playback.url,
+        track: demo.track,
+        playbackUrl: demo.playbackUrl,
         displayName: displayName,
         accentColor: _matchController.accentNeon,
       );
-    } catch (error, stackTrace) {
+    } catch (
+      error,
+      stackTrace
+    ) {
       debugPrint(
         '[MATCH DEMO] '
         'Erro ao abrir demo: '
@@ -1025,17 +1166,18 @@ class _MatchPageState extends State<MatchPage> {
         return;
       }
 
-      ScaffoldMessenger.of(context)
+      ScaffoldMessenger.of(
+          context,
+        )
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          const SnackBar(content: Text('Não foi possível carregar a demo.')),
+          SnackBar(
+            content: Text(
+              _demoController.errorMessage ??
+                  'Não foi possível carregar a demo.',
+            ),
+          ),
         );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoadingDemo = false;
-        });
-      }
     }
   }
 
@@ -1043,202 +1185,104 @@ class _MatchPageState extends State<MatchPage> {
   // INVITE USER TO PROJECT
   // ============================================================
 
-  Future<bool> _inviteUserToProject(String userId) async {
+  Future<
+    bool
+  >
+  _inviteUserToProject(
+    String userId,
+  ) async {
     if (!_ensureMatchUnlockedForInteraction()) {
       return false;
     }
 
-    if (!mounted || !_isTeamExpansionMode || _isCreatingProjectInvitation) {
+    if (!mounted ||
+        !_isTeamExpansionMode) {
       return false;
     }
-
-    final projectId = _targetProjectId;
-
-    final currentUserId = _authenticatedUserId;
 
     final normalizedUserId = userId.trim();
 
-    if (projectId == null ||
-        projectId.isEmpty ||
-        currentUserId == null ||
-        currentUserId.isEmpty ||
-        normalizedUserId.isEmpty) {
+    if (normalizedUserId.isEmpty) {
       return false;
     }
 
-    if (normalizedUserId == currentUserId) {
-      return false;
-    }
+    final discoveryUser = _matchController.discoveryUser;
 
-    setState(() {
-      _isCreatingProjectInvitation = true;
-    });
+    final displayName =
+        discoveryUser !=
+                null &&
+            discoveryUser.id.trim() ==
+                normalizedUserId
+        ? discoveryUser.name.trim()
+        : '';
+
+    final resolvedName = displayName.isNotEmpty
+        ? displayName
+        : 'Profissional';
 
     try {
-      // ========================================================
-      // VALIDAR PROJETO
-      // ========================================================
-
-      final project = await Supabase.instance.client
-          .from('projects')
-          .select('id, title, members, founders, status')
-          .eq('id', projectId)
-          .maybeSingle();
-
-      if (project == null) {
-        _showInvitationMessage('Equipe não encontrada.', isError: true);
-
-        return false;
-      }
-
-      // ========================================================
-      // VALIDAR FUNDADOR
-      // ========================================================
-
-      final foundersRaw = project['founders'];
-
-      final founders = foundersRaw is Iterable
-          ? foundersRaw
-                .map((value) => value.toString().trim())
-                .where((value) => value.isNotEmpty)
-                .toSet()
-          : <String>{};
-
-      if (!founders.contains(currentUserId)) {
-        _showInvitationMessage(
-          'Somente fundadores podem convidar novos membros.',
-          isError: true,
-        );
-
-        return false;
-      }
-
-      // ========================================================
-      // JÁ É MEMBRO
-      // ========================================================
-
-      final membersRaw = project['members'];
-
-      final members = membersRaw is Iterable
-          ? membersRaw
-                .map((value) => value.toString().trim())
-                .where((value) => value.isNotEmpty)
-                .toSet()
-          : <String>{};
-
-      if (members.contains(normalizedUserId)) {
-        _showInvitationMessage(
-          'Este usuário já faz parte da equipe.',
-          isError: true,
-        );
-
-        return false;
-      }
-
-      // ========================================================
-      // CONVITE PENDENTE EXISTENTE
-      // ========================================================
-
-      final existingInvitation = await Supabase.instance.client
-          .from('project_invitations')
-          .select('id, status')
-          .eq('project_id', projectId)
-          .eq('invited_user_id', normalizedUserId)
-          .eq('status', 'pending')
-          .maybeSingle();
-
-      if (existingInvitation != null) {
-        _showInvitationMessage(
-          'Este usuário já possui um convite pendente.',
-          isError: true,
-        );
-
-        return false;
-      }
-
-      // ========================================================
-      // CRIAR CONVITE
-      // ========================================================
-
-      await Supabase.instance.client.from('project_invitations').insert({
-        'project_id': projectId,
-        'invited_by': currentUserId,
-        'invited_user_id': normalizedUserId,
-        'status': 'pending',
-      });
+      final result = await _teamExpansionController.invite(
+        userId: normalizedUserId,
+      );
 
       if (!mounted) {
-        return true;
+        return result.wasCreated;
       }
 
-      final discoveryUser = _matchController.discoveryUser;
+      switch (result.status) {
+        case MatchTeamInvitationStatus.invited:
+          _showInvitationMessage(
+            'Convite enviado para $resolvedName.',
+          );
 
-      final displayName =
-          discoveryUser != null && discoveryUser.id.trim() == normalizedUserId
-          ? discoveryUser.name.trim()
-          : '';
+          return true;
 
-      final resolvedName = displayName.isNotEmpty
-          ? displayName
-          : 'Profissional';
+        case MatchTeamInvitationStatus.alreadyPending:
+          _showInvitationMessage(
+            'Este usuário já possui um convite pendente.',
+            isError: true,
+          );
 
-      _showInvitationMessage('Convite enviado para $resolvedName.');
+          return false;
 
-      debugPrint(
-        '[MATCH PAGE] '
-        'Convite criado. '
-        'Projeto: $projectId | '
-        'Convidado: $normalizedUserId | '
-        'Convidado por: $currentUserId',
-      );
+        case MatchTeamInvitationStatus.alreadyMember:
+          _showInvitationMessage(
+            'Este usuário já faz parte da equipe.',
+            isError: true,
+          );
 
-      return true;
-    } on PostgrestException catch (error, stackTrace) {
-      debugPrint(
-        '[MATCH PAGE] '
-        'Erro Supabase ao criar convite: '
-        '${error.message}',
-      );
-
-      debugPrint(
-        '[MATCH PAGE] '
-        'Código: '
-        '${error.code}',
-      );
-
-      debugPrint('$stackTrace');
-
-      if (mounted) {
-        _showInvitationMessage(
-          'Não foi possível enviar o convite.',
-          isError: true,
-        );
+          return false;
       }
-
-      return false;
-    } catch (error, stackTrace) {
+    } catch (
+      error,
+      stackTrace
+    ) {
       debugPrint(
         '[MATCH PAGE] '
-        'Erro ao criar convite: '
+        'Erro ao convidar usuário para a equipe: '
         '$error',
       );
 
-      debugPrint('$stackTrace');
+      debugPrint(
+        '$stackTrace',
+      );
 
-      if (mounted) {
-        _showInvitationMessage(
-          'Não foi possível enviar o convite.',
-          isError: true,
-        );
+      if (!mounted) {
+        return false;
       }
+
+      final controllerMessage = _teamExpansionController.errorMessage?.trim();
+
+      _showInvitationMessage(
+        controllerMessage !=
+                    null &&
+                controllerMessage.isNotEmpty
+            ? controllerMessage
+            : 'Não foi possível enviar o convite.',
+        isError: true,
+      );
 
       return false;
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isCreatingProjectInvitation = false;
-        });
-      }
     }
   }
 
@@ -1246,20 +1290,29 @@ class _MatchPageState extends State<MatchPage> {
   // INVITATION MESSAGE
   // ============================================================
 
-  void _showInvitationMessage(String message, {bool isError = false}) {
+  void _showInvitationMessage(
+    String message, {
+    bool isError = false,
+  }) {
     if (!mounted) {
       return;
     }
 
-    ScaffoldMessenger.of(context)
+    ScaffoldMessenger.of(
+        context,
+      )
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
-          content: Text(message),
+          content: Text(
+            message,
+          ),
 
           backgroundColor: isError
               ? Colors.red.shade900
-              : const Color(0xFF4C1D95),
+              : const Color(
+                  0xFF4C1D95,
+                ),
         ),
       );
   }
@@ -1276,7 +1329,9 @@ class _MatchPageState extends State<MatchPage> {
   //
   // ============================================================
 
-  void _handleMatchEvent(String projectId) {
+  void _handleMatchEvent(
+    String projectId,
+  ) {
     if (!mounted) {
       return;
     }
@@ -1315,25 +1370,59 @@ class _MatchPageState extends State<MatchPage> {
   }
 
   // ============================================================
+  // SEARCH TOGGLE
+  // ============================================================
+
+  void _toggleSearchPanel() {
+    if (!mounted) {
+      return;
+    }
+
+    setState(
+      () {
+        _isSearchPanelOpen = !_isSearchPanelOpen;
+      },
+    );
+
+    if (_isSearchPanelOpen) {
+      _focusSearchField();
+
+      return;
+    }
+
+    _clearSearch();
+  }
+
+  // ============================================================
   // SEARCH FOCUS
   // ============================================================
 
   void _focusSearchField() {
-    Future.delayed(const Duration(milliseconds: 120), () {
-      if (!mounted || !_isSearchPanelOpen) {
-        return;
-      }
+    Future.delayed(
+      const Duration(
+        milliseconds: 120,
+      ),
+      () {
+        if (!mounted ||
+            !_isSearchPanelOpen) {
+          return;
+        }
 
-      _searchFocusNode.requestFocus();
-    });
+        _searchFocusNode.requestFocus();
+      },
+    );
   }
 
   // ============================================================
   // SEARCH CHANGED
   // ============================================================
 
-  void _handleSearchChanged(String value) {
-    _matchSearchController.onQueryChanged(value);
+  void _handleSearchChanged(
+    String value,
+  ) {
+    _matchSearchController.onQueryChanged(
+      value,
+    );
   }
 
   // ============================================================
@@ -1367,7 +1456,10 @@ class _MatchPageState extends State<MatchPage> {
   //
   // ============================================================
 
-  Future<bool> _ensureAvailabilityBeforeEntering() async {
+  Future<
+    bool
+  >
+  _ensureAvailabilityBeforeEntering() async {
     // ==========================================================
     // 1. EXIGIR PRESENÇA REAL
     // ==========================================================
@@ -1381,16 +1473,22 @@ class _MatchPageState extends State<MatchPage> {
     if (!reallyOnline) {
       _presenceService.requestOnlineAttention();
 
-      ScaffoldMessenger.of(context)
+      ScaffoldMessenger.of(
+          context,
+        )
         ..hideCurrentSnackBar()
         ..showSnackBar(
           const SnackBar(
             behavior: SnackBarBehavior.floating,
-            content: Text('Fique online primeiro para usar Disponíveis agora.'),
+            content: Text(
+              'Fique online primeiro para usar Disponíveis agora.',
+            ),
           ),
         );
 
-      await _openPublicProfile(highlightOnlineOnOpen: true);
+      await _openPublicProfile(
+        highlightOnlineOnOpen: true,
+      );
 
       if (!mounted) {
         return false;
@@ -1398,7 +1496,8 @@ class _MatchPageState extends State<MatchPage> {
 
       final onlineAfterProfile = await _presenceService.ensureReallyOnline();
 
-      if (!mounted || !onlineAfterProfile) {
+      if (!mounted ||
+          !onlineAfterProfile) {
         return false;
       }
     }
@@ -1420,7 +1519,9 @@ class _MatchPageState extends State<MatchPage> {
       accentColor: _matchController.accentNeon,
     );
 
-    if (!mounted || selectedMinutes == null) {
+    if (!mounted ||
+        selectedMinutes ==
+            null) {
       return false;
     }
 
@@ -1437,19 +1538,25 @@ class _MatchPageState extends State<MatchPage> {
     }
 
     if (!activated) {
-      ScaffoldMessenger.of(context)
+      ScaffoldMessenger.of(
+          context,
+        )
         ..hideCurrentSnackBar()
         ..showSnackBar(
           const SnackBar(
             behavior: SnackBarBehavior.floating,
-            content: Text('Não foi possível ativar sua disponibilidade.'),
+            content: Text(
+              'Não foi possível ativar sua disponibilidade.',
+            ),
           ),
         );
 
       return false;
     }
 
-    ScaffoldMessenger.of(context)
+    ScaffoldMessenger.of(
+        context,
+      )
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
@@ -1468,8 +1575,12 @@ class _MatchPageState extends State<MatchPage> {
   // ENCERRAR DISPONIBILIDADE
   // ============================================================
 
-  Future<void> _clearAvailability() async {
-    if (!mounted || _availabilityController.isLoading) {
+  Future<
+    void
+  >
+  _clearAvailability() async {
+    if (!mounted ||
+        _availabilityController.isLoading) {
       return;
     }
 
@@ -1480,32 +1591,43 @@ class _MatchPageState extends State<MatchPage> {
     }
 
     if (!cleared) {
-      ScaffoldMessenger.of(context)
+      ScaffoldMessenger.of(
+          context,
+        )
         ..hideCurrentSnackBar()
         ..showSnackBar(
           const SnackBar(
             behavior: SnackBarBehavior.floating,
-            content: Text('Não foi possível encerrar sua disponibilidade.'),
+            content: Text(
+              'Não foi possível encerrar sua disponibilidade.',
+            ),
           ),
         );
 
       return;
     }
 
-    if (_matchController.discoveryMode == MatchDiscoveryMode.global) {
-      await _sessionService.changeDiscoveryMode(MatchDiscoveryMode.compatible);
+    if (_matchController.discoveryMode ==
+        MatchDiscoveryMode.global) {
+      await _sessionService.changeDiscoveryMode(
+        MatchDiscoveryMode.compatible,
+      );
     }
 
     if (!mounted) {
       return;
     }
 
-    ScaffoldMessenger.of(context)
+    ScaffoldMessenger.of(
+        context,
+      )
       ..hideCurrentSnackBar()
       ..showSnackBar(
         const SnackBar(
           behavior: SnackBarBehavior.floating,
-          content: Text('Disponibilidade encerrada.'),
+          content: Text(
+            'Disponibilidade encerrada.',
+          ),
         ),
       );
   }
@@ -1514,34 +1636,51 @@ class _MatchPageState extends State<MatchPage> {
   // DISCOVERY MODE
   // ============================================================
 
-  Future<void> _changeDiscoveryMode(MatchDiscoveryMode mode) async {
+  Future<
+    void
+  >
+  _changeDiscoveryMode(
+    MatchDiscoveryMode mode,
+  ) async {
     if (!_ensureMatchUnlockedForInteraction()) {
       return;
     }
 
-    if (!mounted || _isInitializingMatch || _sessionService.isRestarting) {
+    if (!mounted ||
+        _isInitializingMatch ||
+        _sessionService.isRestarting) {
       return;
     }
 
-    if (mode == MatchDiscoveryMode.global) {
+    if (mode ==
+        MatchDiscoveryMode.global) {
       final canEnter = await _ensureAvailabilityBeforeEntering();
 
-      if (!mounted || !canEnter) {
+      if (!mounted ||
+          !canEnter) {
         return;
       }
     }
 
-    if (_matchController.discoveryMode == mode) {
+    if (_matchController.discoveryMode ==
+        mode) {
       return;
     }
 
-    setState(() {
-      _isInitializingMatch = true;
-    });
+    setState(
+      () {
+        _isInitializingMatch = true;
+      },
+    );
 
     try {
-      await _sessionService.changeDiscoveryMode(mode);
-    } catch (error, stackTrace) {
+      await _sessionService.changeDiscoveryMode(
+        mode,
+      );
+    } catch (
+      error,
+      stackTrace
+    ) {
       debugPrint(
         '[MATCH PAGE] '
         'Erro ao alterar modo de descoberta: '
@@ -1558,18 +1697,24 @@ class _MatchPageState extends State<MatchPage> {
         return;
       }
 
-      ScaffoldMessenger.of(context)
+      ScaffoldMessenger.of(
+          context,
+        )
         ..hideCurrentSnackBar()
         ..showSnackBar(
           const SnackBar(
-            content: Text('Não foi possível alterar o modo de descoberta.'),
+            content: Text(
+              'Não foi possível alterar o modo de descoberta.',
+            ),
           ),
         );
     } finally {
       if (mounted) {
-        setState(() {
-          _isInitializingMatch = false;
-        });
+        setState(
+          () {
+            _isInitializingMatch = false;
+          },
+        );
       }
     }
   }
@@ -1578,7 +1723,10 @@ class _MatchPageState extends State<MatchPage> {
   // FILTERS
   // ============================================================
 
-  Future<void> _openFilters() async {
+  Future<
+    void
+  >
+  _openFilters() async {
     if (!_ensureMatchUnlockedForInteraction()) {
       return;
     }
@@ -1589,25 +1737,37 @@ class _MatchPageState extends State<MatchPage> {
       accentColor: _matchController.accentNeon,
     );
 
-    if (!mounted || result == null) {
+    if (!mounted ||
+        result ==
+            null) {
       return;
     }
 
-    setState(() {
-      _filterState = result;
-    });
+    setState(
+      () {
+        _filterState = result;
+      },
+    );
   }
 
   // ============================================================
   // PROFESSIONAL PROFILE
   // ============================================================
 
-  Future<void> _openProfessionalProfileSettings() async {
-    await Navigator.of(context).push(
+  Future<
+    void
+  >
+  _openProfessionalProfileSettings() async {
+    await Navigator.of(
+      context,
+    ).push(
       MaterialPageRoute(
-        builder: (_) {
-          return const ProfessionalProfileSettingsPage();
-        },
+        builder:
+            (
+              _,
+            ) {
+              return const ProfessionalProfileSettingsPage();
+            },
       ),
     );
 
@@ -1615,9 +1775,11 @@ class _MatchPageState extends State<MatchPage> {
       return;
     }
 
-    setState(() {
-      _isInitializingMatch = true;
-    });
+    setState(
+      () {
+        _isInitializingMatch = true;
+      },
+    );
 
     try {
       await _matchController.refreshMatchOnboarding();
@@ -1631,7 +1793,9 @@ class _MatchPageState extends State<MatchPage> {
       }
 
       await _loadPublicProfile();
-    } catch (error) {
+    } catch (
+      error
+    ) {
       debugPrint(
         '[MATCH PAGE] '
         'Erro ao atualizar perfil: '
@@ -1639,9 +1803,11 @@ class _MatchPageState extends State<MatchPage> {
       );
     } finally {
       if (mounted) {
-        setState(() {
-          _isInitializingMatch = false;
-        });
+        setState(
+          () {
+            _isInitializingMatch = false;
+          },
+        );
       }
     }
   }
@@ -1651,41 +1817,59 @@ class _MatchPageState extends State<MatchPage> {
   // ============================================================
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(
+    BuildContext context,
+  ) {
     final searchState = _matchSearchController.state;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0D0B1F),
+      backgroundColor: const Color(
+        0xFF0D0B1F,
+      ),
 
       body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+        padding: const EdgeInsets.symmetric(
+          horizontal: 20,
+          vertical: 20,
+        ),
 
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
 
           children: [
-            const SizedBox(height: 2),
+            const SizedBox(
+              height: 2,
+            ),
 
             // ==================================================
             // TEAM EXPANSION CONTEXT
             // ==================================================
             if (_isTeamExpansionMode) ...[
-              _buildTeamExpansionNotice(),
+              TeamExpansionNotice(
+                projectTitle: _teamExpansionController.displayProjectTitle,
+                accentColor: _matchController.accentNeon,
+              ),
 
-              const SizedBox(height: 12),
+              const SizedBox(
+                height: 12,
+              ),
             ],
 
             // ==================================================
             // SEARCH
             // ==================================================
             AnimatedSize(
-              duration: const Duration(milliseconds: 180),
+              duration: const Duration(
+                milliseconds: 180,
+              ),
 
               curve: Curves.easeOut,
 
               child: _isSearchPanelOpen
                   ? Padding(
-                      padding: const EdgeInsets.only(top: 16),
+                      padding: const EdgeInsets.only(
+                        top: 16,
+                      ),
 
                       child: MatchSearchPanelWidget(
                         textController: _searchTextController,
@@ -1707,8 +1891,11 @@ class _MatchPageState extends State<MatchPage> {
             // ==================================================
             // SEARCH RESULTS
             // ==================================================
-            if (_isSearchPanelOpen && searchState.isActive) ...[
-              const SizedBox(height: 16),
+            if (_isSearchPanelOpen &&
+                searchState.isActive) ...[
+              const SizedBox(
+                height: 16,
+              ),
 
               MatchSearchResultsWidget(
                 controller: _matchController,
@@ -1723,7 +1910,9 @@ class _MatchPageState extends State<MatchPage> {
               ),
             ],
 
-            const SizedBox(height: 12),
+            const SizedBox(
+              height: 12,
+            ),
 
             // ==================================================
             // NOVAS CONEXÕES
@@ -1738,15 +1927,20 @@ class _MatchPageState extends State<MatchPage> {
             // ==================================================
             _buildDiscoveryHeader(),
 
-            const SizedBox(height: 10),
+            const SizedBox(
+              height: 10,
+            ),
 
             // ==================================================
             // USERNAME ONBOARDING
             // ==================================================
-            if (!_isInitializingMatch && _matchController.requiresUsername) ...[
+            if (!_isInitializingMatch &&
+                _matchController.requiresUsername) ...[
               _buildUsernameOnboardingCard(),
 
-              const SizedBox(height: 10),
+              const SizedBox(
+                height: 10,
+              ),
             ],
 
             // ==================================================
@@ -1762,7 +1956,9 @@ class _MatchPageState extends State<MatchPage> {
               onEditProfile: _openProfessionalProfileSettings,
             ),
 
-            const SizedBox(height: 10),
+            const SizedBox(
+              height: 10,
+            ),
 
             // ==================================================
             // DISCOVERY MODE
@@ -1777,29 +1973,42 @@ class _MatchPageState extends State<MatchPage> {
               child: IgnorePointer(
                 ignoring: !_matchController.isMatchUnlocked,
                 child: Opacity(
-                  opacity: _matchController.isMatchUnlocked ? 1 : 0.42,
+                  opacity: _matchController.isMatchUnlocked
+                      ? 1
+                      : 0.42,
                   child: _buildDiscoveryModeSelector(),
                 ),
               ),
             ),
 
-            if (_matchController.discoveryMode == MatchDiscoveryMode.global ||
+            if (_matchController.discoveryMode ==
+                    MatchDiscoveryMode.global ||
                 _availabilityController.isActive) ...[
-              const SizedBox(height: 10),
+              const SizedBox(
+                height: 10,
+              ),
 
               MatchAvailabilityCard(
                 controller: _availabilityController,
                 accentColor: _matchController.accentNeon,
                 onActivate: () {
-                  unawaited(_changeDiscoveryMode(MatchDiscoveryMode.global));
+                  unawaited(
+                    _changeDiscoveryMode(
+                      MatchDiscoveryMode.global,
+                    ),
+                  );
                 },
                 onClear: () {
-                  unawaited(_clearAvailability());
+                  unawaited(
+                    _clearAvailability(),
+                  );
                 },
               ),
             ],
 
-            const SizedBox(height: 14),
+            const SizedBox(
+              height: 14,
+            ),
 
             // ==================================================
             // DISCOVERY
@@ -1814,7 +2023,9 @@ class _MatchPageState extends State<MatchPage> {
               child: IgnorePointer(
                 ignoring: !_matchController.isMatchUnlocked,
                 child: Opacity(
-                  opacity: _matchController.isMatchUnlocked ? 1 : 0.42,
+                  opacity: _matchController.isMatchUnlocked
+                      ? 1
+                      : 0.42,
                   child: Stack(
                     children: [
                       // ==================================================
@@ -1827,23 +2038,28 @@ class _MatchPageState extends State<MatchPage> {
                       //
                       // ==================================================
                       AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 220),
+                        duration: const Duration(
+                          milliseconds: 220,
+                        ),
 
                         switchInCurve: Curves.easeOut,
 
                         switchOutCurve: Curves.easeIn,
 
                         child: DiscoverySectionWidget(
-                          key: ValueKey<String>(
-                            _matchController.discoveryUser?.id ??
-                                'discovery-empty',
-                          ),
+                          key:
+                              ValueKey<
+                                String
+                              >(
+                                _matchController.discoveryUser?.id ??
+                                    'discovery-empty',
+                              ),
 
                           controller: _matchController,
 
                           isInitializingMatch:
                               _isInitializingMatch ||
-                              _isCreatingProjectInvitation,
+                              _teamExpansionController.isBusy,
 
                           isTeamExpansionMode: _isTeamExpansionMode,
 
@@ -1861,14 +2077,18 @@ class _MatchPageState extends State<MatchPage> {
                       // ==============================================
                       // LOADING
                       // ==============================================
-                      if (_isLoadingDemo)
+                      if (_demoController.isLoading)
                         Positioned.fill(
                           child: IgnorePointer(
                             child: Container(
                               decoration: BoxDecoration(
-                                color: Colors.black.withValues(alpha: 0.30),
+                                color: Colors.black.withValues(
+                                  alpha: 0.30,
+                                ),
 
-                                borderRadius: BorderRadius.circular(24),
+                                borderRadius: BorderRadius.circular(
+                                  24,
+                                ),
                               ),
 
                               alignment: Alignment.center,
@@ -1885,7 +2105,9 @@ class _MatchPageState extends State<MatchPage> {
               ),
             ),
 
-            const SizedBox(height: 30),
+            const SizedBox(
+              height: 30,
+            ),
           ],
         ),
       ),
@@ -1909,14 +2131,26 @@ class _MatchPageState extends State<MatchPage> {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(
+        18,
+      ),
       decoration: BoxDecoration(
-        color: const Color(0xFF17132D),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: accentColor.withValues(alpha: 0.28)),
+        color: const Color(
+          0xFF17132D,
+        ),
+        borderRadius: BorderRadius.circular(
+          18,
+        ),
+        border: Border.all(
+          color: accentColor.withValues(
+            alpha: 0.28,
+          ),
+        ),
         boxShadow: [
           BoxShadow(
-            color: accentColor.withValues(alpha: 0.08),
+            color: accentColor.withValues(
+              alpha: 0.08,
+            ),
             blurRadius: 22,
             spreadRadius: 1,
           ),
@@ -1932,7 +2166,9 @@ class _MatchPageState extends State<MatchPage> {
                 height: 38,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: accentColor.withValues(alpha: 0.12),
+                  color: accentColor.withValues(
+                    alpha: 0.12,
+                  ),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
@@ -1942,7 +2178,9 @@ class _MatchPageState extends State<MatchPage> {
                 ),
               ),
 
-              const SizedBox(width: 12),
+              const SizedBox(
+                width: 12,
+              ),
 
               const Expanded(
                 child: Column(
@@ -1957,11 +2195,16 @@ class _MatchPageState extends State<MatchPage> {
                       ),
                     ),
 
-                    SizedBox(height: 3),
+                    SizedBox(
+                      height: 3,
+                    ),
 
                     Text(
                       'Escolha um username único para continuar no Match.',
-                      style: TextStyle(color: Colors.white38, fontSize: 10),
+                      style: TextStyle(
+                        color: Colors.white38,
+                        fontSize: 10,
+                      ),
                     ),
                   ],
                 ),
@@ -1969,7 +2212,9 @@ class _MatchPageState extends State<MatchPage> {
             ],
           ),
 
-          const SizedBox(height: 18),
+          const SizedBox(
+            height: 18,
+          ),
 
           const Text(
             'Como você quer ser chamado?',
@@ -1980,7 +2225,9 @@ class _MatchPageState extends State<MatchPage> {
             ),
           ),
 
-          const SizedBox(height: 8),
+          const SizedBox(
+            height: 8,
+          ),
 
           TextField(
             controller: _usernameController,
@@ -1989,16 +2236,26 @@ class _MatchPageState extends State<MatchPage> {
             autocorrect: false,
             enableSuggestions: false,
             textInputAction: TextInputAction.done,
-            style: const TextStyle(color: Colors.white, fontSize: 13),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+            ),
             onChanged: _handleUsernameChanged,
-            onSubmitted: (_) {
-              if (_matchController.canSubmitUsername) {
-                unawaited(_saveUsername());
-              }
-            },
+            onSubmitted:
+                (
+                  _,
+                ) {
+                  if (_matchController.canSubmitUsername) {
+                    unawaited(
+                      _saveUsername(),
+                    );
+                  }
+                },
             decoration: InputDecoration(
               hintText: 'lucasvinicius',
-              hintStyle: const TextStyle(color: Colors.white24),
+              hintStyle: const TextStyle(
+                color: Colors.white24,
+              ),
               prefixText: '@',
               prefixStyle: TextStyle(
                 color: accentColor,
@@ -2006,7 +2263,9 @@ class _MatchPageState extends State<MatchPage> {
               ),
               suffixIcon: checking
                   ? Padding(
-                      padding: const EdgeInsets.all(13),
+                      padding: const EdgeInsets.all(
+                        13,
+                      ),
                       child: SizedBox(
                         width: 16,
                         height: 16,
@@ -2016,13 +2275,15 @@ class _MatchPageState extends State<MatchPage> {
                         ),
                       ),
                     )
-                  : available == true
+                  : available ==
+                        true
                   ? const Icon(
                       Icons.check_circle_rounded,
                       color: Colors.greenAccent,
                       size: 19,
                     )
-                  : available == false
+                  : available ==
+                        false
                   ? const Icon(
                       Icons.cancel_rounded,
                       color: Colors.redAccent,
@@ -2030,24 +2291,37 @@ class _MatchPageState extends State<MatchPage> {
                     )
                   : null,
               filled: true,
-              fillColor: Colors.white.withValues(alpha: 0.035),
+              fillColor: Colors.white.withValues(
+                alpha: 0.035,
+              ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(
+                  12,
+                ),
                 borderSide: BorderSide(
-                  color: Colors.white.withValues(alpha: 0.08),
+                  color: Colors.white.withValues(
+                    alpha: 0.08,
+                  ),
                 ),
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(
+                  12,
+                ),
                 borderSide: BorderSide(
-                  color: accentColor.withValues(alpha: 0.65),
+                  color: accentColor.withValues(
+                    alpha: 0.65,
+                  ),
                 ),
               ),
             ),
           ),
 
-          if (message != null) ...[
-            const SizedBox(height: 8),
+          if (message !=
+              null) ...[
+            const SizedBox(
+              height: 8,
+            ),
 
             Row(
               children: [
@@ -2062,16 +2336,21 @@ class _MatchPageState extends State<MatchPage> {
                   )
                 else
                   Icon(
-                    available == true
+                    available ==
+                            true
                         ? Icons.check_circle_rounded
                         : Icons.cancel_rounded,
                     size: 14,
-                    color: available == true
+                    color:
+                        available ==
+                            true
                         ? Colors.greenAccent
                         : Colors.redAccent,
                   ),
 
-                const SizedBox(width: 6),
+                const SizedBox(
+                  width: 6,
+                ),
 
                 Flexible(
                   child: Text(
@@ -2079,7 +2358,8 @@ class _MatchPageState extends State<MatchPage> {
                     style: TextStyle(
                       color: checking
                           ? Colors.white38
-                          : available == true
+                          : available ==
+                                true
                           ? Colors.greenAccent
                           : Colors.redAccent,
                       fontSize: 10,
@@ -2090,20 +2370,26 @@ class _MatchPageState extends State<MatchPage> {
             ),
           ],
 
-          const SizedBox(height: 16),
+          const SizedBox(
+            height: 16,
+          ),
 
           Align(
             alignment: Alignment.centerRight,
             child: FilledButton(
               onPressed: _matchController.canSubmitUsername
                   ? () {
-                      unawaited(_saveUsername());
+                      unawaited(
+                        _saveUsername(),
+                      );
                     }
                   : null,
               style: FilledButton.styleFrom(
                 backgroundColor: accentColor,
                 foregroundColor: Colors.black,
-                disabledBackgroundColor: Colors.white.withValues(alpha: 0.05),
+                disabledBackgroundColor: Colors.white.withValues(
+                  alpha: 0.05,
+                ),
                 disabledForegroundColor: Colors.white24,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 18,
@@ -2135,118 +2421,37 @@ class _MatchPageState extends State<MatchPage> {
   }
 
   // ============================================================
-  // TEAM EXPANSION NOTICE
-  // ============================================================
-
-  Widget _buildTeamExpansionNotice() {
-    final projectId = _targetProjectId;
-
-    if (projectId == null) {
-      return const SizedBox.shrink();
-    }
-
-    return Container(
-      width: double.infinity,
-
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-
-      decoration: BoxDecoration(
-        color: const Color(0xFF6D28D9).withValues(alpha: 0.10),
-
-        borderRadius: BorderRadius.circular(16),
-
-        border: Border.all(
-          color: const Color(0xFFA78BFA).withValues(alpha: 0.24),
-        ),
-      ),
-
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-
-        children: [
-          Container(
-            width: 38,
-
-            height: 38,
-
-            alignment: Alignment.center,
-
-            decoration: BoxDecoration(
-              color: const Color(0xFF8B5CF6).withValues(alpha: 0.14),
-
-              shape: BoxShape.circle,
-            ),
-
-            child: const Icon(
-              Icons.group_add_rounded,
-
-              color: Color(0xFFA78BFA),
-
-              size: 19,
-            ),
-          ),
-
-          const SizedBox(width: 12),
-
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-
-              children: [
-                Text(
-                  'Expandindo $_targetProjectTitle',
-
-                  style: const TextStyle(
-                    color: Colors.white,
-
-                    fontSize: 12,
-
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-
-                const SizedBox(height: 4),
-
-                const Text(
-                  'Os profissionais escolhidos aqui receberão um convite. '
-                  'Eles só entrarão na equipe depois de aceitar.',
-
-                  style: TextStyle(
-                    color: Colors.white54,
-
-                    fontSize: 10,
-
-                    height: 1.4,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ============================================================
   // DISCOVERY MODE SELECTOR
   // ============================================================
 
   Widget _buildDiscoveryModeSelector() {
     final activeMode = _matchController.discoveryMode;
 
-    final disabled = _isInitializingMatch || _sessionService.isRestarting;
+    final disabled =
+        _isInitializingMatch ||
+        _sessionService.isRestarting;
 
     return Container(
       width: double.infinity,
 
-      padding: const EdgeInsets.all(4),
+      padding: const EdgeInsets.all(
+        4,
+      ),
 
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.035),
+        color: Colors.white.withValues(
+          alpha: 0.035,
+        ),
 
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(
+          14,
+        ),
 
-        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+        border: Border.all(
+          color: Colors.white.withValues(
+            alpha: 0.06,
+          ),
+        ),
       ),
 
       child: Row(
@@ -2262,13 +2467,17 @@ class _MatchPageState extends State<MatchPage> {
 
               label: 'COMPATÍVEIS',
 
-              selected: activeMode == MatchDiscoveryMode.compatible,
+              selected:
+                  activeMode ==
+                  MatchDiscoveryMode.compatible,
 
               disabled: disabled,
             ),
           ),
 
-          const SizedBox(width: 6),
+          const SizedBox(
+            width: 6,
+          ),
 
           // ========================================================
           // PROXIMIDADE
@@ -2281,13 +2490,17 @@ class _MatchPageState extends State<MatchPage> {
 
               label: 'PRÓXIMOS',
 
-              selected: activeMode == MatchDiscoveryMode.nearby,
+              selected:
+                  activeMode ==
+                  MatchDiscoveryMode.nearby,
 
               disabled: disabled,
             ),
           ),
 
-          const SizedBox(width: 6),
+          const SizedBox(
+            width: 6,
+          ),
 
           // ========================================================
           // DISPONÍVEIS AGORA
@@ -2300,7 +2513,9 @@ class _MatchPageState extends State<MatchPage> {
 
               label: 'AGORA',
 
-              selected: activeMode == MatchDiscoveryMode.global,
+              selected:
+                  activeMode ==
+                  MatchDiscoveryMode.global,
 
               disabled: disabled,
             ),
@@ -2331,35 +2546,53 @@ class _MatchPageState extends State<MatchPage> {
             ? null
             : () {
                 if (mode.requiresLocationConsent) {
-                  unawaited(_confirmNearbyDiscovery());
+                  unawaited(
+                    _confirmNearbyDiscovery(),
+                  );
 
                   return;
                 }
 
-                unawaited(_changeDiscoveryMode(mode));
+                unawaited(
+                  _changeDiscoveryMode(
+                    mode,
+                  ),
+                );
               },
 
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(
+          10,
+        ),
 
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
+          duration: const Duration(
+            milliseconds: 180,
+          ),
 
           curve: Curves.easeOut,
 
           height: 42,
 
-          padding: const EdgeInsets.symmetric(horizontal: 12),
+          padding: const EdgeInsets.symmetric(
+            horizontal: 12,
+          ),
 
           decoration: BoxDecoration(
             color: selected
-                ? accentColor.withValues(alpha: 0.16)
+                ? accentColor.withValues(
+                    alpha: 0.16,
+                  )
                 : Colors.transparent,
 
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(
+              10,
+            ),
 
             border: Border.all(
               color: selected
-                  ? accentColor.withValues(alpha: 0.36)
+                  ? accentColor.withValues(
+                      alpha: 0.36,
+                    )
                   : Colors.transparent,
             ),
           ),
@@ -2368,7 +2601,8 @@ class _MatchPageState extends State<MatchPage> {
             mainAxisAlignment: MainAxisAlignment.center,
 
             children: [
-              if (disabled && selected)
+              if (disabled &&
+                  selected)
                 SizedBox(
                   width: 14,
 
@@ -2386,10 +2620,14 @@ class _MatchPageState extends State<MatchPage> {
 
                   size: 16,
 
-                  color: selected ? accentColor : Colors.white38,
+                  color: selected
+                      ? accentColor
+                      : Colors.white38,
                 ),
 
-              const SizedBox(width: 7),
+              const SizedBox(
+                width: 7,
+              ),
 
               Flexible(
                 child: Text(
@@ -2400,7 +2638,9 @@ class _MatchPageState extends State<MatchPage> {
                   overflow: TextOverflow.ellipsis,
 
                   style: TextStyle(
-                    color: selected ? accentColor : Colors.white38,
+                    color: selected
+                        ? accentColor
+                        : Colors.white38,
 
                     fontSize: 9,
 
@@ -2424,7 +2664,9 @@ class _MatchPageState extends State<MatchPage> {
   Widget _buildDiscoveryHeader() {
     final publicProfile = _publicProfileController.profile;
 
-    final hasPublicProfile = publicProfile != null;
+    final hasPublicProfile =
+        publicProfile !=
+        null;
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -2432,7 +2674,9 @@ class _MatchPageState extends State<MatchPage> {
       children: [
         Expanded(
           child: Text(
-            _isTeamExpansionMode ? 'Procurar membro' : 'Novas Conexões',
+            _isTeamExpansionMode
+                ? 'Procurar membro'
+                : 'Novas Conexões',
 
             style: const TextStyle(
               color: Colors.white,
@@ -2446,7 +2690,9 @@ class _MatchPageState extends State<MatchPage> {
           ),
         ),
 
-        const SizedBox(width: 12),
+        const SizedBox(
+          width: 12,
+        ),
 
         // ======================================================
         // AÇÕES DO CANTO SUPERIOR
@@ -2455,6 +2701,66 @@ class _MatchPageState extends State<MatchPage> {
           mainAxisSize: MainAxisSize.min,
 
           children: [
+            // ==================================================
+            // PESQUISAR
+            // ==================================================
+            Tooltip(
+              message: _isSearchPanelOpen
+                  ? 'Fechar pesquisa'
+                  : 'Pesquisar usuário',
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: _toggleSearchPanel,
+                  borderRadius: BorderRadius.circular(
+                    14,
+                  ),
+                  child: AnimatedContainer(
+                    duration: const Duration(
+                      milliseconds: 160,
+                    ),
+                    width: 42,
+                    height: 42,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: _isSearchPanelOpen
+                          ? _matchController.accentNeon.withValues(
+                              alpha: 0.10,
+                            )
+                          : Colors.white.withValues(
+                              alpha: 0.035,
+                            ),
+                      borderRadius: BorderRadius.circular(
+                        14,
+                      ),
+                      border: Border.all(
+                        color: _isSearchPanelOpen
+                            ? _matchController.accentNeon.withValues(
+                                alpha: 0.30,
+                              )
+                            : Colors.white.withValues(
+                                alpha: 0.06,
+                              ),
+                      ),
+                    ),
+                    child: Icon(
+                      _isSearchPanelOpen
+                          ? Icons.close_rounded
+                          : Icons.search_rounded,
+                      size: 21,
+                      color: _isSearchPanelOpen
+                          ? _matchController.accentNeon
+                          : Colors.white54,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+            const SizedBox(
+              width: 6,
+            ),
+
             // ==================================================
             // PERFIL PÚBLICO
             // ==================================================
@@ -2467,7 +2773,9 @@ class _MatchPageState extends State<MatchPage> {
                 child: InkWell(
                   onTap: _openPublicProfile,
 
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(
+                    14,
+                  ),
 
                   child: Container(
                     width: 42,
@@ -2478,17 +2786,25 @@ class _MatchPageState extends State<MatchPage> {
 
                     decoration: BoxDecoration(
                       color: hasPublicProfile
-                          ? _matchController.accentNeon.withValues(alpha: 0.10)
-                          : Colors.white.withValues(alpha: 0.035),
+                          ? _matchController.accentNeon.withValues(
+                              alpha: 0.10,
+                            )
+                          : Colors.white.withValues(
+                              alpha: 0.035,
+                            ),
 
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(
+                        14,
+                      ),
 
                       border: Border.all(
                         color: hasPublicProfile
                             ? _matchController.accentNeon.withValues(
                                 alpha: 0.30,
                               )
-                            : Colors.white.withValues(alpha: 0.06),
+                            : Colors.white.withValues(
+                                alpha: 0.06,
+                              ),
                       ),
                     ),
 
@@ -2506,7 +2822,9 @@ class _MatchPageState extends State<MatchPage> {
               ),
             ),
 
-            const SizedBox(width: 6),
+            const SizedBox(
+              width: 6,
+            ),
 
             // ==================================================
             // MEUS PROJETOS
@@ -2517,16 +2835,24 @@ class _MatchPageState extends State<MatchPage> {
                 color: Colors.transparent,
                 child: InkWell(
                   onTap: _openMatchProjects,
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(
+                    14,
+                  ),
                   child: Container(
                     width: 42,
                     height: 42,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.035),
-                      borderRadius: BorderRadius.circular(14),
+                      color: Colors.white.withValues(
+                        alpha: 0.035,
+                      ),
+                      borderRadius: BorderRadius.circular(
+                        14,
+                      ),
                       border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.06),
+                        color: Colors.white.withValues(
+                          alpha: 0.06,
+                        ),
                       ),
                     ),
                     child: const Icon(
@@ -2539,7 +2865,9 @@ class _MatchPageState extends State<MatchPage> {
               ),
             ),
 
-            const SizedBox(width: 6),
+            const SizedBox(
+              width: 6,
+            ),
 
             // ==================================================
             // FILTROS
@@ -2554,7 +2882,9 @@ class _MatchPageState extends State<MatchPage> {
                   child: InkWell(
                     onTap: _openFilters,
 
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(
+                      14,
+                    ),
 
                     child: Container(
                       width: 42,
@@ -2568,16 +2898,22 @@ class _MatchPageState extends State<MatchPage> {
                             ? _matchController.accentNeon.withValues(
                                 alpha: 0.10,
                               )
-                            : Colors.white.withValues(alpha: 0.035),
+                            : Colors.white.withValues(
+                                alpha: 0.035,
+                              ),
 
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(
+                          14,
+                        ),
 
                         border: Border.all(
                           color: _filterState.hasActiveFilters
                               ? _matchController.accentNeon.withValues(
                                   alpha: 0.30,
                                 )
-                              : Colors.white.withValues(alpha: 0.06),
+                              : Colors.white.withValues(
+                                  alpha: 0.06,
+                                ),
                         ),
                       ),
 
@@ -2607,15 +2943,21 @@ class _MatchPageState extends State<MatchPage> {
                         minHeight: 17,
                       ),
 
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 4,
+                      ),
 
                       decoration: BoxDecoration(
                         color: _matchController.accentNeon,
 
-                        borderRadius: BorderRadius.circular(20),
+                        borderRadius: BorderRadius.circular(
+                          20,
+                        ),
 
                         border: Border.all(
-                          color: const Color(0xFF0D0B1F),
+                          color: const Color(
+                            0xFF0D0B1F,
+                          ),
 
                           width: 2,
                         ),
@@ -2650,15 +2992,33 @@ class _MatchPageState extends State<MatchPage> {
 
   @override
   void dispose() {
-    _matchController.removeListener(_handleStateChange);
+    _matchController.removeListener(
+      _handleStateChange,
+    );
 
-    _professionalProfileController.removeListener(_handleStateChange);
+    _professionalProfileController.removeListener(
+      _handleStateChange,
+    );
 
-    _matchSearchController.removeListener(_handleStateChange);
+    _matchSearchController.removeListener(
+      _handleStateChange,
+    );
 
-    _publicProfileController.removeListener(_handleStateChange);
+    _publicProfileController.removeListener(
+      _handleStateChange,
+    );
 
-    _availabilityController.removeListener(_handleStateChange);
+    _availabilityController.removeListener(
+      _handleStateChange,
+    );
+
+    _teamExpansionController.removeListener(
+      _handleStateChange,
+    );
+
+    _demoController.removeListener(
+      _handleStateChange,
+    );
 
     _usernameDebounce?.cancel();
 
@@ -2678,11 +3038,19 @@ class _MatchPageState extends State<MatchPage> {
 
     _availabilityController.dispose();
 
-    unawaited(_matchSubscription?.cancel());
+    _teamExpansionController.dispose();
+
+    _demoController.dispose();
+
+    unawaited(
+      _matchSubscription?.cancel(),
+    );
 
     _matchSubscription = null;
 
-    unawaited(_sessionService.dispose());
+    unawaited(
+      _sessionService.dispose(),
+    );
 
     _matchController.dispose();
 

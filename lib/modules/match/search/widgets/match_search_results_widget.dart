@@ -2,27 +2,27 @@ import 'package:flutter/material.dart';
 
 import 'package:versin/modules/match/controllers/match_controllers.dart';
 import 'package:versin/modules/match/models/match_user_entity.dart';
-
-import 'profile_tile_widget.dart';
+import 'package:versin/modules/match/widgets/profile_tile_widget.dart';
 
 // ============================================================
 // MATCH SEARCH RESULTS WIDGET
 // ============================================================
 //
-// Responsável por mostrar:
+// Responsável exclusivamente pela apresentação dos resultados.
 //
-// - loading;
+// Estados:
+//
+// - carregando;
 // - erro;
-// - estado vazio;
-// - quantidade de resultados;
-// - lista de usuários.
+// - nenhum resultado;
+// - resultados encontrados.
 //
-// Este widget NÃO:
+// NÃO:
 //
 // - executa pesquisa;
 // - acessa repository;
-// - possui debounce;
-// - acessa Supabase.
+// - acessa Supabase;
+// - possui debounce.
 //
 // ============================================================
 
@@ -30,13 +30,13 @@ class MatchSearchResultsWidget
     extends
         StatelessWidget {
   // ============================================================
-  // CONTROLLER
+  // MATCH CONTROLLER
   // ============================================================
 
   final MatchController controller;
 
   // ============================================================
-  // ESTADO
+  // SEARCH STATE
   // ============================================================
 
   final bool isSearching;
@@ -51,7 +51,7 @@ class MatchSearchResultsWidget
   results;
 
   // ============================================================
-  // CONSTRUTOR
+  // CONSTRUCTOR
   // ============================================================
 
   const MatchSearchResultsWidget({
@@ -76,107 +76,169 @@ class MatchSearchResultsWidget
     // ==========================================================
 
     if (isSearching) {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(
-          vertical: 28,
-        ),
-        decoration: _decoration(),
-        child: const Center(
-          child: SizedBox(
-            width: 20,
-            height: 20,
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              color: Colors.purpleAccent,
-            ),
-          ),
-        ),
-      );
+      return _buildLoading();
     }
 
     // ==========================================================
-    // ERRO
+    // ERROR
     // ==========================================================
 
-    if (errorMessage !=
+    final normalizedError = errorMessage?.trim();
+
+    if (normalizedError !=
             null &&
-        errorMessage!.trim().isNotEmpty) {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(
-          16,
-        ),
-        decoration: _decoration(),
-        child: Row(
-          children: [
-            const Icon(
-              Icons.error_outline_rounded,
-              color: Colors.redAccent,
-              size: 18,
-            ),
-
-            const SizedBox(
-              width: 9,
-            ),
-
-            Expanded(
-              child: Text(
-                errorMessage!,
-                style: const TextStyle(
-                  color: Colors.white54,
-                  fontSize: 11,
-                ),
-              ),
-            ),
-          ],
-        ),
+        normalizedError.isNotEmpty) {
+      return _buildError(
+        normalizedError,
       );
     }
 
     // ==========================================================
-    // VAZIO
+    // EMPTY
     // ==========================================================
 
     if (results.isEmpty) {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(
-          vertical: 24,
-          horizontal: 16,
-        ),
-        decoration: _decoration(),
-        child: Column(
-          children: [
-            const Icon(
-              Icons.person_search_outlined,
-              color: Colors.white24,
-              size: 26,
-            ),
-
-            const SizedBox(
-              height: 8,
-            ),
-
-            Text(
-              'Nenhum usuário encontrado para "$query".',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Colors.white38,
-                fontSize: 11,
-              ),
-            ),
-          ],
-        ),
-      );
+      return _buildEmpty();
     }
 
     // ==========================================================
-    // RESULTADOS
+    // RESULTS
     // ==========================================================
 
+    return _buildResults();
+  }
+
+  // ============================================================
+  // LOADING
+  // ============================================================
+
+  Widget _buildLoading() {
+    return Container(
+      width: double.infinity,
+
+      padding: const EdgeInsets.symmetric(
+        vertical: 28,
+      ),
+
+      decoration: _resultDecoration(),
+
+      child: Center(
+        child: SizedBox(
+          width: 20,
+
+          height: 20,
+
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+
+            color: controller.accentNeon,
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ============================================================
+  // ERROR
+  // ============================================================
+
+  Widget _buildError(
+    String message,
+  ) {
+    return Container(
+      width: double.infinity,
+
+      padding: const EdgeInsets.all(
+        16,
+      ),
+
+      decoration: _resultDecoration(),
+
+      child: Row(
+        children: [
+          const Icon(
+            Icons.error_outline_rounded,
+
+            color: Colors.redAccent,
+
+            size: 18,
+          ),
+
+          const SizedBox(
+            width: 9,
+          ),
+
+          Expanded(
+            child: Text(
+              message,
+
+              style: const TextStyle(
+                color: Colors.white54,
+
+                fontSize: 11,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ============================================================
+  // EMPTY
+  // ============================================================
+
+  Widget _buildEmpty() {
+    return Container(
+      width: double.infinity,
+
+      padding: const EdgeInsets.symmetric(
+        vertical: 24,
+
+        horizontal: 16,
+      ),
+
+      decoration: _resultDecoration(),
+
+      child: Column(
+        children: [
+          const Icon(
+            Icons.person_search_outlined,
+
+            color: Colors.white24,
+
+            size: 26,
+          ),
+
+          const SizedBox(
+            height: 8,
+          ),
+
+          Text(
+            'Nenhum usuário encontrado para '
+            '"$query".',
+
+            textAlign: TextAlign.center,
+
+            style: const TextStyle(
+              color: Colors.white38,
+
+              fontSize: 11,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ============================================================
+  // RESULTS
+  // ============================================================
+
+  Widget _buildResults() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
+
       children: [
         // ======================================================
         // HEADER
@@ -185,9 +247,12 @@ class MatchSearchResultsWidget
           children: [
             const Text(
               'Resultados',
+
               style: TextStyle(
                 color: Colors.white,
+
                 fontSize: 14,
+
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -196,24 +261,34 @@ class MatchSearchResultsWidget
               width: 8,
             ),
 
+            // ==================================================
+            // COUNT
+            // ==================================================
             Container(
               padding: const EdgeInsets.symmetric(
                 horizontal: 7,
+
                 vertical: 3,
               ),
+
               decoration: BoxDecoration(
                 color: controller.accentNeon.withValues(
                   alpha: 0.08,
                 ),
+
                 borderRadius: BorderRadius.circular(
                   20,
                 ),
               ),
+
               child: Text(
                 '${results.length}',
+
                 style: TextStyle(
                   color: controller.accentNeon,
+
                   fontSize: 9,
+
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -226,7 +301,7 @@ class MatchSearchResultsWidget
         ),
 
         // ======================================================
-        // LISTA
+        // USER LIST
         // ======================================================
         ...results.map(
           (
@@ -234,6 +309,7 @@ class MatchSearchResultsWidget
           ) {
             return ProfileTileWidget(
               user: user,
+
               controller: controller,
             );
           },
@@ -243,10 +319,10 @@ class MatchSearchResultsWidget
   }
 
   // ============================================================
-  // DECORAÇÃO
+  // DECORATION
   // ============================================================
 
-  BoxDecoration _decoration() {
+  BoxDecoration _resultDecoration() {
     return BoxDecoration(
       color:
           const Color(
@@ -254,9 +330,11 @@ class MatchSearchResultsWidget
           ).withValues(
             alpha: 0.65,
           ),
+
       borderRadius: BorderRadius.circular(
         16,
       ),
+
       border: Border.all(
         color: Colors.white.withValues(
           alpha: 0.05,

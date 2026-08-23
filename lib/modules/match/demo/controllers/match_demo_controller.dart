@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 
-import 'package:versin/modules/public_profile/controllers/public_profile_controller.dart';
-import 'package:versin/modules/public_profile/models/profile_track_model.dart';
+import 'package:versin/modules/profile/public_profile/controllers/public_profile_controller.dart';
+import 'package:versin/modules/profile/public_profile/models/profile_track_model.dart';
 
 // ============================================================
 // MATCH DEMO RESULT

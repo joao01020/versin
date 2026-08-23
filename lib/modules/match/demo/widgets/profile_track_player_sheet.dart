@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import 'package:versin/modules/public_profile/controllers/profile_track_player_controller.dart';
-import 'package:versin/modules/public_profile/models/profile_track_model.dart';
+import 'package:versin/modules/profile/public_profile/controllers/profile_track_player_controller.dart';
+import 'package:versin/modules/profile/public_profile/models/profile_track_model.dart';
 
 // ============================================================
 // PROFILE TRACK PLAYER SHEET

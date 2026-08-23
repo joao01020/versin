@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 
-import 'package:versin/modules/networking/controllers/global_chat_controller.dart';
+import 'package:versin/modules/networking/chat/controllers/global_chat_controller.dart';
 import 'package:versin/modules/profile/services/profile_name_cache_service.dart';
 
 // ============================================================
@@ -34,7 +34,9 @@ import 'package:versin/modules/profile/services/profile_name_cache_service.dart'
 //
 // ============================================================
 
-class DashboardGlobalChatController extends ChangeNotifier {
+class DashboardGlobalChatController
+    extends
+        ChangeNotifier {
   // ============================================================
   // GLOBAL CHAT
   // ============================================================
@@ -63,9 +65,12 @@ class DashboardGlobalChatController extends ChangeNotifier {
     GlobalChatController? globalChatController,
 
     ProfileNameCacheService? profileNameCacheService,
-  }) : globalChatController = globalChatController ?? GlobalChatController(),
+  }) : globalChatController =
+           globalChatController ??
+           GlobalChatController(),
        profileNameCacheService =
-           profileNameCacheService ?? ProfileNameCacheService();
+           profileNameCacheService ??
+           ProfileNameCacheService();
 
   // ============================================================
   // INITIALIZED
@@ -90,7 +95,9 @@ class DashboardGlobalChatController extends ChangeNotifier {
   String? get latestProjectId {
     final value = globalChatController.latestProjectId?.trim();
 
-    if (value == null || value.isEmpty) {
+    if (value ==
+            null ||
+        value.isEmpty) {
       return null;
     }
 
@@ -104,7 +111,9 @@ class DashboardGlobalChatController extends ChangeNotifier {
   bool get hasProject {
     final projectId = latestProjectId;
 
-    return projectId != null && projectId.isNotEmpty;
+    return projectId !=
+            null &&
+        projectId.isNotEmpty;
   }
 
   // ============================================================
@@ -120,7 +129,8 @@ class DashboardGlobalChatController extends ChangeNotifier {
   // ============================================================
 
   bool get hasMessage {
-    return latestMessage != null;
+    return latestMessage !=
+        null;
   }
 
   // ============================================================
@@ -168,7 +178,8 @@ class DashboardGlobalChatController extends ChangeNotifier {
   String get senderId {
     final message = latestMessage;
 
-    if (message == null) {
+    if (message ==
+        null) {
       return '';
     }
 
@@ -176,7 +187,9 @@ class DashboardGlobalChatController extends ChangeNotifier {
       final value = message.senderId.toString().trim();
 
       return value;
-    } catch (_) {
+    } catch (
+      _
+    ) {
       return '';
     }
   }
@@ -186,13 +199,16 @@ class DashboardGlobalChatController extends ChangeNotifier {
   // ============================================================
 
   void init() {
-    if (_initialized || _disposed) {
+    if (_initialized ||
+        _disposed) {
       return;
     }
 
     _initialized = true;
 
-    globalChatController.addListener(_handleGlobalChatChanged);
+    globalChatController.addListener(
+      _handleGlobalChatChanged,
+    );
 
     globalChatController.init();
 
@@ -218,7 +234,10 @@ class DashboardGlobalChatController extends ChangeNotifier {
   // RESOLVE SENDER NAME
   // ============================================================
 
-  Future<String> resolveSenderName() async {
+  Future<
+    String
+  >
+  resolveSenderName() async {
     final normalizedUserId = senderId.trim();
 
     // ==========================================================
@@ -240,17 +259,24 @@ class DashboardGlobalChatController extends ChangeNotifier {
 
       final normalizedName = resolvedName.trim();
 
-      if (normalizedName.isNotEmpty && normalizedName != 'Membro') {
+      if (normalizedName.isNotEmpty &&
+          normalizedName !=
+              'Membro') {
         return normalizedName;
       }
-    } catch (error, stackTrace) {
+    } catch (
+      error,
+      stackTrace
+    ) {
       debugPrint(
         '[DASHBOARD GLOBAL CHAT] '
         'Erro ao resolver nome do remetente: '
         '$error',
       );
 
-      debugPrint('$stackTrace');
+      debugPrint(
+        '$stackTrace',
+      );
     }
 
     // ==========================================================
@@ -259,7 +285,9 @@ class DashboardGlobalChatController extends ChangeNotifier {
 
     final fallback = globalChatController.senderName.trim();
 
-    if (fallback.isNotEmpty && fallback != 'Membro') {
+    if (fallback.isNotEmpty &&
+        fallback !=
+            'Membro') {
       return fallback;
     }
 
@@ -270,32 +298,45 @@ class DashboardGlobalChatController extends ChangeNotifier {
   // MARK PROJECT AS READ
   // ============================================================
 
-  void markProjectAsRead(String projectId) {
+  void markProjectAsRead(
+    String projectId,
+  ) {
     final normalizedProjectId = projectId.trim();
 
     if (normalizedProjectId.isEmpty) {
       return;
     }
 
-    globalChatController.markProjectAsRead(normalizedProjectId);
+    globalChatController.markProjectAsRead(
+      normalizedProjectId,
+    );
   }
 
   // ============================================================
   // CHAT VISIBLE
   // ============================================================
 
-  void setChatVisible(bool visible, {String? projectId}) {
+  void setChatVisible(
+    bool visible, {
+    String? projectId,
+  }) {
     final normalizedProjectId = projectId?.trim();
 
     if (visible &&
-        normalizedProjectId != null &&
+        normalizedProjectId !=
+            null &&
         normalizedProjectId.isNotEmpty) {
-      globalChatController.setChatVisible(true, projectId: normalizedProjectId);
+      globalChatController.setChatVisible(
+        true,
+        projectId: normalizedProjectId,
+      );
 
       return;
     }
 
-    globalChatController.setChatVisible(false);
+    globalChatController.setChatVisible(
+      false,
+    );
   }
 
   // ============================================================
@@ -311,16 +352,23 @@ class DashboardGlobalChatController extends ChangeNotifier {
   //
   // ============================================================
 
-  bool prepareOpen(String projectId) {
+  bool prepareOpen(
+    String projectId,
+  ) {
     final normalizedProjectId = projectId.trim();
 
     if (normalizedProjectId.isEmpty) {
       return false;
     }
 
-    markProjectAsRead(normalizedProjectId);
+    markProjectAsRead(
+      normalizedProjectId,
+    );
 
-    setChatVisible(true, projectId: normalizedProjectId);
+    setChatVisible(
+      true,
+      projectId: normalizedProjectId,
+    );
 
     return true;
   }
@@ -334,7 +382,9 @@ class DashboardGlobalChatController extends ChangeNotifier {
   // ============================================================
 
   void finishOpen() {
-    setChatVisible(false);
+    setChatVisible(
+      false,
+    );
   }
 
   // ============================================================
@@ -357,7 +407,9 @@ class DashboardGlobalChatController extends ChangeNotifier {
 
     _disposed = true;
 
-    globalChatController.removeListener(_handleGlobalChatChanged);
+    globalChatController.removeListener(
+      _handleGlobalChatChanged,
+    );
 
     globalChatController.dispose();
 

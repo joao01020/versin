@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:versin/app/routes/app_routes.dart';
 
-import '../../models/dashboard_menu_item.dart';
+import '../models/dashboard_menu_item.dart';
 import 'dashboard_menu_visibility.dart';
 
 // ============================================================

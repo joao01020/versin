@@ -47,7 +47,7 @@ import 'package:versin/modules/wallet/views/wallet_page.dart';
 
 import 'package:versin/modules/networking/call/views/call_view.dart';
 import 'package:versin/modules/networking/views/networking_session_view.dart';
-import 'package:versin/modules/networking/views/sub_features/chat_view.dart';
+import 'package:versin/modules/networking/chat/views/chat_view.dart';
 
 // ============================================================
 // NETWORKING - PROJECT INVITATIONS

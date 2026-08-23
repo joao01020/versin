@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../controllers/dashboard_controller.dart';
-import '../models/dashboard_menu_item.dart';
+import '../config/models/dashboard_menu_item.dart';
 
 // ============================================================
 // DASHBOARD SIDE RAIL

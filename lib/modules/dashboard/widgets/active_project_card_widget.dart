@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'package:versin/modules/match/views/match_projects_view.dart';
+import 'package:versin/modules/match/views/projects/match_projects_view.dart';
 
 import '../controllers/dashboard_controller.dart';
 

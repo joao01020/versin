@@ -31,10 +31,10 @@ import 'package:versin/modules/dashboard/invitations/widgets/dashboard_invitatio
 
 import 'package:versin/modules/calendar/views/calendar_page.dart';
 import 'package:versin/modules/chat/data/datasources/chat_remote_datasource.dart';
-import 'package:versin/modules/chat/domain/repositories/chat_repository_impl.dart';
-import 'package:versin/modules/chat/services/ai_provider_service.dart';
-import 'package:versin/modules/chat/services/private_ai_client.dart';
-import 'package:versin/modules/chat/services/private_api_service.dart';
+import 'package:versin/modules/chat/data/repositories/chat_repository_impl.dart';
+import 'package:versin/modules/chat/ai/services/provider/ai_provider_service.dart';
+import 'package:versin/modules/chat/ai/services/private_api/private_ai_client.dart';
+import 'package:versin/modules/chat/ai/services/private_api/private_api_service.dart';
 import 'package:versin/modules/chat/views/chat_page.dart';
 import 'package:versin/modules/hub/views/hub_page.dart';
 import 'package:versin/modules/market/market_page.dart';

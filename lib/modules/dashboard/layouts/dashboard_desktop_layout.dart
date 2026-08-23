@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:versin/features/rhymes/presentation/controller/rhymes_controller.dart';
 
 import '../controllers/dashboard_controller.dart';
-import '../widgets/account_activities_card_widget.dart';
-import '../widgets/ai_monthly_usage_card_widget.dart';
+import '../account/widgets/account_activities_card_widget.dart';
+import '../ai/widgets/ai_monthly_usage_card_widget.dart';
 import '../widgets/hub_status_card_widget.dart';
 import '../widgets/versin_statistics_card_widget.dart';
 

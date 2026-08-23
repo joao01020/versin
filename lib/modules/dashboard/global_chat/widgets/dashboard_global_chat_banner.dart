@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'package:versin/modules/networking/widgets/global_chat_banner.dart';
+import 'package:versin/modules/networking/chat/widgets/global_chat_banner.dart';
 
 import '../controllers/dashboard_global_chat_controller.dart';
 
@@ -34,7 +34,9 @@ import '../controllers/dashboard_global_chat_controller.dart';
 //
 // ============================================================
 
-class DashboardGlobalChatBanner extends StatelessWidget {
+class DashboardGlobalChatBanner
+    extends
+        StatelessWidget {
   // ============================================================
   // CONTROLLER
   // ============================================================
@@ -45,7 +47,13 @@ class DashboardGlobalChatBanner extends StatelessWidget {
   // OPEN
   // ============================================================
 
-  final Future<void> Function(String projectId) onOpen;
+  final Future<
+    void
+  >
+  Function(
+    String projectId,
+  )
+  onOpen;
 
   // ============================================================
   // CONSTRUCTOR
@@ -62,71 +70,89 @@ class DashboardGlobalChatBanner extends StatelessWidget {
   // ============================================================
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(
+    BuildContext context,
+  ) {
     return ListenableBuilder(
       listenable: controller,
 
-      builder: (context, _) {
-        // ================================================
-        // SEM NOTIFICAÇÃO
-        // ================================================
+      builder:
+          (
+            context,
+            _,
+          ) {
+            // ================================================
+            // SEM NOTIFICAÇÃO
+            // ================================================
 
-        if (!controller.hasNotification) {
-          return const SizedBox.shrink();
-        }
+            if (!controller.hasNotification) {
+              return const SizedBox.shrink();
+            }
 
-        // ================================================
-        // PROJECT
-        // ================================================
+            // ================================================
+            // PROJECT
+            // ================================================
 
-        final projectId = controller.latestProjectId;
+            final projectId = controller.latestProjectId;
 
-        if (projectId == null || projectId.isEmpty) {
-          return const SizedBox.shrink();
-        }
+            if (projectId ==
+                    null ||
+                projectId.isEmpty) {
+              return const SizedBox.shrink();
+            }
 
-        // ================================================
-        // MESSAGE
-        // ================================================
+            // ================================================
+            // MESSAGE
+            // ================================================
 
-        if (!controller.hasMessage) {
-          return const SizedBox.shrink();
-        }
+            if (!controller.hasMessage) {
+              return const SizedBox.shrink();
+            }
 
-        // ================================================
-        // NAME
-        // ================================================
+            // ================================================
+            // NAME
+            // ================================================
 
-        return FutureBuilder<String>(
-          future: controller.resolveSenderName(),
+            return FutureBuilder<
+              String
+            >(
+              future: controller.resolveSenderName(),
 
-          builder: (context, snapshot) {
-            final senderName = snapshot.data ?? controller.senderName;
+              builder:
+                  (
+                    context,
+                    snapshot,
+                  ) {
+                    final senderName =
+                        snapshot.data ??
+                        controller.senderName;
 
-            // ========================================
-            // GLOBAL BANNER
-            // ========================================
+                    // ========================================
+                    // GLOBAL BANNER
+                    // ========================================
 
-            return GlobalChatBanner(
-              type: controller.latestIsAudio
-                  ? GlobalChatBannerType.audio
-                  : GlobalChatBannerType.message,
+                    return GlobalChatBanner(
+                      type: controller.latestIsAudio
+                          ? GlobalChatBannerType.audio
+                          : GlobalChatBannerType.message,
 
-              senderName: senderName,
+                      senderName: senderName,
 
-              preview: controller.preview,
+                      preview: controller.preview,
 
-              unreadCount: controller.unreadCount,
+                      unreadCount: controller.unreadCount,
 
-              onOpen: () {
-                _open(projectId);
-              },
+                      onOpen: () {
+                        _open(
+                          projectId,
+                        );
+                      },
 
-              onDismiss: controller.dismissBanner,
+                      onDismiss: controller.dismissBanner,
+                    );
+                  },
             );
           },
-        );
-      },
     );
   }
 
@@ -134,13 +160,20 @@ class DashboardGlobalChatBanner extends StatelessWidget {
   // OPEN
   // ============================================================
 
-  Future<void> _open(String projectId) async {
+  Future<
+    void
+  >
+  _open(
+    String projectId,
+  ) async {
     final normalizedProjectId = projectId.trim();
 
     if (normalizedProjectId.isEmpty) {
       return;
     }
 
-    await onOpen(normalizedProjectId);
+    await onOpen(
+      normalizedProjectId,
+    );
   }
 }

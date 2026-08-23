@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:versin/features/rhymes/presentation/controller/rhymes_controller.dart';
 
 import '../controllers/dashboard_controller.dart';
-import '../widgets/active_project_card_widget.dart';
+import '../projects/widgets/active_project_card_widget.dart';
 import '../widgets/calendar_card_widget.dart';
 
 import 'dashboard_desktop_layout.dart';

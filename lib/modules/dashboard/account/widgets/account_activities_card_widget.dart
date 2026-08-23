@@ -19,7 +19,7 @@ import 'package:versin/modules/networking/invitations/controllers/project_invita
 import 'package:versin/modules/networking/invitations/models/project_invitation_model.dart';
 import 'package:versin/modules/networking/views/networking_session_view.dart';
 
-import '../controllers/dashboard_controller.dart';
+import '../../controllers/dashboard_controller.dart';
 
 // ============================================================
 // ACCOUNT ACTIVITIES CARD WIDGET

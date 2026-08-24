@@ -965,7 +965,47 @@ class StudioController
   // ============================================================
 
   void _markChanged() {
+    if (_isDisposed) {
+      return;
+    }
+
+    // ========================================================
+    // JÁ EXISTE UMA SESSÃO DE EDIÇÃO ATIVA
+    // ========================================================
+    //
+    // Enquanto o Studio já estiver com alterações não salvas,
+    // não precisamos disparar uma nova transição de estado.
+    //
+    // Isso evita que cada tecla, movimento de nó ou alteração na
+    // Timeline tente iniciar outra composition_session.
+    //
+    // Os métodos públicos que realmente alteram o conteúdo
+    // continuam podendo chamar notifyListeners() normalmente
+    // para atualizar a interface.
+    //
+    // ========================================================
+
+    if (_hasUnsavedChanges) {
+      return;
+    }
+
+    // ========================================================
+    // INÍCIO DE UM NOVO CICLO DE COMPOSIÇÃO
+    // ========================================================
+    //
+    // A transição false -> true é observada pela StudioPage.
+    //
+    // Ela é responsável por registrar:
+    //
+    // composition_session
+    //
+    // no CreativeActivityService.
+    //
+    // ========================================================
+
     _hasUnsavedChanges = true;
+
+    notifyListeners();
   }
 
   // ============================================================

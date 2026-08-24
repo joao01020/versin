@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 
 import 'package:versin/modules/brain/controller/brain_controller.dart';
+import 'package:versin/modules/dashboard/production/services/creative_activity_service.dart';
 import 'package:versin/modules/studio/controllers/studio_controller.dart';
 import 'package:versin/modules/studio/controllers/studio_timeline_controller.dart';
 import 'package:versin/modules/studio/models/mind_map_node.dart';
@@ -10,33 +11,43 @@ import 'package:versin/modules/studio/widgets/lyric_editor.dart';
 import 'package:versin/modules/studio/widgets/mind_map.dart';
 import 'package:versin/modules/studio/widgets/song_word_timeline.dart';
 
-class StudioPage
-    extends
-        StatefulWidget {
-  const StudioPage({
-    super.key,
-  });
+class StudioPage extends StatefulWidget {
+  const StudioPage({super.key});
 
   @override
-  State<
-    StudioPage
-  >
-  createState() => _StudioPageState();
+  State<StudioPage> createState() => _StudioPageState();
 }
 
-class _StudioPageState
-    extends
-        State<
-          StudioPage
-        > {
+class _StudioPageState extends State<StudioPage> {
   late final BrainController brainController;
   late final StudioController controller;
 
+  // ============================================================
+  // PRODUÇÃO CRIATIVA — SESSÃO DE COMPOSIÇÃO
+  // ============================================================
+  //
+  // O Studio permanece dentro de um PageView e o StudioController
+  // é mantido vivo pelo GetIt. Por isso não registramos sessão
+  // simplesmente ao abrir/rebuildar a tela.
+  //
+  // Uma nova composition_session nasce quando o Studio passa de
+  // estado salvo -> alterado (unsaved).
+  //
+  // Ao salvar, o ciclo é encerrado. A próxima alteração cria uma
+  // nova sessão.
+  //
+  // ============================================================
+
+  final CreativeActivityService _creativeActivityService =
+      CreativeActivityService();
+
+  bool _wasUnsaved = false;
+  bool _isRegisteringCompositionSession = false;
+  int _compositionSessionSequence = 0;
+
   int? _lastVocabularySignature;
 
-  final Color activeColor = const Color(
-    0xFFE100FF,
-  );
+  final Color activeColor = const Color(0xFFE100FF);
 
   @override
   void initState() {
@@ -46,10 +57,7 @@ class _StudioPageState
     // MESMO CÉREBRO GLOBAL USADO PELO CHAT / BIBLIOTECA
     // ==========================================================
 
-    brainController =
-        GetIt.I<
-          BrainController
-        >();
+    brainController = GetIt.I<BrainController>();
 
     // ==========================================================
     // CONTROLLER DO STUDIO — INSTÂNCIA DA SESSÃO
@@ -70,10 +78,24 @@ class _StudioPageState
     //
     // ==========================================================
 
-    controller =
-        GetIt.I<
-          StudioController
-        >();
+    controller = GetIt.I<StudioController>();
+
+    // ==========================================================
+    // OBSERVAR ATIVIDADE REAL DE COMPOSIÇÃO
+    // ==========================================================
+    //
+    // O listener detecta a transição:
+    //
+    // salvo -> alterado
+    //
+    // e registra exatamente uma composition_session para aquele
+    // ciclo de edição.
+    //
+    // ==========================================================
+
+    _wasUnsaved = controller.hasUnsavedChanges;
+
+    controller.addListener(_handleStudioControllerChanged);
 
     // ==========================================================
     // CARREGAR BANCO DE RIMAS DEPOIS DO PRIMEIRO FRAME
@@ -88,29 +110,137 @@ class _StudioPageState
     //
     // ==========================================================
 
-    brainController.addListener(
-      _handleBrainControllerChanged,
-    );
+    brainController.addListener(_handleBrainControllerChanged);
 
-    WidgetsBinding.instance.addPostFrameCallback(
-      (
-        _,
-      ) async {
-        if (!mounted) {
-          return;
-        }
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) {
+        return;
+      }
 
-        await brainController.carregarDadosUsuario();
+      await brainController.carregarDadosUsuario();
 
-        if (!mounted) {
-          return;
-        }
+      if (!mounted) {
+        return;
+      }
 
-        _syncVocabularyState(
-          force: true,
-        );
-      },
-    );
+      _syncVocabularyState(force: true);
+    });
+  }
+
+  // ============================================================
+  // STUDIO CONTROLLER ALTERADO
+  // ============================================================
+  //
+  // Detecta o início de um novo ciclo real de composição.
+  //
+  // Rebuilds, carregamento de vocabulário e simples abertura da
+  // página não contam como sessão.
+  //
+  // ============================================================
+
+  void _handleStudioControllerChanged() {
+    final hasUnsavedChanges = controller.hasUnsavedChanges;
+
+    // ==========================================================
+    // NOVA SESSÃO
+    // ==========================================================
+    //
+    // A transição salvo -> alterado representa o início de uma
+    // nova sessão de composição.
+    //
+    // ==========================================================
+
+    if (hasUnsavedChanges && !_wasUnsaved) {
+      _wasUnsaved = true;
+
+      _registerCompositionSessionSafely();
+      return;
+    }
+
+    // ==========================================================
+    // SESSÃO ENCERRADA
+    // ==========================================================
+    //
+    // markAsSaved() volta o Studio para o estado salvo.
+    //
+    // A próxima alteração poderá iniciar uma nova sessão.
+    //
+    // ==========================================================
+
+    if (!hasUnsavedChanges && _wasUnsaved) {
+      _wasUnsaved = false;
+    }
+  }
+
+  // ============================================================
+  // REGISTRAR COMPOSITION SESSION
+  // ============================================================
+  //
+  // Best-effort:
+  //
+  // - analytics nunca bloqueia o Studio;
+  // - falha no Supabase não desfaz edição;
+  // - cada sessão recebe source_id único;
+  // - rebuilds não duplicam a métrica.
+  //
+  // ============================================================
+
+  Future<void> _registerCompositionSessionSafely() async {
+    if (_isRegisteringCompositionSession) {
+      return;
+    }
+
+    if (!_creativeActivityService.isAuthenticated) {
+      debugPrint(
+        '[STUDIO] '
+        'composition_session ignorada: usuário não autenticado.',
+      );
+
+      return;
+    }
+
+    _isRegisteringCompositionSession = true;
+
+    final sequence = ++_compositionSessionSequence;
+
+    final startedAt = DateTime.now().toUtc();
+
+    final sessionId =
+        'studio_'
+        '${startedAt.microsecondsSinceEpoch}_'
+        '$sequence';
+
+    try {
+      await _creativeActivityService.recordCompositionSession(
+        sessionId: sessionId,
+        metadata: <String, dynamic>{
+          'origin': 'studio',
+          'started_at': startedAt.toIso8601String(),
+          'studio_title': controller.title,
+          'bpm': controller.bpm,
+          'sequence': sequence,
+        },
+      );
+
+      debugPrint(
+        '[STUDIO] '
+        'Sessão de composição registrada: '
+        '$sessionId',
+      );
+    } catch (error, stackTrace) {
+      debugPrint(
+        '[STUDIO] '
+        'Não foi possível registrar composition_session: '
+        '$error',
+      );
+
+      debugPrint(
+        '[STUDIO] '
+        '$stackTrace',
+      );
+    } finally {
+      _isRegisteringCompositionSession = false;
+    }
   }
 
   // ============================================================
@@ -133,29 +263,15 @@ class _StudioPageState
     _syncVocabularyState();
   }
 
-  void _syncVocabularyState({
-    bool force = false,
-  }) {
+  void _syncVocabularyState({bool force = false}) {
     final normalizedWords = brainController.vocabularyWords
-        .map(
-          (
-            word,
-          ) => word.trim().toLowerCase(),
-        )
-        .where(
-          (
-            word,
-          ) => word.isNotEmpty,
-        )
+        .map((word) => word.trim().toLowerCase())
+        .where((word) => word.isNotEmpty)
         .toList();
 
-    final signature = Object.hashAll(
-      normalizedWords,
-    );
+    final signature = Object.hashAll(normalizedWords);
 
-    if (!force &&
-        signature ==
-            _lastVocabularySignature) {
+    if (!force && signature == _lastVocabularySignature) {
       return;
     }
 
@@ -167,9 +283,7 @@ class _StudioPageState
       '${normalizedWords.length} palavra(s).',
     );
 
-    setState(
-      () {},
-    );
+    setState(() {});
   }
 
   @override
@@ -186,9 +300,9 @@ class _StudioPageState
     //
     // ==========================================================
 
-    brainController.removeListener(
-      _handleBrainControllerChanged,
-    );
+    brainController.removeListener(_handleBrainControllerChanged);
+
+    controller.removeListener(_handleStudioControllerChanged);
 
     super.dispose();
   }
@@ -197,10 +311,7 @@ class _StudioPageState
   // ADICIONAR PALAVRA À TIMELINE
   // ============================================================
 
-  Future<
-    void
-  >
-  _showAddTimelineWordDialog() async {
+  Future<void> _showAddTimelineWordDialog() async {
     // ==========================================================
     // FONTE VIVA DA BIBLIOTECA
     // ==========================================================
@@ -222,220 +333,130 @@ class _StudioPageState
     //
     // ==========================================================
 
-    final result =
-        await showDialog<
-          String
-        >(
-          context: context,
-          builder:
-              (
-                _,
-              ) {
-                return _TimelineLibraryDialog(
-                  timelineController: controller.timelineController,
+    final result = await showDialog<String>(
+      context: context,
+      builder: (_) {
+        return _TimelineLibraryDialog(
+          timelineController: controller.timelineController,
 
-                  activeColor: activeColor,
-                );
-              },
+          activeColor: activeColor,
         );
+      },
+    );
 
-    if (!mounted ||
-        result ==
-            null ||
-        result.trim().isEmpty) {
+    if (!mounted || result == null || result.trim().isEmpty) {
       return;
     }
 
-    controller.addTimelineWord(
-      result.trim(),
-    );
+    controller.addTimelineWord(result.trim());
   }
 
   // ============================================================
   // ADICIONAR NÓ AO MAPA
   // ============================================================
 
-  Future<
-    void
-  >
-  _showAddMindMapNodeDialog() async {
+  Future<void> _showAddMindMapNodeDialog() async {
     final textController = TextEditingController();
 
     MindMapNodeType selectedType = MindMapNodeType.idea;
 
-    final result =
-        await showDialog<
-          Map<
-            String,
-            dynamic
-          >
-        >(
-          context: context,
-          builder:
-              (
-                context,
-              ) {
-                return StatefulBuilder(
-                  builder:
-                      (
-                        context,
-                        setDialogState,
-                      ) {
-                        return AlertDialog(
-                          backgroundColor: const Color(
-                            0xFF1A1A1A,
-                          ),
-                          title: const Text(
-                            'Adicionar ao Mapa',
-                            style: TextStyle(
-                              color: Colors.white,
-                            ),
-                          ),
-                          content: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              TextField(
-                                controller: textController,
-                                autofocus: true,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                ),
-                                decoration: const InputDecoration(
-                                  hintText: 'Ex: madrugada, saudade, reflexo...',
-                                  hintStyle: TextStyle(
-                                    color: Colors.white30,
-                                  ),
-                                ),
-                              ),
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: const Color(0xFF1A1A1A),
+              title: const Text(
+                'Adicionar ao Mapa',
+                style: TextStyle(color: Colors.white),
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: textController,
+                    autofocus: true,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: const InputDecoration(
+                      hintText: 'Ex: madrugada, saudade, reflexo...',
+                      hintStyle: TextStyle(color: Colors.white30),
+                    ),
+                  ),
 
-                              const SizedBox(
-                                height: 18,
-                              ),
+                  const SizedBox(height: 18),
 
-                              DropdownButtonFormField<
-                                MindMapNodeType
-                              >(
-                                initialValue: selectedType,
-                                dropdownColor: const Color(
-                                  0xFF1A1A1A,
-                                ),
-                                decoration: const InputDecoration(
-                                  labelText: 'Tipo',
-                                  labelStyle: TextStyle(
-                                    color: Colors.white54,
-                                  ),
-                                ),
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                ),
-                                items: MindMapNodeType.values.map(
-                                  (
-                                    type,
-                                  ) {
-                                    return DropdownMenuItem<
-                                      MindMapNodeType
-                                    >(
-                                      value: type,
-                                      child: Text(
-                                        _nodeTypeLabel(
-                                          type,
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                ).toList(),
-                                onChanged:
-                                    (
-                                      value,
-                                    ) {
-                                      if (value ==
-                                          null) {
-                                        return;
-                                      }
+                  DropdownButtonFormField<MindMapNodeType>(
+                    initialValue: selectedType,
+                    dropdownColor: const Color(0xFF1A1A1A),
+                    decoration: const InputDecoration(
+                      labelText: 'Tipo',
+                      labelStyle: TextStyle(color: Colors.white54),
+                    ),
+                    style: const TextStyle(color: Colors.white),
+                    items: MindMapNodeType.values.map((type) {
+                      return DropdownMenuItem<MindMapNodeType>(
+                        value: type,
+                        child: Text(_nodeTypeLabel(type)),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      if (value == null) {
+                        return;
+                      }
 
-                                      setDialogState(
-                                        () {
-                                          selectedType = value;
-                                        },
-                                      );
-                                    },
-                              ),
-                            ],
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () {
-                                Navigator.pop(
-                                  context,
-                                );
-                              },
-                              child: const Text(
-                                'CANCELAR',
-                              ),
-                            ),
-                            TextButton(
-                              onPressed: () {
-                                Navigator.pop(
-                                  context,
-                                  {
-                                    'text': textController.text.trim(),
-                                    'type': selectedType,
-                                  },
-                                );
-                              },
-                              child: Text(
-                                'ADICIONAR',
-                                style: TextStyle(
-                                  color: activeColor,
-                                ),
-                              ),
-                            ),
-                          ],
-                        );
-                      },
-                );
-              },
+                      setDialogState(() {
+                        selectedType = value;
+                      });
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                  },
+                  child: const Text('CANCELAR'),
+                ),
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(context, {
+                      'text': textController.text.trim(),
+                      'type': selectedType,
+                    });
+                  },
+                  child: Text(
+                    'ADICIONAR',
+                    style: TextStyle(color: activeColor),
+                  ),
+                ),
+              ],
+            );
+          },
         );
+      },
+    );
 
     textController.dispose();
 
-    if (result ==
-        null) {
+    if (result == null) {
       return;
     }
 
     final text = result['text']?.toString().trim();
 
-    final type =
-        result['type']
-            as MindMapNodeType?;
+    final type = result['type'] as MindMapNodeType?;
 
-    if (text ==
-            null ||
-        text.isEmpty ||
-        type ==
-            null) {
+    if (text == null || text.isEmpty || type == null) {
       return;
     }
 
     final index = controller.mindMapNodes.length;
 
-    final position = Offset(
-      40 +
-          (index %
-                  3) *
-              130,
-      50 +
-          (index ~/
-                  3) *
-              90,
-    );
+    final position = Offset(40 + (index % 3) * 130, 50 + (index ~/ 3) * 90);
 
-    controller.addMindMapNode(
-      text: text,
-      type: type,
-      position: position,
-    );
+    controller.addMindMapNode(text: text, type: type, position: position);
   }
 
   // ============================================================
@@ -445,28 +466,22 @@ class _StudioPageState
   void _saveProject() {
     final data = controller.exportProject();
 
-    debugPrint(
-      '================ STUDIO SAVE ================',
-    );
+    debugPrint('================ STUDIO SAVE ================');
 
-    debugPrint(
-      data.toString(),
-    );
+    debugPrint(data.toString());
 
-    debugPrint(
-      '=============================================',
-    );
+    debugPrint('=============================================');
 
     controller.markAsSaved();
 
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Projeto preparado para salvar.',
-        ),
-      ),
+    debugPrint(
+      '[STUDIO] '
+      'Sessão atual encerrada pelo salvamento. '
+      'A próxima alteração poderá iniciar uma nova sessão.',
+    );
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Projeto preparado para salvar.')),
     );
   }
 
@@ -474,16 +489,10 @@ class _StudioPageState
   // CHAT
   // ============================================================
 
-  void _askChat(
-    String text,
-  ) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(
+  void _askChat(String text) {
+    ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(
-          'Trecho preparado para consultar no Chat: "$text"',
-        ),
+        content: Text('Trecho preparado para consultar no Chat: "$text"'),
       ),
     );
 
@@ -508,181 +517,106 @@ class _StudioPageState
   // EDITAR TÍTULO
   // ============================================================
 
-  Future<
-    void
-  >
-  _editTitle() async {
-    final textController = TextEditingController(
-      text: controller.title,
-    );
+  Future<void> _editTitle() async {
+    final textController = TextEditingController(text: controller.title);
 
-    final result =
-        await showDialog<
-          String
-        >(
-          context: context,
-          builder:
-              (
-                context,
-              ) {
-                return AlertDialog(
-                  backgroundColor: const Color(
-                    0xFF1A1A1A,
-                  ),
-                  title: const Text(
-                    'Nome da Música',
-                    style: TextStyle(
-                      color: Colors.white,
-                    ),
-                  ),
-                  content: TextField(
-                    controller: textController,
-                    autofocus: true,
-                    style: const TextStyle(
-                      color: Colors.white,
-                    ),
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () {
-                        Navigator.pop(
-                          context,
-                        );
-                      },
-                      child: const Text(
-                        'CANCELAR',
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        Navigator.pop(
-                          context,
-                          textController.text.trim(),
-                        );
-                      },
-                      child: Text(
-                        'SALVAR',
-                        style: TextStyle(
-                          color: activeColor,
-                        ),
-                      ),
-                    ),
-                  ],
-                );
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF1A1A1A),
+          title: const Text(
+            'Nome da Música',
+            style: TextStyle(color: Colors.white),
+          ),
+          content: TextField(
+            controller: textController,
+            autofocus: true,
+            style: const TextStyle(color: Colors.white),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
               },
+              child: const Text('CANCELAR'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context, textController.text.trim());
+              },
+              child: Text('SALVAR', style: TextStyle(color: activeColor)),
+            ),
+          ],
         );
+      },
+    );
 
     textController.dispose();
 
-    if (result ==
-            null ||
-        result.isEmpty) {
+    if (result == null || result.isEmpty) {
       return;
     }
 
-    controller.updateTitle(
-      result,
-    );
+    controller.updateTitle(result);
   }
 
   // ============================================================
   // BPM
   // ============================================================
 
-  Future<
-    void
-  >
-  _editBpm() async {
+  Future<void> _editBpm() async {
     final textController = TextEditingController(
       text: controller.bpm.toString(),
     );
 
-    final result =
-        await showDialog<
-          int
-        >(
-          context: context,
-          builder:
-              (
-                context,
-              ) {
-                return AlertDialog(
-                  backgroundColor: const Color(
-                    0xFF1A1A1A,
-                  ),
-                  title: const Text(
-                    'BPM',
-                    style: TextStyle(
-                      color: Colors.white,
-                    ),
-                  ),
-                  content: TextField(
-                    controller: textController,
-                    autofocus: true,
-                    keyboardType: TextInputType.number,
-                    style: const TextStyle(
-                      color: Colors.white,
-                    ),
-                    decoration: const InputDecoration(
-                      hintText: '120',
-                    ),
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () {
-                        Navigator.pop(
-                          context,
-                        );
-                      },
-                      child: const Text(
-                        'CANCELAR',
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        final value = int.tryParse(
-                          textController.text,
-                        );
-
-                        Navigator.pop(
-                          context,
-                          value,
-                        );
-                      },
-                      child: Text(
-                        'SALVAR',
-                        style: TextStyle(
-                          color: activeColor,
-                        ),
-                      ),
-                    ),
-                  ],
-                );
+    final result = await showDialog<int>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF1A1A1A),
+          title: const Text('BPM', style: TextStyle(color: Colors.white)),
+          content: TextField(
+            controller: textController,
+            autofocus: true,
+            keyboardType: TextInputType.number,
+            style: const TextStyle(color: Colors.white),
+            decoration: const InputDecoration(hintText: '120'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
               },
+              child: const Text('CANCELAR'),
+            ),
+            TextButton(
+              onPressed: () {
+                final value = int.tryParse(textController.text);
+
+                Navigator.pop(context, value);
+              },
+              child: Text('SALVAR', style: TextStyle(color: activeColor)),
+            ),
+          ],
         );
+      },
+    );
 
     textController.dispose();
 
-    if (result ==
-            null ||
-        result <=
-            0) {
+    if (result == null || result <= 0) {
       return;
     }
 
-    controller.updateBpm(
-      result,
-    );
+    controller.updateBpm(result);
   }
 
   // ============================================================
   // JANELA EXTERNA — LETRA
   // ============================================================
 
-  Future<
-    void
-  >
-  _detachLyrics() async {
+  Future<void> _detachLyrics() async {
     if (controller.isLyricsDetached) {
       await StudioWindowService.instance.showLyricsWindow();
       return;
@@ -694,23 +628,15 @@ class _StudioPageState
       await StudioWindowService.instance.openLyricsWindow(
         projectId: controller.title,
       );
-    } catch (
-      e
-    ) {
+    } catch (e) {
       controller.dockLyrics();
 
       if (!mounted) {
         return;
       }
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Não foi possível abrir a janela da letra: $e',
-          ),
-        ),
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Não foi possível abrir a janela da letra: $e')),
       );
     }
   }
@@ -719,10 +645,7 @@ class _StudioPageState
   // JANELA EXTERNA — MAPA
   // ============================================================
 
-  Future<
-    void
-  >
-  _detachMindMap() async {
+  Future<void> _detachMindMap() async {
     if (controller.isMindMapDetached) {
       await StudioWindowService.instance.showMindMapWindow();
       return;
@@ -734,23 +657,15 @@ class _StudioPageState
       await StudioWindowService.instance.openMindMapWindow(
         projectId: controller.title,
       );
-    } catch (
-      e
-    ) {
+    } catch (e) {
       controller.dockMindMap();
 
       if (!mounted) {
         return;
       }
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Não foi possível abrir a janela do mapa: $e',
-          ),
-        ),
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Não foi possível abrir a janela do mapa: $e')),
       );
     }
   }
@@ -759,16 +674,11 @@ class _StudioPageState
   // ENCAIXAR TODOS OS PAINÉIS
   // ============================================================
 
-  Future<
-    void
-  >
-  _dockAllPanels() async {
-    await Future.wait(
-      [
-        StudioWindowService.instance.dockLyricsWindow(),
-        StudioWindowService.instance.dockMindMapWindow(),
-      ],
-    );
+  Future<void> _dockAllPanels() async {
+    await Future.wait([
+      StudioWindowService.instance.dockLyricsWindow(),
+      StudioWindowService.instance.dockMindMapWindow(),
+    ]);
 
     controller.dockAllPanels();
   }
@@ -778,73 +688,53 @@ class _StudioPageState
   // ============================================================
 
   @override
-  Widget build(
-    BuildContext context,
-  ) {
+  Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: controller,
-      builder:
-          (
-            context,
-            _,
-          ) {
-            return Scaffold(
-              backgroundColor: const Color(
-                0xFF0D0D0D,
-              ),
-              body: SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.all(
-                    14,
+      builder: (context, _) {
+        return Scaffold(
+          backgroundColor: const Color(0xFF0D0D0D),
+          body: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                children: [
+                  // =================================================
+                  // HEADER
+                  // =================================================
+                  _buildHeader(),
+
+                  const SizedBox(height: 12),
+
+                  // =================================================
+                  // LETRA + MAPA
+                  // =================================================
+                  Expanded(
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        return _buildDockedWorkspace(constraints);
+                      },
+                    ),
                   ),
-                  child: Column(
-                    children: [
-                      // =================================================
-                      // HEADER
-                      // =================================================
-                      _buildHeader(),
 
-                      const SizedBox(
-                        height: 12,
-                      ),
+                  const SizedBox(height: 12),
 
-                      // =================================================
-                      // LETRA + MAPA
-                      // =================================================
-                      Expanded(
-                        child: LayoutBuilder(
-                          builder:
-                              (
-                                context,
-                                constraints,
-                              ) {
-                                return _buildDockedWorkspace(
-                                  constraints,
-                                );
-                              },
-                        ),
-                      ),
-
-                      const SizedBox(
-                        height: 12,
-                      ),
-
-                      // =================================================
-                      // TIMELINE
-                      // =================================================
-                      SongWordTimeline(
-                        words: controller.timelineWords,
-                        activeColor: activeColor,
-                        isWordUsed: controller.isTimelineWordUsed,
-                        onRemoveWord: controller.removeTimelineWord,
-                        onAddWord: _showAddTimelineWordDialog,
-                      ),
-                    ],
+                  // =================================================
+                  // TIMELINE
+                  // =================================================
+                  SongWordTimeline(
+                    words: controller.timelineWords,
+                    activeColor: activeColor,
+                    isWordUsed: controller.isTimelineWordUsed,
+                    onRemoveWord: controller.removeTimelineWord,
+                    onAddWord: _showAddTimelineWordDialog,
                   ),
-                ),
+                ],
               ),
-            );
-          },
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -852,12 +742,8 @@ class _StudioPageState
   // WORKSPACE ENCAIXADO
   // ============================================================
 
-  Widget _buildDockedWorkspace(
-    BoxConstraints constraints,
-  ) {
-    final compact =
-        constraints.maxWidth <
-        850;
+  Widget _buildDockedWorkspace(BoxConstraints constraints) {
+    final compact = constraints.maxWidth < 850;
 
     final lyricsDetached = controller.isLyricsDetached;
 
@@ -867,8 +753,7 @@ class _StudioPageState
     // AMBOS DESTACADOS
     // ==========================================================
 
-    if (lyricsDetached &&
-        mapDetached) {
+    if (lyricsDetached && mapDetached) {
       return _DetachedWorkspacePlaceholder(
         activeColor: activeColor,
         onDockAll: () {
@@ -881,8 +766,7 @@ class _StudioPageState
     // APENAS LETRA ENCAIXADA
     // ==========================================================
 
-    if (!lyricsDetached &&
-        mapDetached) {
+    if (!lyricsDetached && mapDetached) {
       return _DockableHoverPanel(
         activeColor: activeColor,
         tooltip: 'Desencaixar Letra',
@@ -897,8 +781,7 @@ class _StudioPageState
     // APENAS MAPA ENCAIXADO
     // ==========================================================
 
-    if (lyricsDetached &&
-        !mapDetached) {
+    if (lyricsDetached && !mapDetached) {
       return _DockableHoverPanel(
         activeColor: activeColor,
         tooltip: 'Desencaixar Mapa',
@@ -927,9 +810,7 @@ class _StudioPageState
             ),
           ),
 
-          const SizedBox(
-            height: 12,
-          ),
+          const SizedBox(height: 12),
 
           Expanded(
             child: _DockableHoverPanel(
@@ -959,9 +840,7 @@ class _StudioPageState
           ),
         ),
 
-        const SizedBox(
-          width: 12,
-        ),
+        const SizedBox(width: 12),
 
         Expanded(
           flex: 2,
@@ -994,18 +873,9 @@ class _StudioPageState
 
       onSelectionChanged: controller.updateSelectedText,
 
-      onAddToMap:
-          (
-            text,
-          ) {
-            controller.addMindMapNode(
-              text: text,
-              position: const Offset(
-                40,
-                40,
-              ),
-            );
-          },
+      onAddToMap: (text) {
+        controller.addMindMapNode(text: text, position: const Offset(40, 40));
+      },
 
       onAddToTimeline: controller.addTimelineWord,
 
@@ -1037,22 +907,11 @@ class _StudioPageState
 
   Widget _buildHeader() {
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 16,
-        vertical: 12,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: const Color(
-          0xFF111111,
-        ),
-        borderRadius: BorderRadius.circular(
-          16,
-        ),
-        border: Border.all(
-          color: Colors.white.withValues(
-            alpha: 0.05,
-          ),
-        ),
+        color: const Color(0xFF111111),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
       ),
       child: Row(
         children: [
@@ -1061,15 +920,10 @@ class _StudioPageState
           // =====================================================
           Expanded(
             child: InkWell(
-              borderRadius: BorderRadius.circular(
-                8,
-              ),
+              borderRadius: BorderRadius.circular(8),
               onTap: _editTitle,
               child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  vertical: 6,
-                  horizontal: 4,
-                ),
+                padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -1086,9 +940,7 @@ class _StudioPageState
                       ),
                     ),
 
-                    const SizedBox(
-                      width: 8,
-                    ),
+                    const SizedBox(width: 8),
 
                     const Icon(
                       Icons.edit_outlined,
@@ -1097,9 +949,7 @@ class _StudioPageState
                     ),
 
                     if (controller.hasUnsavedChanges) ...[
-                      const SizedBox(
-                        width: 8,
-                      ),
+                      const SizedBox(width: 8),
 
                       Container(
                         width: 6,
@@ -1116,42 +966,25 @@ class _StudioPageState
             ),
           ),
 
-          const SizedBox(
-            width: 12,
-          ),
+          const SizedBox(width: 12),
 
           // =====================================================
           // BPM
           // =====================================================
           InkWell(
-            borderRadius: BorderRadius.circular(
-              10,
-            ),
+            borderRadius: BorderRadius.circular(10),
             onTap: _editBpm,
             child: Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 8,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: activeColor.withValues(
-                  alpha: 0.08,
-                ),
-                borderRadius: BorderRadius.circular(
-                  10,
-                ),
+                color: activeColor.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(10),
               ),
               child: Row(
                 children: [
-                  Icon(
-                    Icons.speed_rounded,
-                    color: activeColor,
-                    size: 16,
-                  ),
+                  Icon(Icons.speed_rounded, color: activeColor, size: 16),
 
-                  const SizedBox(
-                    width: 6,
-                  ),
+                  const SizedBox(width: 6),
 
                   Text(
                     '${controller.bpm} BPM',
@@ -1166,9 +999,7 @@ class _StudioPageState
             ),
           ),
 
-          const SizedBox(
-            width: 10,
-          ),
+          const SizedBox(width: 10),
 
           // =====================================================
           // SALVAR
@@ -1179,26 +1010,15 @@ class _StudioPageState
               backgroundColor: activeColor,
               foregroundColor: Colors.black,
               elevation: 0,
-              padding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 12,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(
-                  10,
-                ),
+                borderRadius: BorderRadius.circular(10),
               ),
             ),
-            icon: const Icon(
-              Icons.save_outlined,
-              size: 17,
-            ),
+            icon: const Icon(Icons.save_outlined, size: 17),
             label: const Text(
               'SALVAR',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
             ),
           ),
         ],
@@ -1210,9 +1030,7 @@ class _StudioPageState
   // LABEL DO TIPO
   // ============================================================
 
-  static String _nodeTypeLabel(
-    MindMapNodeType type,
-  ) {
+  static String _nodeTypeLabel(MindMapNodeType type) {
     switch (type) {
       case MindMapNodeType.idea:
         return 'Ideia';
@@ -1239,9 +1057,7 @@ class _StudioPageState
 // PAINEL ENCAIXADO COM HOVER
 // ============================================================
 
-class _DockableHoverPanel
-    extends
-        StatefulWidget {
+class _DockableHoverPanel extends StatefulWidget {
   final Color activeColor;
 
   final String tooltip;
@@ -1258,50 +1074,29 @@ class _DockableHoverPanel
   });
 
   @override
-  State<
-    _DockableHoverPanel
-  >
-  createState() => _DockableHoverPanelState();
+  State<_DockableHoverPanel> createState() => _DockableHoverPanelState();
 }
 
-class _DockableHoverPanelState
-    extends
-        State<
-          _DockableHoverPanel
-        > {
+class _DockableHoverPanelState extends State<_DockableHoverPanel> {
   bool _hovered = false;
 
   @override
-  Widget build(
-    BuildContext context,
-  ) {
+  Widget build(BuildContext context) {
     return MouseRegion(
-      onEnter:
-          (
-            _,
-          ) {
-            setState(
-              () {
-                _hovered = true;
-              },
-            );
-          },
-      onExit:
-          (
-            _,
-          ) {
-            setState(
-              () {
-                _hovered = false;
-              },
-            );
-          },
+      onEnter: (_) {
+        setState(() {
+          _hovered = true;
+        });
+      },
+      onExit: (_) {
+        setState(() {
+          _hovered = false;
+        });
+      },
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          Positioned.fill(
-            child: widget.child,
-          ),
+          Positioned.fill(child: widget.child),
 
           // ====================================================
           // BOTÃO DE DESENCAIXAR
@@ -1312,30 +1107,18 @@ class _DockableHoverPanelState
             child: IgnorePointer(
               ignoring: !_hovered,
               child: AnimatedOpacity(
-                opacity: _hovered
-                    ? 1
-                    : 0,
-                duration: const Duration(
-                  milliseconds: 130,
-                ),
+                opacity: _hovered ? 1 : 0,
+                duration: const Duration(milliseconds: 130),
                 child: Tooltip(
                   message: widget.tooltip,
                   child: Material(
-                    color: const Color(
-                      0xFF171717,
-                    ),
-                    borderRadius: BorderRadius.circular(
-                      8,
-                    ),
+                    color: const Color(0xFF171717),
+                    borderRadius: BorderRadius.circular(8),
                     child: InkWell(
-                      borderRadius: BorderRadius.circular(
-                        8,
-                      ),
+                      borderRadius: BorderRadius.circular(8),
                       onTap: widget.onDetach,
                       child: Padding(
-                        padding: const EdgeInsets.all(
-                          7,
-                        ),
+                        padding: const EdgeInsets.all(7),
                         child: Icon(
                           Icons.open_in_new_rounded,
                           size: 15,
@@ -1358,9 +1141,7 @@ class _DockableHoverPanelState
 // PLACEHOLDER QUANDO OS DOIS PAINÉIS ESTÃO DESTACADOS
 // ============================================================
 
-class _DetachedWorkspacePlaceholder
-    extends
-        StatelessWidget {
+class _DetachedWorkspacePlaceholder extends StatelessWidget {
   final Color activeColor;
 
   final VoidCallback onDockAll;
@@ -1371,23 +1152,13 @@ class _DetachedWorkspacePlaceholder
   });
 
   @override
-  Widget build(
-    BuildContext context,
-  ) {
+  Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: const Color(
-          0xFF111111,
-        ),
-        borderRadius: BorderRadius.circular(
-          16,
-        ),
-        border: Border.all(
-          color: Colors.white.withValues(
-            alpha: 0.05,
-          ),
-        ),
+        color: const Color(0xFF111111),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
       ),
       child: Center(
         child: Column(
@@ -1396,14 +1167,10 @@ class _DetachedWorkspacePlaceholder
             Icon(
               Icons.dashboard_customize_outlined,
               size: 28,
-              color: activeColor.withValues(
-                alpha: 0.5,
-              ),
+              color: activeColor.withValues(alpha: 0.5),
             ),
 
-            const SizedBox(
-              height: 10,
-            ),
+            const SizedBox(height: 10),
 
             const Text(
               'LETRA e MAPA estão destacados',
@@ -1414,9 +1181,7 @@ class _DetachedWorkspacePlaceholder
               ),
             ),
 
-            const SizedBox(
-              height: 10,
-            ),
+            const SizedBox(height: 10),
 
             TextButton.icon(
               onPressed: onDockAll,
@@ -1458,9 +1223,7 @@ class _DetachedWorkspacePlaceholder
 //
 // ============================================================
 
-class _TimelineLibraryDialog
-    extends
-        StatefulWidget {
+class _TimelineLibraryDialog extends StatefulWidget {
   final StudioTimelineController timelineController;
 
   final Color activeColor;
@@ -1471,17 +1234,10 @@ class _TimelineLibraryDialog
   });
 
   @override
-  State<
-    _TimelineLibraryDialog
-  >
-  createState() => _TimelineLibraryDialogState();
+  State<_TimelineLibraryDialog> createState() => _TimelineLibraryDialogState();
 }
 
-class _TimelineLibraryDialogState
-    extends
-        State<
-          _TimelineLibraryDialog
-        > {
+class _TimelineLibraryDialogState extends State<_TimelineLibraryDialog> {
   late final TextEditingController _searchController;
 
   String _search = '';
@@ -1496,9 +1252,7 @@ class _TimelineLibraryDialogState
 
     _searchController = TextEditingController();
 
-    widget.timelineController.addListener(
-      _handleLibraryChanged,
-    );
+    widget.timelineController.addListener(_handleLibraryChanged);
   }
 
   // ============================================================
@@ -1510,9 +1264,7 @@ class _TimelineLibraryDialogState
       return;
     }
 
-    setState(
-      () {},
-    );
+    setState(() {});
   }
 
   // ============================================================
@@ -1521,9 +1273,7 @@ class _TimelineLibraryDialogState
 
   @override
   void dispose() {
-    widget.timelineController.removeListener(
-      _handleLibraryChanged,
-    );
+    widget.timelineController.removeListener(_handleLibraryChanged);
 
     _searchController.dispose();
 
@@ -1534,21 +1284,10 @@ class _TimelineLibraryDialogState
   // TIMELINE NORMALIZADA
   // ============================================================
 
-  Set<
-    String
-  >
-  get _timelineWords {
+  Set<String> get _timelineWords {
     return widget.timelineController.timelineWords
-        .map(
-          (
-            word,
-          ) => word.trim().toLowerCase(),
-        )
-        .where(
-          (
-            word,
-          ) => word.isNotEmpty,
-        )
+        .map((word) => word.trim().toLowerCase())
+        .where((word) => word.isNotEmpty)
         .toSet();
   }
 
@@ -1576,62 +1315,42 @@ class _TimelineLibraryDialogState
   //
   // ============================================================
 
-  List<
-    String
-  >
-  get _filteredWords {
+  List<String> get _filteredWords {
     final query = _search.trim().toLowerCase();
 
-    final seen =
-        <
-          String
-        >{};
+    final seen = <String>{};
 
-    return widget.timelineController.rhymeLibrary.where(
-      (
-        word,
-      ) {
-        final normalized = word.trim().toLowerCase();
+    return widget.timelineController.rhymeLibrary.where((word) {
+      final normalized = word.trim().toLowerCase();
 
-        if (normalized.isEmpty) {
-          return false;
-        }
+      if (normalized.isEmpty) {
+        return false;
+      }
 
-        if (!seen.add(
-          normalized,
-        )) {
-          return false;
-        }
+      if (!seen.add(normalized)) {
+        return false;
+      }
 
-        if (query.isEmpty) {
-          return true;
-        }
+      if (query.isEmpty) {
+        return true;
+      }
 
-        return normalized.contains(
-          query,
-        );
-      },
-    ).toList();
+      return normalized.contains(query);
+    }).toList();
   }
 
   // ============================================================
   // FECHAR COM RESULTADO
   // ============================================================
 
-  void _finish(
-    String word,
-  ) {
+  void _finish(String word) {
     final normalized = word.trim();
 
     if (normalized.isEmpty) {
       return;
     }
 
-    Navigator.of(
-      context,
-    ).pop(
-      normalized,
-    );
+    Navigator.of(context).pop(normalized);
   }
 
   // ============================================================
@@ -1641,11 +1360,9 @@ class _TimelineLibraryDialogState
   void _clearSearch() {
     _searchController.clear();
 
-    setState(
-      () {
-        _search = '';
-      },
-    );
+    setState(() {
+      _search = '';
+    });
   }
 
   // ============================================================
@@ -1653,9 +1370,7 @@ class _TimelineLibraryDialogState
   // ============================================================
 
   @override
-  Widget build(
-    BuildContext context,
-  ) {
+  Widget build(BuildContext context) {
     final libraryWords = _filteredWords;
 
     final timelineWords = _timelineWords;
@@ -1663,14 +1378,10 @@ class _TimelineLibraryDialogState
     final hasSearch = _search.trim().isNotEmpty;
 
     return AlertDialog(
-      backgroundColor: const Color(
-        0xFF1A1A1A,
-      ),
+      backgroundColor: const Color(0xFF1A1A1A),
       title: const Text(
         'Adicionar à Timeline',
-        style: TextStyle(
-          color: Colors.white,
-        ),
+        style: TextStyle(color: Colors.white),
       ),
       content: SizedBox(
         width: 520,
@@ -1684,25 +1395,16 @@ class _TimelineLibraryDialogState
             TextField(
               controller: _searchController,
               autofocus: true,
-              style: const TextStyle(
-                color: Colors.white,
-              ),
-              onChanged:
-                  (
-                    value,
-                  ) {
-                    setState(
-                      () {
-                        _search = value;
-                      },
-                    );
-                  },
+              style: const TextStyle(color: Colors.white),
+              onChanged: (value) {
+                setState(() {
+                  _search = value;
+                });
+              },
               onSubmitted: _finish,
               decoration: InputDecoration(
                 hintText: 'Buscar na biblioteca ou criar uma palavra...',
-                hintStyle: const TextStyle(
-                  color: Colors.white30,
-                ),
+                hintStyle: const TextStyle(color: Colors.white30),
                 prefixIcon: const Icon(
                   Icons.search_rounded,
                   color: Colors.white30,
@@ -1717,31 +1419,19 @@ class _TimelineLibraryDialogState
                         ),
                       ),
                 filled: true,
-                fillColor: Colors.white.withValues(
-                  alpha: 0.04,
-                ),
+                fillColor: Colors.white.withValues(alpha: 0.04),
                 enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(
-                    12,
-                  ),
-                  borderSide: const BorderSide(
-                    color: Colors.white10,
-                  ),
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Colors.white10),
                 ),
                 focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(
-                    12,
-                  ),
-                  borderSide: BorderSide(
-                    color: widget.activeColor,
-                  ),
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: widget.activeColor),
                 ),
               ),
             ),
 
-            const SizedBox(
-              height: 18,
-            ),
+            const SizedBox(height: 18),
 
             // ==================================================
             // CABEÇALHO DA BIBLIOTECA
@@ -1758,117 +1448,92 @@ class _TimelineLibraryDialogState
                   ),
                 ),
 
-                const SizedBox(
-                  width: 8,
-                ),
+                const SizedBox(width: 8),
 
                 Text(
                   '${libraryWords.length}',
-                  style: const TextStyle(
-                    color: Colors.white24,
-                    fontSize: 10,
-                  ),
+                  style: const TextStyle(color: Colors.white24, fontSize: 10),
                 ),
               ],
             ),
 
-            const SizedBox(
-              height: 10,
-            ),
+            const SizedBox(height: 10),
 
             // ==================================================
             // LISTA
             // ==================================================
             ConstrainedBox(
-              constraints: const BoxConstraints(
-                maxHeight: 260,
-              ),
+              constraints: const BoxConstraints(maxHeight: 260),
               child: libraryWords.isEmpty
                   ? _buildEmptyState()
                   : SingleChildScrollView(
                       child: Wrap(
                         spacing: 8,
                         runSpacing: 8,
-                        children: libraryWords.map(
-                          (
-                            word,
-                          ) {
-                            final normalized = word.trim().toLowerCase();
+                        children: libraryWords.map((word) {
+                          final normalized = word.trim().toLowerCase();
 
-                            final alreadyInTimeline = timelineWords.contains(
-                              normalized,
-                            );
+                          final alreadyInTimeline = timelineWords.contains(
+                            normalized,
+                          );
 
-                            return Tooltip(
-                              message: alreadyInTimeline
-                                  ? 'Já está na Timeline'
-                                  : 'Adicionar à Timeline',
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(
-                                  12,
+                          return Tooltip(
+                            message: alreadyInTimeline
+                                ? 'Já está na Timeline'
+                                : 'Adicionar à Timeline',
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(12),
+                              onTap: alreadyInTimeline
+                                  ? null
+                                  : () {
+                                      _finish(word);
+                                    },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
                                 ),
-                                onTap: alreadyInTimeline
-                                    ? null
-                                    : () {
-                                        _finish(
-                                          word,
-                                        );
-                                      },
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 8,
+                                decoration: BoxDecoration(
+                                  color: widget.activeColor.withValues(
+                                    alpha: alreadyInTimeline ? 0.035 : 0.08,
                                   ),
-                                  decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
                                     color: widget.activeColor.withValues(
-                                      alpha: alreadyInTimeline
-                                          ? 0.035
-                                          : 0.08,
-                                    ),
-                                    borderRadius: BorderRadius.circular(
-                                      12,
-                                    ),
-                                    border: Border.all(
-                                      color: widget.activeColor.withValues(
-                                        alpha: alreadyInTimeline
-                                            ? 0.10
-                                            : 0.20,
-                                      ),
+                                      alpha: alreadyInTimeline ? 0.10 : 0.20,
                                     ),
                                   ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        alreadyInTimeline
-                                            ? Icons.check_rounded
-                                            : Icons.add_rounded,
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      alreadyInTimeline
+                                          ? Icons.check_rounded
+                                          : Icons.add_rounded,
+                                      color: alreadyInTimeline
+                                          ? Colors.white24
+                                          : widget.activeColor,
+                                      size: 15,
+                                    ),
+
+                                    const SizedBox(width: 5),
+
+                                    Text(
+                                      word,
+                                      style: TextStyle(
                                         color: alreadyInTimeline
-                                            ? Colors.white24
-                                            : widget.activeColor,
-                                        size: 15,
+                                            ? Colors.white30
+                                            : Colors.white70,
+                                        fontSize: 12,
                                       ),
-
-                                      const SizedBox(
-                                        width: 5,
-                                      ),
-
-                                      Text(
-                                        word,
-                                        style: TextStyle(
-                                          color: alreadyInTimeline
-                                              ? Colors.white30
-                                              : Colors.white70,
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                            );
-                          },
-                        ).toList(),
+                            ),
+                          );
+                        }).toList(),
                       ),
                     ),
             ),
@@ -1877,33 +1542,22 @@ class _TimelineLibraryDialogState
             // CRIAR NOVA PALAVRA
             // ==================================================
             if (hasSearch) ...[
-              const SizedBox(
-                height: 16,
-              ),
+              const SizedBox(height: 16),
 
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
                   onPressed: () {
-                    _finish(
-                      _search,
-                    );
+                    _finish(_search);
                   },
                   style: OutlinedButton.styleFrom(
                     foregroundColor: widget.activeColor,
                     side: BorderSide(
-                      color: widget.activeColor.withValues(
-                        alpha: 0.35,
-                      ),
+                      color: widget.activeColor.withValues(alpha: 0.35),
                     ),
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 12,
-                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
-                  icon: const Icon(
-                    Icons.add_rounded,
-                    size: 17,
-                  ),
+                  icon: const Icon(Icons.add_rounded, size: 17),
                   label: Text(
                     'CRIAR "${_search.trim()}"',
                     maxLines: 1,
@@ -1922,13 +1576,9 @@ class _TimelineLibraryDialogState
       actions: [
         TextButton(
           onPressed: () {
-            Navigator.of(
-              context,
-            ).pop();
+            Navigator.of(context).pop();
           },
-          child: const Text(
-            'CANCELAR',
-          ),
+          child: const Text('CANCELAR'),
         ),
       ],
     );
@@ -1943,9 +1593,7 @@ class _TimelineLibraryDialogState
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(
-        vertical: 24,
-      ),
+      padding: const EdgeInsets.symmetric(vertical: 24),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -1955,33 +1603,23 @@ class _TimelineLibraryDialogState
             size: 28,
           ),
 
-          const SizedBox(
-            height: 10,
-          ),
+          const SizedBox(height: 10),
 
           Text(
             hasSearch
                 ? 'Nenhuma palavra encontrada.'
                 : 'Nenhuma palavra disponível na biblioteca.',
             textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: Colors.white30,
-              fontSize: 11,
-            ),
+            style: const TextStyle(color: Colors.white30, fontSize: 11),
           ),
 
           if (hasSearch) ...[
-            const SizedBox(
-              height: 6,
-            ),
+            const SizedBox(height: 6),
 
             Text(
               'Você pode criar "${_search.trim()}" usando o botão abaixo.',
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Colors.white24,
-                fontSize: 10,
-              ),
+              style: const TextStyle(color: Colors.white24, fontSize: 10),
             ),
           ],
         ],

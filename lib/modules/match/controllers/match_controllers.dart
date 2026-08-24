@@ -8,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:versin/app/locator.dart';
 
 import 'package:versin/modules/dashboard/controllers/dashboard_controller.dart';
+import 'package:versin/modules/dashboard/production/services/creative_activity_service.dart';
 
 import 'package:versin/modules/profile/controllers/professional_profile_controller.dart';
 import 'package:versin/modules/profile/models/music_role.dart';
@@ -59,23 +60,44 @@ import '../models/match_user_entity.dart';
 //
 // ============================================================
 
-class MatchController with ChangeNotifier {
+class MatchController
+    with
+        ChangeNotifier {
   // ============================================================
   // CONSTANTES
   // ============================================================
 
   static const int _connectionDurationSeconds = 1200;
 
-  static const Duration _searchTimeout = Duration(milliseconds: 1500);
+  static const Duration _searchTimeout = Duration(
+    milliseconds: 1500,
+  );
 
   // ============================================================
   // DEPENDÊNCIAS
   // ============================================================
 
-  final DashboardController _dashboardController = sl<DashboardController>();
+  final DashboardController _dashboardController =
+      sl<
+        DashboardController
+      >();
 
   final ProfessionalProfileController _professionalProfileController =
-      sl<ProfessionalProfileController>();
+      sl<
+        ProfessionalProfileController
+      >();
+
+  // ============================================================
+  // CREATIVE ACTIVITY
+  // ============================================================
+  //
+  // Responsável apenas pelo registro best-effort de métricas
+  // criativas. Uma falha nesta camada nunca pode invalidar um
+  // match ou um projeto que já tenha sido criado com sucesso.
+  //
+  // ============================================================
+
+  final CreativeActivityService _creativeActivityService = CreativeActivityService();
 
   // ============================================================
   // SUPABASE
@@ -100,8 +122,13 @@ class MatchController with ChangeNotifier {
   // STREAM DE EVENTO DE MATCH
   // ============================================================
 
-  final StreamController<String> _matchEventController =
-      StreamController<String>.broadcast();
+  final StreamController<
+    String
+  >
+  _matchEventController =
+      StreamController<
+        String
+      >.broadcast();
 
   // ============================================================
   // TIMERS
@@ -115,7 +142,10 @@ class MatchController with ChangeNotifier {
   // REALTIME
   // ============================================================
 
-  StreamSubscription<dynamic>? _matchSubscription;
+  StreamSubscription<
+    dynamic
+  >?
+  _matchSubscription;
 
   // ============================================================
   // PROTEÇÃO DE CONCORRÊNCIA
@@ -132,9 +162,21 @@ class MatchController with ChangeNotifier {
   //
   // ============================================================
 
-  final Set<String> _networkingChecksInProgress = <String>{};
+  final Set<
+    String
+  >
+  _networkingChecksInProgress =
+      <
+        String
+      >{};
 
-  final Set<String> _emittedProjectIds = <String>{};
+  final Set<
+    String
+  >
+  _emittedProjectIds =
+      <
+        String
+      >{};
 
   // ============================================================
   // ESTADO INTERNO
@@ -146,9 +188,21 @@ class MatchController with ChangeNotifier {
 
   MatchUserEntity? _discoveryUser;
 
-  List<MatchUserEntity> _recommendedUsers = const <MatchUserEntity>[];
+  List<
+    MatchUserEntity
+  >
+  _recommendedUsers =
+      const <
+        MatchUserEntity
+      >[];
 
-  final Set<String> _discoveryVisitedUserIds = <String>{};
+  final Set<
+    String
+  >
+  _discoveryVisitedUserIds =
+      <
+        String
+      >{};
 
   // ============================================================
   // PERFIS JÁ DECIDIDOS
@@ -164,7 +218,13 @@ class MatchController with ChangeNotifier {
   //
   // ============================================================
 
-  final Set<String> _discoveryDecidedUserIds = <String>{};
+  final Set<
+    String
+  >
+  _discoveryDecidedUserIds =
+      <
+        String
+      >{};
 
   // ============================================================
   // ONBOARDING DO MATCH
@@ -212,13 +272,19 @@ class MatchController with ChangeNotifier {
   MatchDiscoveryMode get discoveryMode => _discoveryMode;
 
   bool get isCompatibleDiscovery =>
-      _discoveryMode == MatchDiscoveryMode.compatible;
+      _discoveryMode ==
+      MatchDiscoveryMode.compatible;
 
-  bool get isGlobalDiscovery => _discoveryMode == MatchDiscoveryMode.global;
+  bool get isGlobalDiscovery =>
+      _discoveryMode ==
+      MatchDiscoveryMode.global;
 
   MatchUserEntity? get discoveryUser => _discoveryUser;
 
-  List<MatchUserEntity> get recommendedUsers => _recommendedUsers;
+  List<
+    MatchUserEntity
+  >
+  get recommendedUsers => _recommendedUsers;
 
   int get remainingSeconds => _remainingSeconds;
 
@@ -226,7 +292,10 @@ class MatchController with ChangeNotifier {
   // GETTERS — EVENTOS
   // ============================================================
 
-  Stream<String> get matchEventStream => _matchEventController.stream;
+  Stream<
+    String
+  >
+  get matchEventStream => _matchEventController.stream;
 
   // ============================================================
   // GETTERS — TEMA
@@ -240,20 +309,21 @@ class MatchController with ChangeNotifier {
   // GETTERS — PERFIL PROFISSIONAL
   // ============================================================
 
-  ProfessionalProfileController get professionalProfileController =>
-      _professionalProfileController;
+  ProfessionalProfileController get professionalProfileController => _professionalProfileController;
 
-  MusicRole? get currentPrimaryRole =>
-      _professionalProfileController.primaryRole;
+  MusicRole? get currentPrimaryRole => _professionalProfileController.primaryRole;
 
-  Set<MusicRole> get currentRoles =>
-      _professionalProfileController.selectedRoles;
+  Set<
+    MusicRole
+  >
+  get currentRoles => _professionalProfileController.selectedRoles;
 
-  Set<MusicRole> get lookingForRoles =>
-      _professionalProfileController.lookingForRoles;
+  Set<
+    MusicRole
+  >
+  get lookingForRoles => _professionalProfileController.lookingForRoles;
 
-  String get primaryRoleLabel =>
-      _professionalProfileController.primaryRoleLabel;
+  String get primaryRoleLabel => _professionalProfileController.primaryRoleLabel;
 
   // ============================================================
   // GETTERS — ONBOARDING DO MATCH
@@ -273,49 +343,74 @@ class MatchController with ChangeNotifier {
 
   bool get hasUsername => _currentUsername.trim().isNotEmpty;
 
-  bool get hasPrimaryRole => currentPrimaryRole != null;
+  bool get hasPrimaryRole =>
+      currentPrimaryRole !=
+      null;
 
   bool get requiresUsername => !hasUsername;
 
-  bool get requiresProfessionalProfile => hasUsername && !hasPrimaryRole;
+  bool get requiresProfessionalProfile =>
+      hasUsername &&
+      !hasPrimaryRole;
 
-  bool get isMatchUnlocked => hasUsername && hasPrimaryRole;
+  bool get isMatchUnlocked =>
+      hasUsername &&
+      hasPrimaryRole;
 
-  int get professionalProfileAttentionRevision =>
-      _professionalProfileAttentionRevision;
+  int get professionalProfileAttentionRevision => _professionalProfileAttentionRevision;
 
   bool get canSubmitUsername {
     return !_isCheckingUsername &&
         !_isSavingUsername &&
-        _usernameAvailable == true;
+        _usernameAvailable ==
+            true;
   }
 
   // ============================================================
   // GETTERS — RESULTADOS
   // ============================================================
 
-  bool get hasDiscoveryUser => _discoveryUser != null;
+  bool get hasDiscoveryUser =>
+      _discoveryUser !=
+      null;
 
   bool get hasRecommendations => _recommendedUsers.isNotEmpty;
 
-  List<MatchUserEntity> get visibleRecommendedUsers {
+  List<
+    MatchUserEntity
+  >
+  get visibleRecommendedUsers {
     final currentId = _discoveryUser?.id.trim();
 
-    if (currentId == null || currentId.isEmpty) {
+    if (currentId ==
+            null ||
+        currentId.isEmpty) {
       return _recommendedUsers;
     }
 
     return _recommendedUsers
-        .where((user) => user.id.trim() != currentId)
-        .toList(growable: false);
+        .where(
+          (
+            user,
+          ) =>
+              user.id.trim() !=
+              currentId,
+        )
+        .toList(
+          growable: false,
+        );
   }
 
   bool get hasVisibleRecommendations => visibleRecommendedUsers.isNotEmpty;
 
-  bool get isDiscoveryUserOnline => _discoveryUser?.isOnline ?? false;
+  bool get isDiscoveryUserOnline =>
+      _discoveryUser?.isOnline ??
+      false;
 
   bool get hasMatchResults =>
-      _discoveryUser != null || _recommendedUsers.isNotEmpty;
+      _discoveryUser !=
+          null ||
+      _recommendedUsers.isNotEmpty;
 
   // ============================================================
   // USER ID
@@ -335,7 +430,9 @@ class MatchController with ChangeNotifier {
 
     final authenticatedUserId = _supabase.auth.currentUser?.id.trim();
 
-    if (authenticatedUserId != null && authenticatedUserId.isNotEmpty) {
+    if (authenticatedUserId !=
+            null &&
+        authenticatedUserId.isNotEmpty) {
       return authenticatedUserId;
     }
 
@@ -350,7 +447,9 @@ class MatchController with ChangeNotifier {
     if (kDebugMode) {
       final debugUserId = dotenv.env['DEBUG_USER_ID']?.trim();
 
-      if (debugUserId != null && debugUserId.isNotEmpty) {
+      if (debugUserId !=
+              null &&
+          debugUserId.isNotEmpty) {
         return debugUserId;
       }
     }
@@ -362,7 +461,10 @@ class MatchController with ChangeNotifier {
   // INIT MATCH SESSION
   // ============================================================
 
-  Future<void> initMatchSession() async {
+  Future<
+    void
+  >
+  initMatchSession() async {
     if (_disposed) {
       return;
     }
@@ -371,11 +473,17 @@ class MatchController with ChangeNotifier {
     // RESET
     // ==========================================================
 
-    _setLoading(true, notify: false);
+    _setLoading(
+      true,
+      notify: false,
+    );
 
     _discoveryUser = null;
 
-    _recommendedUsers = const <MatchUserEntity>[];
+    _recommendedUsers =
+        const <
+          MatchUserEntity
+        >[];
 
     _discoveryVisitedUserIds.clear();
 
@@ -483,10 +591,16 @@ class MatchController with ChangeNotifier {
   // CARREGAR USERNAME ATUAL
   // ============================================================
 
-  Future<void> _loadCurrentUsername() async {
+  Future<
+    void
+  >
+  _loadCurrentUsername() async {
     final userId = currentUserId?.trim();
 
-    if (_disposed || userId == null || userId.isEmpty) {
+    if (_disposed ||
+        userId ==
+            null ||
+        userId.isEmpty) {
       _currentUsername = '';
 
       return;
@@ -498,9 +612,16 @@ class MatchController with ChangeNotifier {
 
     try {
       final profile = await _supabase
-          .from('profiles')
-          .select('id, username')
-          .eq('id', userId)
+          .from(
+            'profiles',
+          )
+          .select(
+            'id, username',
+          )
+          .eq(
+            'id',
+            userId,
+          )
           .maybeSingle();
 
       if (_disposed) {
@@ -509,7 +630,9 @@ class MatchController with ChangeNotifier {
 
       _currentUsername =
           profile?['username']?.toString().trim().replaceFirst(
-            RegExp(r'^@+'),
+            RegExp(
+              r'^@+',
+            ),
             '',
           ) ??
           '';
@@ -519,7 +642,10 @@ class MatchController with ChangeNotifier {
         'Username atual: '
         '${_currentUsername.isEmpty ? "não informado" : "@$_currentUsername"}',
       );
-    } on PostgrestException catch (error, stackTrace) {
+    } on PostgrestException catch (
+      error,
+      stackTrace
+    ) {
       debugPrint(
         '[MATCH] '
         'Erro Supabase ao carregar username: '
@@ -531,17 +657,24 @@ class MatchController with ChangeNotifier {
         'Código: ${error.code}',
       );
 
-      debugPrint('$stackTrace');
+      debugPrint(
+        '$stackTrace',
+      );
 
       _currentUsername = '';
-    } catch (error, stackTrace) {
+    } catch (
+      error,
+      stackTrace
+    ) {
       debugPrint(
         '[MATCH] '
         'Erro ao carregar username: '
         '$error',
       );
 
-      debugPrint('$stackTrace');
+      debugPrint(
+        '$stackTrace',
+      );
 
       _currentUsername = '';
     } finally {
@@ -557,30 +690,47 @@ class MatchController with ChangeNotifier {
   // NORMALIZAR USERNAME
   // ============================================================
 
-  String normalizeUsername(String value) {
-    return value.trim().toLowerCase().replaceFirst(RegExp(r'^@+'), '');
+  String normalizeUsername(
+    String value,
+  ) {
+    return value.trim().toLowerCase().replaceFirst(
+      RegExp(
+        r'^@+',
+      ),
+      '',
+    );
   }
 
   // ============================================================
   // VALIDAR FORMATO DO USERNAME
   // ============================================================
 
-  String? validateUsername(String value) {
-    final username = normalizeUsername(value);
+  String? validateUsername(
+    String value,
+  ) {
+    final username = normalizeUsername(
+      value,
+    );
 
     if (username.isEmpty) {
       return 'Informe um username.';
     }
 
-    if (username.length < 3) {
+    if (username.length <
+        3) {
       return 'Use pelo menos 3 caracteres.';
     }
 
-    if (username.length > 24) {
+    if (username.length >
+        24) {
       return 'Use no máximo 24 caracteres.';
     }
 
-    if (!RegExp(r'^[a-z0-9_]+$').hasMatch(username)) {
+    if (!RegExp(
+      r'^[a-z0-9_]+$',
+    ).hasMatch(
+      username,
+    )) {
       return 'Use apenas letras, números e _.';
     }
 
@@ -622,18 +772,28 @@ class MatchController with ChangeNotifier {
   //
   // ============================================================
 
-  Future<bool> checkUsernameAvailability(String value) async {
+  Future<
+    bool
+  >
+  checkUsernameAvailability(
+    String value,
+  ) async {
     if (_disposed) {
       return false;
     }
 
-    final username = normalizeUsername(value);
+    final username = normalizeUsername(
+      value,
+    );
 
-    final validationError = validateUsername(username);
+    final validationError = validateUsername(
+      username,
+    );
 
     final revision = ++_usernameCheckRevision;
 
-    if (validationError != null) {
+    if (validationError !=
+        null) {
       _isCheckingUsername = false;
 
       _usernameAvailable = false;
@@ -656,14 +816,20 @@ class MatchController with ChangeNotifier {
     try {
       final result = await _supabase.rpc(
         'check_username_available',
-        params: {'requested_username': username},
+        params: {
+          'requested_username': username,
+        },
       );
 
-      if (_disposed || revision != _usernameCheckRevision) {
+      if (_disposed ||
+          revision !=
+              _usernameCheckRevision) {
         return false;
       }
 
-      final available = result == true;
+      final available =
+          result ==
+          true;
 
       _usernameAvailable = available;
 
@@ -672,8 +838,13 @@ class MatchController with ChangeNotifier {
           : '@$username já está em uso.';
 
       return available;
-    } on PostgrestException catch (error, stackTrace) {
-      if (!_disposed && revision == _usernameCheckRevision) {
+    } on PostgrestException catch (
+      error,
+      stackTrace
+    ) {
+      if (!_disposed &&
+          revision ==
+              _usernameCheckRevision) {
         _usernameAvailable = false;
 
         _usernameValidationMessage = 'Não foi possível verificar o username.';
@@ -690,11 +861,18 @@ class MatchController with ChangeNotifier {
         'Código: ${error.code}',
       );
 
-      debugPrint('$stackTrace');
+      debugPrint(
+        '$stackTrace',
+      );
 
       return false;
-    } catch (error, stackTrace) {
-      if (!_disposed && revision == _usernameCheckRevision) {
+    } catch (
+      error,
+      stackTrace
+    ) {
+      if (!_disposed &&
+          revision ==
+              _usernameCheckRevision) {
         _usernameAvailable = false;
 
         _usernameValidationMessage = 'Não foi possível verificar o username.';
@@ -706,11 +884,15 @@ class MatchController with ChangeNotifier {
         '$error',
       );
 
-      debugPrint('$stackTrace');
+      debugPrint(
+        '$stackTrace',
+      );
 
       return false;
     } finally {
-      if (!_disposed && revision == _usernameCheckRevision) {
+      if (!_disposed &&
+          revision ==
+              _usernameCheckRevision) {
         _isCheckingUsername = false;
 
         safeNotify();
@@ -731,16 +913,27 @@ class MatchController with ChangeNotifier {
   //
   // ============================================================
 
-  Future<bool> saveUsername(String value) async {
-    if (_disposed || _isSavingUsername) {
+  Future<
+    bool
+  >
+  saveUsername(
+    String value,
+  ) async {
+    if (_disposed ||
+        _isSavingUsername) {
       return false;
     }
 
-    final username = normalizeUsername(value);
+    final username = normalizeUsername(
+      value,
+    );
 
-    final validationError = validateUsername(username);
+    final validationError = validateUsername(
+      username,
+    );
 
-    if (validationError != null) {
+    if (validationError !=
+        null) {
       _usernameAvailable = false;
 
       _usernameValidationMessage = validationError;
@@ -753,9 +946,12 @@ class MatchController with ChangeNotifier {
     // Nunca confiar somente numa verificação antiga.
     //
     // Antes de salvar verificamos novamente a disponibilidade.
-    final available = await checkUsernameAvailability(username);
+    final available = await checkUsernameAvailability(
+      username,
+    );
 
-    if (!available || _disposed) {
+    if (!available ||
+        _disposed) {
       return false;
     }
 
@@ -766,7 +962,9 @@ class MatchController with ChangeNotifier {
     try {
       final result = await _supabase.rpc(
         'set_my_username',
-        params: {'requested_username': username},
+        params: {
+          'requested_username': username,
+        },
       );
 
       if (_disposed) {
@@ -774,9 +972,17 @@ class MatchController with ChangeNotifier {
       }
 
       final savedUsername =
-          result?.toString().trim().replaceFirst(RegExp(r'^@+'), '') ?? '';
+          result?.toString().trim().replaceFirst(
+            RegExp(
+              r'^@+',
+            ),
+            '',
+          ) ??
+          '';
 
-      _currentUsername = savedUsername.isNotEmpty ? savedUsername : username;
+      _currentUsername = savedUsername.isNotEmpty
+          ? savedUsername
+          : username;
 
       _usernameAvailable = true;
 
@@ -791,8 +997,13 @@ class MatchController with ChangeNotifier {
       safeNotify();
 
       return true;
-    } on PostgrestException catch (error, stackTrace) {
-      final duplicate = error.code == '23505';
+    } on PostgrestException catch (
+      error,
+      stackTrace
+    ) {
+      final duplicate =
+          error.code ==
+          '23505';
 
       _usernameAvailable = false;
 
@@ -811,12 +1022,17 @@ class MatchController with ChangeNotifier {
         'Código: ${error.code}',
       );
 
-      debugPrint('$stackTrace');
+      debugPrint(
+        '$stackTrace',
+      );
 
       safeNotify();
 
       return false;
-    } catch (error, stackTrace) {
+    } catch (
+      error,
+      stackTrace
+    ) {
       _usernameAvailable = false;
 
       _usernameValidationMessage = 'Não foi possível salvar o username.';
@@ -827,7 +1043,9 @@ class MatchController with ChangeNotifier {
         '$error',
       );
 
-      debugPrint('$stackTrace');
+      debugPrint(
+        '$stackTrace',
+      );
 
       safeNotify();
 
@@ -850,15 +1068,20 @@ class MatchController with ChangeNotifier {
   //
   // ============================================================
 
-  Future<void> refreshMatchOnboarding() async {
+  Future<
+    void
+  >
+  refreshMatchOnboarding() async {
     if (_disposed) {
       return;
     }
 
-    await Future.wait([
-      _professionalProfileController.load(),
-      _loadCurrentUsername(),
-    ]);
+    await Future.wait(
+      [
+        _professionalProfileController.load(),
+        _loadCurrentUsername(),
+      ],
+    );
 
     if (_disposed) {
       return;
@@ -876,20 +1099,25 @@ class MatchController with ChangeNotifier {
   //
   // ============================================================
 
-  Future<bool> startMatchAfterOnboarding() async {
+  Future<
+    bool
+  >
+  startMatchAfterOnboarding() async {
     if (_disposed) {
       return false;
     }
 
     await refreshMatchOnboarding();
 
-    if (_disposed || !isMatchUnlocked) {
+    if (_disposed ||
+        !isMatchUnlocked) {
       return false;
     }
 
     await initMatchSession();
 
-    return !_disposed && isMatchUnlocked;
+    return !_disposed &&
+        isMatchUnlocked;
   }
 
   // ============================================================
@@ -904,7 +1132,8 @@ class MatchController with ChangeNotifier {
   // ============================================================
 
   void requestProfessionalProfileAttention() {
-    if (_disposed || !requiresProfessionalProfile) {
+    if (_disposed ||
+        !requiresProfessionalProfile) {
       return;
     }
 
@@ -917,10 +1146,15 @@ class MatchController with ChangeNotifier {
   // CARREGAR DECISÕES PERSISTIDAS
   // ============================================================
 
-  Future<void> _loadPersistedDiscoveryDecisions() async {
+  Future<
+    void
+  >
+  _loadPersistedDiscoveryDecisions() async {
     final userId = currentUserId;
 
-    if (userId == null || userId.trim().isEmpty) {
+    if (userId ==
+            null ||
+        userId.trim().isEmpty) {
       return;
     }
 
@@ -932,15 +1166,26 @@ class MatchController with ChangeNotifier {
       // ========================================================
 
       final likes = await _supabase
-          .from('favorites')
-          .select('target_user_id')
-          .eq('sender_id', normalizedUserId);
+          .from(
+            'favorites',
+          )
+          .select(
+            'target_user_id',
+          )
+          .eq(
+            'sender_id',
+            normalizedUserId,
+          );
 
       for (final row in likes) {
         final targetId = row['target_user_id']?.toString().trim();
 
-        if (targetId != null && targetId.isNotEmpty) {
-          _discoveryDecidedUserIds.add(targetId);
+        if (targetId !=
+                null &&
+            targetId.isNotEmpty) {
+          _discoveryDecidedUserIds.add(
+            targetId,
+          );
         }
       }
 
@@ -949,15 +1194,26 @@ class MatchController with ChangeNotifier {
       // ========================================================
 
       final passes = await _supabase
-          .from('match_passes')
-          .select('target_user_id')
-          .eq('sender_id', normalizedUserId);
+          .from(
+            'match_passes',
+          )
+          .select(
+            'target_user_id',
+          )
+          .eq(
+            'sender_id',
+            normalizedUserId,
+          );
 
       for (final row in passes) {
         final targetId = row['target_user_id']?.toString().trim();
 
-        if (targetId != null && targetId.isNotEmpty) {
-          _discoveryDecidedUserIds.add(targetId);
+        if (targetId !=
+                null &&
+            targetId.isNotEmpty) {
+          _discoveryDecidedUserIds.add(
+            targetId,
+          );
         }
       }
 
@@ -966,7 +1222,10 @@ class MatchController with ChangeNotifier {
         'Perfis já avaliados carregados: '
         '${_discoveryDecidedUserIds.length}.',
       );
-    } on PostgrestException catch (error, stackTrace) {
+    } on PostgrestException catch (
+      error,
+      stackTrace
+    ) {
       debugPrint(
         '[MATCH] '
         'Erro Supabase ao carregar perfis já avaliados: '
@@ -979,15 +1238,22 @@ class MatchController with ChangeNotifier {
         '${error.code}',
       );
 
-      debugPrint('$stackTrace');
-    } catch (error, stackTrace) {
+      debugPrint(
+        '$stackTrace',
+      );
+    } catch (
+      error,
+      stackTrace
+    ) {
       debugPrint(
         '[MATCH] '
         'Erro ao carregar perfis já avaliados: '
         '$error',
       );
 
-      debugPrint('$stackTrace');
+      debugPrint(
+        '$stackTrace',
+      );
     }
   }
 
@@ -996,14 +1262,16 @@ class MatchController with ChangeNotifier {
   // ============================================================
 
   void _validateProfessionalProfile() {
-    if (currentPrimaryRole == null) {
+    if (currentPrimaryRole ==
+        null) {
       debugPrint(
         '[MATCH] '
         'Função principal não configurada.',
       );
     }
 
-    if (_discoveryMode == MatchDiscoveryMode.compatible &&
+    if (_discoveryMode ==
+            MatchDiscoveryMode.compatible &&
         lookingForRoles.isEmpty) {
       debugPrint(
         '[MATCH] '
@@ -1019,25 +1287,31 @@ class MatchController with ChangeNotifier {
   void _startSearchTimeout() {
     _searchTimeoutTimer?.cancel();
 
-    _searchTimeoutTimer = Timer(_searchTimeout, () {
-      if (_disposed) {
-        return;
-      }
+    _searchTimeoutTimer = Timer(
+      _searchTimeout,
+      () {
+        if (_disposed) {
+          return;
+        }
 
-      if (!_isLoading) {
-        return;
-      }
+        if (!_isLoading) {
+          return;
+        }
 
-      if (_discoveryUser != null) {
-        return;
-      }
+        if (_discoveryUser !=
+            null) {
+          return;
+        }
 
-      if (_recommendedUsers.isNotEmpty) {
-        return;
-      }
+        if (_recommendedUsers.isNotEmpty) {
+          return;
+        }
 
-      _setLoading(false);
-    });
+        _setLoading(
+          false,
+        );
+      },
+    );
   }
 
   // ============================================================
@@ -1045,11 +1319,17 @@ class MatchController with ChangeNotifier {
   // ============================================================
 
   void _logSessionStarted() {
-    debugPrint('[MATCH] ========================================');
+    debugPrint(
+      '[MATCH] ========================================',
+    );
 
-    debugPrint('[MATCH] Sessão iniciada.');
+    debugPrint(
+      '[MATCH] Sessão iniciada.',
+    );
 
-    debugPrint('[MATCH] User ID: $currentUserId');
+    debugPrint(
+      '[MATCH] User ID: $currentUserId',
+    );
 
     debugPrint(
       '[MATCH] '
@@ -1091,21 +1371,28 @@ class MatchController with ChangeNotifier {
       }).toList()}',
     );
 
-    debugPrint('[MATCH] ========================================');
+    debugPrint(
+      '[MATCH] ========================================',
+    );
   }
 
   // ============================================================
   // LIMPAR RESULTADOS
   // ============================================================
 
-  void clearMatchResults({bool stopLoading = true}) {
+  void clearMatchResults({
+    bool stopLoading = true,
+  }) {
     if (_disposed) {
       return;
     }
 
     _discoveryUser = null;
 
-    _recommendedUsers = const <MatchUserEntity>[];
+    _recommendedUsers =
+        const <
+          MatchUserEntity
+        >[];
 
     _discoveryVisitedUserIds.clear();
 
@@ -1121,15 +1408,21 @@ class MatchController with ChangeNotifier {
 
     safeNotify();
 
-    debugPrint('[MATCH] Resultados limpos.');
+    debugPrint(
+      '[MATCH] Resultados limpos.',
+    );
   }
 
   // ============================================================
   // MODO DE DESCOBERTA
   // ============================================================
 
-  void setDiscoveryMode(MatchDiscoveryMode mode) {
-    if (_disposed || _discoveryMode == mode) {
+  void setDiscoveryMode(
+    MatchDiscoveryMode mode,
+  ) {
+    if (_disposed ||
+        _discoveryMode ==
+            mode) {
       return;
     }
 
@@ -1151,7 +1444,10 @@ class MatchController with ChangeNotifier {
 
     _discoveryUser = null;
 
-    _recommendedUsers = const <MatchUserEntity>[];
+    _recommendedUsers =
+        const <
+          MatchUserEntity
+        >[];
 
     _discoveryVisitedUserIds.clear();
 
@@ -1161,7 +1457,10 @@ class MatchController with ChangeNotifier {
 
     _countdownTimer = null;
 
-    _setLoading(true, notify: false);
+    _setLoading(
+      true,
+      notify: false,
+    );
 
     _startSearchTimeout();
 
@@ -1175,11 +1474,15 @@ class MatchController with ChangeNotifier {
   }
 
   void useCompatibleDiscovery() {
-    setDiscoveryMode(MatchDiscoveryMode.compatible);
+    setDiscoveryMode(
+      MatchDiscoveryMode.compatible,
+    );
   }
 
   void useGlobalDiscovery() {
-    setDiscoveryMode(MatchDiscoveryMode.global);
+    setDiscoveryMode(
+      MatchDiscoveryMode.global,
+    );
   }
 
   // ============================================================
@@ -1189,7 +1492,9 @@ class MatchController with ChangeNotifier {
   void _startRealtimeMatchListener() {
     final userId = currentUserId;
 
-    if (userId == null || userId.trim().isEmpty) {
+    if (userId ==
+            null ||
+        userId.trim().isEmpty) {
       debugPrint(
         '[MATCH] '
         'Não foi possível iniciar realtime: '
@@ -1203,7 +1508,9 @@ class MatchController with ChangeNotifier {
     // CANCELAR LISTENER ANTERIOR
     // ==========================================================
 
-    unawaited(_matchSubscription?.cancel());
+    unawaited(
+      _matchSubscription?.cancel(),
+    );
 
     _matchSubscription = null;
 
@@ -1212,12 +1519,24 @@ class MatchController with ChangeNotifier {
     // ==========================================================
 
     _matchSubscription = _supabase
-        .from('favorites')
-        .stream(primaryKey: ['id'])
-        .eq('target_user_id', userId)
+        .from(
+          'favorites',
+        )
+        .stream(
+          primaryKey: [
+            'id',
+          ],
+        )
+        .eq(
+          'target_user_id',
+          userId,
+        )
         .listen(
-          (snapshot) {
-            if (_disposed || snapshot.isEmpty) {
+          (
+            snapshot,
+          ) {
+            if (_disposed ||
+                snapshot.isEmpty) {
               return;
             }
 
@@ -1225,18 +1544,28 @@ class MatchController with ChangeNotifier {
 
             final senderId = lastMatch['sender_id']?.toString().trim();
 
-            if (senderId == null || senderId.isEmpty) {
+            if (senderId ==
+                    null ||
+                senderId.isEmpty) {
               return;
             }
 
-            unawaited(checkAndStartNetworking(userId, senderId));
-          },
-          onError: (error) {
-            debugPrint(
-              '[MATCH] '
-              'Erro realtime: $error',
+            unawaited(
+              checkAndStartNetworking(
+                userId,
+                senderId,
+              ),
             );
           },
+          onError:
+              (
+                error,
+              ) {
+                debugPrint(
+                  '[MATCH] '
+                  'Erro realtime: $error',
+                );
+              },
         );
   }
 
@@ -1244,7 +1573,13 @@ class MatchController with ChangeNotifier {
   // VERIFICAR MATCH MÚTUO
   // ============================================================
 
-  Future<bool> checkAndStartNetworking(String myId, String otherId) async {
+  Future<
+    bool
+  >
+  checkAndStartNetworking(
+    String myId,
+    String otherId,
+  ) async {
     final normalizedMyId = myId.trim();
 
     final normalizedOtherId = otherId.trim();
@@ -1255,7 +1590,8 @@ class MatchController with ChangeNotifier {
 
     if (normalizedMyId.isEmpty ||
         normalizedOtherId.isEmpty ||
-        normalizedMyId == normalizedOtherId) {
+        normalizedMyId ==
+            normalizedOtherId) {
       return false;
     }
 
@@ -1273,13 +1609,18 @@ class MatchController with ChangeNotifier {
     //
     // ==========================================================
 
-    final pairKey = _networkingPairKey(normalizedMyId, normalizedOtherId);
+    final pairKey = _networkingPairKey(
+      normalizedMyId,
+      normalizedOtherId,
+    );
 
     // ==========================================================
     // VERIFICAÇÃO JÁ EM ANDAMENTO
     // ==========================================================
 
-    if (_networkingChecksInProgress.contains(pairKey)) {
+    if (_networkingChecksInProgress.contains(
+      pairKey,
+    )) {
       debugPrint(
         '[MATCH] '
         'Verificação já em andamento para '
@@ -1289,7 +1630,9 @@ class MatchController with ChangeNotifier {
       return false;
     }
 
-    _networkingChecksInProgress.add(pairKey);
+    _networkingChecksInProgress.add(
+      pairKey,
+    );
 
     try {
       // ========================================================
@@ -1297,22 +1640,46 @@ class MatchController with ChangeNotifier {
       // ========================================================
 
       final myLike = await _supabase
-          .from('favorites')
-          .select('id')
-          .eq('sender_id', normalizedMyId)
-          .eq('target_user_id', normalizedOtherId)
-          .limit(1);
+          .from(
+            'favorites',
+          )
+          .select(
+            'id',
+          )
+          .eq(
+            'sender_id',
+            normalizedMyId,
+          )
+          .eq(
+            'target_user_id',
+            normalizedOtherId,
+          )
+          .limit(
+            1,
+          );
 
       // ========================================================
       // LIKE: OUTRO -> EU
       // ========================================================
 
       final otherLike = await _supabase
-          .from('favorites')
-          .select('id')
-          .eq('sender_id', normalizedOtherId)
-          .eq('target_user_id', normalizedMyId)
-          .limit(1);
+          .from(
+            'favorites',
+          )
+          .select(
+            'id',
+          )
+          .eq(
+            'sender_id',
+            normalizedOtherId,
+          )
+          .eq(
+            'target_user_id',
+            normalizedMyId,
+          )
+          .limit(
+            1,
+          );
 
       // ========================================================
       // EU AINDA NÃO CURTI
@@ -1360,20 +1727,40 @@ class MatchController with ChangeNotifier {
       // ========================================================
 
       final existingProjects = await _supabase
-          .from('projects')
-          .select('id, members, status, origin')
-          .eq('origin', 'match')
-          .eq('status', 'active')
-          .contains('members', [normalizedMyId, normalizedOtherId])
-          .limit(1);
+          .from(
+            'projects',
+          )
+          .select(
+            'id, members, status, origin',
+          )
+          .eq(
+            'origin',
+            'match',
+          )
+          .eq(
+            'status',
+            'active',
+          )
+          .contains(
+            'members',
+            [
+              normalizedMyId,
+              normalizedOtherId,
+            ],
+          )
+          .limit(
+            1,
+          );
 
       if (existingProjects.isNotEmpty) {
-        final existingProjectId = existingProjects.first['id']
-            ?.toString()
-            .trim();
+        final existingProjectId = existingProjects.first['id']?.toString().trim();
 
-        if (existingProjectId != null && existingProjectId.isNotEmpty) {
-          _emitMatchEvent(existingProjectId);
+        if (existingProjectId !=
+                null &&
+            existingProjectId.isNotEmpty) {
+          _emitMatchEvent(
+            existingProjectId,
+          );
 
           debugPrint(
             '[MATCH] '
@@ -1390,24 +1777,38 @@ class MatchController with ChangeNotifier {
       // ========================================================
 
       final newProject = await _supabase
-          .from('projects')
-          .insert({
-            'title': 'Studio Session',
+          .from(
+            'projects',
+          )
+          .insert(
+            {
+              'title': 'Studio Session',
 
-            'members': [normalizedMyId, normalizedOtherId],
+              'members': [
+                normalizedMyId,
+                normalizedOtherId,
+              ],
 
-            'founders': [normalizedMyId, normalizedOtherId],
+              'founders': [
+                normalizedMyId,
+                normalizedOtherId,
+              ],
 
-            'status': 'active',
+              'status': 'active',
 
-            'origin': 'match',
-          })
-          .select('id')
+              'origin': 'match',
+            },
+          )
+          .select(
+            'id',
+          )
           .single();
 
       final newProjectId = newProject['id']?.toString().trim();
 
-      if (newProjectId == null || newProjectId.isEmpty) {
+      if (newProjectId ==
+              null ||
+          newProjectId.isEmpty) {
         debugPrint(
           '[MATCH] '
           'Projeto criado sem ID válido.',
@@ -1417,10 +1818,31 @@ class MatchController with ChangeNotifier {
       }
 
       // ========================================================
+      // PRODUÇÃO CRIATIVA
+      // ========================================================
+      //
+      // O projeto já existe neste ponto.
+      //
+      // Portanto, analytics é best-effort:
+      //
+      // - falha no registro NÃO invalida o projeto;
+      // - falha no registro NÃO desfaz o match;
+      // - source_id torna os eventos idempotentes.
+      //
+      // ========================================================
+
+      await _recordCreativeActivityForNewMatchProject(
+        projectId: newProjectId,
+        collaboratorUserId: normalizedOtherId,
+      );
+
+      // ========================================================
       // EMITIR EVENTO
       // ========================================================
 
-      _emitMatchEvent(newProjectId);
+      _emitMatchEvent(
+        newProjectId,
+      );
 
       debugPrint(
         '[MATCH] '
@@ -1429,7 +1851,10 @@ class MatchController with ChangeNotifier {
       );
 
       return true;
-    } on PostgrestException catch (error, stackTrace) {
+    } on PostgrestException catch (
+      error,
+      stackTrace
+    ) {
       debugPrint(
         '[MATCH] '
         'Erro Supabase ao verificar match: '
@@ -1449,7 +1874,10 @@ class MatchController with ChangeNotifier {
       );
 
       return false;
-    } catch (error, stackTrace) {
+    } catch (
+      error,
+      stackTrace
+    ) {
       debugPrint(
         '[MATCH] '
         'Erro ao iniciar networking: '
@@ -1464,7 +1892,92 @@ class MatchController with ChangeNotifier {
 
       return false;
     } finally {
-      _networkingChecksInProgress.remove(pairKey);
+      _networkingChecksInProgress.remove(
+        pairKey,
+      );
+    }
+  }
+
+  // ============================================================
+  // REGISTRAR PRODUÇÃO CRIATIVA DO NOVO MATCH
+  // ============================================================
+  //
+  // Registra:
+  //
+  // - project_created;
+  // - collaboration_started.
+  //
+  // IMPORTANTE:
+  //
+  // Este método nunca propaga erro.
+  //
+  // A criação do projeto e o match são regras de negócio
+  // principais. Analytics não pode transformá-los em falha.
+  //
+  // ============================================================
+
+  Future<
+    void
+  >
+  _recordCreativeActivityForNewMatchProject({
+    required String projectId,
+    required String collaboratorUserId,
+  }) async {
+    final normalizedProjectId = projectId.trim();
+
+    final normalizedCollaboratorUserId = collaboratorUserId.trim();
+
+    if (normalizedProjectId.isEmpty) {
+      return;
+    }
+
+    try {
+      await _creativeActivityService.recordProjectCreated(
+        projectId: normalizedProjectId,
+        metadata:
+            <
+              String,
+              dynamic
+            >{
+              'origin': 'match',
+              if (normalizedCollaboratorUserId.isNotEmpty) 'other_user_id': normalizedCollaboratorUserId,
+            },
+      );
+
+      await _creativeActivityService.recordCollaborationStarted(
+        sourceId: normalizedProjectId,
+        projectId: normalizedProjectId,
+        metadata:
+            <
+              String,
+              dynamic
+            >{
+              'origin': 'match',
+              if (normalizedCollaboratorUserId.isNotEmpty) 'collaborator_user_id': normalizedCollaboratorUserId,
+            },
+      );
+
+      debugPrint(
+        '[MATCH] '
+        'Produção criativa registrada para o projeto '
+        '$normalizedProjectId.',
+      );
+    } catch (
+      error,
+      stackTrace
+    ) {
+      debugPrint(
+        '[MATCH] '
+        'Projeto criado, mas não foi possível registrar '
+        'as métricas criativas: '
+        '$error',
+      );
+
+      debugPrint(
+        '[MATCH] '
+        'StackTrace analytics: '
+        '$stackTrace',
+      );
     }
   }
 
@@ -1472,12 +1985,18 @@ class MatchController with ChangeNotifier {
   // NETWORKING PAIR KEY
   // ============================================================
 
-  String _networkingPairKey(String firstUserId, String secondUserId) {
+  String _networkingPairKey(
+    String firstUserId,
+    String secondUserId,
+  ) {
     final first = firstUserId.trim();
 
     final second = secondUserId.trim();
 
-    if (first.compareTo(second) <= 0) {
+    if (first.compareTo(
+          second,
+        ) <=
+        0) {
       return '$first::$second';
     }
 
@@ -1488,8 +2007,11 @@ class MatchController with ChangeNotifier {
   // EMITIR MATCH
   // ============================================================
 
-  void _emitMatchEvent(String projectId) {
-    if (_disposed || _matchEventController.isClosed) {
+  void _emitMatchEvent(
+    String projectId,
+  ) {
+    if (_disposed ||
+        _matchEventController.isClosed) {
       return;
     }
 
@@ -1509,7 +2031,9 @@ class MatchController with ChangeNotifier {
     //
     // ==========================================================
 
-    if (_emittedProjectIds.contains(normalizedProjectId)) {
+    if (_emittedProjectIds.contains(
+      normalizedProjectId,
+    )) {
       debugPrint(
         '[MATCH] '
         'Evento de networking já emitido para: '
@@ -1519,16 +2043,25 @@ class MatchController with ChangeNotifier {
       return;
     }
 
-    _emittedProjectIds.add(normalizedProjectId);
+    _emittedProjectIds.add(
+      normalizedProjectId,
+    );
 
-    _matchEventController.add(normalizedProjectId);
+    _matchEventController.add(
+      normalizedProjectId,
+    );
   }
 
   // ============================================================
   // REGISTRAR LIKE
   // ============================================================
 
-  Future<void> registerLike(String targetId) async {
+  Future<
+    void
+  >
+  registerLike(
+    String targetId,
+  ) async {
     if (!isMatchUnlocked) {
       requestProfessionalProfileAttention();
 
@@ -1541,7 +2074,9 @@ class MatchController with ChangeNotifier {
     // USUÁRIO ATUAL
     // ==========================================================
 
-    if (userId == null || userId.trim().isEmpty) {
+    if (userId ==
+            null ||
+        userId.trim().isEmpty) {
       debugPrint(
         '[MATCH] '
         'Like ignorado: '
@@ -1559,7 +2094,9 @@ class MatchController with ChangeNotifier {
     // VALIDAR DESTINO
     // ==========================================================
 
-    if (normalizedTargetId.isEmpty || normalizedTargetId == normalizedUserId) {
+    if (normalizedTargetId.isEmpty ||
+        normalizedTargetId ==
+            normalizedUserId) {
       return;
     }
 
@@ -1589,7 +2126,9 @@ class MatchController with ChangeNotifier {
       // ========================================================
 
       await _supabase
-          .from('favorites')
+          .from(
+            'favorites',
+          )
           .upsert(
             {
               'sender_id': normalizedUserId,
@@ -1600,7 +2139,9 @@ class MatchController with ChangeNotifier {
             ignoreDuplicates: true,
           );
 
-      _discoveryDecidedUserIds.add(normalizedTargetId);
+      _discoveryDecidedUserIds.add(
+        normalizedTargetId,
+      );
 
       debugPrint(
         '[MATCH] '
@@ -1620,8 +2161,14 @@ class MatchController with ChangeNotifier {
       //
       // ========================================================
 
-      await checkAndStartNetworking(normalizedUserId, normalizedTargetId);
-    } on PostgrestException catch (error, stackTrace) {
+      await checkAndStartNetworking(
+        normalizedUserId,
+        normalizedTargetId,
+      );
+    } on PostgrestException catch (
+      error,
+      stackTrace
+    ) {
       debugPrint(
         '[MATCH] '
         'Erro Supabase ao registrar like: '
@@ -1639,7 +2186,10 @@ class MatchController with ChangeNotifier {
         'StackTrace: '
         '$stackTrace',
       );
-    } catch (error, stackTrace) {
+    } catch (
+      error,
+      stackTrace
+    ) {
       debugPrint(
         '[MATCH] '
         'Erro ao registrar like: '
@@ -1658,7 +2208,9 @@ class MatchController with ChangeNotifier {
   // DISCOVERY USER
   // ============================================================
 
-  void setDiscoveryUser(MatchUserEntity user) {
+  void setDiscoveryUser(
+    MatchUserEntity user,
+  ) {
     if (_disposed) {
       return;
     }
@@ -1675,7 +2227,9 @@ class MatchController with ChangeNotifier {
       return;
     }
 
-    if (_discoveryDecidedUserIds.contains(userId)) {
+    if (_discoveryDecidedUserIds.contains(
+      userId,
+    )) {
       debugPrint(
         '[MATCH] '
         'Perfil ignorado porque já foi avaliado: '
@@ -1731,7 +2285,8 @@ class MatchController with ChangeNotifier {
 
     final currentUser = _discoveryUser;
 
-    if (currentUser == null) {
+    if (currentUser ==
+        null) {
       return false;
     }
 
@@ -1746,15 +2301,20 @@ class MatchController with ChangeNotifier {
         continue;
       }
 
-      if (candidateId == currentId) {
+      if (candidateId ==
+          currentId) {
         continue;
       }
 
-      if (_discoveryVisitedUserIds.contains(candidateId)) {
+      if (_discoveryVisitedUserIds.contains(
+        candidateId,
+      )) {
         continue;
       }
 
-      if (_discoveryDecidedUserIds.contains(candidateId)) {
+      if (_discoveryDecidedUserIds.contains(
+        candidateId,
+      )) {
         continue;
       }
 
@@ -1763,7 +2323,8 @@ class MatchController with ChangeNotifier {
       break;
     }
 
-    if (nextUser == null) {
+    if (nextUser ==
+        null) {
       debugPrint(
         '[MATCH] Nenhum próximo usuário disponível. '
         'Mantendo ${currentUser.name}.',
@@ -1773,7 +2334,9 @@ class MatchController with ChangeNotifier {
     }
 
     if (currentId.isNotEmpty) {
-      _discoveryVisitedUserIds.add(currentId);
+      _discoveryVisitedUserIds.add(
+        currentId,
+      );
     }
 
     _discoveryUser = nextUser;
@@ -1786,7 +2349,9 @@ class MatchController with ChangeNotifier {
   }
 
   bool dismissCurrentDiscoveryUser() {
-    if (_disposed || _discoveryUser == null) {
+    if (_disposed ||
+        _discoveryUser ==
+            null) {
       return false;
     }
 
@@ -1798,7 +2363,8 @@ class MatchController with ChangeNotifier {
 
     final currentUser = _discoveryUser;
 
-    if (currentUser == null) {
+    if (currentUser ==
+        null) {
       return false;
     }
 
@@ -1817,7 +2383,9 @@ class MatchController with ChangeNotifier {
     //
     // ==========================================================
 
-    _discoveryDecidedUserIds.add(targetId);
+    _discoveryDecidedUserIds.add(
+      targetId,
+    );
 
     // ==========================================================
     // PERSISTIR PASS / X
@@ -1828,7 +2396,11 @@ class MatchController with ChangeNotifier {
     //
     // ==========================================================
 
-    unawaited(_registerPass(targetId));
+    unawaited(
+      _registerPass(
+        targetId,
+      ),
+    );
 
     return moveToNextDiscoveryUser();
   }
@@ -1837,10 +2409,17 @@ class MatchController with ChangeNotifier {
   // REGISTRAR PASS / X
   // ============================================================
 
-  Future<void> _registerPass(String targetId) async {
+  Future<
+    void
+  >
+  _registerPass(
+    String targetId,
+  ) async {
     final userId = currentUserId;
 
-    if (userId == null || userId.trim().isEmpty) {
+    if (userId ==
+            null ||
+        userId.trim().isEmpty) {
       return;
     }
 
@@ -1848,13 +2427,17 @@ class MatchController with ChangeNotifier {
 
     final normalizedTargetId = targetId.trim();
 
-    if (normalizedTargetId.isEmpty || normalizedTargetId == normalizedUserId) {
+    if (normalizedTargetId.isEmpty ||
+        normalizedTargetId ==
+            normalizedUserId) {
       return;
     }
 
     try {
       await _supabase
-          .from('match_passes')
+          .from(
+            'match_passes',
+          )
           .upsert(
             {
               'sender_id': normalizedUserId,
@@ -1870,7 +2453,10 @@ class MatchController with ChangeNotifier {
         '$normalizedUserId -> '
         '$normalizedTargetId',
       );
-    } on PostgrestException catch (error, stackTrace) {
+    } on PostgrestException catch (
+      error,
+      stackTrace
+    ) {
       debugPrint(
         '[MATCH] '
         'Erro Supabase ao registrar pass: '
@@ -1883,19 +2469,29 @@ class MatchController with ChangeNotifier {
         '${error.code}',
       );
 
-      debugPrint('$stackTrace');
-    } catch (error, stackTrace) {
+      debugPrint(
+        '$stackTrace',
+      );
+    } catch (
+      error,
+      stackTrace
+    ) {
       debugPrint(
         '[MATCH] '
         'Erro ao registrar pass: '
         '$error',
       );
 
-      debugPrint('$stackTrace');
+      debugPrint(
+        '$stackTrace',
+      );
     }
   }
 
-  Future<bool> likeCurrentDiscoveryUserAndAdvance() async {
+  Future<
+    bool
+  >
+  likeCurrentDiscoveryUserAndAdvance() async {
     if (_disposed) {
       return false;
     }
@@ -1908,7 +2504,8 @@ class MatchController with ChangeNotifier {
 
     final currentUser = _discoveryUser;
 
-    if (currentUser == null) {
+    if (currentUser ==
+        null) {
       return false;
     }
 
@@ -1918,7 +2515,9 @@ class MatchController with ChangeNotifier {
       return false;
     }
 
-    await registerLike(targetId);
+    await registerLike(
+      targetId,
+    );
 
     if (_disposed) {
       return false;
@@ -1931,7 +2530,12 @@ class MatchController with ChangeNotifier {
   // RECOMENDAÇÕES
   // ============================================================
 
-  void updateRecommendedUsers(List<MatchUserEntity> users) {
+  void updateRecommendedUsers(
+    List<
+      MatchUserEntity
+    >
+    users,
+  ) {
     if (_disposed) {
       return;
     }
@@ -1951,28 +2555,43 @@ class MatchController with ChangeNotifier {
     final myUserId = currentUserId?.trim();
 
     final filteredUsers = users
-        .where((user) {
-          final candidateId = user.id.trim();
+        .where(
+          (
+            user,
+          ) {
+            final candidateId = user.id.trim();
 
-          if (candidateId.isEmpty) {
-            return false;
-          }
+            if (candidateId.isEmpty) {
+              return false;
+            }
 
-          if (myUserId != null &&
-              myUserId.isNotEmpty &&
-              candidateId == myUserId) {
-            return false;
-          }
+            if (myUserId !=
+                    null &&
+                myUserId.isNotEmpty &&
+                candidateId ==
+                    myUserId) {
+              return false;
+            }
 
-          if (_discoveryDecidedUserIds.contains(candidateId)) {
-            return false;
-          }
+            if (_discoveryDecidedUserIds.contains(
+              candidateId,
+            )) {
+              return false;
+            }
 
-          return true;
-        })
-        .toList(growable: false);
+            return true;
+          },
+        )
+        .toList(
+          growable: false,
+        );
 
-    _recommendedUsers = List<MatchUserEntity>.unmodifiable(filteredUsers);
+    _recommendedUsers =
+        List<
+          MatchUserEntity
+        >.unmodifiable(
+          filteredUsers,
+        );
 
     // ==========================================================
     // PERFIL ATUAL JÁ FOI AVALIADO
@@ -1980,9 +2599,12 @@ class MatchController with ChangeNotifier {
 
     final currentDiscoveryId = _discoveryUser?.id.trim();
 
-    if (currentDiscoveryId != null &&
+    if (currentDiscoveryId !=
+            null &&
         currentDiscoveryId.isNotEmpty &&
-        _discoveryDecidedUserIds.contains(currentDiscoveryId)) {
+        _discoveryDecidedUserIds.contains(
+          currentDiscoveryId,
+        )) {
       _discoveryUser = null;
     }
 
@@ -2008,25 +2630,33 @@ class MatchController with ChangeNotifier {
 
     _remainingSeconds = _connectionDurationSeconds;
 
-    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_disposed) {
+    _countdownTimer = Timer.periodic(
+      const Duration(
+        seconds: 1,
+      ),
+      (
+        timer,
+      ) {
+        if (_disposed) {
+          timer.cancel();
+
+          return;
+        }
+
+        if (_remainingSeconds >
+            0) {
+          _remainingSeconds--;
+
+          safeNotify();
+
+          return;
+        }
+
         timer.cancel();
 
-        return;
-      }
-
-      if (_remainingSeconds > 0) {
-        _remainingSeconds--;
-
-        safeNotify();
-
-        return;
-      }
-
-      timer.cancel();
-
-      _countdownTimer = null;
-    });
+        _countdownTimer = null;
+      },
+    );
   }
 
   // ============================================================
@@ -2047,12 +2677,16 @@ class MatchController with ChangeNotifier {
   // LOADING
   // ============================================================
 
-  void _setLoading(bool value, {bool notify = true}) {
+  void _setLoading(
+    bool value, {
+    bool notify = true,
+  }) {
     if (_disposed) {
       return;
     }
 
-    if (_isLoading == value) {
+    if (_isLoading ==
+        value) {
       return;
     }
 
@@ -2083,12 +2717,17 @@ class MatchController with ChangeNotifier {
   // CONTRATO PROVISÓRIO
   // ============================================================
 
-  String generateProvisionalContractHash(String userA, String userB) {
+  String generateProvisionalContractHash(
+    String userA,
+    String userB,
+  ) {
     final normalizedUserA = userA.trim();
 
     final normalizedUserB = userB.trim();
 
-    final hash = normalizedUserA.hashCode ^ normalizedUserB.hashCode;
+    final hash =
+        normalizedUserA.hashCode ^
+        normalizedUserB.hashCode;
 
     return 'VRSN-'
         '$hash-'
@@ -2121,7 +2760,9 @@ class MatchController with ChangeNotifier {
     // REALTIME
     // ==========================================================
 
-    unawaited(_matchSubscription?.cancel());
+    unawaited(
+      _matchSubscription?.cancel(),
+    );
 
     _matchSubscription = null;
 
@@ -2138,7 +2779,9 @@ class MatchController with ChangeNotifier {
     // ==========================================================
 
     if (!_matchEventController.isClosed) {
-      unawaited(_matchEventController.close());
+      unawaited(
+        _matchEventController.close(),
+      );
     }
 
     // ==========================================================

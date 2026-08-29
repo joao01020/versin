@@ -2,6 +2,7 @@ import json
 import logging
 
 from groq import AsyncGroq
+from groq import BadRequestError
 
 from core.config import settings
 
@@ -12,7 +13,6 @@ class AIService:
     # ============================================================
 
     DEFAULT_MAX_COMPLETION_TOKENS = 500
-
     DEFAULT_TEMPERATURE = 0.6
 
     # ============================================================
@@ -52,6 +52,7 @@ class AIService:
         model: str | None = None,
         max_completion_tokens: int = DEFAULT_MAX_COMPLETION_TOKENS,
         temperature: float = DEFAULT_TEMPERATURE,
+        json_mode: bool = False,
     ) -> dict:
         # ========================================================
         # MODELO
@@ -93,9 +94,7 @@ class AIService:
         # ========================================================
 
         if (
-            len(
-                normalized_user_message
-            )
+            len(normalized_user_message)
             >
             settings.AI_MAX_INPUT_LENGTH
         ):
@@ -110,9 +109,7 @@ class AIService:
 
         max_completion_tokens = max(
             1,
-            int(
-                max_completion_tokens
-            ),
+            int(max_completion_tokens),
         )
 
         # ========================================================
@@ -122,77 +119,106 @@ class AIService:
         temperature = max(
             0.0,
             min(
-                float(
-                    temperature
-                ),
+                float(temperature),
                 2.0,
             ),
         )
+
+        # ========================================================
+        # MENSAGENS
+        # ========================================================
+
+        messages = [
+            {
+                "role": "system",
+                "content": normalized_system_prompt,
+            },
+            {
+                "role": "user",
+                "content": normalized_user_message,
+            },
+        ]
+
+        # ========================================================
+        # REQUEST BASE
+        # ========================================================
+
+        request_data = {
+            "model": selected_model,
+            "messages": messages,
+            "max_completion_tokens": (
+                max_completion_tokens
+            ),
+            "temperature": temperature,
+            "stream": False,
+        }
+
+        # ========================================================
+        # JSON MODE OPCIONAL
+        # ========================================================
+
+        if json_mode:
+            request_data["response_format"] = {
+                "type": "json_object",
+            }
 
         try:
             # ====================================================
             # CHAMADA PARA GROQ
             # ====================================================
 
-            response = (
-                await self.client
-                .chat
-                .completions
-                .create(
-                    model=selected_model,
-
-                    messages=[
-                        {
-                            "role": "system",
-                            "content":
-                                normalized_system_prompt,
-                        },
-                        {
-                            "role": "user",
-                            "content":
-                                normalized_user_message,
-                        },
-                    ],
-
-                    # =================================================
-                    # JSON MODE
-                    # =================================================
-
-                    response_format={
-                        "type":
-                            "json_object",
-                    },
-
-                    # =================================================
-                    # CONTROLE DE CUSTO / TOKENS
-                    # =================================================
-                    #
-                    # A Groq recomenda atualmente
-                    # max_completion_tokens.
-                    #
-                    # Isso impede uma resposta gigantesca.
-                    #
-                    # =================================================
-
-                    max_completion_tokens=(
-                        max_completion_tokens
-                    ),
-
-                    # =================================================
-                    # CRIATIVIDADE
-                    # =================================================
-
-                    temperature=(
-                        temperature
-                    ),
-
-                    # =================================================
-                    # UMA ÚNICA RESPOSTA
-                    # =================================================
-
-                    stream=False,
+            try:
+                response = (
+                    await self.client
+                    .chat
+                    .completions
+                    .create(
+                        **request_data
+                    )
                 )
-            )
+
+            except BadRequestError as error:
+                error_text = str(error)
+
+                # =================================================
+                # FALLBACK PARA ERRO DE JSON DA GROQ
+                # =================================================
+
+                if (
+                    json_mode
+                    and
+                    "json_validate_failed"
+                    in error_text
+                ):
+                    self.logger.warning(
+                        (
+                            "Groq falhou ao validar JSON. "
+                            "Tentando novamente sem JSON mode."
+                        )
+                    )
+
+                    fallback_request = dict(
+                        request_data
+                    )
+
+                    fallback_request.pop(
+                        "response_format",
+                        None,
+                    )
+
+                    response = (
+                        await self.client
+                        .chat
+                        .completions
+                        .create(
+                            **fallback_request
+                        )
+                    )
+
+                    json_mode = False
+
+                else:
+                    raise
 
             # ====================================================
             # VALIDAR CHOICES
@@ -227,51 +253,46 @@ class AIService:
                 )
 
             # ====================================================
-            # CONVERTER JSON
+            # CONVERTER RESPOSTA
             # ====================================================
 
-            try:
-                data = json.loads(
-                    content
-                )
+            if json_mode:
+                try:
+                    data = json.loads(
+                        content
+                    )
 
-            except json.JSONDecodeError as error:
-                self.logger.error(
-                    (
-                        "Resposta da IA não é "
-                        "JSON válido: %s"
-                    ),
-                    content,
-                )
+                except json.JSONDecodeError:
+                    self.logger.warning(
+                        (
+                            "Resposta não era JSON válido. "
+                            "Retornando como texto."
+                        )
+                    )
 
-                raise ValueError(
-                    "A IA respondeu em um "
-                    "formato inválido."
-                ) from error
+                    data = {
+                        "message": content,
+                    }
+
+            else:
+                data = {
+                    "message": content,
+                }
 
             # ====================================================
-            # VALIDAR JSON
+            # GARANTIR DICT
             # ====================================================
 
             if not isinstance(
                 data,
                 dict,
             ):
-                raise ValueError(
-                    "A IA não retornou "
-                    "um objeto JSON."
-                )
+                data = {
+                    "message": str(data),
+                }
 
             # ====================================================
             # USO DE TOKENS
-            # ====================================================
-            #
-            # Groq Chat Completions:
-            #
-            # prompt_tokens
-            # completion_tokens
-            # total_tokens
-            #
             # ====================================================
 
             input_tokens = 0
@@ -311,12 +332,7 @@ class AIService:
                 )
 
             # ====================================================
-            # FALLBACK
-            # ====================================================
-            #
-            # Se por algum motivo total_tokens vier 0,
-            # usamos a soma dos valores disponíveis.
-            #
+            # FALLBACK DE TOKENS
             # ====================================================
 
             if total_tokens <= 0:
@@ -338,20 +354,16 @@ class AIService:
                 or selected_model
             )
 
-            response_id = (
-                getattr(
-                    response,
-                    "id",
-                    None,
-                )
+            response_id = getattr(
+                response,
+                "id",
+                None,
             )
 
-            system_fingerprint = (
-                getattr(
-                    response,
-                    "system_fingerprint",
-                    None,
-                )
+            system_fingerprint = getattr(
+                response,
+                "system_fingerprint",
+                None,
             )
 
             # ====================================================
@@ -375,37 +387,32 @@ class AIService:
             # ====================================================
             # RETORNO
             # ====================================================
-            #
-            # O QuotaService poderá usar:
-            #
-            # result["usage"]["input_tokens"]
-            # result["usage"]["output_tokens"]
-            #
-            # ====================================================
 
             return {
                 "data": data,
 
                 "usage": {
-                    "input_tokens":
-                        input_tokens,
-
-                    "output_tokens":
-                        output_tokens,
-
-                    "total_tokens":
-                        total_tokens,
+                    "input_tokens": (
+                        input_tokens
+                    ),
+                    "output_tokens": (
+                        output_tokens
+                    ),
+                    "total_tokens": (
+                        total_tokens
+                    ),
                 },
 
                 "meta": {
-                    "model":
-                        response_model,
-
-                    "response_id":
-                        response_id,
-
-                    "system_fingerprint":
-                        system_fingerprint,
+                    "model": (
+                        response_model
+                    ),
+                    "response_id": (
+                        response_id
+                    ),
+                    "system_fingerprint": (
+                        system_fingerprint
+                    ),
                 },
             }
 

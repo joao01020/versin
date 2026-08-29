@@ -15,6 +15,10 @@ class AIService:
     DEFAULT_MAX_COMPLETION_TOKENS = 500
     DEFAULT_TEMPERATURE = 0.6
 
+    EMPTY_RESPONSE_RETRY_MULTIPLIER = 2
+    EMPTY_RESPONSE_RETRY_MIN_TOKENS = 1000
+    EMPTY_RESPONSE_RETRY_MAX_TOKENS = 2000
+
     # ============================================================
     # CONSTRUTOR
     # ============================================================
@@ -54,18 +58,15 @@ class AIService:
         temperature: float = DEFAULT_TEMPERATURE,
         json_mode: bool = False,
     ) -> dict:
-        # ========================================================
-        # MODELO
-        # ========================================================
-
         selected_model = (
             model
             or settings.GROQ_MODEL
         )
 
-        # ========================================================
-        # VALIDAR SYSTEM PROMPT
-        # ========================================================
+        if not selected_model:
+            raise ValueError(
+                "Modelo da Groq não configurado."
+            )
 
         normalized_system_prompt = (
             system_prompt.strip()
@@ -76,10 +77,6 @@ class AIService:
                 "system_prompt não pode ser vazio."
             )
 
-        # ========================================================
-        # VALIDAR MENSAGEM
-        # ========================================================
-
         normalized_user_message = (
             user_message.strip()
         )
@@ -88,10 +85,6 @@ class AIService:
             raise ValueError(
                 "user_message não pode ser vazio."
             )
-
-        # ========================================================
-        # LIMITE DE ENTRADA
-        # ========================================================
 
         if (
             len(normalized_user_message)
@@ -103,18 +96,10 @@ class AIService:
                 "máximo permitido."
             )
 
-        # ========================================================
-        # LIMITE DE SAÍDA
-        # ========================================================
-
         max_completion_tokens = max(
             1,
             int(max_completion_tokens),
         )
-
-        # ========================================================
-        # TEMPERATURA
-        # ========================================================
 
         temperature = max(
             0.0,
@@ -123,10 +108,6 @@ class AIService:
                 2.0,
             ),
         )
-
-        # ========================================================
-        # MENSAGENS
-        # ========================================================
 
         messages = [
             {
@@ -139,10 +120,6 @@ class AIService:
             },
         ]
 
-        # ========================================================
-        # REQUEST BASE
-        # ========================================================
-
         request_data = {
             "model": selected_model,
             "messages": messages,
@@ -153,110 +130,91 @@ class AIService:
             "stream": False,
         }
 
-        # ========================================================
-        # JSON MODE OPCIONAL
-        # ========================================================
-
         if json_mode:
             request_data["response_format"] = {
                 "type": "json_object",
             }
 
         try:
-            # ====================================================
-            # CHAMADA PARA GROQ
-            # ====================================================
-
-            try:
-                response = (
-                    await self.client
-                    .chat
-                    .completions
-                    .create(
-                        **request_data
-                    )
+            response, used_json_mode = (
+                await self._create_completion(
+                    request_data=request_data,
+                    json_mode=json_mode,
                 )
-
-            except BadRequestError as error:
-                error_text = str(error)
-
-                # =================================================
-                # FALLBACK PARA ERRO DE JSON DA GROQ
-                # =================================================
-
-                if (
-                    json_mode
-                    and
-                    "json_validate_failed"
-                    in error_text
-                ):
-                    self.logger.warning(
-                        (
-                            "Groq falhou ao validar JSON. "
-                            "Tentando novamente sem JSON mode."
-                        )
-                    )
-
-                    fallback_request = dict(
-                        request_data
-                    )
-
-                    fallback_request.pop(
-                        "response_format",
-                        None,
-                    )
-
-                    response = (
-                        await self.client
-                        .chat
-                        .completions
-                        .create(
-                            **fallback_request
-                        )
-                    )
-
-                    json_mode = False
-
-                else:
-                    raise
-
-            # ====================================================
-            # VALIDAR CHOICES
-            # ====================================================
-
-            if not response.choices:
-                raise ValueError(
-                    "A Groq respondeu sem opções."
-                )
-
-            # ====================================================
-            # CONTEÚDO
-            # ====================================================
-
-            content = (
-                response
-                .choices[0]
-                .message
-                .content
             )
 
-            if content is None:
-                raise ValueError(
-                    "A IA respondeu sem conteúdo."
-                )
-
-            content = content.strip()
+            content = self._extract_content(
+                response=response,
+            )
 
             if not content:
-                raise ValueError(
-                    "A IA respondeu com conteúdo vazio."
+                self._log_empty_response(
+                    response=response,
+                    selected_model=selected_model,
+                    attempt=1,
                 )
 
-            # ====================================================
-            # CONVERTER RESPOSTA
-            # ====================================================
+                retry_request = dict(
+                    request_data
+                )
 
-            if json_mode:
+                retry_request.pop(
+                    "response_format",
+                    None,
+                )
+
+                retry_tokens = max(
+                    max_completion_tokens
+                    * self.EMPTY_RESPONSE_RETRY_MULTIPLIER,
+                    self.EMPTY_RESPONSE_RETRY_MIN_TOKENS,
+                )
+
+                retry_tokens = min(
+                    retry_tokens,
+                    self.EMPTY_RESPONSE_RETRY_MAX_TOKENS,
+                )
+
+                retry_request[
+                    "max_completion_tokens"
+                ] = retry_tokens
+
+                self.logger.warning(
+                    (
+                        "Groq retornou conteúdo vazio. "
+                        "Tentando novamente | "
+                        "model=%s | "
+                        "tokens=%s"
+                    ),
+                    selected_model,
+                    retry_tokens,
+                )
+
+                response, _ = (
+                    await self._create_completion(
+                        request_data=retry_request,
+                        json_mode=False,
+                    )
+                )
+
+                used_json_mode = False
+
+                content = self._extract_content(
+                    response=response,
+                )
+
+                if not content:
+                    self._log_empty_response(
+                        response=response,
+                        selected_model=selected_model,
+                        attempt=2,
+                    )
+
+                    raise ValueError(
+                        "A Groq respondeu com conteúdo vazio "
+                        "mesmo após uma nova tentativa."
+                    )
+
+            if used_json_mode:
                 try:
                     data = json.loads(
                         content
@@ -279,10 +237,6 @@ class AIService:
                     "message": content,
                 }
 
-            # ====================================================
-            # GARANTIR DICT
-            # ====================================================
-
             if not isinstance(
                 data,
                 dict,
@@ -290,10 +244,6 @@ class AIService:
                 data = {
                     "message": str(data),
                 }
-
-            # ====================================================
-            # USO DE TOKENS
-            # ====================================================
 
             input_tokens = 0
             output_tokens = 0
@@ -326,24 +276,15 @@ class AIService:
                     getattr(
                         usage,
                         "total_tokens",
-                        input_tokens
-                        + output_tokens,
+                        input_tokens + output_tokens,
                     )
                 )
-
-            # ====================================================
-            # FALLBACK DE TOKENS
-            # ====================================================
 
             if total_tokens <= 0:
                 total_tokens = (
                     input_tokens
                     + output_tokens
                 )
-
-            # ====================================================
-            # METADADOS
-            # ====================================================
 
             response_model = (
                 getattr(
@@ -366,66 +307,43 @@ class AIService:
                 None,
             )
 
-            # ====================================================
-            # LOG
-            # ====================================================
+            finish_reason = self._finish_reason(
+                response
+            )
 
             self.logger.info(
                 (
                     "IA concluída | "
                     "model=%s | "
+                    "finish_reason=%s | "
                     "input=%s | "
                     "output=%s | "
                     "total=%s"
                 ),
                 response_model,
+                finish_reason,
                 input_tokens,
                 output_tokens,
                 total_tokens,
             )
 
-            # ====================================================
-            # RETORNO
-            # ====================================================
-
             return {
                 "data": data,
-
                 "usage": {
-                    "input_tokens": (
-                        input_tokens
-                    ),
-                    "output_tokens": (
-                        output_tokens
-                    ),
-                    "total_tokens": (
-                        total_tokens
-                    ),
+                    "input_tokens": input_tokens,
+                    "output_tokens": output_tokens,
+                    "total_tokens": total_tokens,
                 },
-
                 "meta": {
-                    "model": (
-                        response_model
-                    ),
-                    "response_id": (
-                        response_id
-                    ),
-                    "system_fingerprint": (
-                        system_fingerprint
-                    ),
+                    "model": response_model,
+                    "response_id": response_id,
+                    "system_fingerprint": system_fingerprint,
+                    "finish_reason": finish_reason,
                 },
             }
 
-        # ========================================================
-        # ERRO DE VALIDAÇÃO
-        # ========================================================
-
         except ValueError:
             raise
-
-        # ========================================================
-        # ERRO DA GROQ / REDE / OUTROS
-        # ========================================================
 
         except Exception as error:
             self.logger.exception(
@@ -441,6 +359,259 @@ class AIService:
             )
 
             raise
+
+    # ============================================================
+    # CRIAR COMPLETION
+    # ============================================================
+
+    async def _create_completion(
+        self,
+        request_data: dict,
+        json_mode: bool,
+    ):
+        try:
+            response = (
+                await self.client
+                .chat
+                .completions
+                .create(
+                    **request_data
+                )
+            )
+
+            return (
+                response,
+                json_mode,
+            )
+
+        except BadRequestError as error:
+            error_text = str(
+                error
+            )
+
+            if (
+                json_mode
+                and
+                "json_validate_failed"
+                in error_text
+            ):
+                self.logger.warning(
+                    (
+                        "Groq falhou ao validar JSON. "
+                        "Tentando novamente sem JSON mode."
+                    )
+                )
+
+                fallback_request = dict(
+                    request_data
+                )
+
+                fallback_request.pop(
+                    "response_format",
+                    None,
+                )
+
+                response = (
+                    await self.client
+                    .chat
+                    .completions
+                    .create(
+                        **fallback_request
+                    )
+                )
+
+                return (
+                    response,
+                    False,
+                )
+
+            raise
+
+    # ============================================================
+    # EXTRAIR CONTEÚDO
+    # ============================================================
+
+    def _extract_content(
+        self,
+        response,
+    ) -> str:
+        choices = getattr(
+            response,
+            "choices",
+            None,
+        )
+
+        if not choices:
+            raise ValueError(
+                "A Groq respondeu sem opções."
+            )
+
+        message = getattr(
+            choices[0],
+            "message",
+            None,
+        )
+
+        if message is None:
+            raise ValueError(
+                "A Groq respondeu sem mensagem."
+            )
+
+        content = getattr(
+            message,
+            "content",
+            None,
+        )
+
+        if content is None:
+            return ""
+
+        if not isinstance(
+            content,
+            str,
+        ):
+            content = str(
+                content
+            )
+
+        return content.strip()
+
+    # ============================================================
+    # LOG DE RESPOSTA VAZIA
+    # ============================================================
+
+    def _log_empty_response(
+        self,
+        response,
+        selected_model: str,
+        attempt: int,
+    ) -> None:
+        choices = getattr(
+            response,
+            "choices",
+            None,
+        )
+
+        choice = (
+            choices[0]
+            if choices
+            else None
+        )
+
+        message = getattr(
+            choice,
+            "message",
+            None,
+        )
+
+        finish_reason = getattr(
+            choice,
+            "finish_reason",
+            None,
+        )
+
+        usage = getattr(
+            response,
+            "usage",
+            None,
+        )
+
+        prompt_tokens = self._safe_int(
+            getattr(
+                usage,
+                "prompt_tokens",
+                0,
+            )
+            if usage is not None
+            else 0
+        )
+
+        completion_tokens = self._safe_int(
+            getattr(
+                usage,
+                "completion_tokens",
+                0,
+            )
+            if usage is not None
+            else 0
+        )
+
+        total_tokens = self._safe_int(
+            getattr(
+                usage,
+                "total_tokens",
+                0,
+            )
+            if usage is not None
+            else 0
+        )
+
+        tool_calls = (
+            getattr(
+                message,
+                "tool_calls",
+                None,
+            )
+            if message is not None
+            else None
+        )
+
+        refusal = (
+            getattr(
+                message,
+                "refusal",
+                None,
+            )
+            if message is not None
+            else None
+        )
+
+        self.logger.warning(
+            (
+                "Resposta vazia da Groq | "
+                "attempt=%s | "
+                "model=%s | "
+                "finish_reason=%s | "
+                "prompt_tokens=%s | "
+                "completion_tokens=%s | "
+                "total_tokens=%s | "
+                "tool_calls=%r | "
+                "refusal=%r | "
+                "message=%r"
+            ),
+            attempt,
+            selected_model,
+            finish_reason,
+            prompt_tokens,
+            completion_tokens,
+            total_tokens,
+            tool_calls,
+            refusal,
+            message,
+        )
+
+    # ============================================================
+    # FINISH REASON
+    # ============================================================
+
+    @staticmethod
+    def _finish_reason(
+        response,
+    ):
+        choices = getattr(
+            response,
+            "choices",
+            None,
+        )
+
+        if not choices:
+            return None
+
+        return getattr(
+            choices[0],
+            "finish_reason",
+            None,
+        )
 
     # ============================================================
     # CONVERSÃO SEGURA PARA INT

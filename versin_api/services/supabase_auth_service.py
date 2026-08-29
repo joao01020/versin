@@ -1,3 +1,5 @@
+import logging
+
 import httpx
 
 from core.config import settings
@@ -16,11 +18,33 @@ from core.config import settings
 
 
 class SupabaseAuthService:
+    # ========================================================
+    # CONFIGURAÇÃO
+    # ========================================================
+
+    DEFAULT_TIMEOUT_SECONDS = 15.0
+    DEFAULT_CONNECT_TIMEOUT_SECONDS = 10.0
+
+    MAX_ACCESS_TOKEN_LENGTH = 16_384
+    MAX_USER_ID_LENGTH = 128
+
+    # ========================================================
+    # CONSTRUTOR
+    # ========================================================
+
     def __init__(
         self,
         *,
-        timeout_seconds: float = 15.0,
+        timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
     ):
+        self.logger = logging.getLogger(
+            __name__
+        )
+
+        # ====================================================
+        # SUPABASE URL
+        # ====================================================
+
         self.supabase_url = (
             settings
             .SUPABASE_URL
@@ -28,26 +52,80 @@ class SupabaseAuthService:
             .rstrip("/")
         )
 
-        self.anon_key = (
+        # ====================================================
+        # PUBLISHABLE KEY
+        # ====================================================
+
+        self.publishable_key = (
             settings
-            .SUPABASE_ANON_KEY
+            .SUPABASE_PUBLISHABLE_KEY
             .strip()
         )
+
+        # ====================================================
+        # VALIDAÇÕES
+        # ====================================================
 
         if not self.supabase_url:
             raise RuntimeError(
                 "SUPABASE_URL não configurada."
             )
 
-        if not self.anon_key:
+        if not self.supabase_url.startswith(
+            "https://"
+        ):
             raise RuntimeError(
-                "SUPABASE_ANON_KEY não configurada."
+                (
+                    "SUPABASE_URL deve "
+                    "utilizar HTTPS."
+                )
             )
+
+        if not self.publishable_key:
+            raise RuntimeError(
+                (
+                    "SUPABASE_PUBLISHABLE_KEY "
+                    "não configurada."
+                )
+            )
+
+        try:
+            timeout_seconds = float(
+                timeout_seconds
+            )
+
+        except (
+            TypeError,
+            ValueError,
+        ) as error:
+            raise ValueError(
+                (
+                    "timeout_seconds deve "
+                    "ser um número válido."
+                )
+            ) from error
+
+        if timeout_seconds <= 0:
+            raise ValueError(
+                (
+                    "timeout_seconds deve "
+                    "ser maior que zero."
+                )
+            )
+
+        connect_timeout = min(
+            timeout_seconds,
+            self.DEFAULT_CONNECT_TIMEOUT_SECONDS,
+        )
+
+        # ====================================================
+        # CLIENTE HTTP
+        # ====================================================
 
         self._client = httpx.AsyncClient(
             timeout=httpx.Timeout(
                 timeout_seconds,
-                connect=10.0,
+                connect=connect_timeout,
             ),
             follow_redirects=True,
         )
@@ -66,60 +144,118 @@ class SupabaseAuthService:
         self._ensure_open()
 
         normalized_token = (
-            access_token
-            .strip()
+            self._normalize_token(
+                access_token
+            )
         )
 
-        if not normalized_token:
-            raise ValueError(
-                "Access token ausente."
-            )
+        url = (
+            f"{self.supabase_url}"
+            "/auth/v1/user"
+        )
 
         try:
             response = await self._client.get(
-                (
-                    f"{self.supabase_url}"
-                    "/auth/v1/user"
-                ),
+                url,
                 headers={
-                    "apikey":
-                        self.anon_key,
+                    "apikey": (
+                        self.publishable_key
+                    ),
 
-                    "authorization":
-                        (
-                            "Bearer "
-                            f"{normalized_token}"
-                        ),
+                    "Authorization": (
+                        "Bearer "
+                        f"{normalized_token}"
+                    ),
                 },
             )
 
-        except httpx.HTTPError as error:
+        # ====================================================
+        # TIMEOUT
+        # ====================================================
+
+        except httpx.TimeoutException as error:
+            self.logger.warning(
+                (
+                    "[SUPABASE AUTH] "
+                    "Timeout ao validar sessão."
+                )
+            )
+
             raise RuntimeError(
-                "Não foi possível validar "
-                "o usuário no Supabase."
+                (
+                    "Tempo limite excedido "
+                    "ao validar o usuário "
+                    "no Supabase."
+                )
             ) from error
 
-        if response.status_code in (
+        # ====================================================
+        # ERRO HTTP / REDE
+        # ====================================================
+
+        except httpx.HTTPError as error:
+            self.logger.error(
+                (
+                    "[SUPABASE AUTH] "
+                    "Erro ao acessar Supabase: %s"
+                ),
+                error,
+            )
+
+            raise RuntimeError(
+                (
+                    "Não foi possível validar "
+                    "o usuário no Supabase."
+                )
+            ) from error
+
+        # ====================================================
+        # TOKEN INVÁLIDO
+        # ====================================================
+
+        if response.status_code in {
             401,
             403,
-        ):
+        }:
             raise PermissionError(
                 "Sessão inválida ou expirada."
             )
 
+        # ====================================================
+        # OUTRO ERRO
+        # ====================================================
+
         if response.is_error:
-            raise RuntimeError(
-                "Supabase Auth retornou "
-                f"HTTP {response.status_code}."
+            self.logger.error(
+                (
+                    "[SUPABASE AUTH] "
+                    "Erro retornado | status=%s"
+                ),
+                response.status_code,
             )
 
+            raise RuntimeError(
+                (
+                    "Supabase Auth retornou "
+                    f"HTTP {response.status_code}."
+                )
+            )
+
+        # ====================================================
+        # JSON
+        # ====================================================
+
         try:
-            payload = response.json()
+            payload = (
+                response.json()
+            )
 
         except ValueError as error:
             raise RuntimeError(
-                "Supabase Auth retornou "
-                "uma resposta inválida."
+                (
+                    "Supabase Auth retornou "
+                    "uma resposta inválida."
+                )
             ) from error
 
         if not isinstance(
@@ -127,22 +263,28 @@ class SupabaseAuthService:
             dict,
         ):
             raise RuntimeError(
-                "Resposta inválida do Supabase Auth."
-            )
-
-        user_id = (
-            str(
-                payload.get(
-                    "id",
-                    "",
+                (
+                    "Resposta inválida "
+                    "do Supabase Auth."
                 )
             )
-            .strip()
+
+        # ====================================================
+        # VALIDAR IDENTIDADE
+        # ====================================================
+
+        user_id = (
+            self._extract_user_id(
+                payload
+            )
         )
 
         if not user_id:
             raise PermissionError(
-                "Usuário autenticado não identificado."
+                (
+                    "Usuário autenticado "
+                    "não identificado."
+                )
             )
 
         return payload
@@ -157,13 +299,151 @@ class SupabaseAuthService:
         access_token: str,
     ) -> str:
         user = await self.get_user(
-            access_token=
-                access_token,
+            access_token=access_token,
         )
 
-        return str(
-            user["id"]
-        ).strip()
+        user_id = (
+            self._extract_user_id(
+                user
+            )
+        )
+
+        if not user_id:
+            raise PermissionError(
+                (
+                    "Usuário autenticado "
+                    "não identificado."
+                )
+            )
+
+        return user_id
+
+    # ========================================================
+    # VALIDATE TOKEN
+    # ========================================================
+
+    async def validate_token(
+        self,
+        *,
+        access_token: str,
+    ) -> bool:
+        try:
+            await self.get_user(
+                access_token=access_token,
+            )
+
+            return True
+
+        except PermissionError:
+            return False
+
+    # ========================================================
+    # EXTRAIR USER ID
+    # ========================================================
+
+    def _extract_user_id(
+        self,
+        payload: dict,
+    ) -> str:
+        raw_user_id = (
+            payload.get(
+                "id"
+            )
+        )
+
+        if raw_user_id is None:
+            return ""
+
+        user_id = (
+            str(
+                raw_user_id
+            )
+            .strip()
+        )
+
+        if not user_id:
+            return ""
+
+        if (
+            len(user_id)
+            >
+            self.MAX_USER_ID_LENGTH
+        ):
+            return ""
+
+        return user_id
+
+    # ========================================================
+    # NORMALIZAR TOKEN
+    # ========================================================
+
+    def _normalize_token(
+        self,
+        access_token: str,
+    ) -> str:
+        if not isinstance(
+            access_token,
+            str,
+        ):
+            raise PermissionError(
+                "Access token inválido."
+            )
+
+        normalized_token = (
+            access_token.strip()
+        )
+
+        # ====================================================
+        # ACEITAR "Bearer ..."
+        # ====================================================
+
+        if (
+            normalized_token
+            .lower()
+            .startswith(
+                "bearer "
+            )
+        ):
+            normalized_token = (
+                normalized_token[7:]
+                .strip()
+            )
+
+        # ====================================================
+        # AUSENTE
+        # ====================================================
+
+        if not normalized_token:
+            raise PermissionError(
+                "Access token ausente."
+            )
+
+        # ====================================================
+        # TAMANHO
+        # ====================================================
+
+        if (
+            len(normalized_token)
+            >
+            self.MAX_ACCESS_TOKEN_LENGTH
+        ):
+            raise PermissionError(
+                "Access token inválido."
+            )
+
+        # ====================================================
+        # QUEBRAS DE LINHA
+        # ====================================================
+
+        if (
+            "\n" in normalized_token
+            or "\r" in normalized_token
+        ):
+            raise PermissionError(
+                "Access token inválido."
+            )
+
+        return normalized_token
 
     # ========================================================
     # CLOSE
@@ -177,7 +457,17 @@ class SupabaseAuthService:
 
         self._closed = True
 
-        await self._client.aclose()
+        try:
+            await self._client.aclose()
+
+        except Exception as error:
+            self.logger.warning(
+                (
+                    "[SUPABASE AUTH] "
+                    "Erro ao fechar cliente: %s"
+                ),
+                error,
+            )
 
     # ========================================================
     # ENSURE OPEN
@@ -188,7 +478,10 @@ class SupabaseAuthService:
     ) -> None:
         if self._closed:
             raise RuntimeError(
-                "SupabaseAuthService já foi fechado."
+                (
+                    "SupabaseAuthService "
+                    "já foi fechado."
+                )
             )
 
     # ========================================================

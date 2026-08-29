@@ -1,4 +1,6 @@
+import logging
 import re
+
 from typing import Any
 
 
@@ -8,6 +10,19 @@ class SafetyService:
     # ============================================================
 
     MAX_INPUT_LENGTH = 12_000
+
+    MAX_OUTPUT_LENGTH = 50_000
+
+    # ============================================================
+    # CONSTRUTOR
+    # ============================================================
+
+    def __init__(
+        self,
+    ):
+        self.logger = logging.getLogger(
+            __name__
+        )
 
     # ============================================================
     # SANITIZAR ENTRADA
@@ -24,40 +39,42 @@ class SafetyService:
             return ""
 
         # ========================================================
-        # REMOVER APENAS CARACTERES DE CONTROLE
+        # NORMALIZAR QUEBRAS DE LINHA
+        # ========================================================
+
+        sanitized = (
+            user_message
+            .replace(
+                "\r\n",
+                "\n",
+            )
+            .replace(
+                "\r",
+                "\n",
+            )
+        )
+
+        # ========================================================
+        # REMOVER CARACTERES DE CONTROLE
         # ========================================================
         #
-        # Mantemos normalmente:
+        # Preservamos:
         #
+        # \n
+        # \t
         # {}
-        # ;
+        # []
         # aspas
-        # acentos
-        # emojis
         # pontuação
-        #
-        # porque podem fazer parte de letras e textos criativos.
+        # emojis
+        # acentos
         #
         # ========================================================
 
         sanitized = re.sub(
             r"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]",
             "",
-            user_message,
-        )
-
-        # ========================================================
-        # NORMALIZAR QUEBRAS DE LINHA
-        # ========================================================
-
-        sanitized = sanitized.replace(
-            "\r\n",
-            "\n",
-        )
-
-        sanitized = sanitized.replace(
-            "\r",
-            "\n",
+            sanitized,
         )
 
         # ========================================================
@@ -94,13 +111,15 @@ class SafetyService:
         ):
             return False
 
-        if not user_message.strip():
+        clean_message = (
+            user_message.strip()
+        )
+
+        if not clean_message:
             return False
 
         if (
-            len(
-                user_message
-            )
+            len(user_message)
             >
             self.MAX_INPUT_LENGTH
         ):
@@ -112,11 +131,9 @@ class SafetyService:
     # DETECTAR POSSÍVEL PROMPT INJECTION
     # ============================================================
     #
-    # IMPORTANTE:
+    # Não bloqueia automaticamente.
     #
-    # Não bloqueamos automaticamente.
-    #
-    # Apenas sinalizamos para logs/monitoramento.
+    # Serve apenas como sinal para logs/monitoramento.
     #
     # ============================================================
 
@@ -132,11 +149,14 @@ class SafetyService:
 
         text = (
             user_message
-            .lower()
+            .casefold()
             .strip()
         )
 
-        suspicious_patterns = [
+        if not text:
+            return False
+
+        suspicious_patterns = (
             "ignore previous instructions",
             "ignore all previous instructions",
             "ignore suas instruções",
@@ -148,16 +168,20 @@ class SafetyService:
             "mostre as instruções do sistema",
             "system prompt",
             "developer message",
-        ]
+        )
 
         detected = any(
             pattern in text
-            for pattern in suspicious_patterns
+            for pattern
+            in suspicious_patterns
         )
 
         if detected:
-            print(
-                "[SAFETY] Possível prompt injection detectado."
+            self.logger.warning(
+                (
+                    "[SAFETY] Possível "
+                    "prompt injection detectado."
+                )
             )
 
         return detected
@@ -178,7 +202,7 @@ class SafetyService:
             ai_response,
             dict,
         ):
-            print(
+            self.logger.warning(
                 (
                     "[SAFETY] Resposta rejeitada: "
                     "não é um dicionário."
@@ -191,15 +215,17 @@ class SafetyService:
         # CONTENT
         # ========================================================
 
-        content = ai_response.get(
-            "content"
+        content = (
+            ai_response.get(
+                "content"
+            )
         )
 
         if not isinstance(
             content,
             str,
         ):
-            print(
+            self.logger.warning(
                 (
                     "[SAFETY] Resposta rejeitada: "
                     "content não é string."
@@ -208,10 +234,12 @@ class SafetyService:
 
             return False
 
-        content = content.strip()
+        content = (
+            content.strip()
+        )
 
         if not content:
-            print(
+            self.logger.warning(
                 (
                     "[SAFETY] Resposta rejeitada: "
                     "content está vazio."
@@ -221,27 +249,42 @@ class SafetyService:
             return False
 
         # ========================================================
-        # IS ACCEPTABLE
-        # ========================================================
-        #
-        # Não bloqueamos se não existir.
-        #
-        # O ChatService possui fallback.
-        #
+        # LIMITE DE SAÍDA
         # ========================================================
 
-        is_acceptable = ai_response.get(
-            "is_acceptable"
+        if (
+            len(content)
+            >
+            self.MAX_OUTPUT_LENGTH
+        ):
+            self.logger.warning(
+                (
+                    "[SAFETY] Resposta rejeitada: "
+                    "content excedeu o limite."
+                )
+            )
+
+            return False
+
+        # ========================================================
+        # IS ACCEPTABLE
+        # ========================================================
+
+        is_acceptable = (
+            ai_response.get(
+                "is_acceptable"
+            )
         )
 
         if (
             is_acceptable is not None
-            and not isinstance(
+            and
+            not isinstance(
                 is_acceptable,
                 bool,
             )
         ):
-            print(
+            self.logger.warning(
                 (
                     "[SAFETY] Aviso: "
                     "is_acceptable não é boolean."
@@ -252,24 +295,30 @@ class SafetyService:
         # IMPACT LEVEL
         # ========================================================
 
-        impact_level = ai_response.get(
-            "impact_level"
+        impact_level = (
+            ai_response.get(
+                "impact_level"
+            )
         )
 
         if impact_level is not None:
             try:
-                normalized_impact = int(
-                    impact_level
+                normalized_impact = (
+                    int(
+                        impact_level
+                    )
                 )
 
-                if (
-                    normalized_impact < 1
-                    or normalized_impact > 5
+                if not (
+                    1
+                    <= normalized_impact
+                    <= 5
                 ):
-                    print(
+                    self.logger.warning(
                         (
                             "[SAFETY] Aviso: "
-                            "impact_level fora da faixa 1-5."
+                            "impact_level fora "
+                            "da faixa 1-5."
                         )
                     )
 
@@ -277,7 +326,7 @@ class SafetyService:
                 TypeError,
                 ValueError,
             ):
-                print(
+                self.logger.warning(
                     (
                         "[SAFETY] Aviso: "
                         "impact_level inválido."
@@ -288,21 +337,25 @@ class SafetyService:
         # FEEDBACK REASON
         # ========================================================
 
-        feedback_reason = ai_response.get(
-            "feedback_reason"
+        feedback_reason = (
+            ai_response.get(
+                "feedback_reason"
+            )
         )
 
         if (
             feedback_reason is not None
-            and not isinstance(
+            and
+            not isinstance(
                 feedback_reason,
                 str,
             )
         ):
-            print(
+            self.logger.warning(
                 (
                     "[SAFETY] Aviso: "
-                    "feedback_reason não é string."
+                    "feedback_reason não "
+                    "é string."
                 )
             )
 
@@ -313,15 +366,7 @@ class SafetyService:
         return True
 
     # ============================================================
-    # COMPATIBILIDADE
-    # ============================================================
-    #
-    # O ChatService chama:
-    #
-    # safety_service.is_content_safe(ai_data)
-    #
-    # Mantemos esse nome para evitar alterar outras partes.
-    #
+    # COMPATIBILIDADE COM CHAT SERVICE
     # ============================================================
 
     def is_content_safe(

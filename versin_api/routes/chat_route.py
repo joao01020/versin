@@ -1,6 +1,6 @@
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 
-from models.schemas import ChatRequest
+from models.schemas import ChatRequest, ChatResponse
 
 
 # ============================================================
@@ -14,46 +14,105 @@ router = APIRouter(
 
 
 # ============================================================
+# HELPERS
+# ============================================================
+
+def _normalize_user_id(
+    user_id: str,
+) -> str:
+    if not isinstance(
+        user_id,
+        str,
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="Usuário inválido.",
+        )
+
+    normalized = (
+        user_id.strip()
+    )
+
+    if not normalized:
+        raise HTTPException(
+            status_code=400,
+            detail="Usuário inválido.",
+        )
+
+    if len(normalized) > 128:
+        raise HTTPException(
+            status_code=400,
+            detail="Usuário inválido.",
+        )
+
+    return normalized
+
+
+def _get_chat_service(
+    request: Request,
+):
+    chat_service = getattr(
+        request.app.state,
+        "chat_service",
+        None,
+    )
+
+    if chat_service is None:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Serviço de chat "
+                "não está disponível."
+            ),
+        )
+
+    return chat_service
+
+
+# ============================================================
 # POST /chat
 # ============================================================
 #
-# Esta rota não contém regra de negócio.
+# Fluxo:
 #
-# Ela apenas:
-#
-# 1. recebe o ChatRequest;
-# 2. pega o ChatService criado no main.py;
-# 3. envia os dados para ChatService.process();
-# 4. devolve a resposta para o Flutter.
+# Flutter
+#   ↓
+# ChatRequest
+#   ↓
+# ChatService.process()
+#   ↓
+# ChatResponse
 #
 # ============================================================
 
-@router.post("")
+@router.post(
+    "",
+    response_model=ChatResponse,
+)
 async def chat(
     data: ChatRequest,
     request: Request,
-):
+) -> ChatResponse:
     chat_service = (
-        request
-        .app
-        .state
-        .chat_service
+        _get_chat_service(
+            request
+        )
     )
 
-    return await chat_service.process(
-        data
+    result = await (
+        chat_service.process(
+            data
+        )
+    )
+
+    return ChatResponse(
+        **result
     )
 
 
 # ============================================================
-# STATUS DA QUOTA DO USUÁRIO
+# STATUS DA QUOTA
 # ============================================================
-#
-# Essa rota será útil para:
-#
-# Dashboard
-# Settings
-# barra "IA mensal"
 #
 # Exemplo:
 #
@@ -67,19 +126,24 @@ async def chat(
 async def get_quota_status(
     user_id: str,
     request: Request,
-):
+) -> dict:
+    normalized_user_id = (
+        _normalize_user_id(
+            user_id
+        )
+    )
+
     chat_service = (
-        request
-        .app
-        .state
-        .chat_service
+        _get_chat_service(
+            request
+        )
     )
 
     return await (
         chat_service
         .quota_service
         .get_status(
-            user_id
+            normalized_user_id
         )
     )
 
@@ -87,8 +151,6 @@ async def get_quota_status(
 # ============================================================
 # STATUS DO RATE LIMIT
 # ============================================================
-#
-# Útil para debug/admin.
 #
 # Exemplo:
 #
@@ -102,18 +164,23 @@ async def get_quota_status(
 async def get_rate_limit_status(
     user_id: str,
     request: Request,
-):
+) -> dict:
+    normalized_user_id = (
+        _normalize_user_id(
+            user_id
+        )
+    )
+
     chat_service = (
-        request
-        .app
-        .state
-        .chat_service
+        _get_chat_service(
+            request
+        )
     )
 
     return await (
         chat_service
         .rate_limiter
         .get_status(
-            user_id
+            normalized_user_id
         )
     )

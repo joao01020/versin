@@ -1,6 +1,10 @@
+import logging
+
 from datetime import datetime, timedelta, timezone
 
 import redis.asyncio as redis
+
+from redis.exceptions import RedisError
 
 from core.config import settings
 
@@ -17,20 +21,6 @@ class QuotaService:
     # ============================================================
     # CICLOS / LIMPEZA
     # ============================================================
-    #
-    # A quota mensal segue o mesmo marco do ciclo mensal da Groq:
-    #
-    #     dia 1 de cada mês às 00:00 UTC
-    #
-    # A renovação NÃO depende do momento do primeiro uso.
-    #
-    # As chaves Redis incluem YYYY-MM, portanto uma nova chave é
-    # usada automaticamente quando o mês muda.
-    #
-    # Mantemos a chave do período anterior por alguns dias apenas
-    # para limpeza/diagnóstico. Isso NÃO prolonga a quota.
-    #
-    # ============================================================
 
     MONTHLY_CLEANUP_GRACE_SECONDS = (
         60 * 60 * 24 * 7
@@ -41,6 +31,79 @@ class QuotaService:
     )
 
     # ============================================================
+    # USUÁRIO
+    # ============================================================
+
+    MAX_USER_ID_LENGTH = 128
+
+    # ============================================================
+    # SCRIPT ATÔMICO DE REGISTRO
+    # ============================================================
+    #
+    # Atualiza:
+    #
+    # 1. quota mensal do usuário;
+    # 2. quota global diária.
+    #
+    # Tudo em uma única operação no Redis.
+    #
+    # Também garante TTL caso a chave esteja sem expiração.
+    #
+    # ============================================================
+
+    _REGISTER_USAGE_SCRIPT = """
+local user_key = KEYS[1]
+local global_key = KEYS[2]
+
+local tokens = tonumber(ARGV[1])
+local user_ttl = tonumber(ARGV[2])
+local global_ttl = tonumber(ARGV[3])
+
+local user_usage = redis.call(
+    'INCRBY',
+    user_key,
+    tokens
+)
+
+local current_user_ttl = redis.call(
+    'TTL',
+    user_key
+)
+
+if current_user_ttl < 0 then
+    redis.call(
+        'EXPIRE',
+        user_key,
+        user_ttl
+    )
+end
+
+local global_usage = redis.call(
+    'INCRBY',
+    global_key,
+    tokens
+)
+
+local current_global_ttl = redis.call(
+    'TTL',
+    global_key
+)
+
+if current_global_ttl < 0 then
+    redis.call(
+        'EXPIRE',
+        global_key,
+        global_ttl
+    )
+end
+
+return {
+    user_usage,
+    global_usage
+}
+"""
+
+    # ============================================================
     # CONSTRUTOR
     # ============================================================
 
@@ -49,10 +112,22 @@ class QuotaService:
         monthly_token_limit: int | None = None,
         global_daily_token_limit: int | None = None,
     ):
+        self.logger = logging.getLogger(
+            __name__
+        )
+
+        # ========================================================
+        # REDIS
+        # ========================================================
+
         if not settings.REDIS_URL:
             raise ValueError(
-                "REDIS_URL não configurada no arquivo .env"
+                "REDIS_URL não configurada."
             )
+
+        # ========================================================
+        # LIMITES
+        # ========================================================
 
         self.monthly_token_limit = (
             monthly_token_limit
@@ -66,62 +141,84 @@ class QuotaService:
             else settings.AI_GLOBAL_DAILY_TOKEN_LIMIT
         )
 
-        if self.monthly_token_limit <= 0:
+        if (
+            self.monthly_token_limit
+            <= 0
+        ):
             raise ValueError(
-                "AI_MONTHLY_TOKEN_LIMIT deve ser maior que zero."
+                (
+                    "AI_MONTHLY_TOKEN_LIMIT "
+                    "deve ser maior que zero."
+                )
             )
 
-        if self.global_daily_token_limit <= 0:
+        if (
+            self.global_daily_token_limit
+            <= 0
+        ):
             raise ValueError(
-                "AI_GLOBAL_DAILY_TOKEN_LIMIT deve ser maior que zero."
+                (
+                    "AI_GLOBAL_DAILY_TOKEN_LIMIT "
+                    "deve ser maior que zero."
+                )
             )
+
+        # ========================================================
+        # CLIENTE REDIS
+        # ========================================================
 
         self.redis = redis.from_url(
             settings.REDIS_URL,
             decode_responses=True,
 
-            # ====================================================
-            # CONEXÃO REMOTA / UPSTASH
-            # ====================================================
-
             socket_connect_timeout=10,
             socket_timeout=10,
+
             retry_on_timeout=True,
+
             health_check_interval=30,
         )
 
         self._redis_available = True
 
     # ============================================================
-    # TESTAR CONEXÃO REDIS
+    # TESTAR REDIS
     # ============================================================
 
     async def check_connection(
         self,
     ) -> bool:
         try:
-            result = await self.redis.ping()
+            result = (
+                await self.redis.ping()
+            )
 
             self._redis_available = bool(
                 result
             )
 
             if self._redis_available:
-                print(
-                    "[QUOTA] Redis conectado com sucesso."
+                self.logger.info(
+                    (
+                        "[QUOTA] Redis "
+                        "conectado com sucesso."
+                    )
                 )
 
-            return self._redis_available
+            return (
+                self._redis_available
+            )
 
-        except redis.RedisError as error:
+        except RedisError as error:
             self._redis_available = False
 
-            print(
+            self.logger.error(
                 (
-                    "[QUOTA] Redis indisponível: "
-                    f"{type(error).__name__}: "
-                    f"{error}"
-                )
+                    "[QUOTA] Redis indisponível | "
+                    "type=%s | detail=%s"
+                ),
+                type(error).__name__,
+                error,
             )
 
             return False
@@ -129,28 +226,30 @@ class QuotaService:
         except Exception as error:
             self._redis_available = False
 
-            print(
+            self.logger.exception(
                 (
-                    "[QUOTA] Erro inesperado ao testar Redis: "
-                    f"{type(error).__name__}: "
-                    f"{error}"
-                )
+                    "[QUOTA] Erro inesperado "
+                    "ao testar Redis: %s"
+                ),
+                error,
             )
 
             return False
 
     # ============================================================
-    # ESTADO DA CONEXÃO
+    # ESTADO DO REDIS
     # ============================================================
 
     @property
     def redis_available(
         self,
     ) -> bool:
-        return self._redis_available
+        return (
+            self._redis_available
+        )
 
     # ============================================================
-    # RECONEXÃO
+    # GARANTIR CONEXÃO
     # ============================================================
 
     async def ensure_connection(
@@ -159,10 +258,12 @@ class QuotaService:
         if self._redis_available:
             return True
 
-        return await self.check_connection()
+        return await (
+            self.check_connection()
+        )
 
     # ============================================================
-    # DATA ATUAL UTC
+    # DATA UTC
     # ============================================================
 
     @staticmethod
@@ -172,7 +273,7 @@ class QuotaService:
         )
 
     # ============================================================
-    # INÍCIO DO MÊS ATUAL
+    # INÍCIO DO MÊS
     # ============================================================
 
     def _get_current_month_start(
@@ -188,13 +289,7 @@ class QuotaService:
         )
 
     # ============================================================
-    # PRÓXIMA RENOVAÇÃO MENSAL
-    # ============================================================
-    #
-    # Alinhada ao ciclo mensal da Groq:
-    #
-    #     1º dia do próximo mês, 00:00 UTC
-    #
+    # PRÓXIMO MÊS
     # ============================================================
 
     def _get_next_month_start(
@@ -224,12 +319,10 @@ class QuotaService:
     def _get_next_day_start(
         self,
     ) -> datetime:
-        now = self._now()
-
         tomorrow = (
-            now
+            self._now()
             + timedelta(
-                days=1,
+                days=1
             )
         )
 
@@ -241,7 +334,7 @@ class QuotaService:
         )
 
     # ============================================================
-    # SEGUNDOS ATÉ UMA DATA
+    # SEGUNDOS ATÉ
     # ============================================================
 
     def _seconds_until(
@@ -261,13 +354,7 @@ class QuotaService:
         )
 
     # ============================================================
-    # TTL DA CHAVE MENSAL
-    # ============================================================
-    #
-    # A chave atual pode permanecer alguns dias depois da
-    # renovação apenas para limpeza. Como a chave possui YYYY-MM,
-    # o novo mês nunca reutiliza a quota anterior.
-    #
+    # TTL MENSAL
     # ============================================================
 
     def _get_monthly_key_ttl(
@@ -275,14 +362,16 @@ class QuotaService:
     ) -> int:
         return max(
             1,
-            self._seconds_until(
-                self._get_next_month_start()
-            )
-            + self.MONTHLY_CLEANUP_GRACE_SECONDS,
+            (
+                self._seconds_until(
+                    self._get_next_month_start()
+                )
+                + self.MONTHLY_CLEANUP_GRACE_SECONDS
+            ),
         )
 
     # ============================================================
-    # TTL DA CHAVE DIÁRIA
+    # TTL DIÁRIO
     # ============================================================
 
     def _get_daily_key_ttl(
@@ -290,14 +379,16 @@ class QuotaService:
     ) -> int:
         return max(
             1,
-            self._seconds_until(
-                self._get_next_day_start()
-            )
-            + self.DAILY_CLEANUP_GRACE_SECONDS,
+            (
+                self._seconds_until(
+                    self._get_next_day_start()
+                )
+                + self.DAILY_CLEANUP_GRACE_SECONDS
+            ),
         )
 
     # ============================================================
-    # METADADOS DO CICLO MENSAL
+    # METADADOS MENSAIS
     # ============================================================
 
     def _get_monthly_period_metadata(
@@ -337,32 +428,35 @@ class QuotaService:
         )
 
         return {
-            "period":
-                "monthly",
+            "period": "monthly",
 
-            "provider":
-                "groq",
+            "provider": "groq",
 
-            "billing_cycle_anchor":
-                "first_day_of_month",
+            "billing_cycle_anchor": (
+                "first_day_of_month"
+            ),
 
-            "renewal_timezone":
-                "UTC",
+            "renewal_timezone": "UTC",
 
-            "period_start":
-                period_start.isoformat(),
+            "period_start": (
+                period_start.isoformat()
+            ),
 
-            "renews_at":
-                renews_at.isoformat(),
+            "renews_at": (
+                renews_at.isoformat()
+            ),
 
-            "renews_in_seconds":
-                renews_in_seconds,
+            "renews_in_seconds": (
+                renews_in_seconds
+            ),
 
-            "renews_in_hours":
-                renews_in_hours,
+            "renews_in_hours": (
+                renews_in_hours
+            ),
 
-            "renews_in_days":
-                renews_in_days,
+            "renews_in_days": (
+                renews_in_days
+            ),
         }
 
     # ============================================================
@@ -373,8 +467,11 @@ class QuotaService:
         self,
         user_id: str,
     ) -> str:
-        month = self._now().strftime(
-            "%Y-%m"
+        month = (
+            self._now()
+            .strftime(
+                "%Y-%m"
+            )
         )
 
         return (
@@ -390,8 +487,11 @@ class QuotaService:
     def _get_global_day_key(
         self,
     ) -> str:
-        day = self._now().strftime(
-            "%Y-%m-%d"
+        day = (
+            self._now()
+            .strftime(
+                "%Y-%m-%d"
+            )
         )
 
         return (
@@ -403,8 +503,9 @@ class QuotaService:
     # VALIDAR USUÁRIO
     # ============================================================
 
-    @staticmethod
+    @classmethod
     def _validate_user_id(
+        cls,
         user_id: str,
     ) -> str:
         if not isinstance(
@@ -415,9 +516,20 @@ class QuotaService:
                 "user_id inválido."
             )
 
-        normalized = user_id.strip()
+        normalized = (
+            user_id.strip()
+        )
 
         if not normalized:
+            raise ValueError(
+                "user_id inválido."
+            )
+
+        if (
+            len(normalized)
+            >
+            cls.MAX_USER_ID_LENGTH
+        ):
             raise ValueError(
                 "user_id inválido."
             )
@@ -430,11 +542,14 @@ class QuotaService:
 
     @staticmethod
     def _normalize_tokens(
-        tokens: int,
+        tokens,
     ) -> int:
         try:
             return max(
-                int(tokens),
+                int(
+                    tokens
+                    or 0
+                ),
                 0,
             )
 
@@ -445,15 +560,17 @@ class QuotaService:
             return 0
 
     # ============================================================
-    # USO MENSAL DO USUÁRIO
+    # USO MENSAL
     # ============================================================
 
     async def get_usage(
         self,
         user_id: str,
     ) -> int:
-        user_id = self._validate_user_id(
-            user_id
+        user_id = (
+            self._validate_user_id(
+                user_id
+            )
         )
 
         key = self._get_month_key(
@@ -461,72 +578,78 @@ class QuotaService:
         )
 
         try:
-            value = await self.redis.get(
-                key
+            value = (
+                await self.redis.get(
+                    key
+                )
             )
-
-            if value is None:
-                return 0
 
             self._redis_available = True
 
-            return max(
-                int(value),
-                0,
+            return self._normalize_tokens(
+                value
             )
 
-        except redis.RedisError as error:
+        except RedisError as error:
             self._redis_available = False
 
-            print(
+            self.logger.error(
                 (
-                    "[QUOTA] Erro ao consultar quota mensal: "
-                    f"{type(error).__name__}: "
-                    f"{error}"
-                )
+                    "[QUOTA] Erro ao consultar "
+                    "quota mensal | "
+                    "type=%s | detail=%s"
+                ),
+                type(error).__name__,
+                error,
             )
+
+            # ====================================================
+            # FAIL OPEN
+            # ====================================================
 
             return 0
 
     # ============================================================
-    # USO GLOBAL DO DIA
+    # USO GLOBAL DIÁRIO
     # ============================================================
 
     async def get_global_daily_usage(
         self,
     ) -> int:
-        key = self._get_global_day_key()
+        key = (
+            self._get_global_day_key()
+        )
 
         try:
-            value = await self.redis.get(
-                key
+            value = (
+                await self.redis.get(
+                    key
+                )
             )
-
-            if value is None:
-                return 0
 
             self._redis_available = True
 
-            return max(
-                int(value),
-                0,
+            return self._normalize_tokens(
+                value
             )
 
-        except redis.RedisError as error:
+        except RedisError as error:
             self._redis_available = False
 
-            print(
+            self.logger.error(
                 (
-                    "[QUOTA] Erro ao consultar quota global diária: "
-                    f"{type(error).__name__}: "
-                    f"{error}"
-                )
+                    "[QUOTA] Erro ao consultar "
+                    "quota global diária | "
+                    "type=%s | detail=%s"
+                ),
+                type(error).__name__,
+                error,
             )
 
             return 0
 
     # ============================================================
-    # TOKENS RESTANTES DO USUÁRIO
+    # RESTANTE MENSAL
     # ============================================================
 
     async def get_remaining(
@@ -539,27 +662,34 @@ class QuotaService:
 
         return max(
             0,
-            self.monthly_token_limit
-            - usage,
+            (
+                self.monthly_token_limit
+                - usage
+            ),
         )
 
     # ============================================================
-    # TOKENS GLOBAIS RESTANTES HOJE
+    # RESTANTE GLOBAL
     # ============================================================
 
     async def get_global_daily_remaining(
         self,
     ) -> int:
-        usage = await self.get_global_daily_usage()
+        usage = (
+            await self
+            .get_global_daily_usage()
+        )
 
         return max(
             0,
-            self.global_daily_token_limit
-            - usage,
+            (
+                self.global_daily_token_limit
+                - usage
+            ),
         )
 
     # ============================================================
-    # CALCULAR PERCENTUAL
+    # PERCENTUAL
     # ============================================================
 
     @staticmethod
@@ -585,7 +715,7 @@ class QuotaService:
         )
 
     # ============================================================
-    # PERCENTUAL MENSAL DO USUÁRIO
+    # PERCENTUAL DO USUÁRIO
     # ============================================================
 
     async def get_usage_percentage(
@@ -602,13 +732,16 @@ class QuotaService:
         )
 
     # ============================================================
-    # PERCENTUAL GLOBAL DO DIA
+    # PERCENTUAL GLOBAL
     # ============================================================
 
     async def get_global_daily_percentage(
         self,
     ) -> float:
-        usage = await self.get_global_daily_usage()
+        usage = (
+            await self
+            .get_global_daily_usage()
+        )
 
         return self._calculate_percentage(
             usage,
@@ -628,8 +761,10 @@ class QuotaService:
             user_id
         )
 
-        estimated_tokens = self._normalize_tokens(
-            estimated_tokens
+        estimated_tokens = (
+            self._normalize_tokens(
+                estimated_tokens
+            )
         )
 
         projected_usage = (
@@ -637,9 +772,21 @@ class QuotaService:
             + estimated_tokens
         )
 
+        # ========================================================
+        # Permite chegar exatamente ao limite.
+        #
+        # Exemplo:
+        #
+        # 48.000 usados
+        # + 2.000 estimados
+        # = 50.000
+        #
+        # Ainda pode executar.
+        # ========================================================
+
         return (
             projected_usage
-            < self.monthly_token_limit
+            <= self.monthly_token_limit
         )
 
     # ============================================================
@@ -650,10 +797,15 @@ class QuotaService:
         self,
         estimated_tokens: int = 0,
     ) -> bool:
-        usage = await self.get_global_daily_usage()
+        usage = (
+            await self
+            .get_global_daily_usage()
+        )
 
-        estimated_tokens = self._normalize_tokens(
-            estimated_tokens
+        estimated_tokens = (
+            self._normalize_tokens(
+                estimated_tokens
+            )
         )
 
         projected_usage = (
@@ -663,7 +815,7 @@ class QuotaService:
 
         return (
             projected_usage
-            < self.global_daily_token_limit
+            <= self.global_daily_token_limit
         )
 
     # ============================================================
@@ -675,19 +827,25 @@ class QuotaService:
         user_id: str,
         estimated_tokens: int = 0,
     ) -> bool:
-        user_allowed = await self.check_user_limit(
-            user_id=user_id,
-            estimated_tokens=estimated_tokens,
+        user_allowed = (
+            await self.check_user_limit(
+                user_id=user_id,
+                estimated_tokens=(
+                    estimated_tokens
+                ),
+            )
         )
 
         if not user_allowed:
             return False
 
-        global_allowed = await self.check_global_limit(
-            estimated_tokens=estimated_tokens,
+        return await (
+            self.check_global_limit(
+                estimated_tokens=(
+                    estimated_tokens
+                )
+            )
         )
-
-        return global_allowed
 
     # ============================================================
     # LIMITE MENSAL ATINGIDO
@@ -713,7 +871,10 @@ class QuotaService:
     async def is_global_limit_reached(
         self,
     ) -> bool:
-        usage = await self.get_global_daily_usage()
+        usage = (
+            await self
+            .get_global_daily_usage()
+        )
 
         return (
             usage
@@ -730,16 +891,22 @@ class QuotaService:
         input_tokens: int = 0,
         output_tokens: int = 0,
     ) -> int:
-        user_id = self._validate_user_id(
-            user_id
+        user_id = (
+            self._validate_user_id(
+                user_id
+            )
         )
 
-        input_tokens = self._normalize_tokens(
-            input_tokens
+        input_tokens = (
+            self._normalize_tokens(
+                input_tokens
+            )
         )
 
-        output_tokens = self._normalize_tokens(
-            output_tokens
+        output_tokens = (
+            self._normalize_tokens(
+                output_tokens
+            )
         )
 
         total_tokens = (
@@ -747,85 +914,142 @@ class QuotaService:
             + output_tokens
         )
 
-        if total_tokens == 0:
+        # ========================================================
+        # NADA PARA REGISTRAR
+        # ========================================================
+
+        if total_tokens <= 0:
             return await self.get_usage(
                 user_id
             )
 
-        user_key = self._get_month_key(
-            user_id
+        # ========================================================
+        # CHAVES
+        # ========================================================
+
+        user_key = (
+            self._get_month_key(
+                user_id
+            )
         )
 
-        global_key = self._get_global_day_key()
+        global_key = (
+            self._get_global_day_key()
+        )
+
+        # ========================================================
+        # TTLS
+        # ========================================================
+
+        user_ttl = (
+            self._get_monthly_key_ttl()
+        )
+
+        global_ttl = (
+            self._get_daily_key_ttl()
+        )
 
         try:
             # ====================================================
-            # QUOTA MENSAL DO USUÁRIO
+            # REGISTRO ATÔMICO
             # ====================================================
 
-            user_usage = await self.redis.incrby(
+            result = await self.redis.eval(
+                self._REGISTER_USAGE_SCRIPT,
+                2,
                 user_key,
-                total_tokens,
-            )
-
-            await self.redis.expire(
-                user_key,
-                self._get_monthly_key_ttl(),
-            )
-
-            # ====================================================
-            # QUOTA GLOBAL DO DIA
-            # ====================================================
-
-            global_usage = await self.redis.incrby(
                 global_key,
                 total_tokens,
+                user_ttl,
+                global_ttl,
             )
 
-            await self.redis.expire(
-                global_key,
-                self._get_daily_key_ttl(),
+            # ====================================================
+            # NORMALIZAR RESULTADO
+            # ====================================================
+
+            user_usage = (
+                self._normalize_tokens(
+                    result[0]
+                    if (
+                        isinstance(
+                            result,
+                            (list, tuple),
+                        )
+                        and len(result) > 0
+                    )
+                    else 0
+                )
+            )
+
+            global_usage = (
+                self._normalize_tokens(
+                    result[1]
+                    if (
+                        isinstance(
+                            result,
+                            (list, tuple),
+                        )
+                        and len(result) > 1
+                    )
+                    else 0
+                )
             )
 
             self._redis_available = True
 
-            print(
+            # ====================================================
+            # LOG
+            # ====================================================
+
+            self.logger.info(
                 (
                     "[QUOTA] Uso registrado | "
-                    f"user={user_id} | "
-                    f"input={input_tokens} | "
-                    f"output={output_tokens} | "
-                    f"total={total_tokens} | "
-                    f"monthly={user_usage} | "
-                    f"global={global_usage}"
-                )
+                    "user=%s | "
+                    "input=%s | "
+                    "output=%s | "
+                    "total=%s | "
+                    "monthly=%s | "
+                    "global=%s"
+                ),
+                user_id,
+                input_tokens,
+                output_tokens,
+                total_tokens,
+                user_usage,
+                global_usage,
             )
 
-            return int(
-                user_usage
-            )
+            return user_usage
 
-        except redis.RedisError as error:
+        except RedisError as error:
             self._redis_available = False
 
-            print(
+            self.logger.error(
                 (
-                    "[QUOTA] Erro Redis ao registrar uso | "
-                    f"type={type(error).__name__} | "
-                    f"detail={error}"
-                )
+                    "[QUOTA] Erro Redis ao "
+                    "registrar uso | "
+                    "type=%s | detail=%s"
+                ),
+                type(error).__name__,
+                error,
             )
+
+            # ====================================================
+            # FAIL OPEN
+            # ====================================================
 
             return await self.get_usage(
                 user_id
             )
 
         except Exception as error:
-            print(
+            self.logger.exception(
                 (
-                    "[QUOTA] Erro inesperado ao registrar uso: "
-                    f"{repr(error)}"
-                )
+                    "[QUOTA] Erro inesperado "
+                    "ao registrar uso: %s"
+                ),
+                error,
             )
 
             return await self.get_usage(
@@ -833,7 +1057,7 @@ class QuotaService:
             )
 
     # ============================================================
-    # REGISTRAR E RETORNAR STATUS
+    # REGISTRAR + STATUS
     # ============================================================
 
     async def register_usage_and_get_status(
@@ -860,38 +1084,56 @@ class QuotaService:
         self,
         percentage: float,
     ) -> str:
-        if percentage >= self.BLOCKED_PERCENTAGE:
+        if (
+            percentage
+            >= self.BLOCKED_PERCENTAGE
+        ):
             return "blocked"
 
-        if percentage >= self.CRITICAL_PERCENTAGE:
+        if (
+            percentage
+            >= self.CRITICAL_PERCENTAGE
+        ):
             return "critical"
 
-        if percentage >= self.WARNING_PERCENTAGE:
+        if (
+            percentage
+            >= self.WARNING_PERCENTAGE
+        ):
             return "warning"
 
         return "normal"
 
     # ============================================================
-    # MENSAGEM DO USUÁRIO
+    # MENSAGEM
     # ============================================================
 
     def _get_usage_message(
         self,
         percentage: float,
     ) -> str:
-        if percentage >= self.BLOCKED_PERCENTAGE:
+        if (
+            percentage
+            >= self.BLOCKED_PERCENTAGE
+        ):
             return (
                 "Seus créditos Versin acabaram "
                 "neste ciclo mensal."
             )
 
-        if percentage >= self.CRITICAL_PERCENTAGE:
+        if (
+            percentage
+            >= self.CRITICAL_PERCENTAGE
+        ):
             return (
                 "Seus créditos Versin estão "
                 "quase no fim."
             )
 
-        if percentage >= self.WARNING_PERCENTAGE:
+        if (
+            percentage
+            >= self.WARNING_PERCENTAGE
+        ):
             return (
                 "Você já utilizou 80% ou mais "
                 "dos seus créditos Versin."
@@ -902,7 +1144,7 @@ class QuotaService:
         )
 
     # ============================================================
-    # BARRA TEXTUAL
+    # BARRA
     # ============================================================
 
     def _build_progress_bar(
@@ -918,15 +1160,28 @@ class QuotaService:
             ),
         )
 
+        size = max(
+            int(size),
+            1,
+        )
+
         filled = round(
             normalized
             / 100
             * size
         )
 
-        empty = max(
+        filled = max(
             0,
-            size - filled,
+            min(
+                filled,
+                size,
+            ),
+        )
+
+        empty = (
+            size
+            - filled
         )
 
         return (
@@ -935,30 +1190,49 @@ class QuotaService:
         )
 
     # ============================================================
-    # STATUS COMPLETO DO USUÁRIO
+    # STATUS COMPLETO
     # ============================================================
 
     async def get_status(
         self,
         user_id: str,
     ) -> dict:
-        user_id = self._validate_user_id(
-            user_id
+        user_id = (
+            self._validate_user_id(
+                user_id
+            )
         )
+
+        # ========================================================
+        # BUSCAR USOS
+        # ========================================================
 
         usage = await self.get_usage(
             user_id
         )
 
-        remaining = max(
-            0,
-            self.monthly_token_limit
-            - usage,
+        global_usage = (
+            await self
+            .get_global_daily_usage()
         )
 
-        percentage = self._calculate_percentage(
-            usage,
-            self.monthly_token_limit,
+        # ========================================================
+        # MENSAL
+        # ========================================================
+
+        remaining = max(
+            0,
+            (
+                self.monthly_token_limit
+                - usage
+            ),
+        )
+
+        percentage = (
+            self._calculate_percentage(
+                usage,
+                self.monthly_token_limit,
+            )
         )
 
         rounded_percentage = round(
@@ -966,20 +1240,26 @@ class QuotaService:
             1,
         )
 
-        level = self._get_usage_level(
-            percentage
+        level = (
+            self._get_usage_level(
+                percentage
+            )
         )
 
-        message = self._get_usage_message(
-            percentage
+        message = (
+            self._get_usage_message(
+                percentage
+            )
         )
 
-        progress_bar = self._build_progress_bar(
-            percentage
+        progress_bar = (
+            self._build_progress_bar(
+                percentage
+            )
         )
 
         # ========================================================
-        # CICLO / RENOVAÇÃO
+        # CICLO
         # ========================================================
 
         period = (
@@ -990,17 +1270,19 @@ class QuotaService:
         # GLOBAL
         # ========================================================
 
-        global_usage = await self.get_global_daily_usage()
-
         global_remaining = max(
             0,
-            self.global_daily_token_limit
-            - global_usage,
+            (
+                self.global_daily_token_limit
+                - global_usage
+            ),
         )
 
-        global_percentage = self._calculate_percentage(
-            global_usage,
-            self.global_daily_token_limit,
+        global_percentage = (
+            self._calculate_percentage(
+                global_usage,
+                self.global_daily_token_limit,
+            )
         )
 
         global_blocked = (
@@ -1009,7 +1291,8 @@ class QuotaService:
         )
 
         user_blocked = (
-            level == "blocked"
+            usage
+            >= self.monthly_token_limit
         )
 
         can_use_ai = (
@@ -1023,126 +1306,153 @@ class QuotaService:
 
         return {
             # ====================================================
-            # QUOTA DO USUÁRIO
+            # USUÁRIO
             # ====================================================
 
-            "used_tokens":
-                usage,
+            "used_tokens": usage,
 
-            "remaining_tokens":
-                remaining,
+            "remaining_tokens": (
+                remaining
+            ),
 
-            "limit_tokens":
-                self.monthly_token_limit,
+            "limit_tokens": (
+                self.monthly_token_limit
+            ),
 
-            "usage_percentage":
-                rounded_percentage,
+            "usage_percentage": (
+                rounded_percentage
+            ),
 
-            "progress":
-                round(
-                    rounded_percentage / 100,
-                    4,
+            "progress": round(
+                min(
+                    1.0,
+                    rounded_percentage
+                    / 100,
                 ),
+                4,
+            ),
 
-            "level":
-                level,
+            "level": level,
 
-            "message":
-                message,
+            "message": message,
 
-            "blocked":
-                user_blocked,
+            "blocked": (
+                user_blocked
+            ),
 
-            "can_use_ai":
-                can_use_ai,
+            "can_use_ai": (
+                can_use_ai
+            ),
 
             # ====================================================
-            # CICLO / RENOVAÇÃO
-            # ====================================================
-            #
-            # O frontend deve usar renews_at como fonte da verdade
-            # para mostrar quando os créditos serão renovados.
-            #
+            # CICLO
             # ====================================================
 
-            "period":
-                period["period"],
+            "period": (
+                period["period"]
+            ),
 
-            "provider":
-                period["provider"],
+            "provider": (
+                period["provider"]
+            ),
 
-            "billing_cycle_anchor":
-                period["billing_cycle_anchor"],
+            "billing_cycle_anchor": (
+                period[
+                    "billing_cycle_anchor"
+                ]
+            ),
 
-            "renewal_timezone":
-                period["renewal_timezone"],
+            "renewal_timezone": (
+                period[
+                    "renewal_timezone"
+                ]
+            ),
 
-            "period_start":
-                period["period_start"],
+            "period_start": (
+                period[
+                    "period_start"
+                ]
+            ),
 
-            "renews_at":
-                period["renews_at"],
+            "renews_at": (
+                period[
+                    "renews_at"
+                ]
+            ),
 
-            "renews_in_seconds":
-                period["renews_in_seconds"],
+            "renews_in_seconds": (
+                period[
+                    "renews_in_seconds"
+                ]
+            ),
 
-            "renews_in_hours":
-                period["renews_in_hours"],
+            "renews_in_hours": (
+                period[
+                    "renews_in_hours"
+                ]
+            ),
 
-            "renews_in_days":
-                period["renews_in_days"],
+            "renews_in_days": (
+                period[
+                    "renews_in_days"
+                ]
+            ),
 
             # ====================================================
             # BARRA
             # ====================================================
 
-            "progress_bar":
-                progress_bar,
+            "progress_bar": (
+                progress_bar
+            ),
 
-            "progress_text":
-                (
-                    f"{progress_bar} "
-                    f"{rounded_percentage:g}%"
-                ),
+            "progress_text": (
+                f"{progress_bar} "
+                f"{rounded_percentage:g}%"
+            ),
 
             # ====================================================
             # REDIS
             # ====================================================
 
-            "redis_available":
-                self._redis_available,
+            "redis_available": (
+                self._redis_available
+            ),
 
             # ====================================================
-            # QUOTA GLOBAL
+            # GLOBAL
             # ====================================================
 
             "global": {
-                "used_tokens":
-                    global_usage,
+                "used_tokens": (
+                    global_usage
+                ),
 
-                "remaining_tokens":
-                    global_remaining,
+                "remaining_tokens": (
+                    global_remaining
+                ),
 
-                "limit_tokens":
-                    self.global_daily_token_limit,
+                "limit_tokens": (
+                    self.global_daily_token_limit
+                ),
 
-                "usage_percentage":
-                    round(
-                        global_percentage,
-                        1,
+                "usage_percentage": round(
+                    global_percentage,
+                    1,
+                ),
+
+                "progress": round(
+                    min(
+                        1.0,
+                        global_percentage
+                        / 100,
                     ),
+                    4,
+                ),
 
-                "progress":
-                    round(
-                        min(
-                            1.0,
-                            global_percentage / 100,
-                        ),
-                        4,
-                    ),
-
-                "blocked":
-                    global_blocked,
+                "blocked": (
+                    global_blocked
+                ),
             },
         }
 
@@ -1153,7 +1463,10 @@ class QuotaService:
     async def get_global_status(
         self,
     ) -> dict:
-        usage = await self.get_global_daily_usage()
+        usage = (
+            await self
+            .get_global_daily_usage()
+        )
 
         resets_at = (
             self._get_next_day_start()
@@ -1167,55 +1480,67 @@ class QuotaService:
 
         remaining = max(
             0,
-            self.global_daily_token_limit
-            - usage,
+            (
+                self.global_daily_token_limit
+                - usage
+            ),
         )
 
-        percentage = self._calculate_percentage(
-            usage,
-            self.global_daily_token_limit,
+        percentage = (
+            self._calculate_percentage(
+                usage,
+                self.global_daily_token_limit,
+            )
         )
 
         return {
-            "used_tokens":
-                usage,
-
-            "remaining_tokens":
-                remaining,
-
-            "limit_tokens":
-                self.global_daily_token_limit,
-
-            "usage_percentage":
-                round(
-                    percentage,
-                    1,
-                ),
-
-            "progress":
-                round(
-                    min(
-                        1.0,
-                        percentage / 100,
-                    ),
-                    4,
-                ),
-
-            "blocked":
+            "used_tokens": (
                 usage
-                >= self.global_daily_token_limit,
+            ),
 
-            "period":
-                "daily",
+            "remaining_tokens": (
+                remaining
+            ),
 
-            "reset_timezone":
-                "UTC",
+            "limit_tokens": (
+                self.global_daily_token_limit
+            ),
 
-            "resets_at":
-                resets_at.isoformat(),
+            "usage_percentage": round(
+                percentage,
+                1,
+            ),
 
-            "resets_in_seconds":
-                resets_in_seconds,
+            "progress": round(
+                min(
+                    1.0,
+                    percentage
+                    / 100,
+                ),
+                4,
+            ),
+
+            "blocked": (
+                usage
+                >=
+                self.global_daily_token_limit
+            ),
+
+            "period": "daily",
+
+            "reset_timezone": "UTC",
+
+            "resets_at": (
+                resets_at.isoformat()
+            ),
+
+            "resets_in_seconds": (
+                resets_in_seconds
+            ),
+
+            "redis_available": (
+                self._redis_available
+            ),
         }
 
     # ============================================================
@@ -1228,11 +1553,13 @@ class QuotaService:
         try:
             await self.redis.aclose()
 
-        except redis.RedisError as error:
-            print(
+        except RedisError as error:
+            self.logger.warning(
                 (
-                    "[QUOTA] Erro ao fechar Redis: "
-                    f"{type(error).__name__}: "
-                    f"{error}"
-                )
+                    "[QUOTA] Erro ao fechar "
+                    "Redis | type=%s | "
+                    "detail=%s"
+                ),
+                type(error).__name__,
+                error,
             )

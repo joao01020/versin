@@ -1,4 +1,5 @@
 import logging
+import re
 
 from fastapi import HTTPException
 
@@ -24,6 +25,16 @@ class ChatService:
     DEFAULT_MAX_COMPLETION_TOKENS = 2048
 
     PRIVATE_API_MODEL = "openai/gpt-oss-20b"
+
+    # ============================================================
+    # RIMAS
+    # ============================================================
+
+    DEFAULT_RHYME_COUNT = 5
+
+    MAX_RHYME_COUNT = 30
+
+    RHYME_REPAIR_MAX_COMPLETION_TOKENS = 2048
 
     # ============================================================
     # CONSTRUTOR
@@ -96,7 +107,25 @@ class ChatService:
             )
 
         # ========================================================
-        # 4. API KEY
+        # 4. IDENTIFICAR PEDIDO DE RIMAS
+        # ========================================================
+
+        is_rhyme_request = (
+            self._is_rhyme_request(
+                clean_message
+            )
+        )
+
+        requested_rhyme_count = (
+            self._extract_requested_rhyme_count(
+                clean_message
+            )
+            if is_rhyme_request
+            else None
+        )
+
+        # ========================================================
+        # 5. API KEY
         # ========================================================
 
         api_key = get_safe_key(
@@ -114,7 +143,7 @@ class ChatService:
             )
 
         # ========================================================
-        # 5. MODELO
+        # 6. MODELO
         # ========================================================
 
         selected_model = (
@@ -126,7 +155,7 @@ class ChatService:
         )
 
         # ========================================================
-        # 6. PROMPT
+        # 7. PROMPT
         # ========================================================
 
         prompt = create_producer_prompt(
@@ -141,7 +170,7 @@ class ChatService:
         )
 
         # ========================================================
-        # 7. AI SERVICE
+        # 8. AI SERVICE
         # ========================================================
 
         ai_service = AIService(
@@ -150,7 +179,7 @@ class ChatService:
 
         try:
             # ====================================================
-            # 8. CHAMADA PARA GROQ
+            # 9. PRIMEIRA CHAMADA
             # ====================================================
 
             result = (
@@ -163,33 +192,14 @@ class ChatService:
                         self.DEFAULT_MAX_COMPLETION_TOKENS
                     ),
 
-                    # =============================================
-                    # O prompt do Versin trabalha com:
-                    #
-                    # content
-                    # is_acceptable
-                    # impact_level
-                    # feedback_reason
-                    #
-                    # Portanto tentamos JSON primeiro.
-                    #
-                    # O AIService possui fallback automático
-                    # para texto caso a Groq falhe no JSON.
-                    # =============================================
-
                     json_mode=True,
-
-                    # =============================================
-                    # Evita que GPT-OSS consuma todos os tokens
-                    # apenas pensando.
-                    # =============================================
 
                     reasoning_effort="low",
                 )
             )
 
             # ====================================================
-            # 9. NORMALIZAR RESULTADO DA IA
+            # 10. DATA
             # ====================================================
 
             ai_data = (
@@ -200,22 +210,175 @@ class ChatService:
 
             ai_data = (
                 self._normalize_ai_data(
-                    ai_data
+                    ai_data,
+                    is_rhyme_request=(
+                        is_rhyme_request
+                    ),
+                    requested_rhyme_count=(
+                        requested_rhyme_count
+                    ),
                 )
             )
 
             # ====================================================
-            # 10. USAGE
+            # 11. USAGE DA PRIMEIRA CHAMADA
             # ====================================================
 
-            usage = (
+            total_usage = (
                 self._extract_usage(
                     result
                 )
             )
 
             # ====================================================
-            # 11. VALIDAR SEGURANÇA
+            # 12. REPARAR RIMAS INCOMPLETAS
+            # ====================================================
+            #
+            # Exemplo:
+            #
+            # usuário pede:
+            #
+            # 10 rimas com pedro
+            #
+            # IA retorna:
+            #
+            # certo, aperto, aperto, aperto...
+            #
+            # Após deduplicar:
+            #
+            # certo, aperto
+            #
+            # Como faltam 8, fazemos UMA segunda chamada.
+            #
+            # ====================================================
+
+            if (
+                is_rhyme_request
+                and
+                requested_rhyme_count is not None
+            ):
+                current_rhymes = (
+                    self._split_rhymes(
+                        ai_data.get(
+                            "content",
+                            "",
+                        )
+                    )
+                )
+
+                if (
+                    len(current_rhymes)
+                    <
+                    requested_rhyme_count
+                ):
+                    missing_count = (
+                        requested_rhyme_count
+                        - len(current_rhymes)
+                    )
+
+                    self.logger.warning(
+                        (
+                            "[CHAT] Rimas insuficientes "
+                            "após deduplicação | "
+                            "requested=%s | "
+                            "unique=%s | "
+                            "missing=%s"
+                        ),
+                        requested_rhyme_count,
+                        len(current_rhymes),
+                        missing_count,
+                    )
+
+                    repair_result = (
+                        await self._repair_rhymes(
+                            ai_service=ai_service,
+                            system_prompt=prompt,
+                            original_message=(
+                                clean_message
+                            ),
+                            existing_rhymes=(
+                                current_rhymes
+                            ),
+                            requested_count=(
+                                requested_rhyme_count
+                            ),
+                            model=selected_model,
+                        )
+                    )
+
+                    # =============================================
+                    # USAGE DO REPARO
+                    # =============================================
+
+                    repair_usage = (
+                        self._extract_usage(
+                            repair_result
+                        )
+                    )
+
+                    total_usage = (
+                        self._merge_usage(
+                            total_usage,
+                            repair_usage,
+                        )
+                    )
+
+                    # =============================================
+                    # DATA DO REPARO
+                    # =============================================
+
+                    repair_data = (
+                        self._extract_ai_data(
+                            repair_result
+                        )
+                    )
+
+                    repair_data = (
+                        self._normalize_ai_data(
+                            repair_data,
+                            is_rhyme_request=True,
+                            requested_rhyme_count=None,
+                        )
+                    )
+
+                    repair_rhymes = (
+                        self._split_rhymes(
+                            repair_data.get(
+                                "content",
+                                "",
+                            )
+                        )
+                    )
+
+                    # =============================================
+                    # UNIR SEM DUPLICAR
+                    # =============================================
+
+                    merged_rhymes = (
+                        self._merge_unique_rhymes(
+                            current_rhymes,
+                            repair_rhymes,
+                        )
+                    )
+
+                    # =============================================
+                    # RESPEITAR QUANTIDADE PEDIDA
+                    # =============================================
+
+                    merged_rhymes = (
+                        merged_rhymes[
+                            :requested_rhyme_count
+                        ]
+                    )
+
+                    ai_data[
+                        "content"
+                    ] = ", ".join(
+                        merged_rhymes
+                    )
+
+            # ====================================================
+            # 13. VALIDAR SEGURANÇA
             # ====================================================
 
             if not (
@@ -229,29 +392,29 @@ class ChatService:
                 )
 
             # ====================================================
-            # 12. TOKENS
+            # 14. TOKENS REAIS
             # ====================================================
 
             input_tokens = (
-                usage[
+                total_usage[
                     "input_tokens"
                 ]
             )
 
             output_tokens = (
-                usage[
+                total_usage[
                     "output_tokens"
                 ]
             )
 
             total_tokens = (
-                usage[
+                total_usage[
                     "total_tokens"
                 ]
             )
 
             # ====================================================
-            # 13. REGISTRAR QUOTA
+            # 15. REGISTRAR QUOTA
             # ====================================================
 
             quota_status = (
@@ -271,7 +434,7 @@ class ChatService:
             )
 
             # ====================================================
-            # 14. LOG
+            # 16. LOG
             # ====================================================
 
             self.logger.info(
@@ -279,6 +442,7 @@ class ChatService:
                     "[CHAT] "
                     "user=%s | "
                     "model=%s | "
+                    "rhyme_request=%s | "
                     "input=%s | "
                     "output=%s | "
                     "total=%s | "
@@ -286,6 +450,7 @@ class ChatService:
                 ),
                 data.user_id,
                 selected_model,
+                is_rhyme_request,
                 input_tokens,
                 output_tokens,
                 total_tokens,
@@ -296,12 +461,12 @@ class ChatService:
             )
 
             # ====================================================
-            # 15. RESPOSTA FINAL
+            # 17. RESPOSTA FINAL
             # ====================================================
 
             return self._build_response(
                 ai_data=ai_data,
-                usage=usage,
+                usage=total_usage,
                 quota_status=quota_status,
             )
 
@@ -354,12 +519,404 @@ class ChatService:
                 ),
             ) from error
 
-        finally:
-            # ====================================================
-            # FECHAR CLIENTE GROQ
-            # ====================================================
+        # ========================================================
+        # FECHAR CLIENTE
+        # ========================================================
 
+        finally:
             await ai_service.close()
+
+    # ============================================================
+    # REPARAR RIMAS
+    # ============================================================
+
+    async def _repair_rhymes(
+        self,
+        *,
+        ai_service: AIService,
+        system_prompt: str,
+        original_message: str,
+        existing_rhymes: list[str],
+        requested_count: int,
+        model: str,
+    ) -> dict:
+        missing_count = max(
+            requested_count
+            - len(existing_rhymes),
+            0,
+        )
+
+        existing_string = (
+            ", ".join(
+                existing_rhymes
+            )
+            if existing_rhymes
+            else "nenhuma"
+        )
+
+        repair_message = (
+            f"{original_message}\n\n"
+            "CORREÇÃO OBRIGATÓRIA:\n"
+            f"O usuário pediu {requested_count} rimas únicas.\n"
+            f"Já temos estas opções válidas: {existing_string}.\n"
+            f"Faltam {missing_count} opções.\n"
+            "Gere somente novas rimas diferentes das já existentes.\n"
+            "Não repita nenhuma palavra.\n"
+            "Todas devem ser únicas.\n"
+            "No campo content, retorne somente as novas palavras "
+            "separadas por vírgula e espaço."
+        )
+
+        return await (
+            ai_service.get_analysis(
+                system_prompt=system_prompt,
+                user_message=repair_message,
+                model=model,
+
+                max_completion_tokens=(
+                    self.RHYME_REPAIR_MAX_COMPLETION_TOKENS
+                ),
+
+                json_mode=True,
+
+                reasoning_effort="low",
+            )
+        )
+
+    # ============================================================
+    # DETECTAR PEDIDO DE RIMAS
+    # ============================================================
+
+    @staticmethod
+    def _is_rhyme_request(
+        message: str,
+    ) -> bool:
+        if not isinstance(
+            message,
+            str,
+        ):
+            return False
+
+        text = (
+            message
+            .casefold()
+            .strip()
+        )
+
+        if not text:
+            return False
+
+        patterns = (
+            r"\brima\b",
+            r"\brimas\b",
+            r"\brimar\b",
+            r"\brime\b",
+            r"\brimando\b",
+        )
+
+        return any(
+            re.search(
+                pattern,
+                text,
+            )
+            is not None
+            for pattern
+            in patterns
+        )
+
+    # ============================================================
+    # EXTRAIR QUANTIDADE PEDIDA
+    # ============================================================
+
+    @classmethod
+    def _extract_requested_rhyme_count(
+        cls,
+        message: str,
+    ) -> int:
+        if not isinstance(
+            message,
+            str,
+        ):
+            return cls.DEFAULT_RHYME_COUNT
+
+        text = (
+            message
+            .casefold()
+            .strip()
+        )
+
+        # ========================================================
+        # Exemplos:
+        #
+        # 10 rimas com pedro
+        # me dê 15 rimas
+        # quero 8 rimas para amor
+        #
+        # ========================================================
+
+        match = re.search(
+            r"\b(\d{1,3})\s+rimas?\b",
+            text,
+        )
+
+        if match is None:
+            return (
+                cls.DEFAULT_RHYME_COUNT
+            )
+
+        try:
+            amount = int(
+                match.group(1)
+            )
+
+        except (
+            TypeError,
+            ValueError,
+        ):
+            return (
+                cls.DEFAULT_RHYME_COUNT
+            )
+
+        return max(
+            1,
+            min(
+                amount,
+                cls.MAX_RHYME_COUNT,
+            ),
+        )
+
+    # ============================================================
+    # DIVIDIR RIMAS
+    # ============================================================
+
+    @classmethod
+    def _split_rhymes(
+        cls,
+        content: str,
+    ) -> list[str]:
+        if not isinstance(
+            content,
+            str,
+        ):
+            return []
+
+        # ========================================================
+        # NORMALIZAR QUEBRAS
+        # ========================================================
+
+        content = (
+            content
+            .replace(
+                "\r\n",
+                "\n",
+            )
+            .replace(
+                "\r",
+                "\n",
+            )
+        )
+
+        # ========================================================
+        # QUEBRA POR:
+        #
+        # vírgula
+        # ponto e vírgula
+        # newline
+        #
+        # ========================================================
+
+        raw_parts = re.split(
+            r"[,;\n]+",
+            content,
+        )
+
+        result: list[str] = []
+
+        seen: set[str] = set()
+
+        for raw_part in raw_parts:
+            value = (
+                cls._clean_rhyme(
+                    raw_part
+                )
+            )
+
+            if not value:
+                continue
+
+            normalized = (
+                value.casefold()
+            )
+
+            if normalized in seen:
+                continue
+
+            seen.add(
+                normalized
+            )
+
+            result.append(
+                value
+            )
+
+        return result
+
+    # ============================================================
+    # LIMPAR UMA RIMA
+    # ============================================================
+
+    @staticmethod
+    def _clean_rhyme(
+        value: str,
+    ) -> str:
+        if not isinstance(
+            value,
+            str,
+        ):
+            return ""
+
+        value = (
+            value.strip()
+        )
+
+        if not value:
+            return ""
+
+        # ========================================================
+        # REMOVE NUMERAÇÃO
+        #
+        # 1. palavra
+        # 2) palavra
+        # 3 - palavra
+        # ========================================================
+
+        value = re.sub(
+            r"^\s*\d+\s*[\.\)\-:]\s*",
+            "",
+            value,
+        )
+
+        # ========================================================
+        # REMOVE BULLETS
+        # ========================================================
+
+        value = re.sub(
+            r"^\s*[-•*]\s*",
+            "",
+            value,
+        )
+
+        # ========================================================
+        # REMOVE PREFIXOS QUE ESCAPARAM
+        # ========================================================
+
+        value = re.sub(
+            (
+                r"^\s*"
+                r"(rimas?|opções?|palavras?)"
+                r"\s*:\s*"
+            ),
+            "",
+            value,
+            flags=re.IGNORECASE,
+        )
+
+        # ========================================================
+        # REMOVE COLCHETES
+        # ========================================================
+
+        value = (
+            value
+            .strip()
+            .strip("[]")
+            .strip()
+        )
+
+        # ========================================================
+        # REMOVE ASPAS EXTERNAS
+        # ========================================================
+
+        while (
+            len(value) >= 2
+            and (
+                (
+                    value.startswith("'")
+                    and value.endswith("'")
+                )
+                or (
+                    value.startswith('"')
+                    and value.endswith('"')
+                )
+                or (
+                    value.startswith("`")
+                    and value.endswith("`")
+                )
+            )
+        ):
+            value = (
+                value[1:-1]
+                .strip()
+            )
+
+        # ========================================================
+        # LIMPEZA FINAL
+        # ========================================================
+
+        value = (
+            value
+            .strip()
+            .strip(",;")
+            .strip()
+        )
+
+        return value
+
+    # ============================================================
+    # UNIR RIMAS SEM REPETIR
+    # ============================================================
+
+    @staticmethod
+    def _merge_unique_rhymes(
+        first: list[str],
+        second: list[str],
+    ) -> list[str]:
+        result: list[str] = []
+
+        seen: set[str] = set()
+
+        for value in (
+            list(first)
+            + list(second)
+        ):
+            if not isinstance(
+                value,
+                str,
+            ):
+                continue
+
+            clean_value = (
+                value.strip()
+            )
+
+            if not clean_value:
+                continue
+
+            normalized = (
+                clean_value.casefold()
+            )
+
+            if normalized in seen:
+                continue
+
+            seen.add(
+                normalized
+            )
+
+            result.append(
+                clean_value
+            )
+
+        return result
 
     # ============================================================
     # VERIFICAR QUOTA
@@ -422,7 +979,9 @@ class ChatService:
                         "global_daily_limit"
                     ),
 
-                    "quota": quota_status,
+                    "quota": (
+                        quota_status
+                    ),
                 },
             )
 
@@ -442,7 +1001,9 @@ class ChatService:
                     "monthly_user_limit"
                 ),
 
-                "quota": quota_status,
+                "quota": (
+                    quota_status
+                ),
             },
         )
 
@@ -478,7 +1039,7 @@ class ChatService:
         return selected_model
 
     # ============================================================
-    # EXTRAIR DATA DA IA
+    # EXTRAIR DATA
     # ============================================================
 
     @staticmethod
@@ -511,12 +1072,16 @@ class ChatService:
         return data
 
     # ============================================================
-    # NORMALIZAR DATA DA IA
+    # NORMALIZAR DATA
     # ============================================================
 
-    @staticmethod
+    @classmethod
     def _normalize_ai_data(
+        cls,
         ai_data: dict,
+        *,
+        is_rhyme_request: bool = False,
+        requested_rhyme_count: int | None = None,
     ) -> dict:
         normalized = dict(
             ai_data
@@ -525,26 +1090,14 @@ class ChatService:
         # ========================================================
         # CONTENT
         # ========================================================
-        #
-        # Em JSON mode normalmente vem:
-        #
-        # {
-        #   "content": "..."
-        # }
-        #
-        # No fallback de texto do AIService vem:
-        #
-        # {
-        #   "message": "..."
-        # }
-        #
-        # Aqui aceitamos os dois.
-        #
-        # ========================================================
 
         content = normalized.get(
             "content"
         )
+
+        # ========================================================
+        # FALLBACK DO AI SERVICE
+        # ========================================================
 
         if not isinstance(
             content,
@@ -560,7 +1113,43 @@ class ChatService:
         ):
             content = ""
 
-        content = content.strip()
+        content = (
+            content.strip()
+        )
+
+        # ========================================================
+        # NORMALIZAR RIMAS
+        # ========================================================
+
+        if (
+            is_rhyme_request
+            and content
+        ):
+            rhymes = (
+                cls._split_rhymes(
+                    content
+                )
+            )
+
+            if (
+                requested_rhyme_count
+                is not None
+            ):
+                rhymes = (
+                    rhymes[
+                        :requested_rhyme_count
+                    ]
+                )
+
+            content = (
+                ", ".join(
+                    rhymes
+                )
+            )
+
+        # ========================================================
+        # VAZIO
+        # ========================================================
 
         if not content:
             raise ValueError(
@@ -575,8 +1164,10 @@ class ChatService:
         # IS ACCEPTABLE
         # ========================================================
 
-        is_acceptable = normalized.get(
-            "is_acceptable"
+        is_acceptable = (
+            normalized.get(
+                "is_acceptable"
+            )
         )
 
         if isinstance(
@@ -588,10 +1179,6 @@ class ChatService:
             ] = is_acceptable
 
         else:
-            # Se houve fallback para texto normal,
-            # consideramos aceitável até que o
-            # SafetyService faça sua própria validação.
-
             normalized[
                 "is_acceptable"
             ] = True
@@ -601,7 +1188,7 @@ class ChatService:
         # ========================================================
 
         impact_level = (
-            ChatService._safe_int(
+            cls._safe_int(
                 normalized.get(
                     "impact_level",
                     1,
@@ -620,7 +1207,7 @@ class ChatService:
         )
 
         # ========================================================
-        # FEEDBACK REASON
+        # FEEDBACK
         # ========================================================
 
         feedback_reason = (
@@ -662,6 +1249,11 @@ class ChatService:
                 "usage",
                 {},
             )
+            if isinstance(
+                result,
+                dict,
+            )
+            else {}
         )
 
         if not isinstance(
@@ -721,6 +1313,66 @@ class ChatService:
         }
 
     # ============================================================
+    # SOMAR USAGES
+    # ============================================================
+
+    @staticmethod
+    def _merge_usage(
+        first: dict,
+        second: dict,
+    ) -> dict:
+        input_tokens = (
+            ChatService._safe_int(
+                first.get(
+                    "input_tokens",
+                    0,
+                )
+            )
+            +
+            ChatService._safe_int(
+                second.get(
+                    "input_tokens",
+                    0,
+                )
+            )
+        )
+
+        output_tokens = (
+            ChatService._safe_int(
+                first.get(
+                    "output_tokens",
+                    0,
+                )
+            )
+            +
+            ChatService._safe_int(
+                second.get(
+                    "output_tokens",
+                    0,
+                )
+            )
+        )
+
+        total_tokens = (
+            input_tokens
+            + output_tokens
+        )
+
+        return {
+            "input_tokens": (
+                input_tokens
+            ),
+
+            "output_tokens": (
+                output_tokens
+            ),
+
+            "total_tokens": (
+                total_tokens
+            ),
+        }
+
+    # ============================================================
     # CONVERSÃO SEGURA
     # ============================================================
 
@@ -750,9 +1402,7 @@ class ChatService:
     @staticmethod
     def _build_blocked_response() -> dict:
         return {
-            "role": (
-                "assistant"
-            ),
+            "role": "assistant",
 
             "content": (
                 "Não foi possível "
@@ -785,7 +1435,7 @@ class ChatService:
 
         content = ai_data.get(
             "content",
-            ""
+            "",
         )
 
         if not isinstance(
@@ -874,9 +1524,7 @@ class ChatService:
         # ========================================================
 
         return {
-            "role": (
-                "assistant"
-            ),
+            "role": "assistant",
 
             "content": content,
 
@@ -892,15 +1540,7 @@ class ChatService:
                 feedback_reason
             ),
 
-            # ====================================================
-            # TOKENS DESTA REQUISIÇÃO
-            # ====================================================
-
             "usage": usage,
-
-            # ====================================================
-            # QUOTA ATUAL
-            # ====================================================
 
             "quota": quota_status,
         }

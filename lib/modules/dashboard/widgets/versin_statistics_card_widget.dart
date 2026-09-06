@@ -75,8 +75,6 @@ class _VersinStatisticsCardWidgetState
 
   bool _hasLoadedExpansionPreference = false;
 
-  bool _animateExpansion = false;
-
   // ============================================================
   // UI PREFERENCES
   // ============================================================
@@ -160,30 +158,11 @@ class _VersinStatisticsCardWidgetState
 
         _hasLoadedExpansionPreference = true;
 
-        // A restauração inicial nunca deve parecer uma ação
-        // executada pelo usuário.
-        _animateExpansion = false;
-      },
-    );
-
-    // ==========================================================
-    // ENABLE USER ANIMATIONS
-    // ==========================================================
-    //
-    // Habilitamos as animações somente depois que o primeiro
-    // frame com a preferência restaurada já foi desenhado.
-    //
-    // ==========================================================
-
-    WidgetsBinding.instance.addPostFrameCallback(
-      (
-        _,
-      ) {
-        if (!mounted) {
-          return;
-        }
-
-        _animateExpansion = true;
+        // A preferência inicial é aplicada diretamente.
+        //
+        // O AnimatedSize só entra na árvore depois que o estado
+        // inicial já foi carregado, evitando animação durante a
+        // restauração da preferência.
       },
     );
   }
@@ -300,8 +279,6 @@ class _VersinStatisticsCardWidgetState
 
     setState(
       () {
-        _animateExpansion = true;
-
         _isExpanded = nextIsExpanded;
       },
     );
@@ -398,27 +375,38 @@ class _VersinStatisticsCardWidgetState
           // ====================================================
           // CONTEÚDO EXPANSÍVEL
           // ====================================================
-          AnimatedSize(
-            duration: _animateExpansion
-                ? const Duration(
-                    milliseconds: 320,
-                  )
-                : Duration.zero,
-
-            curve: Curves.easeOutCubic,
-
-            alignment: Alignment.topCenter,
-
-            child:
-                _hasLoadedExpansionPreference &&
-                    _isExpanded
-                ? _buildExpandedContent()
-                : const SizedBox(
-                    width: double.infinity,
-                    height: 0,
-                  ),
-          ),
+          _buildExpandableContent(),
         ],
+      ),
+    );
+  }
+
+  // ============================================================
+  // CONTEÚDO EXPANSÍVEL
+  // ============================================================
+  //
+  // A preferência inicial é aplicada sem animação de expansão.
+  // Depois disso, AnimatedAlign anima o fator de altura de 0 a 1.
+  // O conteúdo permanece montado e é recortado durante a transição.
+  //
+  // ============================================================
+
+  Widget _buildExpandableContent() {
+    if (!_hasLoadedExpansionPreference) {
+      return const SizedBox.shrink();
+    }
+
+    return ClipRect(
+      child: AnimatedAlign(
+        duration: const Duration(
+          milliseconds: 320,
+        ),
+        curve: Curves.easeOutCubic,
+        alignment: Alignment.topCenter,
+        heightFactor: _isExpanded
+            ? 1.0
+            : 0.0,
+        child: _buildExpandedContent(),
       ),
     );
   }
@@ -574,11 +562,9 @@ class _VersinStatisticsCardWidgetState
                       ? 0
                       : 0.5,
 
-                  duration: _animateExpansion
-                      ? const Duration(
-                          milliseconds: 250,
-                        )
-                      : Duration.zero,
+                  duration: const Duration(
+                    milliseconds: 250,
+                  ),
 
                   curve: Curves.easeOutCubic,
 

@@ -55,7 +55,6 @@ import 'package:versin/modules/storage/controllers/storage_controller.dart';
 
 import 'package:versin/modules/storage/data/repositories/storage_repository.dart';
 import 'package:versin/modules/storage/data/repositories/supabase_storage_repository.dart';
-import 'package:versin/modules/storage/data/repositories/cached_storage_repository.dart';
 
 import 'package:versin/modules/storage/services/beat_storage_service.dart';
 import 'package:versin/modules/storage/services/storage_file_service.dart';
@@ -79,14 +78,6 @@ import 'package:versin/modules/profile/public_profile/repositories/public_profil
 import 'package:versin/modules/profile/services/presence/user_presence_service.dart';
 
 // ============================================================
-// ACCOUNT & PRIVACY
-// ============================================================
-
-import 'package:versin/modules/settings/account/controllers/account_security_controller.dart';
-import 'package:versin/modules/settings/account/data/repositories/account_security_repository_impl.dart';
-import 'package:versin/modules/settings/account/domain/repositories/account_security_repository.dart';
-
-// ============================================================
 // SERVICE LOCATOR
 // ============================================================
 
@@ -96,18 +87,25 @@ final sl = GetIt.instance;
 // SETUP
 // ============================================================
 
-void setupLocator() {
+void
+setupLocator() {
   // ==========================================================
   // CORE & DASHBOARD
   // ==========================================================
 
-  sl.registerLazySingleton<DashboardController>(() => DashboardController());
+  sl.registerLazySingleton<
+    DashboardController
+  >(
+    () => DashboardController(),
+  );
 
   // ==========================================================
   // PROFESSIONAL PROFILE MODULE
   // ==========================================================
 
-  sl.registerLazySingleton<ProfessionalProfileController>(
+  sl.registerLazySingleton<
+    ProfessionalProfileController
+  >(
     () => ProfessionalProfileController(),
   );
 
@@ -128,40 +126,74 @@ void setupLocator() {
   //
   // ==========================================================
 
-  sl.registerLazySingleton<PublicProfileRepository>(
+  sl.registerLazySingleton<
+    PublicProfileRepository
+  >(
     () => PublicProfileRepositoryImpl(),
   );
 
-  sl.registerLazySingleton<UserPresenceService>(
-    () => UserPresenceService(repository: sl<PublicProfileRepository>()),
+  sl.registerLazySingleton<
+    UserPresenceService
+  >(
+    () => UserPresenceService(
+      repository:
+          sl<
+            PublicProfileRepository
+          >(),
+    ),
   );
 
   // ==========================================================
   // ACTIVITIES MODULE
   // ==========================================================
 
-  sl.registerLazySingleton<RecentActivityRepository>(
+  sl.registerLazySingleton<
+    RecentActivityRepository
+  >(
     () => RecentActivityRepositoryImpl(),
   );
 
-  sl.registerLazySingleton<RecentActivityController>(
-    () => RecentActivityController(repository: sl<RecentActivityRepository>()),
+  sl.registerLazySingleton<
+    RecentActivityController
+  >(
+    () => RecentActivityController(
+      repository:
+          sl<
+            RecentActivityRepository
+          >(),
+    ),
   );
 
-  sl.registerLazySingleton<RecentActivityService>(
-    () => RecentActivityService(controller: sl<RecentActivityController>()),
+  sl.registerLazySingleton<
+    RecentActivityService
+  >(
+    () => RecentActivityService(
+      controller:
+          sl<
+            RecentActivityController
+          >(),
+    ),
   );
 
   // ==========================================================
   // NOTIFICATIONS MODULE
   // ==========================================================
 
-  sl.registerLazySingleton<NotificationRepository>(
+  sl.registerLazySingleton<
+    NotificationRepository
+  >(
     () => NotificationRepositoryImpl(),
   );
 
-  sl.registerLazySingleton<NotificationController>(
-    () => NotificationController(repository: sl<NotificationRepository>()),
+  sl.registerLazySingleton<
+    NotificationController
+  >(
+    () => NotificationController(
+      repository:
+          sl<
+            NotificationRepository
+          >(),
+    ),
   );
 
   // ==========================================================
@@ -178,12 +210,21 @@ void setupLocator() {
   //
   // ==========================================================
 
-  sl.registerLazySingleton<ProjectInvitationService>(
+  sl.registerLazySingleton<
+    ProjectInvitationService
+  >(
     () => ProjectInvitationService(),
   );
 
-  sl.registerLazySingleton<ProjectInvitationController>(
-    () => ProjectInvitationController(service: sl<ProjectInvitationService>()),
+  sl.registerLazySingleton<
+    ProjectInvitationController
+  >(
+    () => ProjectInvitationController(
+      service:
+          sl<
+            ProjectInvitationService
+          >(),
+    ),
   );
 
   // ==========================================================
@@ -219,36 +260,72 @@ void setupLocator() {
   //
   // ==========================================================
 
-  sl.registerLazySingleton<MatchRepository>(() => MatchRepository());
+  sl.registerLazySingleton<
+    MatchRepository
+  >(
+    () => MatchRepository(),
+  );
 
-  sl.registerLazySingleton<MatchAvailabilityService>(
+  sl.registerLazySingleton<
+    MatchAvailabilityService
+  >(
     () => MatchAvailabilityService(),
   );
 
-  sl.registerFactory<MatchController>(() => MatchController());
+  sl.registerFactory<
+    MatchController
+  >(
+    () => MatchController(),
+  );
 
   // ==========================================================
   // WALLET MODULE
   // ==========================================================
 
-  sl.registerLazySingleton<WalletController>(() => WalletController());
+  sl.registerLazySingleton<
+    WalletController
+  >(
+    () => WalletController(),
+  );
 
-  sl.registerLazySingleton<RoyaltiesController>(() => RoyaltiesController());
+  sl.registerLazySingleton<
+    RoyaltiesController
+  >(
+    () => RoyaltiesController(),
+  );
 
   // ==========================================================
   // BRAIN & RHYMES MODULE
   // ==========================================================
 
-  sl.registerLazySingleton<BrainController>(() => BrainController());
+  sl.registerLazySingleton<
+    BrainController
+  >(
+    () => BrainController(),
+  );
 
-  sl.registerLazySingleton<RhymesController>(() => sl<BrainController>());
+  sl.registerLazySingleton<
+    RhymesController
+  >(
+    () =>
+        sl<
+          BrainController
+        >(),
+  );
 
   // ==========================================================
   // STUDIO MODULE
   // ==========================================================
 
-  sl.registerLazySingleton<StudioController>(
-    () => StudioController(rhymesController: sl<BrainController>()),
+  sl.registerLazySingleton<
+    StudioController
+  >(
+    () => StudioController(
+      rhymesController:
+          sl<
+            BrainController
+          >(),
+    ),
   );
 
   // ==========================================================
@@ -291,7 +368,11 @@ void setupLocator() {
   //
   // ==========================================================
 
-  sl.registerLazySingleton<StorageHashService>(() => StorageHashService());
+  sl.registerLazySingleton<
+    StorageHashService
+  >(
+    () => StorageHashService(),
+  );
 
   // ==========================================================
   // STORAGE FILE SERVICE
@@ -311,7 +392,11 @@ void setupLocator() {
   //
   // ==========================================================
 
-  sl.registerLazySingleton<StorageFileService>(() => StorageFileService());
+  sl.registerLazySingleton<
+    StorageFileService
+  >(
+    () => StorageFileService(),
+  );
 
   // ==========================================================
   // STORAGE REPOSITORY
@@ -333,9 +418,14 @@ void setupLocator() {
   //
   // ==========================================================
 
-  sl.registerLazySingleton<StorageRepository>(
-    () => CachedStorageRepository(
-      remote: SupabaseStorageRepository(hashService: sl<StorageHashService>()),
+  sl.registerLazySingleton<
+    StorageRepository
+  >(
+    () => SupabaseStorageRepository(
+      hashService:
+          sl<
+            StorageHashService
+          >(),
     ),
   );
 
@@ -355,7 +445,11 @@ void setupLocator() {
   //
   // ==========================================================
 
-  sl.registerLazySingleton<BeatStorageService>(() => BeatStorageService());
+  sl.registerLazySingleton<
+    BeatStorageService
+  >(
+    () => BeatStorageService(),
+  );
 
   // ==========================================================
   // WORK STORAGE SERVICE
@@ -386,10 +480,18 @@ void setupLocator() {
   //
   // ==========================================================
 
-  sl.registerLazySingleton<WorkStorageService>(
+  sl.registerLazySingleton<
+    WorkStorageService
+  >(
     () => WorkStorageService(
-      repository: sl<StorageRepository>(),
-      beatStorageService: sl<BeatStorageService>(),
+      repository:
+          sl<
+            StorageRepository
+          >(),
+      beatStorageService:
+          sl<
+            BeatStorageService
+          >(),
     ),
   );
 
@@ -408,20 +510,14 @@ void setupLocator() {
   //
   // ==========================================================
 
-  sl.registerLazySingleton<StorageController>(
-    () => StorageController(repository: sl<StorageRepository>()),
-  );
-
-  // ==========================================================
-  // ACCOUNT & PRIVACY
-  // ==========================================================
-
-  sl.registerLazySingleton<AccountSecurityRepository>(
-    () => AccountSecurityRepositoryImpl(),
-  );
-
-  sl.registerLazySingleton<AccountSecurityController>(
-    () =>
-        AccountSecurityController(repository: sl<AccountSecurityRepository>()),
+  sl.registerLazySingleton<
+    StorageController
+  >(
+    () => StorageController(
+      repository:
+          sl<
+            StorageRepository
+          >(),
+    ),
   );
 }

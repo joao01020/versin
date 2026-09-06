@@ -4,10 +4,6 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'package:versin/core/cache/app_cache_service.dart';
-import 'package:versin/core/cache/cache_keys.dart';
-import 'package:versin/core/cache/cache_policy.dart';
-import 'package:versin/core/cache/request_deduplicator.dart';
 import 'package:versin/modules/match/controllers/match_controllers.dart';
 import 'package:versin/modules/match/models/match_discovery_mode.dart';
 import 'package:versin/modules/match/models/match_user_entity.dart';
@@ -40,10 +36,6 @@ class MatchRepository {
   // ============================================================
 
   final SupabaseClient _supabase = Supabase.instance.client;
-
-  final AppCacheService _cache = AppCacheService.instance;
-
-  final RequestDeduplicator _deduplicator = RequestDeduplicator.instance;
 
   // ============================================================
   // CONFIGURAÇÃO
@@ -84,169 +76,223 @@ class MatchRepository {
   //
   // ============================================================
 
-  Future<List<MatchUserEntity>> searchUsers({
+  Future<
+    List<
+      MatchUserEntity
+    >
+  >
+  searchUsers({
     required String query,
     String? currentUserId,
   }) async {
-    final normalizedQuery = _normalizeSearchQuery(query);
-    if (normalizedQuery.isEmpty) return const [];
-
-    final resolvedUserId = currentUserId?.trim().isNotEmpty == true
-        ? currentUserId!.trim()
-        : (_supabase.auth.currentUser?.id.trim() ?? 'anonymous');
-
-    final cacheKey = CacheKeys.matchSearch(
-      userId: resolvedUserId,
-      query: normalizedQuery,
+    final normalizedQuery = _normalizeSearchQuery(
+      query,
     );
 
-    final cached = await _cache.read(
-      cacheKey,
-      policy: CachePolicy.matchSearch,
-    );
-
-    if (cached != null) {
-      final users = _decodeCachedUsers(cached.value);
-      if (cached.isFresh) return users;
-
-      unawaited(
-        _refreshSearchUsers(
-          normalizedQuery: normalizedQuery,
-          currentUserId: currentUserId,
-          cacheKey: cacheKey,
-        ),
-      );
-      return users;
+    if (normalizedQuery.isEmpty) {
+      return const [];
     }
 
-    return _refreshSearchUsers(
-      normalizedQuery: normalizedQuery,
-      currentUserId: currentUserId,
-      cacheKey: cacheKey,
+    final normalizedCurrentUserId = currentUserId?.trim();
+
+    debugPrint(
+      '[MATCH REPOSITORY] '
+      '========================================',
     );
-  }
 
-  Future<List<MatchUserEntity>> _refreshSearchUsers({
-    required String normalizedQuery,
-    required String? currentUserId,
-    required String cacheKey,
-  }) {
-    return _deduplicator.run<List<MatchUserEntity>>(
-      'remote:$cacheKey',
-      () async {
-        try {
-          final queryBuilder = _supabase
-              .from('profiles')
-              .select('id,username,artist_name,name,primary_role,roles,looking_for_roles,tags,bio,showcase_url,showcase_desc,is_online,last_seen_at')
-              .eq('is_online', true)
-              .gte('last_seen_at', _onlineCutoffIso())
-              .or(
-                'username.ilike.%$normalizedQuery%,'
-                'artist_name.ilike.%$normalizedQuery%,'
-                'name.ilike.%$normalizedQuery%',
-              );
+    debugPrint(
+      '[MATCH REPOSITORY] '
+      'Pesquisando usuários.',
+    );
 
-          final dynamic response;
-          final id = currentUserId?.trim();
-          if (id != null && id.isNotEmpty) {
-            response = await queryBuilder.neq('id', id).limit(_searchLimit);
-          } else {
-            response = await queryBuilder.limit(_searchLimit);
+    debugPrint(
+      '[MATCH REPOSITORY] '
+      'Query: $normalizedQuery',
+    );
+
+    try {
+      final queryBuilder = _supabase
+          .from(
+            'profiles',
+          )
+          .select(
+            '''
+                id,
+                username,
+                artist_name,
+                name,
+                primary_role,
+                roles,
+                looking_for_roles,
+                tags,
+                bio,
+                showcase_url,
+                showcase_desc,
+                is_online,
+                last_seen_at
+                ''',
+          )
+          .eq(
+            'is_online',
+            true,
+          )
+          .gte(
+            'last_seen_at',
+            _onlineCutoffIso(),
+          )
+          .or(
+            'username.ilike.%$normalizedQuery%,'
+            'artist_name.ilike.%$normalizedQuery%,'
+            'name.ilike.%$normalizedQuery%',
+          );
+
+      final dynamic response;
+
+      if (normalizedCurrentUserId !=
+              null &&
+          normalizedCurrentUserId.isNotEmpty) {
+        response = await queryBuilder
+            .neq(
+              'id',
+              normalizedCurrentUserId,
+            )
+            .limit(
+              _searchLimit,
+            );
+      } else {
+        response = await queryBuilder.limit(
+          _searchLimit,
+        );
+      }
+
+      final rows =
+          List<
+            Map<
+              String,
+              dynamic
+            >
+          >.from(
+            response
+                as List,
+          );
+
+      final now = DateTime.now().toUtc();
+
+      final users = rows
+          .where(
+            (
+              row,
+            ) => _isProfileReallyOnline(
+              row,
+              now: now,
+            ),
+          )
+          .map(
+            _mapMapToEntity,
+          )
+          .where(
+            (
+              user,
+            ) =>
+                user.id.isNotEmpty &&
+                user.isOnline,
+          )
+          .toList();
+
+      users.sort(
+        (
+          a,
+          b,
+        ) {
+          final scoreA = _calculateSearchScore(
+            user: a,
+            query: normalizedQuery,
+          );
+
+          final scoreB = _calculateSearchScore(
+            user: b,
+            query: normalizedQuery,
+          );
+
+          final scoreComparison = scoreB.compareTo(
+            scoreA,
+          );
+
+          if (scoreComparison !=
+              0) {
+            return scoreComparison;
           }
 
-          final rows = List<Map<String, dynamic>>.from(response as List);
-          final now = DateTime.now().toUtc();
-
-          final users = rows
-              .where((row) => _isProfileReallyOnline(row, now: now))
-              .map(_mapMapToEntity)
-              .where((user) => user.id.isNotEmpty && user.isOnline)
-              .toList();
-
-          users.sort((a, b) {
-            final scoreA = _calculateSearchScore(user: a, query: normalizedQuery);
-            final scoreB = _calculateSearchScore(user: b, query: normalizedQuery);
-            final comparison = scoreB.compareTo(scoreA);
-            if (comparison != 0) return comparison;
-            return a.name.toLowerCase().compareTo(b.name.toLowerCase());
-          });
-
-          await _cache.write(cacheKey, users.map(_encodeMatchUser).toList());
-          return users;
-        } catch (_) {
-          final stale = await _cache.read(
-            cacheKey,
-            policy: CachePolicy.matchSearch,
-            allowStale: true,
+          return a.name.toLowerCase().compareTo(
+            b.name.toLowerCase(),
           );
-          if (stale != null) return _decodeCachedUsers(stale.value);
-          rethrow;
-        }
-      },
-    );
-  }
-
-  Map<String, dynamic> _encodeMatchUser(MatchUserEntity user) {
-    return <String, dynamic>{
-      'id': user.id,
-      'username': user.username,
-      'name': user.name,
-      'primary_role': user.primaryRole?.key,
-      'roles': user.roles.map((e) => e.key).toList(),
-      'looking_for_roles': user.lookingForRoles.map((e) => e.key).toList(),
-      'tags': user.tags,
-      'bio': user.bio,
-      'showcase_url': user.showcaseMediaUrl,
-      'showcase_desc': user.showcaseDescription,
-      'distance_km': user.distanceKm,
-      'is_online': user.isOnline,
-      'preferred_connection': user.preferredConnection.name,
-      'session_started_at': user.sessionStartedAt?.toUtc().toIso8601String(),
-      'provisional_hash': user.provisionalHash,
-    };
-  }
-
-  List<MatchUserEntity> _decodeCachedUsers(dynamic raw) {
-    if (raw is! List) return <MatchUserEntity>[];
-    final result = <MatchUserEntity>[];
-    for (final item in raw) {
-      if (item is! Map) continue;
-      final map = Map<String, dynamic>.from(item);
-      final preferred = ConnectionType.values.firstWhere(
-        (value) => value.name == map['preferred_connection']?.toString(),
-        orElse: () => ConnectionType.proximity,
+        },
       );
-      result.add(
-        MatchUserEntity(
-          id: map['id']?.toString() ?? '',
-          username: map['username']?.toString() ?? '',
-          name: map['name']?.toString() ?? '',
-          primaryRole: MusicRole.fromKey(map['primary_role']?.toString()),
-          roles: MusicRole.fromKeys(
-            map['roles'] is Iterable ? map['roles'] as Iterable : const [],
-          ),
-          lookingForRoles: MusicRole.fromKeys(
-            map['looking_for_roles'] is Iterable
-                ? map['looking_for_roles'] as Iterable
-                : const [],
-          ),
-          tags: map['tags'] is Iterable
-              ? (map['tags'] as Iterable).map((e) => e.toString()).toList()
-              : const <String>[],
-          bio: map['bio']?.toString() ?? '',
-          showcaseMediaUrl: map['showcase_url']?.toString() ?? '',
-          showcaseDescription: map['showcase_desc']?.toString() ?? '',
-          distanceKm: double.tryParse(map['distance_km']?.toString() ?? '') ?? 0,
-          isOnline: map['is_online'] == true,
-          preferredConnection: preferred,
-          sessionStartedAt: DateTime.tryParse(
-            map['session_started_at']?.toString() ?? '',
-          ),
-          provisionalHash: map['provisional_hash']?.toString(),
-        ),
+
+      debugPrint(
+        '[MATCH REPOSITORY] '
+        '${users.length} usuário(s) encontrado(s).',
       );
+
+      for (final user in users) {
+        debugPrint(
+          '[MATCH REPOSITORY] '
+          '${user.name} | '
+          '${user.usernameLabel}',
+        );
+      }
+
+      debugPrint(
+        '[MATCH REPOSITORY] '
+        '========================================',
+      );
+
+      return users;
+    } on PostgrestException catch (
+      error
+    ) {
+      debugPrint(
+        '[MATCH REPOSITORY] '
+        '========================================',
+      );
+
+      debugPrint(
+        '[MATCH REPOSITORY] '
+        'Erro Supabase na pesquisa.',
+      );
+
+      debugPrint(
+        '[MATCH REPOSITORY] '
+        'Mensagem: ${error.message}',
+      );
+
+      debugPrint(
+        '[MATCH REPOSITORY] '
+        'Código: ${error.code}',
+      );
+
+      debugPrint(
+        '[MATCH REPOSITORY] '
+        'Detalhes: ${error.details}',
+      );
+
+      debugPrint(
+        '[MATCH REPOSITORY] '
+        '========================================',
+      );
+
+      rethrow;
+    } catch (
+      error
+    ) {
+      debugPrint(
+        '[MATCH REPOSITORY] '
+        'Erro inesperado na pesquisa: '
+        '$error',
+      );
+
+      rethrow;
     }
-    return result;
   }
 
   // ============================================================

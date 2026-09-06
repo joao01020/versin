@@ -1,11 +1,3 @@
-import 'dart:async';
-
-import 'package:supabase_flutter/supabase_flutter.dart';
-
-import 'package:versin/core/cache/app_cache_service.dart';
-import 'package:versin/core/cache/cache_keys.dart';
-import 'package:versin/core/cache/cache_policy.dart';
-import 'package:versin/core/cache/request_deduplicator.dart';
 import 'package:versin/modules/profile/data/datasources/professional_profile_remote_datasource.dart';
 import 'package:versin/modules/profile/models/professional_profile_model.dart';
 import 'package:versin/modules/profile/repositories/professional_profile_repository.dart';
@@ -49,14 +41,13 @@ import 'package:versin/modules/profile/repositories/professional_profile_reposit
 // ============================================================
 
 class ProfessionalProfileRepositoryImpl
-    implements ProfessionalProfileRepository {
+    implements
+        ProfessionalProfileRepository {
   // ============================================================
   // DEPENDÊNCIAS
   // ============================================================
 
   final ProfessionalProfileRemoteDatasource _remoteDatasource;
-  final AppCacheService _cache = AppCacheService.instance;
-  final RequestDeduplicator _deduplicator = RequestDeduplicator.instance;
 
   // ============================================================
   // CONSTRUTOR
@@ -65,7 +56,8 @@ class ProfessionalProfileRepositoryImpl
   ProfessionalProfileRepositoryImpl({
     ProfessionalProfileRemoteDatasource? remoteDatasource,
   }) : _remoteDatasource =
-           remoteDatasource ?? ProfessionalProfileRemoteDatasourceImpl();
+           remoteDatasource ??
+           ProfessionalProfileRemoteDatasourceImpl();
 
   // ============================================================
   // BUSCAR PERFIL PROFISSIONAL
@@ -82,47 +74,11 @@ class ProfessionalProfileRepositoryImpl
   // ============================================================
 
   @override
-  Future<ProfessionalProfileModel> getProfessionalProfile() async {
-    final userId = Supabase.instance.client.auth.currentUser?.id.trim();
-    if (userId == null || userId.isEmpty)
-      return ProfessionalProfileModel.empty();
-
-    final key = CacheKeys.professionalProfile(userId);
-    final cached = await _cache.read(
-      key,
-      policy: CachePolicy.professionalProfile,
-    );
-    if (cached != null) {
-      final profile = _decodeProfile(cached.value);
-      if (cached.isFresh) return profile;
-      unawaited(_refreshProfessionalProfile(userId));
-      return profile;
-    }
-    return _refreshProfessionalProfile(userId);
-  }
-
-  Future<ProfessionalProfileModel> _refreshProfessionalProfile(String userId) {
-    final key = CacheKeys.professionalProfile(userId);
-    return _deduplicator.run<ProfessionalProfileModel>('remote:$key', () async {
-      try {
-        final profile = await _remoteDatasource.getProfessionalProfile();
-        await _cache.write(key, profile.toMap());
-        return profile;
-      } catch (_) {
-        final stale = await _cache.read(
-          key,
-          policy: CachePolicy.professionalProfile,
-          allowStale: true,
-        );
-        if (stale != null) return _decodeProfile(stale.value);
-        rethrow;
-      }
-    });
-  }
-
-  ProfessionalProfileModel _decodeProfile(dynamic raw) {
-    if (raw is! Map) return ProfessionalProfileModel.empty();
-    return ProfessionalProfileModel.fromMap(Map<String, dynamic>.from(raw));
+  Future<
+    ProfessionalProfileModel
+  >
+  getProfessionalProfile() async {
+    return await _remoteDatasource.getProfessionalProfile();
   }
 
   // ============================================================
@@ -130,7 +86,12 @@ class ProfessionalProfileRepositoryImpl
   // ============================================================
 
   @override
-  Future<void> saveProfessionalProfile(ProfessionalProfileModel profile) async {
+  Future<
+    void
+  >
+  saveProfessionalProfile(
+    ProfessionalProfileModel profile,
+  ) async {
     // ==========================================================
     // NORMALIZAR FUNÇÕES DO USUÁRIO
     // ==========================================================
@@ -163,13 +124,16 @@ class ProfessionalProfileRepositoryImpl
     // VALIDAR FUNÇÃO PRINCIPAL
     // ==========================================================
 
-    if (primaryRole == null) {
+    if (primaryRole ==
+        null) {
       throw ArgumentError(
         'É necessário informar uma função profissional principal.',
       );
     }
 
-    if (!normalizedRoles.contains(primaryRole)) {
+    if (!normalizedRoles.contains(
+      primaryRole,
+    )) {
       throw ArgumentError(
         'A função principal precisa estar entre as funções selecionadas.',
       );
@@ -213,14 +177,8 @@ class ProfessionalProfileRepositoryImpl
     // SALVAR NO DATASOURCE
     // ==========================================================
 
-    await _remoteDatasource.saveProfessionalProfile(normalizedProfile);
-
-    final userId = Supabase.instance.client.auth.currentUser?.id.trim();
-    if (userId != null && userId.isNotEmpty) {
-      await _cache.write(
-        CacheKeys.professionalProfile(userId),
-        normalizedProfile.toMap(),
-      );
-    }
+    await _remoteDatasource.saveProfessionalProfile(
+      normalizedProfile,
+    );
   }
 }

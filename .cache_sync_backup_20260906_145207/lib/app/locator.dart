@@ -55,7 +55,6 @@ import 'package:versin/modules/storage/controllers/storage_controller.dart';
 
 import 'package:versin/modules/storage/data/repositories/storage_repository.dart';
 import 'package:versin/modules/storage/data/repositories/supabase_storage_repository.dart';
-import 'package:versin/modules/storage/data/repositories/cached_storage_repository.dart';
 
 import 'package:versin/modules/storage/services/beat_storage_service.dart';
 import 'package:versin/modules/storage/services/storage_file_service.dart';
@@ -334,9 +333,7 @@ void setupLocator() {
   // ==========================================================
 
   sl.registerLazySingleton<StorageRepository>(
-    () => CachedStorageRepository(
-      remote: SupabaseStorageRepository(hashService: sl<StorageHashService>()),
-    ),
+    () => SupabaseStorageRepository(hashService: sl<StorageHashService>()),
   );
 
   // ==========================================================

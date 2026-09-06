@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:versin/app/routes/app_routes.dart';
 import 'package:versin/app/locator.dart';
 import 'package:versin/features/rhymes/presentation/controller/rhymes_controller.dart';
 import 'package:versin/modules/login/data/repositories/auth_repository_impl.dart';
@@ -8,7 +9,6 @@ import 'package:versin/modules/dashboard/controllers/dashboard_controller.dart';
 import 'package:versin/modules/profile/views/account_information_page.dart';
 import 'package:versin/modules/profile/views/professional_profile_settings_page.dart';
 import 'package:versin/modules/settings/views/account_privacy_page.dart';
-import 'package:versin/modules/settings/legal/views/legal_center_page.dart';
 import 'package:versin/modules/profile/public_profile/controllers/public_profile_controller.dart';
 import 'package:versin/modules/profile/public_profile/data/repositories/public_profile_repository_impl.dart';
 import 'package:versin/modules/profile/public_profile/services/profile_track_service.dart';
@@ -20,7 +20,7 @@ import 'package:versin/modules/settings/views/private_api_settings_page.dart';
 class SettingsPage
     extends
         StatefulWidget {
-  static const String routeName = '/settings';
+  static const String routeName = AppRoutes.settings;
 
   const SettingsPage({
     super.key,
@@ -440,35 +440,6 @@ class _SettingsPageState
             ),
 
             _buildSectionTitle(
-              "Sobre & Legal",
-            ),
-            _buildSettingsContainer(
-              child: SettingsTile(
-                icon: Icons.info_outline_rounded,
-                title: "Sobre & Legal",
-                subtitle: "Privacidade, termos, licenças, versão, segurança e créditos",
-                onTap: () {
-                  Navigator.of(
-                    context,
-                  ).push(
-                    MaterialPageRoute<
-                      void
-                    >(
-                      builder:
-                          (
-                            _,
-                          ) => const LegalCenterPage(),
-                    ),
-                  );
-                },
-              ),
-            ),
-
-            const SizedBox(
-              height: 24,
-            ),
-
-            _buildSectionTitle(
               "Segurança & Criptografia",
             ),
             _buildSettingsContainer(
@@ -795,7 +766,7 @@ class _SettingsPageState
       Navigator.of(
         context,
       ).pushNamedAndRemoveUntil(
-        '/login',
+        AppRoutes.login,
         (
           route,
         ) => false,

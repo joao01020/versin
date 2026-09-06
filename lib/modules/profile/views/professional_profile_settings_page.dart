@@ -182,7 +182,7 @@ class _ProfessionalProfileSettingsPageState
                 child: Center(
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(
-                      maxWidth: 720,
+                      maxWidth: 820,
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -201,25 +201,25 @@ class _ProfessionalProfileSettingsPageState
                         // ==================================================
                         _buildRolesCard(),
 
-                        // ==================================================
-                        // FUNÇÃO PRINCIPAL
-                        // ==================================================
-                        if (_controller.hasSelectedRoles) ...[
-                          const SizedBox(
-                            height: 18,
-                          ),
-
-                          _buildPrimaryRoleCard(),
-                        ],
-
                         const SizedBox(
-                          height: 18,
+                          height: 14,
                         ),
 
                         // ==================================================
                         // QUEM O USUÁRIO PROCURA
                         // ==================================================
                         _buildLookingForCard(),
+
+                        // ==================================================
+                        // FUNÇÃO PRINCIPAL
+                        // ==================================================
+                        if (_controller.hasSelectedRoles) ...[
+                          const SizedBox(
+                            height: 14,
+                          ),
+
+                          _buildPrimaryRoleCard(),
+                        ],
 
                         // ==================================================
                         // ERRO
@@ -274,66 +274,194 @@ class _ProfessionalProfileSettingsPageState
   // ============================================================
 
   Widget _buildIntroCard() {
+    final roleCount = _controller.selectedRoles.length;
+    final lookingCount = _controller.lookingForRoles.length;
+    final primaryRole = _controller.primaryRole;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(
-        18,
+        20,
       ),
-      decoration: _cardDecoration(),
-      child: Row(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            _primaryPurple.withValues(
+              alpha: 0.25,
+            ),
+            _surfaceColor.withValues(
+              alpha: 0.90,
+            ),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(
+          22,
+        ),
+        border: Border.all(
+          color: _accentNeon.withValues(
+            alpha: 0.12,
+          ),
+        ),
+      ),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: _accentNeon.withValues(
-                alpha: 0.08,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  color: _accentNeon.withValues(
+                    alpha: 0.10,
+                  ),
+                  borderRadius: BorderRadius.circular(
+                    14,
+                  ),
+                  border: Border.all(
+                    color: _accentNeon.withValues(
+                      alpha: 0.16,
+                    ),
+                  ),
+                ),
+                child: const Icon(
+                  Icons.badge_outlined,
+                  color: _accentNeon,
+                  size: 22,
+                ),
               ),
-              borderRadius: BorderRadius.circular(
-                12,
+              const SizedBox(
+                width: 13,
               ),
-            ),
-            child: const Icon(
-              Icons.badge_outlined,
-              color: _accentNeon,
-              size: 22,
-            ),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Seu perfil profissional',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    SizedBox(
+                      height: 4,
+                    ),
+                    Text(
+                      'Organize sua identidade profissional e diga ao '
+                      'Conectar quais perfis fazem sentido para você.',
+                      style: TextStyle(
+                        color: Colors.white54,
+                        fontSize: 11,
+                        height: 1.45,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-
           const SizedBox(
-            width: 12,
+            height: 16,
           ),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _buildMiniStatus(
+                icon: Icons.work_outline_rounded,
+                label:
+                    roleCount ==
+                        1
+                    ? '1 área selecionada'
+                    : '$roleCount áreas selecionadas',
+                active:
+                    roleCount >
+                    0,
+              ),
+              _buildMiniStatus(
+                icon: Icons.person_search_outlined,
+                label:
+                    lookingCount ==
+                        1
+                    ? '1 perfil procurado'
+                    : '$lookingCount perfis procurados',
+                active:
+                    lookingCount >
+                    0,
+              ),
+              _buildMiniStatus(
+                icon: Icons.star_rounded,
+                label:
+                    primaryRole?.label ??
+                    'Função principal pendente',
+                active:
+                    primaryRole !=
+                    null,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Seu perfil profissional',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                  ),
+  Widget _buildMiniStatus({
+    required IconData icon,
+    required String label,
+    required bool active,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 10,
+        vertical: 7,
+      ),
+      decoration: BoxDecoration(
+        color: active
+            ? _accentNeon.withValues(
+                alpha: 0.07,
+              )
+            : Colors.white.withValues(
+                alpha: 0.025,
+              ),
+        borderRadius: BorderRadius.circular(
+          999,
+        ),
+        border: Border.all(
+          color: active
+              ? _accentNeon.withValues(
+                  alpha: 0.15,
+                )
+              : Colors.white.withValues(
+                  alpha: 0.05,
                 ),
-
-                SizedBox(
-                  height: 5,
-                ),
-
-                Text(
-                  'Informe suas funções profissionais e quais '
-                  'profissionais você deseja encontrar. '
-                  'Essas informações serão usadas pelo Conectar '
-                  'para encontrar pessoas compatíveis.',
-                  style: TextStyle(
-                    color: Colors.white54,
-                    fontSize: 11,
-                    height: 1.45,
-                  ),
-                ),
-              ],
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            color: active
+                ? _accentNeon
+                : Colors.white24,
+            size: 13,
+          ),
+          const SizedBox(
+            width: 6,
+          ),
+          Text(
+            label,
+            style: TextStyle(
+              color: active
+                  ? Colors.white70
+                  : Colors.white38,
+              fontSize: 9.5,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],
@@ -346,68 +474,23 @@ class _ProfessionalProfileSettingsPageState
   // ============================================================
 
   Widget _buildRolesCard() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(
-        18,
-      ),
-      decoration: _cardDecoration(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Row(
-            children: [
-              Icon(
-                Icons.work_outline_rounded,
-                color: _accentNeon,
-                size: 18,
-              ),
-
-              SizedBox(
-                width: 8,
-              ),
-
-              Text(
-                'O que você faz na música?',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(
-            height: 5,
-          ),
-
-          const Text(
-            'Você pode selecionar todas as áreas em que atua.',
-            style: TextStyle(
-              color: Colors.white38,
-              fontSize: 10,
-            ),
-          ),
-
-          const SizedBox(
-            height: 16,
-          ),
-
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: MusicRole.values.map(
-              (
-                role,
-              ) {
-                return _buildRoleChip(
-                  role,
-                );
-              },
-            ).toList(),
-          ),
-        ],
+    return _buildSectionCard(
+      icon: Icons.work_outline_rounded,
+      title: 'O que você faz na música?',
+      subtitle: 'Selecione todas as áreas em que você atua.',
+      badge: '${_controller.selectedRoles.length}',
+      child: Wrap(
+        spacing: 9,
+        runSpacing: 9,
+        children: MusicRole.values.map(
+          (
+            role,
+          ) {
+            return _buildRoleChip(
+              role,
+            );
+          },
+        ).toList(),
       ),
     );
   }
@@ -423,78 +506,91 @@ class _ProfessionalProfileSettingsPageState
       role,
     );
 
-    return InkWell(
-      onTap:
-          _controller.isSaving ||
-              _controller.isLoading
-          ? null
-          : () {
-              _controller.toggleRole(
-                role,
-              );
-            },
-      borderRadius: BorderRadius.circular(
-        14,
-      ),
-      child: AnimatedContainer(
-        duration: const Duration(
-          milliseconds: 160,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap:
+            _controller.isSaving ||
+                _controller.isLoading
+            ? null
+            : () {
+                _controller.toggleRole(
+                  role,
+                );
+              },
+        borderRadius: BorderRadius.circular(
+          12,
         ),
-        padding: const EdgeInsets.symmetric(
-          horizontal: 14,
-          vertical: 11,
-        ),
-        decoration: BoxDecoration(
-          color: selected
-              ? _primaryPurple.withValues(
-                  alpha: 0.28,
-                )
-              : Colors.white.withValues(
-                  alpha: 0.03,
-                ),
-          borderRadius: BorderRadius.circular(
-            14,
+        child: AnimatedContainer(
+          duration: const Duration(
+            milliseconds: 180,
           ),
-          border: Border.all(
+          curve: Curves.easeOutCubic,
+          padding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 9,
+          ),
+          decoration: BoxDecoration(
             color: selected
                 ? _accentNeon.withValues(
-                    alpha: 0.55,
+                    alpha: 0.075,
                   )
                 : Colors.white.withValues(
-                    alpha: 0.07,
+                    alpha: 0.025,
                   ),
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              selected
-                  ? Icons.check_circle_rounded
-                  : Icons.circle_outlined,
+            borderRadius: BorderRadius.circular(
+              12,
+            ),
+            border: Border.all(
               color: selected
-                  ? _accentNeon
-                  : Colors.white24,
-              size: 17,
+                  ? _accentNeon.withValues(
+                      alpha: 0.38,
+                    )
+                  : Colors.white.withValues(
+                      alpha: 0.055,
+                    ),
             ),
-
-            const SizedBox(
-              width: 7,
-            ),
-
-            Text(
-              role.label,
-              style: TextStyle(
-                color: selected
-                    ? Colors.white
-                    : Colors.white70,
-                fontSize: 12,
-                fontWeight: selected
-                    ? FontWeight.w600
-                    : FontWeight.w400,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AnimatedSwitcher(
+                duration: const Duration(
+                  milliseconds: 150,
+                ),
+                child: Icon(
+                  selected
+                      ? Icons.check_circle_rounded
+                      : Icons.circle_outlined,
+                  key:
+                      ValueKey<
+                        bool
+                      >(
+                        selected,
+                      ),
+                  color: selected
+                      ? _accentNeon
+                      : Colors.white24,
+                  size: 16,
+                ),
               ),
-            ),
-          ],
+              const SizedBox(
+                width: 7,
+              ),
+              Text(
+                role.label,
+                style: TextStyle(
+                  color: selected
+                      ? Colors.white
+                      : Colors.white60,
+                  fontSize: 11.5,
+                  fontWeight: selected
+                      ? FontWeight.w600
+                      : FontWeight.w400,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -505,58 +601,17 @@ class _ProfessionalProfileSettingsPageState
   // ============================================================
 
   Widget _buildPrimaryRoleCard() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(
-        18,
-      ),
-      decoration: _cardDecoration(),
+    return _buildSectionCard(
+      icon: Icons.star_outline_rounded,
+      title: 'Função principal',
+      subtitle: 'Escolha uma das suas áreas para aparecer abaixo do seu nome no Dashboard.',
+      badge: _controller.primaryRole?.label,
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Row(
-            children: [
-              Icon(
-                Icons.star_outline_rounded,
-                color: _accentNeon,
-                size: 18,
-              ),
-
-              SizedBox(
-                width: 8,
-              ),
-
-              Text(
-                'Função principal',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(
-            height: 5,
-          ),
-
-          const Text(
-            'Essa função será exibida abaixo do seu nome no Dashboard.',
-            style: TextStyle(
-              color: Colors.white38,
-              fontSize: 10,
-            ),
-          ),
-
-          const SizedBox(
-            height: 14,
-          ),
-
-          ..._controller.selectedRoles.map(
-            _buildPrimaryRoleOption,
-          ),
-        ],
+        children: _controller.selectedRoles
+            .map(
+              _buildPrimaryRoleOption,
+            )
+            .toList(),
       ),
     );
   }
@@ -576,90 +631,128 @@ class _ProfessionalProfileSettingsPageState
       padding: const EdgeInsets.only(
         bottom: 8,
       ),
-      child: InkWell(
-        onTap:
-            _controller.isSaving ||
-                _controller.isLoading
-            ? null
-            : () {
-                _controller.setPrimaryRole(
-                  role,
-                );
-              },
-        borderRadius: BorderRadius.circular(
-          12,
-        ),
-        child: AnimatedContainer(
-          duration: const Duration(
-            milliseconds: 160,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap:
+              _controller.isSaving ||
+                  _controller.isLoading
+              ? null
+              : () {
+                  _controller.setPrimaryRole(
+                    role,
+                  );
+                },
+          borderRadius: BorderRadius.circular(
+            13,
           ),
-          padding: const EdgeInsets.symmetric(
-            horizontal: 14,
-            vertical: 13,
-          ),
-          decoration: BoxDecoration(
-            color: selected
-                ? _primaryPurple.withValues(
-                    alpha: 0.20,
-                  )
-                : Colors.black.withValues(
-                    alpha: 0.12,
-                  ),
-            borderRadius: BorderRadius.circular(
-              12,
+          child: AnimatedContainer(
+            duration: const Duration(
+              milliseconds: 180,
             ),
-            border: Border.all(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 13,
+              vertical: 11,
+            ),
+            decoration: BoxDecoration(
               color: selected
-                  ? _accentNeon.withValues(
-                      alpha: 0.40,
+                  ? _primaryPurple.withValues(
+                      alpha: 0.20,
                     )
-                  : Colors.white.withValues(
-                      alpha: 0.04,
+                  : Colors.black.withValues(
+                      alpha: 0.10,
                     ),
-            ),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                selected
-                    ? Icons.radio_button_checked
-                    : Icons.radio_button_unchecked,
+              borderRadius: BorderRadius.circular(
+                13,
+              ),
+              border: Border.all(
                 color: selected
-                    ? _accentNeon
-                    : Colors.white24,
-                size: 19,
+                    ? _accentNeon.withValues(
+                        alpha: 0.32,
+                      )
+                    : Colors.white.withValues(
+                        alpha: 0.04,
+                      ),
               ),
-
-              const SizedBox(
-                width: 10,
-              ),
-
-              Expanded(
-                child: Text(
-                  role.label,
-                  style: TextStyle(
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 31,
+                  height: 31,
+                  decoration: BoxDecoration(
                     color: selected
-                        ? Colors.white
-                        : Colors.white70,
-                    fontSize: 12,
-                    fontWeight: selected
-                        ? FontWeight.w600
-                        : FontWeight.w400,
+                        ? _accentNeon.withValues(
+                            alpha: 0.09,
+                          )
+                        : Colors.white.withValues(
+                            alpha: 0.025,
+                          ),
+                    borderRadius: BorderRadius.circular(
+                      9,
+                    ),
+                  ),
+                  child: Icon(
+                    selected
+                        ? Icons.star_rounded
+                        : Icons.star_border_rounded,
+                    color: selected
+                        ? _accentNeon
+                        : Colors.white24,
+                    size: 16,
                   ),
                 ),
-              ),
-
-              if (selected)
-                const Text(
-                  'PRINCIPAL',
-                  style: TextStyle(
-                    color: _accentNeon,
-                    fontSize: 8,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 0.7,
+                const SizedBox(
+                  width: 10,
+                ),
+                Expanded(
+                  child: Text(
+                    role.label,
+                    style: TextStyle(
+                      color: selected
+                          ? Colors.white
+                          : Colors.white60,
+                      fontSize: 11.5,
+                      fontWeight: selected
+                          ? FontWeight.w600
+                          : FontWeight.w400,
+                    ),
                   ),
                 ),
-            ],
+                if (selected)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _accentNeon.withValues(
+                        alpha: 0.08,
+                      ),
+                      borderRadius: BorderRadius.circular(
+                        999,
+                      ),
+                    ),
+                    child: const Text(
+                      'PRINCIPAL',
+                      style: TextStyle(
+                        color: _accentNeon,
+                        fontSize: 8,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.6,
+                      ),
+                    ),
+                  )
+                else
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: Colors.white.withValues(
+                      alpha: 0.14,
+                    ),
+                    size: 18,
+                  ),
+              ],
+            ),
           ),
         ),
       ),
@@ -671,61 +764,17 @@ class _ProfessionalProfileSettingsPageState
   // ============================================================
 
   Widget _buildLookingForCard() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(
-        18,
-      ),
-      decoration: _cardDecoration(),
+    return _buildSectionCard(
+      icon: Icons.person_search_outlined,
+      title: 'Quem você procura para se conectar?',
+      subtitle: 'Escolha os tipos de profissionais com quem você quer trabalhar.',
+      badge: '${_controller.lookingForRoles.length}',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
-            children: [
-              Icon(
-                Icons.person_search_outlined,
-                color: _accentNeon,
-                size: 19,
-              ),
-
-              SizedBox(
-                width: 8,
-              ),
-
-              Expanded(
-                child: Text(
-                  'Quem você procura para se conectar?',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(
-            height: 5,
-          ),
-
-          const Text(
-            'Escolha todos os tipos de profissionais com quem '
-            'você tem interesse em trabalhar.',
-            style: TextStyle(
-              color: Colors.white38,
-              fontSize: 10,
-              height: 1.4,
-            ),
-          ),
-
-          const SizedBox(
-            height: 16,
-          ),
-
           Wrap(
-            spacing: 10,
-            runSpacing: 10,
+            spacing: 9,
+            runSpacing: 9,
             children: MusicRole.values.map(
               (
                 role,
@@ -736,12 +785,10 @@ class _ProfessionalProfileSettingsPageState
               },
             ).toList(),
           ),
-
           if (_controller.hasLookingForRoles) ...[
             const SizedBox(
-              height: 16,
+              height: 14,
             ),
-
             _buildLookingForSummary(),
           ],
         ],
@@ -760,78 +807,79 @@ class _ProfessionalProfileSettingsPageState
       role,
     );
 
-    return InkWell(
-      onTap:
-          _controller.isSaving ||
-              _controller.isLoading
-          ? null
-          : () {
-              _controller.toggleLookingForRole(
-                role,
-              );
-            },
-      borderRadius: BorderRadius.circular(
-        14,
-      ),
-      child: AnimatedContainer(
-        duration: const Duration(
-          milliseconds: 160,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap:
+            _controller.isSaving ||
+                _controller.isLoading
+            ? null
+            : () {
+                _controller.toggleLookingForRole(
+                  role,
+                );
+              },
+        borderRadius: BorderRadius.circular(
+          12,
         ),
-        padding: const EdgeInsets.symmetric(
-          horizontal: 14,
-          vertical: 11,
-        ),
-        decoration: BoxDecoration(
-          color: selected
-              ? _primaryPurple.withValues(
-                  alpha: 0.28,
-                )
-              : Colors.white.withValues(
-                  alpha: 0.03,
-                ),
-          borderRadius: BorderRadius.circular(
-            14,
+        child: AnimatedContainer(
+          duration: const Duration(
+            milliseconds: 180,
           ),
-          border: Border.all(
+          padding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 9,
+          ),
+          decoration: BoxDecoration(
             color: selected
-                ? _accentNeon.withValues(
-                    alpha: 0.55,
+                ? _primaryPurple.withValues(
+                    alpha: 0.22,
                   )
                 : Colors.white.withValues(
-                    alpha: 0.07,
+                    alpha: 0.025,
                   ),
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              selected
-                  ? Icons.person_search_rounded
-                  : Icons.person_outline_rounded,
+            borderRadius: BorderRadius.circular(
+              12,
+            ),
+            border: Border.all(
               color: selected
-                  ? _accentNeon
-                  : Colors.white24,
-              size: 17,
+                  ? _accentNeon.withValues(
+                      alpha: 0.36,
+                    )
+                  : Colors.white.withValues(
+                      alpha: 0.055,
+                    ),
             ),
-
-            const SizedBox(
-              width: 7,
-            ),
-
-            Text(
-              role.label,
-              style: TextStyle(
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                selected
+                    ? Icons.group_add_rounded
+                    : Icons.person_add_alt_outlined,
                 color: selected
-                    ? Colors.white
-                    : Colors.white70,
-                fontSize: 12,
-                fontWeight: selected
-                    ? FontWeight.w600
-                    : FontWeight.w400,
+                    ? _accentNeon
+                    : Colors.white24,
+                size: 16,
               ),
-            ),
-          ],
+              const SizedBox(
+                width: 7,
+              ),
+              Text(
+                role.label,
+                style: TextStyle(
+                  color: selected
+                      ? Colors.white
+                      : Colors.white60,
+                  fontSize: 11.5,
+                  fontWeight: selected
+                      ? FontWeight.w600
+                      : FontWeight.w400,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -846,19 +894,20 @@ class _ProfessionalProfileSettingsPageState
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(
-        12,
+      padding: const EdgeInsets.symmetric(
+        horizontal: 11,
+        vertical: 9,
       ),
       decoration: BoxDecoration(
-        color: _accentNeon.withValues(
-          alpha: 0.05,
+        color: Colors.black.withValues(
+          alpha: 0.12,
         ),
         borderRadius: BorderRadius.circular(
-          12,
+          11,
         ),
         border: Border.all(
-          color: _accentNeon.withValues(
-            alpha: 0.12,
+          color: Colors.white.withValues(
+            alpha: 0.04,
           ),
         ),
       ),
@@ -868,42 +917,21 @@ class _ProfessionalProfileSettingsPageState
           const Icon(
             Icons.hub_outlined,
             color: _accentNeon,
-            size: 17,
+            size: 15,
           ),
-
           const SizedBox(
-            width: 9,
+            width: 8,
           ),
-
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Você procura',
-                  style: TextStyle(
-                    color: Colors.white54,
-                    fontSize: 9,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.6,
-                  ),
-                ),
-
-                const SizedBox(
-                  height: 4,
-                ),
-
-                Text(
-                  labels.join(
-                    ' • ',
-                  ),
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 11,
-                    height: 1.4,
-                  ),
-                ),
-              ],
+            child: Text(
+              labels.join(
+                '  •  ',
+              ),
+              style: const TextStyle(
+                color: Colors.white54,
+                fontSize: 9.5,
+                height: 1.4,
+              ),
             ),
           ),
         ],
@@ -1031,22 +1059,157 @@ class _ProfessionalProfileSettingsPageState
   }
 
   // ============================================================
+  // SECTION CARD
+  // ============================================================
+
+  Widget _buildSectionCard({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Widget child,
+    String? badge,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(
+        18,
+      ),
+      decoration: _cardDecoration(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: _accentNeon.withValues(
+                    alpha: 0.07,
+                  ),
+                  borderRadius: BorderRadius.circular(
+                    10,
+                  ),
+                  border: Border.all(
+                    color: _accentNeon.withValues(
+                      alpha: 0.10,
+                    ),
+                  ),
+                ),
+                child: Icon(
+                  icon,
+                  color: _accentNeon,
+                  size: 17,
+                ),
+              ),
+              const SizedBox(
+                width: 10,
+              ),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(
+                      height: 3,
+                    ),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        color: Colors.white38,
+                        fontSize: 10,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (badge !=
+                      null &&
+                  badge.trim().isNotEmpty) ...[
+                const SizedBox(
+                  width: 10,
+                ),
+                Container(
+                  constraints: const BoxConstraints(
+                    minWidth: 30,
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 9,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _accentNeon.withValues(
+                      alpha: 0.07,
+                    ),
+                    borderRadius: BorderRadius.circular(
+                      999,
+                    ),
+                    border: Border.all(
+                      color: _accentNeon.withValues(
+                        alpha: 0.13,
+                      ),
+                    ),
+                  ),
+                  child: Text(
+                    badge,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: _accentNeon,
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(
+            height: 15,
+          ),
+          child,
+        ],
+      ),
+    );
+  }
+
+  // ============================================================
   // CARD
   // ============================================================
 
   BoxDecoration _cardDecoration() {
     return BoxDecoration(
       color: _surfaceColor.withValues(
-        alpha: 0.72,
+        alpha: 0.66,
       ),
       borderRadius: BorderRadius.circular(
-        20,
+        18,
       ),
       border: Border.all(
         color: Colors.white.withValues(
-          alpha: 0.07,
+          alpha: 0.055,
         ),
       ),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withValues(
+            alpha: 0.10,
+          ),
+          blurRadius: 18,
+          offset: const Offset(
+            0,
+            7,
+          ),
+        ),
+      ],
     );
   }
 }

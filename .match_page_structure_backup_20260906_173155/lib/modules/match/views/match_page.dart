@@ -2,8 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import 'package:versin/modules/match/page/match_page_coordinator.dart';
-import 'package:versin/modules/match/page/match_page_view.dart';
+import 'package:versin/modules/match/presentation/match_page_coordinator.dart';
+import 'package:versin/modules/match/presentation/match_page_view.dart';
 
 // ============================================================
 // MATCH PAGE

@@ -24,7 +24,9 @@ import 'package:flutter/material.dart';
 //
 // ============================================================
 
-class MatchDiscoveryHeader extends StatelessWidget {
+class MatchDiscoveryHeader
+    extends
+        StatelessWidget {
   // ============================================================
   // MODE
   // ============================================================
@@ -69,8 +71,6 @@ class MatchDiscoveryHeader extends StatelessWidget {
 
   final VoidCallback onFilters;
 
-  final VoidCallback onInfo;
-
   // ============================================================
   // CONSTRUCTOR
   // ============================================================
@@ -87,7 +87,6 @@ class MatchDiscoveryHeader extends StatelessWidget {
     required this.onPublicProfile,
     required this.onProjects,
     required this.onFilters,
-    required this.onInfo,
   });
 
   // ============================================================
@@ -95,7 +94,9 @@ class MatchDiscoveryHeader extends StatelessWidget {
   // ============================================================
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(
+    BuildContext context,
+  ) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
 
@@ -105,7 +106,9 @@ class MatchDiscoveryHeader extends StatelessWidget {
         // ======================================================
         Expanded(
           child: Text(
-            isTeamExpansionMode ? 'Procurar membro' : 'Novas Conexões',
+            isTeamExpansionMode
+                ? 'Procurar membro'
+                : 'Novas Conexões',
 
             style: const TextStyle(
               color: Colors.white,
@@ -119,7 +122,9 @@ class MatchDiscoveryHeader extends StatelessWidget {
           ),
         ),
 
-        const SizedBox(width: 12),
+        const SizedBox(
+          width: 12,
+        ),
 
         // ======================================================
         // ACTIONS
@@ -147,7 +152,9 @@ class MatchDiscoveryHeader extends StatelessWidget {
               onTap: onSearch,
             ),
 
-            const SizedBox(width: 6),
+            const SizedBox(
+              width: 6,
+            ),
 
             // ==================================================
             // PUBLIC PROFILE
@@ -164,7 +171,9 @@ class MatchDiscoveryHeader extends StatelessWidget {
               onTap: onPublicProfile,
             ),
 
-            const SizedBox(width: 6),
+            const SizedBox(
+              width: 6,
+            ),
 
             // ==================================================
             // PROJECTS
@@ -181,7 +190,9 @@ class MatchDiscoveryHeader extends StatelessWidget {
               onTap: onProjects,
             ),
 
-            const SizedBox(width: 6),
+            const SizedBox(
+              width: 6,
+            ),
 
             // ==================================================
             // FILTERS
@@ -205,7 +216,9 @@ class MatchDiscoveryHeader extends StatelessWidget {
                 // ==============================================
                 // BADGE
                 // ==============================================
-                if (hasActiveFilters && activeFilterCount > 0)
+                if (hasActiveFilters &&
+                    activeFilterCount >
+                        0)
                   Positioned(
                     top: -4,
 
@@ -218,17 +231,23 @@ class MatchDiscoveryHeader extends StatelessWidget {
                         minHeight: 17,
                       ),
 
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 4,
+                      ),
 
                       alignment: Alignment.center,
 
                       decoration: BoxDecoration(
                         color: accentColor,
 
-                        borderRadius: BorderRadius.circular(100),
+                        borderRadius: BorderRadius.circular(
+                          100,
+                        ),
 
                         border: Border.all(
-                          color: const Color(0xFF0D0B1F),
+                          color: const Color(
+                            0xFF0D0B1F,
+                          ),
 
                           width: 2,
                         ),
@@ -249,23 +268,6 @@ class MatchDiscoveryHeader extends StatelessWidget {
                   ),
               ],
             ),
-
-            const SizedBox(width: 6),
-
-            // ==================================================
-            // INFO — FORMAS DE CONECTAR
-            // ==================================================
-            _HeaderActionButton(
-              tooltip: 'Como funcionam as conexões',
-
-              icon: Icons.info_outline_rounded,
-
-              active: false,
-
-              accentColor: accentColor,
-
-              onTap: onInfo,
-            ),
           ],
         ),
       ],
@@ -277,7 +279,9 @@ class MatchDiscoveryHeader extends StatelessWidget {
 // HEADER ACTION
 // ============================================================
 
-class _HeaderActionButton extends StatelessWidget {
+class _HeaderActionButton
+    extends
+        StatelessWidget {
   final String tooltip;
 
   final IconData icon;
@@ -297,7 +301,9 @@ class _HeaderActionButton extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(
+    BuildContext context,
+  ) {
     return Tooltip(
       message: tooltip,
 
@@ -307,10 +313,14 @@ class _HeaderActionButton extends StatelessWidget {
         child: InkWell(
           onTap: onTap,
 
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(
+            14,
+          ),
 
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 160),
+            duration: const Duration(
+              milliseconds: 160,
+            ),
 
             width: 42,
 
@@ -320,15 +330,25 @@ class _HeaderActionButton extends StatelessWidget {
 
             decoration: BoxDecoration(
               color: active
-                  ? accentColor.withValues(alpha: 0.10)
-                  : Colors.white.withValues(alpha: 0.035),
+                  ? accentColor.withValues(
+                      alpha: 0.10,
+                    )
+                  : Colors.white.withValues(
+                      alpha: 0.035,
+                    ),
 
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(
+                14,
+              ),
 
               border: Border.all(
                 color: active
-                    ? accentColor.withValues(alpha: 0.30)
-                    : Colors.white.withValues(alpha: 0.06),
+                    ? accentColor.withValues(
+                        alpha: 0.30,
+                      )
+                    : Colors.white.withValues(
+                        alpha: 0.06,
+                      ),
               ),
             ),
 
@@ -337,7 +357,9 @@ class _HeaderActionButton extends StatelessWidget {
 
               size: 21,
 
-              color: active ? accentColor : Colors.white54,
+              color: active
+                  ? accentColor
+                  : Colors.white54,
             ),
           ),
         ),

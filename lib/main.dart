@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:versin/core/testing/versin_instance.dart';
+
 import 'package:desktop_multi_window/desktop_multi_window.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -54,6 +56,9 @@ const WindowMethodChannel _mindMapChannel = WindowMethodChannel(
 
 Future<void> main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize the local test profile before any plugin or service reads preferences.
+  VersinInstance.initialize();
 
   // ============================================================
   // DEEP LINK INICIAL

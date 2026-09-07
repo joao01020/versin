@@ -36,6 +36,7 @@ import 'package:versin/modules/match/team_expansion/controllers/match_team_expan
 import 'package:versin/modules/match/team_expansion/services/match_team_invitation_service.dart';
 
 import 'package:versin/modules/match/views/projects/match_projects_view.dart';
+import 'package:versin/modules/match/page/services/match_confirmation_service.dart';
 
 import 'package:versin/modules/onboarding/controllers/match_onboarding_controller.dart';
 
@@ -112,6 +113,24 @@ class MatchPageCoordinator extends ChangeNotifier {
   MatchFilterState filterState = const MatchFilterState.initial();
 
   StreamSubscription<String>? _matchSubscription;
+
+  final MatchConfirmationService _confirmationService =
+      MatchConfirmationService();
+  final List<MatchConfirmation> _confirmationQueue = <MatchConfirmation>[];
+  final Set<String> _pendingConfirmationIds = <String>{};
+  bool _confirmationReady = false;
+
+  bool get hasPendingConfirmation => _confirmationQueue.isNotEmpty;
+
+  MatchConfirmation? takeNextConfirmation() {
+    if (_disposed || _confirmationQueue.isEmpty) return null;
+    return _confirmationQueue.removeAt(0);
+  }
+
+  Future<void> acknowledgeConfirmation(MatchConfirmation confirmation) async {
+    await _confirmationService.acknowledge(confirmation.projectId);
+    _pendingConfirmationIds.remove(confirmation.projectId);
+  }
 
   bool _disposed = false;
   bool _initialized = false;
@@ -293,6 +312,18 @@ class MatchPageCoordinator extends ChangeNotifier {
     );
 
     try {
+      // Establish the historical baseline before starting match events.
+      final confirmationUserId = authenticatedUserId;
+      if (!isTeamExpansionMode && confirmationUserId != null) {
+        try {
+          await _confirmationService.initialize(confirmationUserId);
+          _confirmationReady = true;
+        } catch (error) {
+          // A notification failure must never prevent discovery.
+          debugPrint('[MATCH CONFIRMATION] Inicialização: $error');
+        }
+      }
+
       await _sessionService.initialize();
 
       if (_disposed) {
@@ -818,32 +849,29 @@ class MatchPageCoordinator extends ChangeNotifier {
   }
 
   void _handleMatchEvent(String projectId) {
-    if (_disposed) {
+    final id = projectId.trim();
+    if (_disposed || isTeamExpansionMode || !_confirmationReady || id.isEmpty) {
       return;
     }
-
-    final normalizedProjectId = projectId.trim();
-
-    if (normalizedProjectId.isEmpty) {
+    if (_confirmationService.isSeen(id) || !_pendingConfirmationIds.add(id)) {
       return;
     }
+    unawaited(_resolveConfirmation(id));
+  }
 
-    if (isTeamExpansionMode) {
-      debugPrint(
-        '[MATCH PAGE COORDINATOR] '
-        'Evento ignorado em expansão de equipe. '
-        'Projeto: $normalizedProjectId',
-      );
-
-      return;
+  Future<void> _resolveConfirmation(String projectId) async {
+    try {
+      final confirmation = await _confirmationService.resolve(projectId);
+      if (_disposed || confirmation == null) {
+        _pendingConfirmationIds.remove(projectId);
+        return;
+      }
+      _confirmationQueue.add(confirmation);
+      notifyListeners();
+    } catch (error) {
+      _pendingConfirmationIds.remove(projectId);
+      debugPrint('[MATCH CONFIRMATION] Não foi possível carregar: $error');
     }
-
-    debugPrint(
-      '[MATCH PAGE COORDINATOR] '
-      'Match recebido. '
-      'Projeto disponível em Meus projetos: '
-      '$normalizedProjectId',
-    );
   }
 
   // ============================================================
@@ -890,6 +918,8 @@ class MatchPageCoordinator extends ChangeNotifier {
     }
 
     _disposed = true;
+    _confirmationQueue.clear();
+    _pendingConfirmationIds.clear();
 
     matchController.removeListener(_relayState);
 

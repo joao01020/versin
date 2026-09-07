@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:versin/core/testing/versin_instance.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../../../models/private_api_config.dart';
@@ -56,11 +57,8 @@ class PrivateApiService {
   // CONSTRUTOR
   // ============================================================
 
-  PrivateApiService({
-    FlutterSecureStorage? storage,
-  }) : _storage =
-           storage ??
-           const FlutterSecureStorage();
+  PrivateApiService({FlutterSecureStorage? storage})
+    : _storage = storage ?? const FlutterSecureStorage();
 
   // ============================================================
   // SALVAR CONFIGURAÇÃO COMPLETA
@@ -76,10 +74,7 @@ class PrivateApiService {
   //
   // ============================================================
 
-  Future<
-    void
-  >
-  saveConfig({
+  Future<void> saveConfig({
     required PrivateApiConfig config,
     required String apiKey,
   }) async {
@@ -92,9 +87,7 @@ class PrivateApiService {
     // ==========================================================
 
     if (!config.hasValidProvider) {
-      throw ArgumentError(
-        'Provider inválido ou não suportado.',
-      );
+      throw ArgumentError('Provider inválido ou não suportado.');
     }
 
     // ==========================================================
@@ -102,20 +95,15 @@ class PrivateApiService {
     // ==========================================================
 
     if (normalizedApiKey.isEmpty) {
-      throw ArgumentError(
-        'API Key não pode ficar vazia.',
-      );
+      throw ArgumentError('API Key não pode ficar vazia.');
     }
 
     // ==========================================================
     // CUSTOM PRECISA DE BASE URL
     // ==========================================================
 
-    if (config.isCustom &&
-        !config.hasBaseUrl) {
-      throw ArgumentError(
-        'Provider Custom exige uma Base URL.',
-      );
+    if (config.isCustom && !config.hasBaseUrl) {
+      throw ArgumentError('Provider Custom exige uma Base URL.');
     }
 
     try {
@@ -124,7 +112,7 @@ class PrivateApiService {
       // ========================================================
 
       await _storage.write(
-        key: _providerKey,
+        key: VersinInstance.secureKey(_providerKey),
 
         value: normalizedProvider,
       );
@@ -138,7 +126,7 @@ class PrivateApiService {
       // ========================================================
 
       await _storage.write(
-        key: _apiKeyKey,
+        key: VersinInstance.secureKey(_apiKeyKey),
 
         value: normalizedApiKey,
       );
@@ -148,7 +136,7 @@ class PrivateApiService {
       // ========================================================
 
       await _writeNullable(
-        key: _modelKey,
+        key: VersinInstance.secureKey(_modelKey),
 
         value: config.normalizedModel,
       );
@@ -158,7 +146,7 @@ class PrivateApiService {
       // ========================================================
 
       await _writeNullable(
-        key: _baseUrlKey,
+        key: VersinInstance.secureKey(_baseUrlKey),
 
         value: config.normalizedBaseUrl,
       );
@@ -168,11 +156,9 @@ class PrivateApiService {
       // ========================================================
 
       await _storage.write(
-        key: _enabledKey,
+        key: VersinInstance.secureKey(_enabledKey),
 
-        value: config.enabled
-            ? 'true'
-            : 'false',
+        value: config.enabled ? 'true' : 'false',
       );
 
       // ========================================================
@@ -205,10 +191,7 @@ class PrivateApiService {
       // debugPrint(apiKey);
       //
       // ========================================================
-    } catch (
-      error,
-      stackTrace
-    ) {
+    } catch (error, stackTrace) {
       debugPrint(
         '[PRIVATE API] '
         'Erro ao salvar configuração: $error',
@@ -238,49 +221,37 @@ class PrivateApiService {
   //
   // ============================================================
 
-  Future<
-    void
-  >
-  saveMetadata(
-    PrivateApiConfig config,
-  ) async {
+  Future<void> saveMetadata(PrivateApiConfig config) async {
     if (!config.hasValidProvider) {
-      throw ArgumentError(
-        'Provider inválido ou não suportado.',
-      );
+      throw ArgumentError('Provider inválido ou não suportado.');
     }
 
-    if (config.isCustom &&
-        !config.hasBaseUrl) {
-      throw ArgumentError(
-        'Provider Custom exige uma Base URL.',
-      );
+    if (config.isCustom && !config.hasBaseUrl) {
+      throw ArgumentError('Provider Custom exige uma Base URL.');
     }
 
     await _storage.write(
-      key: _providerKey,
+      key: VersinInstance.secureKey(_providerKey),
 
       value: config.normalizedProvider,
     );
 
     await _writeNullable(
-      key: _modelKey,
+      key: VersinInstance.secureKey(_modelKey),
 
       value: config.normalizedModel,
     );
 
     await _writeNullable(
-      key: _baseUrlKey,
+      key: VersinInstance.secureKey(_baseUrlKey),
 
       value: config.normalizedBaseUrl,
     );
 
     await _storage.write(
-      key: _enabledKey,
+      key: VersinInstance.secureKey(_enabledKey),
 
-      value: config.enabled
-          ? 'true'
-          : 'false',
+      value: config.enabled ? 'true' : 'false',
     );
 
     debugPrint(
@@ -293,22 +264,15 @@ class PrivateApiService {
   // ATUALIZAR SOMENTE API KEY
   // ============================================================
 
-  Future<
-    void
-  >
-  saveApiKey(
-    String apiKey,
-  ) async {
+  Future<void> saveApiKey(String apiKey) async {
     final normalized = apiKey.trim();
 
     if (normalized.isEmpty) {
-      throw ArgumentError(
-        'API Key não pode ficar vazia.',
-      );
+      throw ArgumentError('API Key não pode ficar vazia.');
     }
 
     await _storage.write(
-      key: _apiKeyKey,
+      key: VersinInstance.secureKey(_apiKeyKey),
 
       value: normalized,
     );
@@ -337,25 +301,22 @@ class PrivateApiService {
   //
   // ============================================================
 
-  Future<
-    PrivateApiConfig
-  >
-  loadConfig() async {
+  Future<PrivateApiConfig> loadConfig() async {
     try {
       final provider = await _storage.read(
-        key: _providerKey,
+        key: VersinInstance.secureKey(_providerKey),
       );
 
       final model = await _storage.read(
-        key: _modelKey,
+        key: VersinInstance.secureKey(_modelKey),
       );
 
       final baseUrl = await _storage.read(
-        key: _baseUrlKey,
+        key: VersinInstance.secureKey(_baseUrlKey),
       );
 
       final enabled = await _storage.read(
-        key: _enabledKey,
+        key: VersinInstance.secureKey(_enabledKey),
       );
 
       // ========================================================
@@ -367,37 +328,24 @@ class PrivateApiService {
       // ========================================================
 
       final storedApiKey = await _storage.read(
-        key: _apiKeyKey,
+        key: VersinInstance.secureKey(_apiKeyKey),
       );
 
       final hasStoredApiKey =
-          storedApiKey !=
-              null &&
-          storedApiKey.trim().isNotEmpty;
+          storedApiKey != null && storedApiKey.trim().isNotEmpty;
 
       return PrivateApiConfig(
-        provider: _normalizeProviderOrDefault(
-          provider,
-        ),
+        provider: _normalizeProviderOrDefault(provider),
 
-        model: _normalizeNullable(
-          model,
-        ),
+        model: _normalizeNullable(model),
 
-        baseUrl: _normalizeNullable(
-          baseUrl,
-        ),
+        baseUrl: _normalizeNullable(baseUrl),
 
-        enabled:
-            enabled ==
-            'true',
+        enabled: enabled == 'true',
 
         hasApiKey: hasStoredApiKey,
       );
-    } catch (
-      error,
-      stackTrace
-    ) {
+    } catch (error, stackTrace) {
       debugPrint(
         '[PRIVATE API] '
         'Erro ao carregar configuração: $error',
@@ -416,10 +364,7 @@ class PrivateApiService {
   // API PRIVADA PODE SER USADA?
   // ============================================================
 
-  Future<
-    bool
-  >
-  isEnabled() async {
+  Future<bool> isEnabled() async {
     final config = await loadConfig();
 
     return config.canUsePrivateApi;
@@ -429,22 +374,14 @@ class PrivateApiService {
   // POSSUI API KEY?
   // ============================================================
 
-  Future<
-    bool
-  >
-  hasApiKey() async {
+  Future<bool> hasApiKey() async {
     try {
       final value = await _storage.read(
-        key: _apiKeyKey,
+        key: VersinInstance.secureKey(_apiKeyKey),
       );
 
-      return value !=
-              null &&
-          value.trim().isNotEmpty;
-    } catch (
-      error,
-      stackTrace
-    ) {
+      return value != null && value.trim().isNotEmpty;
+    } catch (error, stackTrace) {
       debugPrint(
         '[PRIVATE API] '
         'Erro ao verificar API Key: $error',
@@ -479,17 +416,13 @@ class PrivateApiService {
   //
   // ============================================================
 
-  Future<
-    String?
-  >
-  readApiKey() async {
+  Future<String?> readApiKey() async {
     try {
       final value = await _storage.read(
-        key: _apiKeyKey,
+        key: VersinInstance.secureKey(_apiKeyKey),
       );
 
-      if (value ==
-          null) {
+      if (value == null) {
         return null;
       }
 
@@ -500,10 +433,7 @@ class PrivateApiService {
       }
 
       return normalized;
-    } catch (
-      error,
-      stackTrace
-    ) {
+    } catch (error, stackTrace) {
       debugPrint(
         '[PRIVATE API] '
         'Erro ao acessar API Key.',
@@ -522,33 +452,23 @@ class PrivateApiService {
   // ATIVAR
   // ============================================================
 
-  Future<
-    void
-  >
-  enable() async {
+  Future<void> enable() async {
     final config = await loadConfig();
 
     if (!config.hasApiKey) {
-      throw StateError(
-        'Nenhuma API Key privada foi configurada.',
-      );
+      throw StateError('Nenhuma API Key privada foi configurada.');
     }
 
     if (!config.hasValidProvider) {
-      throw StateError(
-        'Provider inválido.',
-      );
+      throw StateError('Provider inválido.');
     }
 
-    if (config.isCustom &&
-        !config.hasBaseUrl) {
-      throw StateError(
-        'Provider Custom exige uma Base URL.',
-      );
+    if (config.isCustom && !config.hasBaseUrl) {
+      throw StateError('Provider Custom exige uma Base URL.');
     }
 
     await _storage.write(
-      key: _enabledKey,
+      key: VersinInstance.secureKey(_enabledKey),
 
       value: 'true',
     );
@@ -563,12 +483,9 @@ class PrivateApiService {
   // DESATIVAR
   // ============================================================
 
-  Future<
-    void
-  >
-  disable() async {
+  Future<void> disable() async {
     await _storage.write(
-      key: _enabledKey,
+      key: VersinInstance.secureKey(_enabledKey),
 
       value: 'false',
     );
@@ -583,12 +500,7 @@ class PrivateApiService {
   // ALTERAR ENABLED
   // ============================================================
 
-  Future<
-    void
-  >
-  setEnabled(
-    bool enabled,
-  ) async {
+  Future<void> setEnabled(bool enabled) async {
     if (enabled) {
       await enable();
 
@@ -608,14 +520,9 @@ class PrivateApiService {
   //
   // ============================================================
 
-  Future<
-    void
-  >
-  removeApiKey() async {
+  Future<void> removeApiKey() async {
     try {
-      await _storage.delete(
-        key: _apiKeyKey,
-      );
+      await _storage.delete(key: VersinInstance.secureKey(_apiKeyKey));
 
       await disable();
 
@@ -623,10 +530,7 @@ class PrivateApiService {
         '[PRIVATE API] '
         'API Key removida deste dispositivo.',
       );
-    } catch (
-      error,
-      stackTrace
-    ) {
+    } catch (error, stackTrace) {
       debugPrint(
         '[PRIVATE API] '
         'Erro ao remover API Key: $error',
@@ -645,43 +549,25 @@ class PrivateApiService {
   // REMOVER TODA CONFIGURAÇÃO
   // ============================================================
 
-  Future<
-    void
-  >
-  clear() async {
+  Future<void> clear() async {
     try {
-      await Future.wait(
-        [
-          _storage.delete(
-            key: _providerKey,
-          ),
+      await Future.wait([
+        _storage.delete(key: VersinInstance.secureKey(_providerKey)),
 
-          _storage.delete(
-            key: _apiKeyKey,
-          ),
+        _storage.delete(key: VersinInstance.secureKey(_apiKeyKey)),
 
-          _storage.delete(
-            key: _modelKey,
-          ),
+        _storage.delete(key: VersinInstance.secureKey(_modelKey)),
 
-          _storage.delete(
-            key: _baseUrlKey,
-          ),
+        _storage.delete(key: VersinInstance.secureKey(_baseUrlKey)),
 
-          _storage.delete(
-            key: _enabledKey,
-          ),
-        ],
-      );
+        _storage.delete(key: VersinInstance.secureKey(_enabledKey)),
+      ]);
 
       debugPrint(
         '[PRIVATE API] '
         'Toda configuração privada foi removida.',
       );
-    } catch (
-      error,
-      stackTrace
-    ) {
+    } catch (error, stackTrace) {
       debugPrint(
         '[PRIVATE API] '
         'Erro ao limpar configuração: $error',
@@ -700,10 +586,7 @@ class PrivateApiService {
   // CONFIGURAÇÃO EXISTE?
   // ============================================================
 
-  Future<
-    bool
-  >
-  hasConfiguration() async {
+  Future<bool> hasConfiguration() async {
     final config = await loadConfig();
 
     return config.hasApiKey ||
@@ -716,41 +599,27 @@ class PrivateApiService {
   // SALVAR STRING OPCIONAL
   // ============================================================
 
-  Future<
-    void
-  >
-  _writeNullable({
+  Future<void> _writeNullable({
     required String key,
     required String? value,
   }) async {
     final normalized = value?.trim();
 
-    if (normalized ==
-            null ||
-        normalized.isEmpty) {
-      await _storage.delete(
-        key: key,
-      );
+    if (normalized == null || normalized.isEmpty) {
+      await _storage.delete(key: VersinInstance.secureKey(key));
 
       return;
     }
 
-    await _storage.write(
-      key: key,
-
-      value: normalized,
-    );
+    await _storage.write(key: VersinInstance.secureKey(key), value: normalized);
   }
 
   // ============================================================
   // NORMALIZAR STRING
   // ============================================================
 
-  String? _normalizeNullable(
-    String? value,
-  ) {
-    if (value ==
-        null) {
+  String? _normalizeNullable(String? value) {
+    if (value == null) {
       return null;
     }
 
@@ -767,14 +636,10 @@ class PrivateApiService {
   // NORMALIZAR PROVIDER
   // ============================================================
 
-  String _normalizeProviderOrDefault(
-    String? value,
-  ) {
+  String _normalizeProviderOrDefault(String? value) {
     final normalized = value?.trim();
 
-    if (normalized ==
-            null ||
-        normalized.isEmpty) {
+    if (normalized == null || normalized.isEmpty) {
       return 'OpenAI';
     }
 

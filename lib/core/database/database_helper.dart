@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
+import 'package:versin/core/testing/versin_instance.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
@@ -13,18 +16,12 @@ class DatabaseHelper {
   // DATABASE
   // ============================================================
 
-  Future<
-    Database
-  >
-  get database async {
-    if (_database !=
-        null) {
+  Future<Database> get database async {
+    if (_database != null) {
       return _database!;
     }
 
-    _database = await _initDB(
-      'versin_storage.db',
-    );
+    _database = await _initDB('versin_storage.db');
 
     return _database!;
   }
@@ -33,22 +30,19 @@ class DatabaseHelper {
   // INIT
   // ============================================================
 
-  Future<
-    Database
-  >
-  _initDB(
-    String filePath,
-  ) async {
-    final dbPath = await getDatabasesPath();
+  Future<Database> _initDB(String filePath) async {
+    final defaultDbPath = await getDatabasesPath();
+    final dbPath = VersinInstance.isIsolated
+        ? join(defaultDbPath, 'versin_test_${VersinInstance.id}')
+        : defaultDbPath;
 
-    final path = join(
-      dbPath,
-      filePath,
-    );
+    if (VersinInstance.isIsolated) {
+      await Directory(dbPath).create(recursive: true);
+    }
 
-    debugPrint(
-      '[DATABASE] Abrindo: $path',
-    );
+    final path = join(dbPath, filePath);
+
+    debugPrint('[DATABASE] Abrindo: $path');
 
     return openDatabase(
       path,
@@ -63,33 +57,24 @@ class DatabaseHelper {
   // CREATE
   // ============================================================
 
-  Future<
-    void
-  >
-  _createDB(
-    Database db,
-    int version,
-  ) async {
+  Future<void> _createDB(Database db, int version) async {
     // ==========================================================
     // RIMAS
     // ==========================================================
 
-    await db.execute(
-      '''
+    await db.execute('''
       CREATE TABLE offline_rhymes (
         id TEXT PRIMARY KEY,
         word TEXT,
         synced INTEGER
       )
-      ''',
-    );
+      ''');
 
     // ==========================================================
     // PROJETOS
     // ==========================================================
 
-    await db.execute(
-      '''
+    await db.execute('''
       CREATE TABLE projects (
         id TEXT PRIMARY KEY,
         name TEXT,
@@ -99,15 +84,13 @@ class DatabaseHelper {
         technique TEXT,
         synced INTEGER
       )
-      ''',
-    );
+      ''');
 
     // ==========================================================
     // PERFIL
     // ==========================================================
 
-    await db.execute(
-      '''
+    await db.execute('''
       CREATE TABLE user_profile (
         id TEXT PRIMARY KEY,
         name TEXT,
@@ -115,29 +98,17 @@ class DatabaseHelper {
         wallet TEXT,
         synced INTEGER
       )
-      ''',
-    );
+      ''');
 
-    debugPrint(
-      '[DATABASE] Banco criado na versão $version.',
-    );
+    debugPrint('[DATABASE] Banco criado na versão $version.');
   }
 
   // ============================================================
   // UPGRADE
   // ============================================================
 
-  Future<
-    void
-  >
-  _upgradeDB(
-    Database db,
-    int oldVersion,
-    int newVersion,
-  ) async {
-    debugPrint(
-      '[DATABASE] Migration $oldVersion -> $newVersion',
-    );
+  Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
+    debugPrint('[DATABASE] Migration $oldVersion -> $newVersion');
 
     // ==========================================================
     // PROJECTS.NAME
@@ -173,12 +144,7 @@ class DatabaseHelper {
   //
   // ============================================================
 
-  Future<
-    void
-  >
-  _onOpen(
-    Database db,
-  ) async {
+  Future<void> _onOpen(Database db) async {
     await _addColumnIfMissing(
       db,
       table: 'user_profile',
@@ -186,53 +152,33 @@ class DatabaseHelper {
       definition: 'TEXT',
     );
 
-    debugPrint(
-      '[DATABASE] Estrutura verificada.',
-    );
+    debugPrint('[DATABASE] Estrutura verificada.');
   }
 
   // ============================================================
   // ADICIONAR COLUNA SE NÃO EXISTIR
   // ============================================================
 
-  Future<
-    void
-  >
-  _addColumnIfMissing(
+  Future<void> _addColumnIfMissing(
     Database db, {
     required String table,
     required String column,
     required String definition,
   }) async {
-    final tableExists = await _tableExists(
-      db,
-      table,
-    );
+    final tableExists = await _tableExists(db, table);
 
     if (!tableExists) {
-      debugPrint(
-        '[DATABASE] Tabela $table não existe.',
-      );
+      debugPrint('[DATABASE] Tabela $table não existe.');
 
       return;
     }
 
-    final columns = await db.rawQuery(
-      'PRAGMA table_info($table)',
-    );
+    final columns = await db.rawQuery('PRAGMA table_info($table)');
 
-    final exists = columns.any(
-      (
-        item,
-      ) =>
-          item['name'] ==
-          column,
-    );
+    final exists = columns.any((item) => item['name'] == column);
 
     if (exists) {
-      debugPrint(
-        '[DATABASE] $table.$column já existe.',
-      );
+      debugPrint('[DATABASE] $table.$column já existe.');
 
       return;
     }
@@ -242,22 +188,14 @@ class DatabaseHelper {
       'ADD COLUMN $column $definition',
     );
 
-    debugPrint(
-      '[DATABASE] Coluna criada: $table.$column',
-    );
+    debugPrint('[DATABASE] Coluna criada: $table.$column');
   }
 
   // ============================================================
   // VERIFICAR TABELA
   // ============================================================
 
-  Future<
-    bool
-  >
-  _tableExists(
-    Database db,
-    String table,
-  ) async {
+  Future<bool> _tableExists(Database db, String table) async {
     final result = await db.rawQuery(
       '''
       SELECT name
@@ -266,9 +204,7 @@ class DatabaseHelper {
       AND name = ?
       LIMIT 1
       ''',
-      [
-        table,
-      ],
+      [table],
     );
 
     return result.isNotEmpty;
@@ -278,14 +214,10 @@ class DatabaseHelper {
   // FECHAR
   // ============================================================
 
-  Future<
-    void
-  >
-  close() async {
+  Future<void> close() async {
     final db = _database;
 
-    if (db ==
-        null) {
+    if (db == null) {
       return;
     }
 
@@ -293,8 +225,6 @@ class DatabaseHelper {
 
     _database = null;
 
-    debugPrint(
-      '[DATABASE] Banco fechado.',
-    );
+    debugPrint('[DATABASE] Banco fechado.');
   }
 }

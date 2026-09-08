@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:versin/core/version/app_version_service.dart';
 
 class AppVersionPage extends StatefulWidget {
   const AppVersionPage({super.key});
@@ -24,7 +25,7 @@ class _AppVersionPageState extends State<AppVersionPage> {
 
   Future<void> _loadPackageInfo() async {
     try {
-      final info = await PackageInfo.fromPlatform();
+      final info = await AppVersionService.instance.load();
 
       if (!mounted) {
         return;
@@ -86,6 +87,9 @@ class _AppVersionPageState extends State<AppVersionPage> {
                     : Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
+                          // ====================================
+                          // LOGO VERSIN
+                          // ====================================
                           Container(
                             width: 72,
                             height: 72,
@@ -96,13 +100,18 @@ class _AppVersionPageState extends State<AppVersionPage> {
                                 color: _accent.withValues(alpha: 0.24),
                               ),
                             ),
-                            child: const Icon(
-                              Icons.graphic_eq_rounded,
-                              color: _accent,
-                              size: 34,
+                            child: Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: Image.asset(
+                                'assets/logo/logo.png',
+                                fit: BoxFit.contain,
+                                filterQuality: FilterQuality.high,
+                              ),
                             ),
                           ),
+
                           const SizedBox(height: 20),
+
                           const Text(
                             'VERSIN',
                             style: TextStyle(
@@ -112,7 +121,9 @@ class _AppVersionPageState extends State<AppVersionPage> {
                               letterSpacing: 3,
                             ),
                           ),
+
                           const SizedBox(height: 4),
+
                           Text(
                             'GENESIS',
                             style: TextStyle(
@@ -122,20 +133,20 @@ class _AppVersionPageState extends State<AppVersionPage> {
                               letterSpacing: 3,
                             ),
                           ),
+
                           const SizedBox(height: 28),
+
+                          // ====================================
+                          // INFORMAÇÕES DA VERSÃO
+                          // ====================================
                           _infoRow('Versão', info?.version ?? 'Indisponível'),
+
                           _divider(),
+
                           _infoRow(
                             'Build',
                             info?.buildNumber ?? 'Indisponível',
                           ),
-                          _divider(),
-                          _infoRow(
-                            'Pacote',
-                            info?.packageName ?? 'Indisponível',
-                          ),
-                          _divider(),
-                          _infoRow('Nome', info?.appName ?? 'Versin'),
                         ],
                       ),
               ),

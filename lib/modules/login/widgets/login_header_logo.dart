@@ -45,16 +45,20 @@ class LoginHeaderLogo
                 ),
               ],
             ),
-            child: Icon(
-              Icons.all_inclusive_rounded,
-              color: accentNeon,
-              size: 42,
+            child: Image.asset(
+              'assets/logo/logo.png',
+              width: 42,
+              height: 42,
+              fit: BoxFit.contain,
+              filterQuality: FilterQuality.high,
             ),
           ),
         ),
+
         const SizedBox(
           height: 16,
         ),
+
         const Text(
           'VERSIN',
           style: TextStyle(
@@ -64,6 +68,7 @@ class LoginHeaderLogo
             letterSpacing: 4,
           ),
         ),
+
         const Text(
           'Ecossistema Descentralizado',
           textAlign: TextAlign.center,

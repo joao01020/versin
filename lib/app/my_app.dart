@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:versin/core/localization/versin_locale.dart';
 
 import 'package:versin/app/auth_wrapper.dart';
 import 'package:versin/app/routes/app_routes.dart';
@@ -67,6 +68,9 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      locale: VersinLocale.locale,
+      supportedLocales: VersinLocale.supportedLocales,
+      localizationsDelegates: VersinLocale.localizationsDelegates,
       // ======================================================
       // IDENTIDADE
       // ======================================================

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:versin/core/version/app_version_service.dart';
 
 import 'package:versin/modules/notifications/controllers/notification_controller.dart';
 import 'package:versin/modules/notifications/models/system_notification_model.dart';
@@ -43,6 +44,11 @@ class _NotificationPanelWidgetState
 
   NotificationController get controller => widget.controller;
 
+  late final Future<
+    String
+  >
+  _versionLabel;
+
   // ============================================================
   // ACCENT
   // ============================================================
@@ -60,6 +66,8 @@ class _NotificationPanelWidgetState
   @override
   void initState() {
     super.initState();
+
+    _versionLabel = AppVersionService.instance.displayVersion;
 
     controller.addListener(
       _onControllerUpdate,
@@ -920,6 +928,32 @@ class _NotificationPanelWidgetState
                 fontSize: 10,
                 height: 1.4,
               ),
+            ),
+
+            const SizedBox(
+              height: 16,
+            ),
+
+            FutureBuilder<
+              String
+            >(
+              future: _versionLabel,
+              builder:
+                  (
+                    context,
+                    snapshot,
+                  ) {
+                    return Text(
+                      snapshot.data ??
+                          'Versin Genesis',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.white24,
+                        fontSize: 10,
+                        letterSpacing: 0.5,
+                      ),
+                    );
+                  },
             ),
           ],
         ),

@@ -152,9 +152,15 @@ class DashboardSideRail
           ),
         ),
       ),
-      child: Icon(
-        Icons.graphic_eq_rounded,
-        color: controller.accentNeon,
+      child: Padding(
+        padding: const EdgeInsets.all(
+          7,
+        ),
+        child: Image.asset(
+          'assets/logo/logo.png',
+          fit: BoxFit.contain,
+          filterQuality: FilterQuality.high,
+        ),
       ),
     );
   }
@@ -172,84 +178,82 @@ class DashboardSideRail
         ? controller.accentNeon
         : Colors.white38;
 
-    return Tooltip(
-      message: item.label,
-      child: InkWell(
-        onTap: () {
-          onTap(
-            index,
-          );
-        },
-        child: AnimatedContainer(
-          duration: const Duration(
-            milliseconds: 180,
+    // Sem Tooltip: o nome já aparece abaixo do ícone.
+    return InkWell(
+      onTap: () {
+        onTap(
+          index,
+        );
+      },
+      child: AnimatedContainer(
+        duration: const Duration(
+          milliseconds: 180,
+        ),
+        curve: Curves.easeOutCubic,
+        margin: const EdgeInsets.symmetric(
+          horizontal: 10,
+          vertical: 4,
+        ),
+        padding: const EdgeInsets.symmetric(
+          vertical: 10,
+        ),
+        decoration: BoxDecoration(
+          color: selected
+              ? controller.accentNeon.withValues(
+                  alpha: 0.12,
+                )
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(
+            12,
           ),
-          curve: Curves.easeOutCubic,
-          margin: const EdgeInsets.symmetric(
-            horizontal: 10,
-            vertical: 4,
-          ),
-          padding: const EdgeInsets.symmetric(
-            vertical: 10,
-          ),
-          decoration: BoxDecoration(
+          border: Border.all(
             color: selected
                 ? controller.accentNeon.withValues(
-                    alpha: 0.12,
+                    alpha: 0.25,
                   )
                 : Colors.transparent,
-            borderRadius: BorderRadius.circular(
-              12,
-            ),
-            border: Border.all(
-              color: selected
-                  ? controller.accentNeon.withValues(
-                      alpha: 0.25,
-                    )
-                  : Colors.transparent,
-            ),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // ================================================
-              // ÍCONE
-              // ================================================
-              Icon(
-                item.icon,
-                color: foregroundColor,
-                size: 22,
-              ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // ================================================
+            // ÍCONE
+            // ================================================
+            Icon(
+              item.icon,
+              color: foregroundColor,
+              size: 22,
+            ),
 
-              const SizedBox(
-                height: 5,
-              ),
+            const SizedBox(
+              height: 5,
+            ),
 
-              // ================================================
-              // LABEL
-              // ================================================
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 3,
+            // ================================================
+            // LABEL
+            // ================================================
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 3,
+              ),
+              child: Text(
+                _railLabel(
+                  item.label,
                 ),
-                child: Text(
-                  _railLabel(
-                    item.label,
-                  ),
-                  textAlign: TextAlign.center,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: foregroundColor,
-                    fontSize: 9,
-                    fontWeight: selected
-                        ? FontWeight.bold
-                        : FontWeight.normal,
-                  ),
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: foregroundColor,
+                  fontSize: 9,
+                  fontWeight: selected
+                      ? FontWeight.bold
+                      : FontWeight.normal,
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

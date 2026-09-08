@@ -2,64 +2,116 @@ name: versin
 description: "A new Flutter project."
 publish_to: "none"
 
-version: 1.0.0+1
+# ============================================================
+# VERSÃO DO APLICATIVO
+# ============================================================
+# MAJOR.MINOR.PATCH+BUILD
+# Exemplo: 1.0.1+2
+version: 1.0.1+2
 
 environment:
   sdk: ^3.11.3
 
 dependencies:
+  flutter_localizations:
+    sdk: flutter
   flutter:
     sdk: flutter
 
+  # ==========================================================
+  # INTERFACE E NAVEGAÇÃO
+  # ==========================================================
   cupertino_icons: ^1.0.8
-  http: ^1.2.0
-  flutter_markdown: ^0.7.7+1
   url_launcher: ^6.3.2
-  file_picker: ^10.3.10
-  path_provider: ^2.1.5
+  flutter_markdown: ^0.7.7+1
+  markdown: ^7.3.1
+  fl_chart: ^1.2.0
+
+  # ==========================================================
+  # REDE, BACKEND E AUTENTICAÇÃO
+  # ==========================================================
+  http: ^1.2.0
   supabase_flutter: ^2.12.1
+  flutter_dotenv: ^5.1.0
+  connectivity_plus: ^7.1.1
+  wifi_scan: ^0.4.1+2
+
+  # ==========================================================
+  # IDENTIFICADORES E CRIPTOGRAFIA
+  # ==========================================================
   crypto: ^3.0.7
   uuid: ^4.5.3
-  flutter_dotenv: ^5.1.0 # Adicionado para carregar suas chaves com segurança
+  flutter_secure_storage: ^9.2.4
+
+  # ==========================================================
+  # ARMAZENAMENTO E ARQUIVOS
+  # ==========================================================
+  file_picker: ^10.3.10
+  path_provider: ^2.1.5
+  shared_preferences: ^2.5.5
+  sqflite: ^2.4.2+1
+  sqflite_common_ffi: ^2.4.0+3
+  sqlite3_flutter_libs: ^0.6.0+eol
+  path: ^1.9.1
+
+  # ==========================================================
+  # ÁUDIO E MÍDIA
+  # ==========================================================
   record: ^6.2.1
+  audioplayers: ^6.6.0
+  just_audio: ^0.10.6
+  just_audio_media_kit: ^2.1.0
+  media_kit_libs_linux: ^1.2.1
+  image_picker: ^1.2.1
+  flutter_webrtc: ^1.5.2
+
+  # ==========================================================
+  # DOCUMENTOS E FORMATAÇÃO
+  # ==========================================================
   pdf: ^3.12.0
   printing: ^5.14.3
   intl: ^0.20.2
-  image_picker: ^1.2.1
-  audioplayers: ^6.6.0
-  markdown: ^7.3.1
-  sqflite: ^2.4.2+1
-  path: ^1.9.1
-  connectivity_plus: ^7.1.1
-  wifi_scan: ^0.4.1+2
-  sqflite_common_ffi: ^2.4.0+3
-  sqlite3_flutter_libs: ^0.6.0+eol
+
+  # ==========================================================
+  # LOCALIZAÇÃO
+  # ==========================================================
+  geolocator: ^14.0.2
+
+  # ==========================================================
+  # INJEÇÃO DE DEPENDÊNCIAS
+  # ==========================================================
   get_it: ^8.0.0
-  fl_chart: ^1.2.0
+
+  # ==========================================================
+  # DESKTOP
+  # ==========================================================
   desktop_multi_window: ^0.3.0
   desktop_drop: ^0.3.0
-  just_audio: ^0.10.6
 
   window_manager:
     git:
       url: https://github.com/boyan01/window_manager.git
       path: packages/window_manager
       ref: 6fae92d21b4c80ce1b8f71c1190d7970cf722bd4
-  just_audio_media_kit: ^2.1.0
-  media_kit_libs_linux: ^1.2.1
-  geolocator: ^14.0.2
-  flutter_secure_storage: ^9.2.4
-  shared_preferences: ^2.5.5
-  flutter_webrtc: ^1.5.2
+
+  # ==========================================================
+  # INFORMAÇÕES DO APLICATIVO
+  # ==========================================================
   package_info_plus: ^9.0.1
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+
   flutter_lints: ^6.0.0
 
 flutter:
   uses-material-design: true
+
+  # ==========================================================
+  # ASSETS
+  # ==========================================================
   assets:
     - .env
     - assets/sounds/click.wav
+    - assets/logo/

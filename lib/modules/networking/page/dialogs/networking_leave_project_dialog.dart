@@ -1,7 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:versin/modules/match/quick/widgets/match_collaboration_confirmation_dialog.dart';
 
 abstract final class NetworkingLeaveProjectDialog {
-  static Future<bool> show({required BuildContext context}) async {
+  static Future<bool> show({
+    required BuildContext context,
+    Map<String, dynamic>? preview,
+  }) async {
+    if (preview != null) {
+      return MatchCollaborationConfirmationDialog.show(
+        context: context, preview: preview,
+      );
+    }
     var confirmed = false;
 
     final result = await showDialog<bool>(

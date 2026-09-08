@@ -1,6 +1,8 @@
-import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
+import 'package:flutter/foundation.dart'
+    show debugPrint, kIsWeb, defaultTargetPlatform, TargetPlatform;
 
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:versin/modules/login/data/datasources/desktop_oauth_service.dart';
 
 // ============================================================
 // AUTH REMOTE DATASOURCE
@@ -204,6 +206,11 @@ class AuthRemoteDatasourceImpl implements AuthRemoteDatasource {
 
   @override
   Future<void> signInWithOAuth(OAuthProvider provider) async {
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.linux) {
+      await DesktopOAuthService.instance.signIn(provider);
+      return;
+    }
+
     // ========================================================
     // REDIRECT OAUTH
     // ========================================================

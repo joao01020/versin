@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:versin/app/locator.dart';
 
 import 'package:versin/modules/match/availability/controllers/match_availability_controller.dart';
+import 'package:versin/modules/match/quick/services/match_quick_connection_service.dart';
 import 'package:versin/modules/match/availability/services/match_availability_service.dart';
 
 import 'package:versin/modules/match/controllers/match_controllers.dart';
@@ -134,6 +135,37 @@ class MatchPageCoordinator extends ChangeNotifier {
 
   bool _disposed = false;
   bool _initialized = false;
+  bool _quickExitInProgress = false;
+
+  void _handleQuickState() {
+    final quick = MatchQuickConnectionService.instance;
+    if (_disposed || !_initialized || isInitializingMatch ||
+        _quickExitInProgress || isTeamExpansionMode ||
+        !quick.isPaused ||
+        matchController.discoveryMode != MatchDiscoveryMode.global) {
+      return;
+    }
+    unawaited(_ensureNotDiscoveringWhilePaused());
+  }
+
+  Future<void> _ensureNotDiscoveringWhilePaused() async {
+    if (_quickExitInProgress || _disposed) return;
+    _quickExitInProgress = true;
+    try {
+      final quick = MatchQuickConnectionService.instance;
+      await quick.refresh();
+      if (_disposed || !quick.isPaused ||
+          discoveryController.isBusy ||
+          matchController.discoveryMode != MatchDiscoveryMode.global) return;
+      await availabilityController.refresh();
+      if (_disposed || !quick.isPaused) return;
+      await _sessionService.changeDiscoveryMode(MatchDiscoveryMode.compatible);
+    } catch (error) {
+      debugPrint('[MATCH] Não foi possível sair do Agora pausado: $error');
+    } finally {
+      _quickExitInProgress = false;
+    }
+  }
 
   // ============================================================
   // DERIVED STATE
@@ -172,8 +204,7 @@ class MatchPageCoordinator extends ChangeNotifier {
   bool get isDiscoveryBusy => discoveryController.isBusy;
 
   bool get isAvailabilityVisible =>
-      matchController.discoveryMode == MatchDiscoveryMode.global ||
-      availabilityController.isActive;
+      matchController.discoveryMode == MatchDiscoveryMode.global;
 
   String? get authenticatedUserId {
     final id = Supabase.instance.client.auth.currentUser?.id.trim();
@@ -254,6 +285,7 @@ class MatchPageCoordinator extends ChangeNotifier {
   // ============================================================
 
   void _setupListeners() {
+    MatchQuickConnectionService.instance.addListener(_handleQuickState);
     matchController.addListener(_relayState);
 
     professionalProfileController.addListener(_relayState);
@@ -874,6 +906,21 @@ class MatchPageCoordinator extends ChangeNotifier {
     }
   }
 
+  Future<void> refreshDiscovery(BuildContext context) async {
+    if (_disposed || isInitializingMatch || discoveryController.isBusy) return;
+    _setInitializing(true);
+    try {
+      await _sessionService.restart();
+    } catch (error) {
+      if (context.mounted && !_disposed) {
+        _showMessage(context, 'Não foi possível atualizar a busca.');
+      }
+      debugPrint('[MATCH] Erro ao atualizar descoberta: $error');
+    } finally {
+      _setInitializing(false);
+    }
+  }
+
   // ============================================================
   // HELPERS
   // ============================================================
@@ -918,6 +965,7 @@ class MatchPageCoordinator extends ChangeNotifier {
     }
 
     _disposed = true;
+    MatchQuickConnectionService.instance.removeListener(_handleQuickState);
     _confirmationQueue.clear();
     _pendingConfirmationIds.clear();
 

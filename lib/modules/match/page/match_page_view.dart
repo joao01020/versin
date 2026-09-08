@@ -197,6 +197,7 @@ class MatchPageView extends StatelessWidget {
                               );
                             }
                           : null,
+                      onRefresh: () => coordinator.refreshDiscovery(context),
                       onListenDemo: (userId) {
                         return coordinator.openUserDemo(context, userId);
                       },

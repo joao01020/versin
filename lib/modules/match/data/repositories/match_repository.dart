@@ -9,6 +9,8 @@ import 'package:versin/core/cache/cache_keys.dart';
 import 'package:versin/core/cache/cache_policy.dart';
 import 'package:versin/core/cache/request_deduplicator.dart';
 import 'package:versin/modules/match/controllers/match_controllers.dart';
+import 'package:versin/modules/match/services/match_valid_profile_service.dart';
+import 'package:versin/modules/match/data/repositories/match_discovery_policy.dart';
 import 'package:versin/modules/match/models/match_discovery_mode.dart';
 import 'package:versin/modules/match/models/match_user_entity.dart';
 
@@ -49,25 +51,25 @@ class MatchRepository {
   // CONFIGURAÇÃO
   // ============================================================
 
+  final MatchValidProfileService _validProfiles = MatchValidProfileService.instance;
+
+  Future<List<MatchUserEntity>> _filterValidEntities(
+    List<MatchUserEntity> users,
+  ) async {
+    if (users.isEmpty) return users;
+    final valid = await _validProfiles.validIds(users.map((user) => user.id));
+    return users.where((user) => valid.contains(user.id)).toList();
+  }
+
   static const int _searchLimit = 20;
 
-  static const Duration _onlinePresenceWindow = Duration(
-    seconds: 90,
-  );
+  static const Duration _onlinePresenceWindow = Duration(seconds: 90);
 
   // ============================================================
   // STREAM
   // ============================================================
 
-  StreamSubscription<
-    List<
-      Map<
-        String,
-        dynamic
-      >
-    >
-  >?
-  _profilesSubscription;
+  StreamSubscription<List<Map<String, dynamic>>>? _profilesSubscription;
 
   // ============================================================
   // PESQUISAR USUÁRIOS
@@ -100,13 +102,10 @@ class MatchRepository {
       query: normalizedQuery,
     );
 
-    final cached = await _cache.read(
-      cacheKey,
-      policy: CachePolicy.matchSearch,
-    );
+    final cached = await _cache.read(cacheKey, policy: CachePolicy.matchSearch);
 
     if (cached != null) {
-      final users = _decodeCachedUsers(cached.value);
+      final users = await _filterValidEntities(_decodeCachedUsers(cached.value));
       if (cached.isFresh) return users;
 
       unawaited(
@@ -131,59 +130,66 @@ class MatchRepository {
     required String? currentUserId,
     required String cacheKey,
   }) {
-    return _deduplicator.run<List<MatchUserEntity>>(
-      'remote:$cacheKey',
-      () async {
-        try {
-          final queryBuilder = _supabase
-              .from('profiles')
-              .select('id,username,artist_name,name,primary_role,roles,looking_for_roles,tags,bio,showcase_url,showcase_desc,is_online,last_seen_at')
-              .eq('is_online', true)
-              .gte('last_seen_at', _onlineCutoffIso())
-              .or(
-                'username.ilike.%$normalizedQuery%,'
-                'artist_name.ilike.%$normalizedQuery%,'
-                'name.ilike.%$normalizedQuery%',
-              );
+    return _deduplicator.run<
+      List<MatchUserEntity>
+    >('remote:$cacheKey', () async {
+      try {
+        final queryBuilder = _supabase
+            .from('profiles')
+            .select(
+              'id,username,artist_name,name,primary_role,roles,looking_for_roles,tags,bio,showcase_url,showcase_desc,is_online,last_seen_at',
+            )
+            .eq('is_online', true)
+            .gte('last_seen_at', _onlineCutoffIso())
+            .or(
+              'username.ilike.%$normalizedQuery%,'
+              'artist_name.ilike.%$normalizedQuery%,'
+              'name.ilike.%$normalizedQuery%',
+            );
 
-          final dynamic response;
-          final id = currentUserId?.trim();
-          if (id != null && id.isNotEmpty) {
-            response = await queryBuilder.neq('id', id).limit(_searchLimit);
-          } else {
-            response = await queryBuilder.limit(_searchLimit);
-          }
-
-          final rows = List<Map<String, dynamic>>.from(response as List);
-          final now = DateTime.now().toUtc();
-
-          final users = rows
-              .where((row) => _isProfileReallyOnline(row, now: now))
-              .map(_mapMapToEntity)
-              .where((user) => user.id.isNotEmpty && user.isOnline)
-              .toList();
-
-          users.sort((a, b) {
-            final scoreA = _calculateSearchScore(user: a, query: normalizedQuery);
-            final scoreB = _calculateSearchScore(user: b, query: normalizedQuery);
-            final comparison = scoreB.compareTo(scoreA);
-            if (comparison != 0) return comparison;
-            return a.name.toLowerCase().compareTo(b.name.toLowerCase());
-          });
-
-          await _cache.write(cacheKey, users.map(_encodeMatchUser).toList());
-          return users;
-        } catch (_) {
-          final stale = await _cache.read(
-            cacheKey,
-            policy: CachePolicy.matchSearch,
-            allowStale: true,
-          );
-          if (stale != null) return _decodeCachedUsers(stale.value);
-          rethrow;
+        final dynamic response;
+        final id = currentUserId?.trim();
+        if (id != null && id.isNotEmpty) {
+          response = await queryBuilder.neq('id', id).limit(_searchLimit);
+        } else {
+          response = await queryBuilder.limit(_searchLimit);
         }
-      },
-    );
+
+        final rows = List<Map<String, dynamic>>.from(response as List);
+        final now = DateTime.now().toUtc();
+
+        final validIds = await _validProfiles.validIds(
+          rows.map((row) => row['id']?.toString() ?? ''),
+        );
+        final users = rows
+            .where((row) => validIds.contains(row['id']?.toString()))
+            .where((row) => _isProfileReallyOnline(row, now: now))
+            .map(_mapMapToEntity)
+            .where((user) => user.id.isNotEmpty && user.isOnline)
+            .toList();
+
+        users.sort((a, b) {
+          final scoreA = _calculateSearchScore(user: a, query: normalizedQuery);
+          final scoreB = _calculateSearchScore(user: b, query: normalizedQuery);
+          final comparison = scoreB.compareTo(scoreA);
+          if (comparison != 0) return comparison;
+          return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+        });
+
+        await _cache.write(cacheKey, users.map(_encodeMatchUser).toList());
+        return users;
+      } catch (_) {
+        final stale = await _cache.read(
+          cacheKey,
+          policy: CachePolicy.matchSearch,
+          allowStale: true,
+        );
+        if (stale != null) {
+          return _filterValidEntities(_decodeCachedUsers(stale.value));
+        }
+        rethrow;
+      }
+    });
   }
 
   Map<String, dynamic> _encodeMatchUser(MatchUserEntity user) {
@@ -236,7 +242,8 @@ class MatchRepository {
           bio: map['bio']?.toString() ?? '',
           showcaseMediaUrl: map['showcase_url']?.toString() ?? '',
           showcaseDescription: map['showcase_desc']?.toString() ?? '',
-          distanceKm: double.tryParse(map['distance_km']?.toString() ?? '') ?? 0,
+          distanceKm:
+              double.tryParse(map['distance_km']?.toString() ?? '') ?? 0,
           isOnline: map['is_online'] == true,
           preferredConnection: preferred,
           sessionStartedAt: DateTime.tryParse(
@@ -263,37 +270,27 @@ class MatchRepository {
 
     var score = 0;
 
-    if (normalizedUsername ==
-        query) {
+    if (normalizedUsername == query) {
       score += 100;
     }
 
-    if (normalizedName ==
-        query) {
+    if (normalizedName == query) {
       score += 90;
     }
 
-    if (normalizedUsername.startsWith(
-      query,
-    )) {
+    if (normalizedUsername.startsWith(query)) {
       score += 50;
     }
 
-    if (normalizedName.startsWith(
-      query,
-    )) {
+    if (normalizedName.startsWith(query)) {
       score += 40;
     }
 
-    if (normalizedUsername.contains(
-      query,
-    )) {
+    if (normalizedUsername.contains(query)) {
       score += 20;
     }
 
-    if (normalizedName.contains(
-      query,
-    )) {
+    if (normalizedName.contains(query)) {
       score += 10;
     }
 
@@ -308,24 +305,15 @@ class MatchRepository {
   // NORMALIZAR PESQUISA
   // ============================================================
 
-  String _normalizeSearchQuery(
-    String value,
-  ) {
-    return value.trim().toLowerCase().replaceFirst(
-      RegExp(
-        r'^@+',
-      ),
-      '',
-    );
+  String _normalizeSearchQuery(String value) {
+    return value.trim().toLowerCase().replaceFirst(RegExp(r'^@+'), '');
   }
 
   // ============================================================
   // INICIAR STREAM DE MATCH
   // ============================================================
 
-  void streamCrossRoleMatches(
-    MatchController controller,
-  ) {
+  void streamCrossRoleMatches(MatchController controller) {
     // ==========================================================
     // CANCELAR STREAM ANTIGO
     // ==========================================================
@@ -391,7 +379,9 @@ class MatchRepository {
     //
     // ==========================================================
 
-    if (lookingForRoles.isEmpty) {
+    if (lookingForRoles.isEmpty &&
+        !(controller.discoveryMode == MatchDiscoveryMode.compatible &&
+            currentRoles.isNotEmpty)) {
       debugPrint(
         '[MATCH REPOSITORY] '
         'Nenhuma profissão procurada configurada.',
@@ -408,152 +398,124 @@ class MatchRepository {
     }
 
     // ==========================================================
-    // STREAM DE USUÁRIOS ONLINE
+    // STREAM DE CANDIDATOS
     // ==========================================================
 
-    _profilesSubscription = _supabase
-        .from(
-          'profiles',
-        )
-        .stream(
-          primaryKey: [
-            'id',
-          ],
-        )
-        .eq(
-          'is_online',
-          true,
-        )
-        .listen(
-          (
-            data,
-          ) async {
-            final now = DateTime.now().toUtc();
+    final profilesStream = _supabase.from('profiles').stream(primaryKey: ['id']);
 
-            final activeProfiles = data
-                .where(
-                  (
-                    profile,
-                  ) => _isProfileReallyOnline(
-                    profile,
-                    now: now,
-                  ),
-                )
-                .map(
-                  (
-                    profile,
-                  ) =>
-                      Map<
-                        String,
-                        dynamic
-                      >.from(
-                        profile,
-                      ),
-                )
-                .toList(
-                  growable: false,
-                );
+    // Somente Agora restringe o stream à presença ativa.
+    // Compatíveis e Próximos precisam receber também perfis offline.
+    final stream = MatchDiscoveryPolicy.requiresOnlinePresence(
+      controller.discoveryMode,
+    )
+        ? profilesStream.eq('is_online', true)
+        : profilesStream;
 
-            debugPrint(
-              '[MATCH REALTIME] '
-              '${data.length} perfil(is) recebido(s); '
-              '${activeProfiles.length} com presença ativa.',
-            );
+    _profilesSubscription = stream.listen(
+      (data) async {
+        final now = DateTime.now().toUtc();
 
-            for (final profile in activeProfiles) {
-              debugPrint(
-                '[MATCH REALTIME] '
-                '----------------------------------------',
-              );
+        final activeProfiles = data
+            .where(
+              (profile) => MatchDiscoveryPolicy.allowsPresence(
+                mode: controller.discoveryMode,
+                isOnline: _isProfileReallyOnline(profile, now: now),
+              ),
+            )
+            .map((profile) => Map<String, dynamic>.from(profile))
+            .toList(growable: false);
 
-              debugPrint(
-                '[MATCH REALTIME] '
-                'ID: ${profile['id']}',
-              );
-
-              debugPrint(
-                '[MATCH REALTIME] '
-                'Username: ${profile['username']}',
-              );
-
-              debugPrint(
-                '[MATCH REALTIME] '
-                'Online: ${profile['is_online']}',
-              );
-
-              debugPrint(
-                '[MATCH REALTIME] '
-                'Available now: '
-                '${profile['available_now']}',
-              );
-
-              debugPrint(
-                '[MATCH REALTIME] '
-                'Available until: '
-                '${profile['available_until']}',
-              );
-
-              debugPrint(
-                '[MATCH REALTIME] '
-                'Location enabled: '
-                '${profile['location_enabled']}',
-              );
-
-              debugPrint(
-                '[MATCH REALTIME] '
-                'Latitude: '
-                '${profile['latitude']}',
-              );
-
-              debugPrint(
-                '[MATCH REALTIME] '
-                'Longitude: '
-                '${profile['longitude']}',
-              );
-
-              debugPrint(
-                '[MATCH REALTIME] '
-                'Location updated at: '
-                '${profile['location_updated_at']}',
-              );
-            }
-
-            await _processProfiles(
-              controller: controller,
-              data: activeProfiles,
-            );
-          },
-          onError:
-              (
-                error,
-              ) {
-                debugPrint(
-                  '[MATCH REPOSITORY] '
-                  'Erro no pipeline do Match: '
-                  '$error',
-                );
-
-                controller.clearMatchResults();
-              },
+        debugPrint(
+          '[MATCH REALTIME] '
+          '${data.length} perfil(is) recebido(s); '
+          '${activeProfiles.length} com presença ativa.',
         );
+
+        for (final profile in activeProfiles) {
+          debugPrint(
+            '[MATCH REALTIME] '
+            '----------------------------------------',
+          );
+
+          debugPrint(
+            '[MATCH REALTIME] '
+            'ID: ${profile['id']}',
+          );
+
+          debugPrint(
+            '[MATCH REALTIME] '
+            'Username: ${profile['username']}',
+          );
+
+          debugPrint(
+            '[MATCH REALTIME] '
+            'Online: ${profile['is_online']}',
+          );
+
+          debugPrint(
+            '[MATCH REALTIME] '
+            'Available now: '
+            '${profile['available_now']}',
+          );
+
+          debugPrint(
+            '[MATCH REALTIME] '
+            'Available until: '
+            '${profile['available_until']}',
+          );
+
+          debugPrint(
+            '[MATCH REALTIME] '
+            'Location enabled: '
+            '${profile['location_enabled']}',
+          );
+
+          debugPrint(
+            '[MATCH REALTIME] '
+            'Latitude: '
+            '${profile['latitude']}',
+          );
+
+          debugPrint(
+            '[MATCH REALTIME] '
+            'Longitude: '
+            '${profile['longitude']}',
+          );
+
+          debugPrint(
+            '[MATCH REALTIME] '
+            'Location updated at: '
+            '${profile['location_updated_at']}',
+          );
+        }
+
+        try {
+          await _processProfiles(controller: controller, data: activeProfiles);
+        } catch (error, stackTrace) {
+          debugPrint('[MATCH REPOSITORY] Validação de perfis: $error');
+          debugPrint('$stackTrace');
+          controller.clearMatchResults();
+        }
+      },
+      onError: (error) {
+        debugPrint(
+          '[MATCH REPOSITORY] '
+          'Erro no pipeline do Match: '
+          '$error',
+        );
+
+        controller.clearMatchResults();
+      },
+    );
   }
 
   // ============================================================
   // PROCESSAR PERFIS
   // ============================================================
 
-  Future<
-    void
-  >
-  _processProfiles({
+  Future<void> _processProfiles({
     required MatchController controller,
-    required List<
-      Map<
-        String,
-        dynamic
-      >
-    >
-    data,
+    required List<Map<String, dynamic>> data,
   }) async {
     // ==========================================================
     // ESTADO ATUAL
@@ -573,9 +535,16 @@ class MatchRepository {
     // PERFIS JÁ AVALIADOS
     // ==========================================================
 
-    final excludedUserIds = await _loadExcludedDiscoveryUserIds(
-      currentUserId,
+    // Validação obrigatória também para Compatíveis e Próximos.
+    // Não usamos is_online como prova de existência da conta.
+    final validIds = await _validProfiles.validIds(
+      data.map((profile) => profile['id']?.toString() ?? ''),
     );
+    data = data.where(
+      (profile) => validIds.contains(profile['id']?.toString()),
+    ).toList(growable: false);
+
+    final excludedUserIds = await _loadExcludedDiscoveryUserIds(currentUserId);
 
     // ==========================================================
     // SEM DADOS
@@ -584,7 +553,7 @@ class MatchRepository {
     if (data.isEmpty) {
       debugPrint(
         '[MATCH REPOSITORY] '
-        'Nenhum perfil online recebido.',
+        'Nenhum perfil recebido para o modo atual.',
       );
 
       controller.clearMatchResults();
@@ -596,19 +565,13 @@ class MatchRepository {
     // PERFIL DO PRÓPRIO USUÁRIO
     // ==========================================================
 
-    Map<
-      String,
-      dynamic
-    >?
-    currentProfile;
+    Map<String, dynamic>? currentProfile;
 
-    if (currentUserId !=
-        null) {
+    if (currentUserId != null) {
       for (final profile in data) {
         final profileId = profile['id']?.toString().trim();
 
-        if (profileId ==
-            currentUserId) {
+        if (profileId == currentUserId) {
           currentProfile = profile;
 
           break;
@@ -620,30 +583,18 @@ class MatchRepository {
     // LOCALIZAÇÃO ATUAL
     // ==========================================================
 
-    final currentLocationEnabled =
-        currentProfile?['location_enabled'] ==
-        true;
+    final currentLocationEnabled = currentProfile?['location_enabled'] == true;
 
-    final currentLatitude = _readNullableDouble(
-      currentProfile?['latitude'],
-    );
+    final currentLatitude = _readNullableDouble(currentProfile?['latitude']);
 
-    final currentLongitude = _readNullableDouble(
-      currentProfile?['longitude'],
-    );
+    final currentLongitude = _readNullableDouble(currentProfile?['longitude']);
 
     final hasCurrentLocation =
         currentLocationEnabled &&
-        currentLatitude !=
-            null &&
-        currentLongitude !=
-            null &&
-        _isValidLatitude(
-          currentLatitude,
-        ) &&
-        _isValidLongitude(
-          currentLongitude,
-        );
+        currentLatitude != null &&
+        currentLongitude != null &&
+        _isValidLatitude(currentLatitude) &&
+        _isValidLongitude(currentLongitude);
 
     // ==========================================================
     // LOG DO MODO
@@ -659,8 +610,7 @@ class MatchRepository {
     // NEARBY EXIGE LOCALIZAÇÃO
     // ==========================================================
 
-    if (discoveryMode ==
-        MatchDiscoveryMode.nearby) {
+    if (discoveryMode == MatchDiscoveryMode.nearby) {
       debugPrint(
         '[MATCH NEARBY] '
         'Localização do usuário disponível: '
@@ -690,22 +640,10 @@ class MatchRepository {
     // CANDIDATOS
     // ==========================================================
 
-    final candidates =
-        <
-          Map<
-            String,
-            dynamic
-          >
-        >[];
+    final candidates = <Map<String, dynamic>>[];
 
     for (final rawProfile in data) {
-      final profile =
-          Map<
-            String,
-            dynamic
-          >.from(
-            rawProfile,
-          );
+      final profile = Map<String, dynamic>.from(rawProfile);
 
       // ========================================================
       // ID
@@ -713,9 +651,7 @@ class MatchRepository {
 
       final profileId = profile['id']?.toString().trim();
 
-      if (profileId ==
-              null ||
-          profileId.isEmpty) {
+      if (profileId == null || profileId.isEmpty) {
         debugPrint(
           '[MATCH REPOSITORY] '
           'Perfil ignorado: ID inválido.',
@@ -728,10 +664,7 @@ class MatchRepository {
       // NÃO MOSTRAR A SI MESMO
       // ========================================================
 
-      if (currentUserId !=
-              null &&
-          profileId ==
-              currentUserId) {
+      if (currentUserId != null && profileId == currentUserId) {
         debugPrint(
           '[MATCH REPOSITORY] '
           'Perfil ignorado: próprio usuário '
@@ -745,9 +678,7 @@ class MatchRepository {
       // JÁ AVALIADO
       // ========================================================
 
-      if (excludedUserIds.contains(
-        profileId,
-      )) {
+      if (excludedUserIds.contains(profileId)) {
         debugPrint(
           '[MATCH REPOSITORY] '
           'Perfil $profileId ignorado: '
@@ -758,17 +689,17 @@ class MatchRepository {
       }
 
       // ========================================================
-      // SOMENTE ONLINE REAL
+      // PRESENÇA EXIGIDA SOMENTE EM AGORA
       // ========================================================
 
-      if (!_isProfileReallyOnline(
-        profile,
-        now: now,
+      if (!MatchDiscoveryPolicy.allowsPresence(
+        mode: discoveryMode,
+        isOnline: _isProfileReallyOnline(profile, now: now),
       )) {
         debugPrint(
           '[MATCH REPOSITORY] '
           'Perfil $profileId ignorado: '
-          'sem presença recente.',
+          'sem presença recente no modo Agora.',
         );
 
         continue;
@@ -778,11 +709,7 @@ class MatchRepository {
       // FUNÇÕES DO CANDIDATO
       // ========================================================
 
-      final candidateRoles = MusicRole.fromKeys(
-        _readList(
-          profile['roles'],
-        ),
-      );
+      final candidateRoles = MusicRole.fromKeys(_readList(profile['roles']));
 
       if (candidateRoles.isEmpty) {
         debugPrint(
@@ -818,9 +745,14 @@ class MatchRepository {
       //
       // ========================================================
 
-      final compatible = _hasIntersection(
-        first: lookingForRoles,
-        second: candidateRoles,
+      final compatible = MatchDiscoveryPolicy.matchesRoles(
+        mode: discoveryMode,
+        currentRoles: currentRoles,
+        lookingForRoles: lookingForRoles,
+        candidateRoles: candidateRoles,
+        candidateLookingForRoles: MusicRole.fromKeys(
+          _readList(profile['looking_for_roles']),
+        ),
       );
 
       if (!compatible) {
@@ -855,12 +787,8 @@ class MatchRepository {
       //
       // ========================================================
 
-      if (discoveryMode ==
-          MatchDiscoveryMode.global) {
-        if (!_isProfileAvailableNow(
-          profile,
-          now: now,
-        )) {
+      if (discoveryMode == MatchDiscoveryMode.global) {
+        if (!_isProfileAvailableNow(profile, now: now)) {
           debugPrint(
             '[MATCH AVAILABLE NOW] '
             'Perfil $profileId ignorado: '
@@ -870,9 +798,7 @@ class MatchRepository {
           continue;
         }
 
-        candidates.add(
-          profile,
-        );
+        candidates.add(profile);
 
         continue;
       }
@@ -881,11 +807,8 @@ class MatchRepository {
       // COMPATÍVEIS
       // ========================================================
 
-      if (discoveryMode ==
-          MatchDiscoveryMode.compatible) {
-        candidates.add(
-          profile,
-        );
+      if (discoveryMode == MatchDiscoveryMode.compatible) {
+        candidates.add(profile);
 
         continue;
       }
@@ -894,32 +817,19 @@ class MatchRepository {
       // PRÓXIMOS
       // ========================================================
 
-      if (discoveryMode ==
-          MatchDiscoveryMode.nearby) {
-        final candidateLocationEnabled =
-            profile['location_enabled'] ==
-            true;
+      if (discoveryMode == MatchDiscoveryMode.nearby) {
+        final candidateLocationEnabled = profile['location_enabled'] == true;
 
-        final candidateLatitude = _readNullableDouble(
-          profile['latitude'],
-        );
+        final candidateLatitude = _readNullableDouble(profile['latitude']);
 
-        final candidateLongitude = _readNullableDouble(
-          profile['longitude'],
-        );
+        final candidateLongitude = _readNullableDouble(profile['longitude']);
 
         final hasCandidateLocation =
             candidateLocationEnabled &&
-            candidateLatitude !=
-                null &&
-            candidateLongitude !=
-                null &&
-            _isValidLatitude(
-              candidateLatitude,
-            ) &&
-            _isValidLongitude(
-              candidateLongitude,
-            );
+            candidateLatitude != null &&
+            candidateLongitude != null &&
+            _isValidLatitude(candidateLatitude) &&
+            _isValidLongitude(candidateLongitude);
 
         if (!hasCandidateLocation) {
           debugPrint(
@@ -946,9 +856,7 @@ class MatchRepository {
           '${distanceKm.toStringAsFixed(2)} km.',
         );
 
-        candidates.add(
-          profile,
-        );
+        candidates.add(profile);
       }
     }
 
@@ -994,73 +902,52 @@ class MatchRepository {
       // ========================================================
 
       case MatchDiscoveryMode.compatible:
-        candidates.sort(
-          (
-            a,
-            b,
-          ) {
-            final scoreA = _calculateCompatibilityScore(
-              profile: a,
-              currentRoles: currentRoles,
-              lookingForRoles: lookingForRoles,
-            );
+        candidates.sort((a, b) {
+          final scoreA = _calculateCompatibilityScore(
+            profile: a,
+            currentRoles: currentRoles,
+            lookingForRoles: lookingForRoles,
+          );
 
-            final scoreB = _calculateCompatibilityScore(
-              profile: b,
-              currentRoles: currentRoles,
-              lookingForRoles: lookingForRoles,
-            );
+          final scoreB = _calculateCompatibilityScore(
+            profile: b,
+            currentRoles: currentRoles,
+            lookingForRoles: lookingForRoles,
+          );
 
-            return scoreB.compareTo(
-              scoreA,
-            );
-          },
-        );
+          return scoreB.compareTo(scoreA);
+        });
 
       // ========================================================
       // PRÓXIMOS
       // ========================================================
 
       case MatchDiscoveryMode.nearby:
-        candidates.sort(
-          (
-            a,
-            b,
-          ) {
-            final distanceA = _readDouble(
-              a['distance'],
-            );
+        candidates.sort((a, b) {
+          final distanceA = _readDouble(a['distance']);
 
-            final distanceB = _readDouble(
-              b['distance'],
-            );
+          final distanceB = _readDouble(b['distance']);
 
-            final distanceComparison = distanceA.compareTo(
-              distanceB,
-            );
+          final distanceComparison = distanceA.compareTo(distanceB);
 
-            if (distanceComparison !=
-                0) {
-              return distanceComparison;
-            }
+          if (distanceComparison != 0) {
+            return distanceComparison;
+          }
 
-            final scoreA = _calculateCompatibilityScore(
-              profile: a,
-              currentRoles: currentRoles,
-              lookingForRoles: lookingForRoles,
-            );
+          final scoreA = _calculateCompatibilityScore(
+            profile: a,
+            currentRoles: currentRoles,
+            lookingForRoles: lookingForRoles,
+          );
 
-            final scoreB = _calculateCompatibilityScore(
-              profile: b,
-              currentRoles: currentRoles,
-              lookingForRoles: lookingForRoles,
-            );
+          final scoreB = _calculateCompatibilityScore(
+            profile: b,
+            currentRoles: currentRoles,
+            lookingForRoles: lookingForRoles,
+          );
 
-            return scoreB.compareTo(
-              scoreA,
-            );
-          },
-        );
+          return scoreB.compareTo(scoreA);
+        });
 
       // ========================================================
       // DISPONÍVEIS AGORA
@@ -1078,56 +965,38 @@ class MatchRepository {
       // ========================================================
 
       case MatchDiscoveryMode.global:
-        candidates.sort(
-          (
-            a,
-            b,
-          ) {
-            final scoreA = _calculateCompatibilityScore(
-              profile: a,
-              currentRoles: currentRoles,
-              lookingForRoles: lookingForRoles,
-            );
+        candidates.sort((a, b) {
+          final scoreA = _calculateCompatibilityScore(
+            profile: a,
+            currentRoles: currentRoles,
+            lookingForRoles: lookingForRoles,
+          );
 
-            final scoreB = _calculateCompatibilityScore(
-              profile: b,
-              currentRoles: currentRoles,
-              lookingForRoles: lookingForRoles,
-            );
+          final scoreB = _calculateCompatibilityScore(
+            profile: b,
+            currentRoles: currentRoles,
+            lookingForRoles: lookingForRoles,
+          );
 
-            final scoreComparison = scoreB.compareTo(
-              scoreA,
-            );
+          final scoreComparison = scoreB.compareTo(scoreA);
 
-            if (scoreComparison !=
-                0) {
-              return scoreComparison;
-            }
+          if (scoreComparison != 0) {
+            return scoreComparison;
+          }
 
-            final nameA = _readDisplayName(
-              a,
-            ).toLowerCase();
+          final nameA = _readDisplayName(a).toLowerCase();
 
-            final nameB = _readDisplayName(
-              b,
-            ).toLowerCase();
+          final nameB = _readDisplayName(b).toLowerCase();
 
-            return nameA.compareTo(
-              nameB,
-            );
-          },
-        );
+          return nameA.compareTo(nameB);
+        });
     }
 
     // ==========================================================
     // CONVERTER
     // ==========================================================
 
-    final users = candidates
-        .map(
-          _mapMapToEntity,
-        )
-        .toList();
+    final users = candidates.map(_mapMapToEntity).toList();
 
     if (users.isEmpty) {
       controller.clearMatchResults();
@@ -1139,21 +1008,13 @@ class MatchRepository {
     // DISCOVERY
     // ==========================================================
 
-    controller.setDiscoveryUser(
-      users.first,
-    );
+    controller.setDiscoveryUser(users.first);
 
     // ==========================================================
     // RECOMENDADOS
     // ==========================================================
 
-    controller.updateRecommendedUsers(
-      users
-          .skip(
-            1,
-          )
-          .toList(),
-    );
+    controller.updateRecommendedUsers(users.skip(1).toList());
 
     // ==========================================================
     // LOG FINAL
@@ -1166,9 +1027,7 @@ class MatchRepository {
     );
 
     for (final user in users) {
-      final distanceText =
-          discoveryMode ==
-              MatchDiscoveryMode.nearby
+      final distanceText = discoveryMode == MatchDiscoveryMode.nearby
           ? ' | distância: '
                 '${user.distanceKm.toStringAsFixed(2)} km'
           : '';
@@ -1194,28 +1053,16 @@ class MatchRepository {
   // CARREGAR PERFIS JÁ AVALIADOS
   // ============================================================
 
-  Future<
-    Set<
-      String
-    >
-  >
-  _loadExcludedDiscoveryUserIds(
+  Future<Set<String>> _loadExcludedDiscoveryUserIds(
     String? currentUserId,
   ) async {
     final normalizedUserId = currentUserId?.trim();
 
-    if (normalizedUserId ==
-            null ||
-        normalizedUserId.isEmpty) {
-      return <
-        String
-      >{};
+    if (normalizedUserId == null || normalizedUserId.isEmpty) {
+      return <String>{};
     }
 
-    final excluded =
-        <
-          String
-        >{};
+    final excluded = <String>{};
 
     // ==========================================================
     // LIKES
@@ -1223,54 +1070,33 @@ class MatchRepository {
 
     try {
       final likes = await _supabase
-          .from(
-            'favorites',
-          )
-          .select(
-            'target_user_id',
-          )
-          .eq(
-            'sender_id',
-            normalizedUserId,
-          );
+          .from('favorites')
+          .select('target_user_id')
+          .eq('sender_id', normalizedUserId);
 
       for (final row in likes) {
         final targetId = row['target_user_id']?.toString().trim();
 
-        if (targetId !=
-                null &&
-            targetId.isNotEmpty) {
-          excluded.add(
-            targetId,
-          );
+        if (targetId != null && targetId.isNotEmpty) {
+          excluded.add(targetId);
         }
       }
-    } on PostgrestException catch (
-      error,
-      stackTrace
-    ) {
+    } on PostgrestException catch (error, stackTrace) {
       debugPrint(
         '[MATCH REPOSITORY] '
         'Erro ao carregar likes já enviados: '
         '${error.message}',
       );
 
-      debugPrint(
-        '$stackTrace',
-      );
-    } catch (
-      error,
-      stackTrace
-    ) {
+      debugPrint('$stackTrace');
+    } catch (error, stackTrace) {
       debugPrint(
         '[MATCH REPOSITORY] '
         'Erro inesperado ao carregar likes: '
         '$error',
       );
 
-      debugPrint(
-        '$stackTrace',
-      );
+      debugPrint('$stackTrace');
     }
 
     // ==========================================================
@@ -1279,54 +1105,33 @@ class MatchRepository {
 
     try {
       final passes = await _supabase
-          .from(
-            'match_passes',
-          )
-          .select(
-            'target_user_id',
-          )
-          .eq(
-            'sender_id',
-            normalizedUserId,
-          );
+          .from('match_passes')
+          .select('target_user_id')
+          .eq('sender_id', normalizedUserId);
 
       for (final row in passes) {
         final targetId = row['target_user_id']?.toString().trim();
 
-        if (targetId !=
-                null &&
-            targetId.isNotEmpty) {
-          excluded.add(
-            targetId,
-          );
+        if (targetId != null && targetId.isNotEmpty) {
+          excluded.add(targetId);
         }
       }
-    } on PostgrestException catch (
-      error,
-      stackTrace
-    ) {
+    } on PostgrestException catch (error, stackTrace) {
       debugPrint(
         '[MATCH REPOSITORY] '
         'Erro ao carregar passes já enviados: '
         '${error.message}',
       );
 
-      debugPrint(
-        '$stackTrace',
-      );
-    } catch (
-      error,
-      stackTrace
-    ) {
+      debugPrint('$stackTrace');
+    } catch (error, stackTrace) {
       debugPrint(
         '[MATCH REPOSITORY] '
         'Erro inesperado ao carregar passes: '
         '$error',
       );
 
-      debugPrint(
-        '$stackTrace',
-      );
+      debugPrint('$stackTrace');
     }
 
     debugPrint(
@@ -1350,118 +1155,63 @@ class MatchRepository {
   }) {
     const earthRadiusKm = 6371.0088;
 
-    final latitudeDelta = _degreesToRadians(
-      latitudeB -
-          latitudeA,
-    );
+    final latitudeDelta = _degreesToRadians(latitudeB - latitudeA);
 
-    final longitudeDelta = _degreesToRadians(
-      longitudeB -
-          longitudeA,
-    );
+    final longitudeDelta = _degreesToRadians(longitudeB - longitudeA);
 
-    final latitudeARadians = _degreesToRadians(
-      latitudeA,
-    );
+    final latitudeARadians = _degreesToRadians(latitudeA);
 
-    final latitudeBRadians = _degreesToRadians(
-      latitudeB,
-    );
+    final latitudeBRadians = _degreesToRadians(latitudeB);
 
     final haversine =
-        math.pow(
-          math.sin(
-            latitudeDelta /
-                2,
-          ),
-          2,
-        ) +
-        math.cos(
-              latitudeARadians,
-            ) *
-            math.cos(
-              latitudeBRadians,
-            ) *
-            math.pow(
-              math.sin(
-                longitudeDelta /
-                    2,
-              ),
-              2,
-            );
+        math.pow(math.sin(latitudeDelta / 2), 2) +
+        math.cos(latitudeARadians) *
+            math.cos(latitudeBRadians) *
+            math.pow(math.sin(longitudeDelta / 2), 2);
 
-    final normalizedHaversine = haversine.toDouble().clamp(
-      0.0,
-      1.0,
-    );
+    final normalizedHaversine = haversine.toDouble().clamp(0.0, 1.0);
 
     final centralAngle =
         2 *
         math.atan2(
-          math.sqrt(
-            normalizedHaversine,
-          ),
-          math.sqrt(
-            1 -
-                normalizedHaversine,
-          ),
+          math.sqrt(normalizedHaversine),
+          math.sqrt(1 - normalizedHaversine),
         );
 
-    return earthRadiusKm *
-        centralAngle;
+    return earthRadiusKm * centralAngle;
   }
 
   // ============================================================
   // GRAUS → RADIANOS
   // ============================================================
 
-  double _degreesToRadians(
-    double degrees,
-  ) {
-    return degrees *
-        math.pi /
-        180.0;
+  double _degreesToRadians(double degrees) {
+    return degrees * math.pi / 180.0;
   }
 
   // ============================================================
   // COORDENADAS VÁLIDAS
   // ============================================================
 
-  bool _isValidLatitude(
-    double value,
-  ) {
-    return value >=
-            -90.0 &&
-        value <=
-            90.0;
+  bool _isValidLatitude(double value) {
+    return value >= -90.0 && value <= 90.0;
   }
 
-  bool _isValidLongitude(
-    double value,
-  ) {
-    return value >=
-            -180.0 &&
-        value <=
-            180.0;
+  bool _isValidLongitude(double value) {
+    return value >= -180.0 && value <= 180.0;
   }
 
   // ============================================================
   // DOUBLE OPCIONAL
   // ============================================================
 
-  double? _readNullableDouble(
-    dynamic value,
-  ) {
-    if (value
-        is num) {
+  double? _readNullableDouble(dynamic value) {
+    if (value is num) {
       return value.toDouble();
     }
 
-    if (value
-        is String) {
-      return double.tryParse(
-        value.trim(),
-      );
+    if (value is String) {
+      return double.tryParse(value.trim());
     }
 
     return null;
@@ -1472,30 +1222,14 @@ class MatchRepository {
   // ============================================================
 
   int _calculateCompatibilityScore({
-    required Map<
-      String,
-      dynamic
-    >
-    profile,
-    required Set<
-      MusicRole
-    >
-    currentRoles,
-    required Set<
-      MusicRole
-    >
-    lookingForRoles,
+    required Map<String, dynamic> profile,
+    required Set<MusicRole> currentRoles,
+    required Set<MusicRole> lookingForRoles,
   }) {
-    final candidateRoles = MusicRole.fromKeys(
-      _readList(
-        profile['roles'],
-      ),
-    );
+    final candidateRoles = MusicRole.fromKeys(_readList(profile['roles']));
 
     final candidateLookingForRoles = MusicRole.fromKeys(
-      _readList(
-        profile['looking_for_roles'],
-      ),
+      _readList(profile['looking_for_roles']),
     );
 
     final candidatePrimaryRole = MusicRole.fromKey(
@@ -1509,9 +1243,7 @@ class MatchRepository {
     // ==========================================================
 
     for (final role in candidateRoles) {
-      if (lookingForRoles.contains(
-        role,
-      )) {
+      if (lookingForRoles.contains(role)) {
         score += 10;
       }
     }
@@ -1520,11 +1252,8 @@ class MatchRepository {
     // PRINCIPAL É O QUE EU PROCURO
     // ==========================================================
 
-    if (candidatePrimaryRole !=
-            null &&
-        lookingForRoles.contains(
-          candidatePrimaryRole,
-        )) {
+    if (candidatePrimaryRole != null &&
+        lookingForRoles.contains(candidatePrimaryRole)) {
       score += 5;
     }
 
@@ -1545,9 +1274,7 @@ class MatchRepository {
     // ONLINE
     // ==========================================================
 
-    if (_isProfileReallyOnline(
-      profile,
-    )) {
+    if (_isProfileReallyOnline(profile)) {
       score += 1;
     }
 
@@ -1559,21 +1286,13 @@ class MatchRepository {
   // ============================================================
 
   bool _hasIntersection({
-    required Iterable<
-      MusicRole
-    >
-    first,
-    required Iterable<
-      MusicRole
-    >
-    second,
+    required Iterable<MusicRole> first,
+    required Iterable<MusicRole> second,
   }) {
     final secondSet = second.toSet();
 
     for (final role in first) {
-      if (secondSet.contains(
-        role,
-      )) {
+      if (secondSet.contains(role)) {
         return true;
       }
     }
@@ -1596,42 +1315,24 @@ class MatchRepository {
   String _onlineCutoffIso() {
     return DateTime.now()
         .toUtc()
-        .subtract(
-          _onlinePresenceWindow,
-        )
+        .subtract(_onlinePresenceWindow)
         .toIso8601String();
   }
 
-  bool _isProfileReallyOnline(
-    Map<
-      String,
-      dynamic
-    >
-    profile, {
-    DateTime? now,
-  }) {
-    if (profile['is_online'] !=
-        true) {
+  bool _isProfileReallyOnline(Map<String, dynamic> profile, {DateTime? now}) {
+    if (profile['is_online'] != true) {
       return false;
     }
 
-    final lastSeenAt = _readNullableDateTime(
-      profile['last_seen_at'],
-    );
+    final lastSeenAt = _readNullableDateTime(profile['last_seen_at']);
 
-    if (lastSeenAt ==
-        null) {
+    if (lastSeenAt == null) {
       return false;
     }
 
-    final reference =
-        (now ??
-                DateTime.now())
-            .toUtc();
+    final reference = (now ?? DateTime.now()).toUtc();
 
-    final difference = reference.difference(
-      lastSeenAt,
-    );
+    final difference = reference.difference(lastSeenAt);
 
     // Pequena tolerância para relógio do servidor/cliente.
 
@@ -1639,8 +1340,7 @@ class MatchRepository {
       return true;
     }
 
-    return difference <=
-        _onlinePresenceWindow;
+    return difference <= _onlinePresenceWindow;
   }
 
   // ============================================================
@@ -1661,52 +1361,32 @@ class MatchRepository {
   //
   // ============================================================
 
-  bool _isProfileAvailableNow(
-    Map<
-      String,
-      dynamic
-    >
-    profile, {
-    DateTime? now,
-  }) {
-    if (profile['available_now'] !=
-        true) {
+  bool _isProfileAvailableNow(Map<String, dynamic> profile, {DateTime? now}) {
+    if (profile['available_now'] != true) {
       return false;
     }
 
-    final availableUntil = _readNullableDateTime(
-      profile['available_until'],
-    );
+    final availableUntil = _readNullableDateTime(profile['available_until']);
 
-    if (availableUntil ==
-        null) {
+    if (availableUntil == null) {
       return false;
     }
 
-    final reference =
-        (now ??
-                DateTime.now())
-            .toUtc();
+    final reference = (now ?? DateTime.now()).toUtc();
 
-    return availableUntil.isAfter(
-      reference,
-    );
+    return availableUntil.isAfter(reference);
   }
 
   // ============================================================
   // DATETIME OPCIONAL
   // ============================================================
 
-  DateTime? _readNullableDateTime(
-    dynamic value,
-  ) {
-    if (value ==
-        null) {
+  DateTime? _readNullableDateTime(dynamic value) {
+    if (value == null) {
       return null;
     }
 
-    if (value
-        is DateTime) {
+    if (value is DateTime) {
       return value.toUtc();
     }
 
@@ -1716,66 +1396,33 @@ class MatchRepository {
       return null;
     }
 
-    return DateTime.tryParse(
-      normalized,
-    )?.toUtc();
+    return DateTime.tryParse(normalized)?.toUtc();
   }
 
   // ============================================================
   // MAPEAR SUPABASE → ENTITY
   // ============================================================
 
-  MatchUserEntity _mapMapToEntity(
-    Map<
-      String,
-      dynamic
-    >
-    map,
-  ) {
-    final username = _readUsername(
-      map,
-    );
+  MatchUserEntity _mapMapToEntity(Map<String, dynamic> map) {
+    final username = _readUsername(map);
 
-    final displayName = _readDisplayName(
-      map,
-    );
+    final displayName = _readDisplayName(map);
 
-    final primaryRole = MusicRole.fromKey(
-      map['primary_role']?.toString(),
-    );
+    final primaryRole = MusicRole.fromKey(map['primary_role']?.toString());
 
-    final roles = MusicRole.fromKeys(
-      _readList(
-        map['roles'],
-      ),
-    );
+    final roles = MusicRole.fromKeys(_readList(map['roles']));
 
     final lookingForRoles = MusicRole.fromKeys(
-      _readList(
-        map['looking_for_roles'],
-      ),
+      _readList(map['looking_for_roles']),
     );
 
-    final tags =
-        _readList(
-              map['tags'],
-            )
-            .map(
-              (
-                item,
-              ) => item.toString().trim(),
-            )
-            .where(
-              (
-                item,
-              ) => item.isNotEmpty,
-            )
-            .toList();
+    final tags = _readList(map['tags'])
+        .map((item) => item.toString().trim())
+        .where((item) => item.isNotEmpty)
+        .toList();
 
     return MatchUserEntity(
-      id:
-          map['id']?.toString().trim() ??
-          '',
+      id: map['id']?.toString().trim() ?? '',
 
       username: username,
 
@@ -1789,25 +1436,15 @@ class MatchRepository {
 
       tags: tags,
 
-      bio:
-          map['bio']?.toString().trim() ??
-          '',
+      bio: map['bio']?.toString().trim() ?? '',
 
-      showcaseMediaUrl:
-          map['showcase_url']?.toString().trim() ??
-          '',
+      showcaseMediaUrl: map['showcase_url']?.toString().trim() ?? '',
 
-      showcaseDescription:
-          map['showcase_desc']?.toString().trim() ??
-          '',
+      showcaseDescription: map['showcase_desc']?.toString().trim() ?? '',
 
-      distanceKm: _readDouble(
-        map['distance'],
-      ),
+      distanceKm: _readDouble(map['distance']),
 
-      isOnline: _isProfileReallyOnline(
-        map,
-      ),
+      isOnline: _isProfileReallyOnline(map),
     );
   }
 
@@ -1815,59 +1452,34 @@ class MatchRepository {
   // USERNAME
   // ============================================================
 
-  String _readUsername(
-    Map<
-      String,
-      dynamic
-    >
-    map,
-  ) {
+  String _readUsername(Map<String, dynamic> map) {
     final username = map['username']?.toString().trim();
 
-    if (username ==
-            null ||
-        username.isEmpty) {
+    if (username == null || username.isEmpty) {
       return '';
     }
 
-    return username.replaceFirst(
-      RegExp(
-        r'^@+',
-      ),
-      '',
-    );
+    return username.replaceFirst(RegExp(r'^@+'), '');
   }
 
   // ============================================================
   // NOME PARA EXIBIÇÃO
   // ============================================================
 
-  String _readDisplayName(
-    Map<
-      String,
-      dynamic
-    >
-    map,
-  ) {
+  String _readDisplayName(Map<String, dynamic> map) {
     final artistName = map['artist_name']?.toString().trim();
 
-    if (artistName !=
-            null &&
-        artistName.isNotEmpty) {
+    if (artistName != null && artistName.isNotEmpty) {
       return artistName;
     }
 
     final name = map['name']?.toString().trim();
 
-    if (name !=
-            null &&
-        name.isNotEmpty) {
+    if (name != null && name.isNotEmpty) {
       return name;
     }
 
-    final username = _readUsername(
-      map,
-    );
+    final username = _readUsername(map);
 
     if (username.isNotEmpty) {
       return username;
@@ -1880,19 +1492,12 @@ class MatchRepository {
   // LIST
   // ============================================================
 
-  Iterable<
-    dynamic
-  >
-  _readList(
-    dynamic value,
-  ) {
-    if (value ==
-        null) {
+  Iterable<dynamic> _readList(dynamic value) {
+    if (value == null) {
       return const [];
     }
 
-    if (value
-        is Iterable) {
+    if (value is Iterable) {
       return value;
     }
 
@@ -1903,20 +1508,13 @@ class MatchRepository {
   // DOUBLE
   // ============================================================
 
-  double _readDouble(
-    dynamic value,
-  ) {
-    if (value
-        is num) {
+  double _readDouble(dynamic value) {
+    if (value is num) {
       return value.toDouble();
     }
 
-    if (value
-        is String) {
-      return double.tryParse(
-            value,
-          ) ??
-          0.0;
+    if (value is String) {
+      return double.tryParse(value) ?? 0.0;
     }
 
     return 0.0;
@@ -1926,10 +1524,7 @@ class MatchRepository {
   // PARAR STREAM
   // ============================================================
 
-  Future<
-    void
-  >
-  stopStreaming() async {
+  Future<void> stopStreaming() async {
     await _profilesSubscription?.cancel();
 
     _profilesSubscription = null;
@@ -1939,10 +1534,7 @@ class MatchRepository {
   // DISPOSE
   // ============================================================
 
-  Future<
-    void
-  >
-  dispose() async {
+  Future<void> dispose() async {
     await stopStreaming();
   }
 }

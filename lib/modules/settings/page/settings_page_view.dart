@@ -5,6 +5,7 @@
 // quebrar rotas existentes.
 
 import 'package:flutter/material.dart';
+import 'package:versin/core/version/app_version_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:versin/app/locator.dart';
 import 'package:versin/features/rhymes/presentation/controller/rhymes_controller.dart';
@@ -23,18 +24,39 @@ import 'package:versin/modules/profile/public_profile/views/public_profile_page.
 import 'package:versin/modules/settings/widgets/settings_tile.dart';
 import 'package:versin/modules/settings/views/private_api_settings_page.dart';
 
-class SettingsPageView extends StatefulWidget {
-  const SettingsPageView({super.key});
+class SettingsPageView
+    extends
+        StatefulWidget {
+  const SettingsPageView({
+    super.key,
+  });
 
   @override
-  State<SettingsPageView> createState() => _SettingsPageViewState();
+  State<
+    SettingsPageView
+  >
+  createState() => _SettingsPageViewState();
 }
 
-class _SettingsPageViewState extends State<SettingsPageView> {
-  final RhymesController _rhymesController = sl<RhymesController>();
+class _SettingsPageViewState
+    extends
+        State<
+          SettingsPageView
+        > {
+  final RhymesController _rhymesController =
+      sl<
+        RhymesController
+      >();
+  late final Future<
+    String
+  >
+  _versionLabel;
   final AuthRepository _authRepository = AuthRepositoryImpl();
 
-  final DashboardController _dashboardController = sl<DashboardController>();
+  final DashboardController _dashboardController =
+      sl<
+        DashboardController
+      >();
 
   // ============================================================
   // PUBLIC PROFILE
@@ -43,10 +65,17 @@ class _SettingsPageViewState extends State<SettingsPageView> {
   late final PublicProfileController _publicProfileController;
 
   bool _isLoggingOut = false;
+  bool _isOpeningPublicProfile = false;
 
-  final Color primaryPurple = const Color(0xFF6A1B9A);
-  final Color accentNeon = const Color(0xFFE040FB);
-  final Color deepBg = const Color(0xFF0D0B1F);
+  final Color primaryPurple = const Color(
+    0xFF6A1B9A,
+  );
+  final Color accentNeon = const Color(
+    0xFFE040FB,
+  );
+  final Color deepBg = const Color(
+    0xFF0D0B1F,
+  );
 
   bool _syncCloud = true;
   bool _autoSave = true;
@@ -62,6 +91,7 @@ class _SettingsPageViewState extends State<SettingsPageView> {
   @override
   void initState() {
     super.initState();
+    _versionLabel = AppVersionService.instance.displayVersion;
 
     _publicProfileController = PublicProfileController(
       repository: PublicProfileRepositoryImpl(),
@@ -79,18 +109,29 @@ class _SettingsPageViewState extends State<SettingsPageView> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(
+    BuildContext context,
+  ) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0D0B1F),
+      backgroundColor: const Color(
+        0xFF0D0B1F,
+      ),
       body: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+        padding: const EdgeInsets.symmetric(
+          horizontal: 20,
+          vertical: 20,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 10),
+            const SizedBox(
+              height: 10,
+            ),
 
-            _buildSectionTitle("Perfil"),
+            _buildSectionTitle(
+              "Perfil",
+            ),
             _buildSettingsContainer(
               child: Column(
                 children: [
@@ -102,9 +143,14 @@ class _SettingsPageViewState extends State<SettingsPageView> {
                     title: "Informações da Conta",
                     subtitle: "E-mail, username, nome artístico e avatar",
                     onTap: () {
-                      Navigator.of(context).push(
+                      Navigator.of(
+                        context,
+                      ).push(
                         MaterialPageRoute(
-                          builder: (_) => const AccountInformationPage(),
+                          builder:
+                              (
+                                _,
+                              ) => const AccountInformationPage(),
                         ),
                       );
                     },
@@ -132,10 +178,14 @@ class _SettingsPageViewState extends State<SettingsPageView> {
                     title: "Perfil Profissional",
                     subtitle: "Funções, habilidades e preferências do Conectar",
                     onTap: () {
-                      Navigator.of(context).push(
+                      Navigator.of(
+                        context,
+                      ).push(
                         MaterialPageRoute(
-                          builder: (_) =>
-                              const ProfessionalProfileSettingsPage(),
+                          builder:
+                              (
+                                _,
+                              ) => const ProfessionalProfileSettingsPage(),
                         ),
                       );
                     },
@@ -144,63 +194,96 @@ class _SettingsPageViewState extends State<SettingsPageView> {
               ),
             ),
 
-            const SizedBox(height: 24),
+            const SizedBox(
+              height: 24,
+            ),
 
-            _buildSectionTitle("Conta & Privacidade"),
+            _buildSectionTitle(
+              "Conta & Privacidade",
+            ),
             _buildSettingsContainer(
               child: SettingsTile(
                 icon: Icons.admin_panel_settings_outlined,
                 title: "Conta & Privacidade",
                 subtitle: "Senha, dados pessoais e exclusão da conta",
                 onTap: () {
-                  Navigator.of(context).push(
+                  Navigator.of(
+                    context,
+                  ).push(
                     MaterialPageRoute(
-                      builder: (_) => const AccountPrivacyPage(),
+                      builder:
+                          (
+                            _,
+                          ) => const AccountPrivacyPage(),
                     ),
                   );
                 },
               ),
             ),
 
-            const SizedBox(height: 24),
+            const SizedBox(
+              height: 24,
+            ),
 
-            _buildSectionTitle("IA mensal"),
+            _buildSectionTitle(
+              "IA mensal",
+            ),
 
             AnimatedBuilder(
               animation: _rhymesController,
-              builder: (context, _) {
-                return _buildAiQuotaCard();
-              },
+              builder:
+                  (
+                    context,
+                    _,
+                  ) {
+                    return _buildAiQuotaCard();
+                  },
             ),
 
-            const SizedBox(height: 24),
+            const SizedBox(
+              height: 24,
+            ),
 
-            _buildSectionTitle("Preferências do Sistema"),
+            _buildSectionTitle(
+              "Preferências do Sistema",
+            ),
             _buildSettingsContainer(
               child: Column(
                 children: [
                   _buildSwitchTile(
                     title: "Sincronização",
-                    subtitle:
-                        "Manter banco de dados local e nuvem em tempo real",
+                    subtitle: "Manter banco de dados local e nuvem em tempo real",
                     value: _syncCloud,
-                    onChanged: (val) => setState(() => _syncCloud = val),
+                    onChanged:
+                        (
+                          val,
+                        ) => setState(
+                          () => _syncCloud = val,
+                        ),
                   ),
                   _buildDivider(),
                   _buildSwitchTile(
                     title: "Auto-Salvar Rascunhos",
-                    subtitle:
-                        "Salvar rimas e composições automaticamente ao digitar",
+                    subtitle: "Salvar rimas e composições automaticamente ao digitar",
                     value: _autoSave,
-                    onChanged: (val) => setState(() => _autoSave = val),
+                    onChanged:
+                        (
+                          val,
+                        ) => setState(
+                          () => _autoSave = val,
+                        ),
                   ),
                 ],
               ),
             ),
 
-            const SizedBox(height: 24),
+            const SizedBox(
+              height: 24,
+            ),
 
-            _buildSectionTitle("Integrações & Hardware"),
+            _buildSectionTitle(
+              "Integrações & Hardware",
+            ),
             _buildSettingsContainer(
               child: Column(
                 children: [
@@ -213,13 +296,21 @@ class _SettingsPageViewState extends State<SettingsPageView> {
                   _buildDivider(),
 
                   Theme(
-                    data: Theme.of(
-                      context,
-                    ).copyWith(dividerColor: Colors.transparent),
+                    data:
+                        Theme.of(
+                          context,
+                        ).copyWith(
+                          dividerColor: Colors.transparent,
+                        ),
                     child: ExpansionTile(
-                      onExpansionChanged: (expanded) {
-                        setState(() => _isApiExpanded = expanded);
-                      },
+                      onExpansionChanged:
+                          (
+                            expanded,
+                          ) {
+                            setState(
+                              () => _isApiExpanded = expanded,
+                            );
+                          },
                       leading: Icon(
                         Icons.vpn_key_outlined,
                         color: accentNeon,
@@ -227,11 +318,16 @@ class _SettingsPageViewState extends State<SettingsPageView> {
                       ),
                       title: const Text(
                         "Configurar API Privada",
-                        style: TextStyle(color: Colors.white),
+                        style: TextStyle(
+                          color: Colors.white,
+                        ),
                       ),
                       subtitle: const Text(
                         "Gerenciar credenciais e chaves externas de IA/Serviços",
-                        style: TextStyle(color: Colors.white54, fontSize: 12),
+                        style: TextStyle(
+                          color: Colors.white54,
+                          fontSize: 12,
+                        ),
                       ),
                       trailing: Icon(
                         _isApiExpanded
@@ -252,25 +348,37 @@ class _SettingsPageViewState extends State<SettingsPageView> {
                             children: [
                               Container(
                                 width: double.infinity,
-                                padding: const EdgeInsets.all(12),
+                                padding: const EdgeInsets.all(
+                                  12,
+                                ),
                                 decoration: BoxDecoration(
-                                  color: Colors.black.withValues(alpha: 0.3),
-                                  borderRadius: BorderRadius.circular(10),
+                                  color: Colors.black.withValues(
+                                    alpha: 0.3,
+                                  ),
+                                  borderRadius: BorderRadius.circular(
+                                    10,
+                                  ),
                                   border: Border.all(
-                                    color: Colors.white.withValues(alpha: 0.02),
+                                    color: Colors.white.withValues(
+                                      alpha: 0.02,
+                                    ),
                                   ),
                                 ),
                                 child: Text(
                                   "Esta opção opcional concede autonomia para vincular sua própria chave de API ao ecossistema Versin. "
                                   "Recomendado para contornar limitações padrão de cota de requisições ou para aplicar modelos neurais customizados dedicados.",
                                   style: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.5),
+                                    color: Colors.white.withValues(
+                                      alpha: 0.5,
+                                    ),
                                     fontSize: 12,
                                     height: 1.4,
                                   ),
                                 ),
                               ),
-                              const SizedBox(height: 14),
+                              const SizedBox(
+                                height: 14,
+                              ),
                               TextField(
                                 controller: _apiKeyController,
                                 obscureText: _obscureApiKey,
@@ -293,7 +401,9 @@ class _SettingsPageViewState extends State<SettingsPageView> {
                                     vertical: 12,
                                   ),
                                   enabledBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
+                                    borderRadius: BorderRadius.circular(
+                                      12,
+                                    ),
                                     borderSide: BorderSide(
                                       color: Colors.white.withValues(
                                         alpha: 0.05,
@@ -301,9 +411,13 @@ class _SettingsPageViewState extends State<SettingsPageView> {
                                     ),
                                   ),
                                   focusedBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
+                                    borderRadius: BorderRadius.circular(
+                                      12,
+                                    ),
                                     borderSide: BorderSide(
-                                      color: accentNeon.withValues(alpha: 0.3),
+                                      color: accentNeon.withValues(
+                                        alpha: 0.3,
+                                      ),
                                     ),
                                   ),
                                   suffixIcon: IconButton(
@@ -332,36 +446,49 @@ class _SettingsPageViewState extends State<SettingsPageView> {
               ),
             ),
 
-            const SizedBox(height: 24),
+            const SizedBox(
+              height: 24,
+            ),
 
-            _buildSectionTitle("Sobre & Legal"),
+            _buildSectionTitle(
+              "Sobre & Legal",
+            ),
             _buildSettingsContainer(
               child: SettingsTile(
                 icon: Icons.info_outline_rounded,
                 title: "Sobre & Legal",
-                subtitle:
-                    "Privacidade, termos, licenças, versão, segurança e créditos",
+                subtitle: "Privacidade, termos, licenças, versão, segurança e créditos",
                 onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => const LegalCenterPage(),
+                  Navigator.of(
+                    context,
+                  ).push(
+                    MaterialPageRoute<
+                      void
+                    >(
+                      builder:
+                          (
+                            _,
+                          ) => const LegalCenterPage(),
                     ),
                   );
                 },
               ),
             ),
 
-            const SizedBox(height: 24),
+            const SizedBox(
+              height: 24,
+            ),
 
-            _buildSectionTitle("Segurança & Criptografia"),
+            _buildSectionTitle(
+              "Segurança & Criptografia",
+            ),
             _buildSettingsContainer(
               child: Column(
                 children: [
                   SettingsTile(
                     icon: Icons.vpn_key_outlined,
                     title: "Gerenciar Par de Chaves",
-                    subtitle:
-                        "Backup e rotação das chaves públicas e privadas da rede",
+                    subtitle: "Backup e rotação das chaves públicas e privadas da rede",
                     iconColor: Colors.white60,
                     iconBackgroundColor: Colors.white10,
                     onTap: () {},
@@ -384,7 +511,9 @@ class _SettingsPageViewState extends State<SettingsPageView> {
                             size: 22,
                           ),
                     title: Text(
-                      _isLoggingOut ? "Saindo..." : "Sair da Conta",
+                      _isLoggingOut
+                          ? "Saindo..."
+                          : "Sair da Conta",
                       style: const TextStyle(
                         color: Colors.redAccent,
                         fontWeight: FontWeight.bold,
@@ -392,27 +521,53 @@ class _SettingsPageViewState extends State<SettingsPageView> {
                     ),
                     subtitle: const Text(
                       "Encerrar esta sessão do Versin",
-                      style: TextStyle(color: Colors.white38, fontSize: 11),
+                      style: TextStyle(
+                        color: Colors.white38,
+                        fontSize: 11,
+                      ),
                     ),
-                    onTap: _isLoggingOut ? null : _confirmLogout,
+                    onTap: _isLoggingOut
+                        ? null
+                        : _confirmLogout,
                   ),
                 ],
               ),
             ),
 
-            const SizedBox(height: 40),
+            const SizedBox(
+              height: 40,
+            ),
 
             Center(
-              child: Text(
-                "Versin Genesis v0.0.1",
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  fontSize: 11,
-                  letterSpacing: 1,
-                ),
-              ),
+              child:
+                  FutureBuilder<
+                    String
+                  >(
+                    future: _versionLabel,
+                    builder:
+                        (
+                          context,
+                          snapshot,
+                        ) {
+                          return Text(
+                            snapshot.hasError
+                                ? 'Versin Genesis'
+                                : snapshot.data ??
+                                      'Versin Genesis',
+                            style: TextStyle(
+                              color: Colors.white.withValues(
+                                alpha: 0.2,
+                              ),
+                              fontSize: 11,
+                              letterSpacing: 1,
+                            ),
+                          );
+                        },
+                  ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(
+              height: 20,
+            ),
           ],
         ),
       ),
@@ -423,121 +578,193 @@ class _SettingsPageViewState extends State<SettingsPageView> {
   // ABRIR PERFIL PÚBLICO
   // ============================================================
 
-  Future<void> _openPublicProfile() async {
-    final userId = Supabase.instance.client.auth.currentUser?.id.trim();
+  Future<
+    void
+  >
+  _openPublicProfile() async {
+    // A guarda é ativada antes de qualquer await, impedindo que
+    // cliques repetidos iniciem carregamentos ou rotas simultâneas.
+    if (_isOpeningPublicProfile) {
+      return;
+    }
 
-    if (userId == null || userId.isEmpty) {
+    _isOpeningPublicProfile = true;
+
+    try {
+      final userId = Supabase.instance.client.auth.currentUser?.id.trim();
+
+      if (userId ==
+              null ||
+          userId.isEmpty) {
+        if (!mounted) {
+          return;
+        }
+
+        ScaffoldMessenger.of(
+            context,
+          )
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            const SnackBar(
+              behavior: SnackBarBehavior.floating,
+              content: Text(
+                'Não foi possível identificar o usuário autenticado.',
+              ),
+            ),
+          );
+
+        return;
+      }
+
+      await _publicProfileController.load(
+        userId: userId,
+      );
+
       if (!mounted) {
         return;
       }
 
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          const SnackBar(
-            behavior: SnackBarBehavior.floating,
-            content: Text(
-              'Não foi possível identificar o usuário autenticado.',
-            ),
-          ),
-        );
+      // Mantém a guarda até a rota ser fechada, não apenas até
+      // terminar o carregamento inicial.
+      await Navigator.of(
+        context,
+      ).push(
+        MaterialPageRoute<
+          void
+        >(
+          builder:
+              (
+                _,
+              ) {
+                return PublicProfilePage(
+                  userId: userId,
+                  controller: _publicProfileController,
+                );
+              },
+        ),
+      );
 
-      return;
+      if (!mounted) {
+        return;
+      }
+
+      await _publicProfileController.refresh();
+    } finally {
+      _isOpeningPublicProfile = false;
     }
-
-    await _publicProfileController.load(userId: userId);
-
-    if (!mounted) {
-      return;
-    }
-
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) {
-          return PublicProfilePage(
-            userId: userId,
-            controller: _publicProfileController,
-          );
-        },
-      ),
-    );
-
-    if (!mounted) {
-      return;
-    }
-
-    await _publicProfileController.refresh();
   }
 
-  Future<void> _confirmLogout() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          backgroundColor: const Color(0xFF17132D),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          icon: const Icon(
-            Icons.logout_rounded,
-            color: Colors.redAccent,
-            size: 32,
-          ),
-          title: const Text(
-            'Sair da conta?',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-          ),
-          content: const Text(
-            'Sua sessão será encerrada neste dispositivo.',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.white54, fontSize: 12, height: 1.4),
-          ),
-          actionsAlignment: MainAxisAlignment.center,
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(dialogContext).pop(false);
+  Future<
+    void
+  >
+  _confirmLogout() async {
+    final confirmed =
+        await showDialog<
+          bool
+        >(
+          context: context,
+          builder:
+              (
+                dialogContext,
+              ) {
+                return AlertDialog(
+                  backgroundColor: const Color(
+                    0xFF17132D,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(
+                      20,
+                    ),
+                  ),
+                  icon: const Icon(
+                    Icons.logout_rounded,
+                    color: Colors.redAccent,
+                    size: 32,
+                  ),
+                  title: const Text(
+                    'Sair da conta?',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  content: const Text(
+                    'Sua sessão será encerrada neste dispositivo.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.white54,
+                      fontSize: 12,
+                      height: 1.4,
+                    ),
+                  ),
+                  actionsAlignment: MainAxisAlignment.center,
+                  actions: [
+                    TextButton(
+                      onPressed: () {
+                        Navigator.of(
+                          dialogContext,
+                        ).pop(
+                          false,
+                        );
+                      },
+                      child: const Text(
+                        'CANCELAR',
+                        style: TextStyle(
+                          color: Colors.white54,
+                        ),
+                      ),
+                    ),
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.of(
+                          dialogContext,
+                        ).pop(
+                          true,
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.redAccent,
+                        foregroundColor: Colors.white,
+                      ),
+                      icon: const Icon(
+                        Icons.logout_rounded,
+                        size: 17,
+                      ),
+                      label: const Text(
+                        'SAIR',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                );
               },
-              child: const Text(
-                'CANCELAR',
-                style: TextStyle(color: Colors.white54),
-              ),
-            ),
-            ElevatedButton.icon(
-              onPressed: () {
-                Navigator.of(dialogContext).pop(true);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.redAccent,
-                foregroundColor: Colors.white,
-              ),
-              icon: const Icon(Icons.logout_rounded, size: 17),
-              label: const Text(
-                'SAIR',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ),
-          ],
         );
-      },
-    );
 
-    if (confirmed != true || !mounted) {
+    if (confirmed !=
+            true ||
+        !mounted) {
       return;
     }
 
     await _logout();
   }
 
-  Future<void> _logout() async {
+  Future<
+    void
+  >
+  _logout() async {
     if (_isLoggingOut) {
       return;
     }
 
-    setState(() {
-      _isLoggingOut = true;
-    });
+    setState(
+      () {
+        _isLoggingOut = true;
+      },
+    );
 
     // ==========================================================
     // PRESENÇA DA SESSÃO
@@ -563,8 +790,14 @@ class _SettingsPageViewState extends State<SettingsPageView> {
 
     var presencePreference = false;
 
-    if (sl.isRegistered<UserPresenceService>()) {
-      presenceService = sl<UserPresenceService>();
+    if (sl
+        .isRegistered<
+          UserPresenceService
+        >()) {
+      presenceService =
+          sl<
+            UserPresenceService
+          >();
 
       presenceWasStarted = presenceService.isStarted;
 
@@ -599,8 +832,17 @@ class _SettingsPageViewState extends State<SettingsPageView> {
       // LOGIN
       // ========================================================
 
-      Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
-    } catch (error) {
+      Navigator.of(
+        context,
+      ).pushNamedAndRemoveUntil(
+        '/login',
+        (
+          route,
+        ) => false,
+      );
+    } catch (
+      error
+    ) {
       // ========================================================
       // RESTAURAR PRESENÇA SE O LOGOUT FALHOU
       // ========================================================
@@ -611,17 +853,23 @@ class _SettingsPageViewState extends State<SettingsPageView> {
       //
       // ========================================================
 
-      if (presenceService != null &&
+      if (presenceService !=
+              null &&
           presenceWasStarted &&
-          Supabase.instance.client.auth.currentUser != null) {
+          Supabase.instance.client.auth.currentUser !=
+              null) {
         try {
-          await presenceService.start(wantsToAppearOnline: presencePreference);
+          await presenceService.start(
+            wantsToAppearOnline: presencePreference,
+          );
 
           debugPrint(
             '[SETTINGS] '
             'Presença restaurada porque o logout falhou.',
           );
-        } catch (presenceError) {
+        } catch (
+          presenceError
+        ) {
           debugPrint(
             '[SETTINGS] '
             'Não foi possível restaurar a presença: '
@@ -634,17 +882,25 @@ class _SettingsPageViewState extends State<SettingsPageView> {
         return;
       }
 
-      setState(() {
-        _isLoggingOut = false;
-      });
+      setState(
+        () {
+          _isLoggingOut = false;
+        },
+      );
 
-      ScaffoldMessenger.of(context)
+      ScaffoldMessenger.of(
+          context,
+        )
         ..hideCurrentSnackBar()
         ..showSnackBar(
           SnackBar(
             behavior: SnackBarBehavior.floating,
-            backgroundColor: const Color(0xFF211216),
-            content: Text('Não foi possível sair da conta: $error'),
+            backgroundColor: const Color(
+              0xFF211216,
+            ),
+            content: Text(
+              'Não foi possível sair da conta: $error',
+            ),
           ),
         );
     }
@@ -655,9 +911,15 @@ class _SettingsPageViewState extends State<SettingsPageView> {
   // ============================================================
 
   Widget _buildAiQuotaCard() {
-    final percentage = _rhymesController.aiUsagePercentage.clamp(0.0, 100.0);
+    final percentage = _rhymesController.aiUsagePercentage.clamp(
+      0.0,
+      100.0,
+    );
 
-    final progress = _rhymesController.aiUsageProgress.clamp(0.0, 1.0);
+    final progress = _rhymesController.aiUsageProgress.clamp(
+      0.0,
+      1.0,
+    );
 
     final level = _rhymesController.aiUsageLevel;
 
@@ -669,13 +931,21 @@ class _SettingsPageViewState extends State<SettingsPageView> {
 
     final limitTokens = _rhymesController.aiLimitTokens;
 
-    final accent = _aiQuotaColor(level, percentage);
+    final accent = _aiQuotaColor(
+      level,
+      percentage,
+    );
 
-    final statusText = _aiQuotaStatusText(level, percentage);
+    final statusText = _aiQuotaStatusText(
+      level,
+      percentage,
+    );
 
     return _buildSettingsContainer(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(
+          16,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -688,9 +958,17 @@ class _SettingsPageViewState extends State<SettingsPageView> {
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: accent.withValues(alpha: 0.10),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: accent.withValues(alpha: 0.22)),
+                    color: accent.withValues(
+                      alpha: 0.10,
+                    ),
+                    borderRadius: BorderRadius.circular(
+                      12,
+                    ),
+                    border: Border.all(
+                      color: accent.withValues(
+                        alpha: 0.22,
+                      ),
+                    ),
                   ),
                   child: Icon(
                     Icons.auto_awesome_rounded,
@@ -699,7 +977,9 @@ class _SettingsPageViewState extends State<SettingsPageView> {
                   ),
                 ),
 
-                const SizedBox(width: 12),
+                const SizedBox(
+                  width: 12,
+                ),
 
                 const Expanded(
                   child: Column(
@@ -714,11 +994,16 @@ class _SettingsPageViewState extends State<SettingsPageView> {
                         ),
                       ),
 
-                      SizedBox(height: 2),
+                      SizedBox(
+                        height: 2,
+                      ),
 
                       Text(
                         'Uso da sua cota mensal de inteligência artificial',
-                        style: TextStyle(color: Colors.white54, fontSize: 11),
+                        style: TextStyle(
+                          color: Colors.white54,
+                          fontSize: 11,
+                        ),
                       ),
                     ],
                   ),
@@ -730,9 +1015,17 @@ class _SettingsPageViewState extends State<SettingsPageView> {
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: accent.withValues(alpha: 0.10),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: accent.withValues(alpha: 0.22)),
+                    color: accent.withValues(
+                      alpha: 0.10,
+                    ),
+                    borderRadius: BorderRadius.circular(
+                      20,
+                    ),
+                    border: Border.all(
+                      color: accent.withValues(
+                        alpha: 0.22,
+                      ),
+                    ),
                   ),
                   child: Text(
                     '${_formatPercentage(percentage)}%',
@@ -747,16 +1040,27 @@ class _SettingsPageViewState extends State<SettingsPageView> {
               ],
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(
+              height: 16,
+            ),
 
             // ====================================================
             // STATUS
             // ====================================================
             Row(
               children: [
-                Icon(_aiQuotaIcon(level, percentage), color: accent, size: 15),
+                Icon(
+                  _aiQuotaIcon(
+                    level,
+                    percentage,
+                  ),
+                  color: accent,
+                  size: 15,
+                ),
 
-                const SizedBox(width: 7),
+                const SizedBox(
+                  width: 7,
+                ),
 
                 Text(
                   statusText,
@@ -769,22 +1073,35 @@ class _SettingsPageViewState extends State<SettingsPageView> {
               ],
             ),
 
-            const SizedBox(height: 9),
+            const SizedBox(
+              height: 9,
+            ),
 
             // ====================================================
             // BARRA
             // ====================================================
             ClipRRect(
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(
+                20,
+              ),
               child: LinearProgressIndicator(
                 value: progress,
                 minHeight: 10,
-                backgroundColor: Colors.white.withValues(alpha: 0.07),
-                valueColor: AlwaysStoppedAnimation<Color>(accent),
+                backgroundColor: Colors.white.withValues(
+                  alpha: 0.07,
+                ),
+                valueColor:
+                    AlwaysStoppedAnimation<
+                      Color
+                    >(
+                      accent,
+                    ),
               ),
             ),
 
-            const SizedBox(height: 6),
+            const SizedBox(
+              height: 6,
+            ),
 
             // ====================================================
             // MARCADORES
@@ -793,61 +1110,99 @@ class _SettingsPageViewState extends State<SettingsPageView> {
               children: [
                 Text(
                   '0%',
-                  style: TextStyle(color: Colors.white24, fontSize: 9),
+                  style: TextStyle(
+                    color: Colors.white24,
+                    fontSize: 9,
+                  ),
                 ),
 
                 Spacer(),
 
                 Text(
                   '70%',
-                  style: TextStyle(color: Colors.white24, fontSize: 9),
+                  style: TextStyle(
+                    color: Colors.white24,
+                    fontSize: 9,
+                  ),
                 ),
 
-                SizedBox(width: 24),
+                SizedBox(
+                  width: 24,
+                ),
 
                 Text(
                   '90%',
-                  style: TextStyle(color: Colors.white24, fontSize: 9),
+                  style: TextStyle(
+                    color: Colors.white24,
+                    fontSize: 9,
+                  ),
                 ),
 
-                SizedBox(width: 18),
+                SizedBox(
+                  width: 18,
+                ),
 
                 Text(
                   '100%',
-                  style: TextStyle(color: Colors.white24, fontSize: 9),
+                  style: TextStyle(
+                    color: Colors.white24,
+                    fontSize: 9,
+                  ),
                 ),
               ],
             ),
 
-            const SizedBox(height: 12),
+            const SizedBox(
+              height: 12,
+            ),
 
             // ====================================================
             // MENSAGEM
             // ====================================================
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 10,
+              ),
               decoration: BoxDecoration(
-                color: accent.withValues(alpha: 0.06),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: accent.withValues(alpha: 0.12)),
+                color: accent.withValues(
+                  alpha: 0.06,
+                ),
+                borderRadius: BorderRadius.circular(
+                  10,
+                ),
+                border: Border.all(
+                  color: accent.withValues(
+                    alpha: 0.12,
+                  ),
+                ),
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Icon(
                     Icons.info_outline_rounded,
-                    color: accent.withValues(alpha: 0.90),
+                    color: accent.withValues(
+                      alpha: 0.90,
+                    ),
                     size: 15,
                   ),
 
-                  const SizedBox(width: 8),
+                  const SizedBox(
+                    width: 8,
+                  ),
 
                   Expanded(
                     child: Text(
-                      _normalizeAiMessage(message, percentage),
+                      _normalizeAiMessage(
+                        message,
+                        percentage,
+                      ),
                       style: TextStyle(
-                        color: accent.withValues(alpha: 0.92),
+                        color: accent.withValues(
+                          alpha: 0.92,
+                        ),
                         fontSize: 11,
                         height: 1.35,
                         fontWeight: FontWeight.w500,
@@ -858,7 +1213,9 @@ class _SettingsPageViewState extends State<SettingsPageView> {
               ),
             ),
 
-            const SizedBox(height: 14),
+            const SizedBox(
+              height: 14,
+            ),
 
             // ====================================================
             // TOKENS
@@ -868,25 +1225,35 @@ class _SettingsPageViewState extends State<SettingsPageView> {
                 Expanded(
                   child: _buildAiQuotaMetric(
                     label: 'USADOS',
-                    value: _formatTokens(usedTokens),
+                    value: _formatTokens(
+                      usedTokens,
+                    ),
                   ),
                 ),
 
-                const SizedBox(width: 8),
+                const SizedBox(
+                  width: 8,
+                ),
 
                 Expanded(
                   child: _buildAiQuotaMetric(
                     label: 'RESTANTES',
-                    value: _formatTokens(remainingTokens),
+                    value: _formatTokens(
+                      remainingTokens,
+                    ),
                   ),
                 ),
 
-                const SizedBox(width: 8),
+                const SizedBox(
+                  width: 8,
+                ),
 
                 Expanded(
                   child: _buildAiQuotaMetric(
                     label: 'LIMITE',
-                    value: _formatTokens(limitTokens),
+                    value: _formatTokens(
+                      limitTokens,
+                    ),
                   ),
                 ),
               ],
@@ -901,13 +1268,27 @@ class _SettingsPageViewState extends State<SettingsPageView> {
   // MÉTRICA DA QUOTA
   // ============================================================
 
-  Widget _buildAiQuotaMetric({required String label, required String value}) {
+  Widget _buildAiQuotaMetric({
+    required String label,
+    required String value,
+  }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 10,
+        vertical: 9,
+      ),
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.18),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.04)),
+        color: Colors.black.withValues(
+          alpha: 0.18,
+        ),
+        borderRadius: BorderRadius.circular(
+          10,
+        ),
+        border: Border.all(
+          color: Colors.white.withValues(
+            alpha: 0.04,
+          ),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -922,7 +1303,9 @@ class _SettingsPageViewState extends State<SettingsPageView> {
             ),
           ),
 
-          const SizedBox(height: 3),
+          const SizedBox(
+            height: 3,
+          ),
 
           Text(
             value,
@@ -944,18 +1327,30 @@ class _SettingsPageViewState extends State<SettingsPageView> {
   // COR DA QUOTA
   // ============================================================
 
-  Color _aiQuotaColor(String level, double percentage) {
+  Color _aiQuotaColor(
+    String level,
+    double percentage,
+  ) {
     final normalizedLevel = level.toLowerCase();
 
-    if (percentage >= 100 || normalizedLevel == 'blocked') {
+    if (percentage >=
+            100 ||
+        normalizedLevel ==
+            'blocked') {
       return Colors.redAccent;
     }
 
-    if (percentage >= 90 || normalizedLevel == 'critical') {
+    if (percentage >=
+            90 ||
+        normalizedLevel ==
+            'critical') {
       return Colors.orangeAccent;
     }
 
-    if (percentage >= 70 || normalizedLevel == 'warning') {
+    if (percentage >=
+            70 ||
+        normalizedLevel ==
+            'warning') {
       return Colors.amberAccent;
     }
 
@@ -966,18 +1361,30 @@ class _SettingsPageViewState extends State<SettingsPageView> {
   // ÍCONE DA QUOTA
   // ============================================================
 
-  IconData _aiQuotaIcon(String level, double percentage) {
+  IconData _aiQuotaIcon(
+    String level,
+    double percentage,
+  ) {
     final normalizedLevel = level.toLowerCase();
 
-    if (percentage >= 100 || normalizedLevel == 'blocked') {
+    if (percentage >=
+            100 ||
+        normalizedLevel ==
+            'blocked') {
       return Icons.block_rounded;
     }
 
-    if (percentage >= 90 || normalizedLevel == 'critical') {
+    if (percentage >=
+            90 ||
+        normalizedLevel ==
+            'critical') {
       return Icons.warning_amber_rounded;
     }
 
-    if (percentage >= 70 || normalizedLevel == 'warning') {
+    if (percentage >=
+            70 ||
+        normalizedLevel ==
+            'warning') {
       return Icons.info_outline_rounded;
     }
 
@@ -988,18 +1395,30 @@ class _SettingsPageViewState extends State<SettingsPageView> {
   // STATUS DA QUOTA
   // ============================================================
 
-  String _aiQuotaStatusText(String level, double percentage) {
+  String _aiQuotaStatusText(
+    String level,
+    double percentage,
+  ) {
     final normalizedLevel = level.toLowerCase();
 
-    if (percentage >= 100 || normalizedLevel == 'blocked') {
+    if (percentage >=
+            100 ||
+        normalizedLevel ==
+            'blocked') {
       return 'Limite atingido';
     }
 
-    if (percentage >= 90 || normalizedLevel == 'critical') {
+    if (percentage >=
+            90 ||
+        normalizedLevel ==
+            'critical') {
       return 'Limite próximo';
     }
 
-    if (percentage >= 70 || normalizedLevel == 'warning') {
+    if (percentage >=
+            70 ||
+        normalizedLevel ==
+            'warning') {
       return 'Uso elevado';
     }
 
@@ -1010,18 +1429,24 @@ class _SettingsPageViewState extends State<SettingsPageView> {
   // MENSAGEM DA QUOTA
   // ============================================================
 
-  String _normalizeAiMessage(String message, double percentage) {
+  String _normalizeAiMessage(
+    String message,
+    double percentage,
+  ) {
     final normalized = message.trim();
 
-    if (percentage >= 100) {
+    if (percentage >=
+        100) {
       return 'Limite mensal de IA atingido.';
     }
 
-    if (percentage >= 90) {
+    if (percentage >=
+        90) {
       return 'Seu limite mensal está próximo.';
     }
 
-    if (percentage >= 70) {
+    if (percentage >=
+        70) {
       return 'Você já utilizou boa parte da sua IA este mês.';
     }
 
@@ -1036,33 +1461,48 @@ class _SettingsPageViewState extends State<SettingsPageView> {
   // FORMATAR PERCENTUAL
   // ============================================================
 
-  String _formatPercentage(double percentage) {
-    if (percentage == percentage.roundToDouble()) {
+  String _formatPercentage(
+    double percentage,
+  ) {
+    if (percentage ==
+        percentage.roundToDouble()) {
       return percentage.toInt().toString();
     }
 
-    return percentage.toStringAsFixed(1);
+    return percentage.toStringAsFixed(
+      1,
+    );
   }
 
   // ============================================================
   // FORMATAR TOKENS
   // ============================================================
 
-  String _formatTokens(int value) {
-    if (value >= 1000000) {
-      final millions = value / 1000000;
+  String _formatTokens(
+    int value,
+  ) {
+    if (value >=
+        1000000) {
+      final millions =
+          value /
+          1000000;
 
-      if (millions == millions.roundToDouble()) {
+      if (millions ==
+          millions.roundToDouble()) {
         return '${millions.toInt()}M';
       }
 
       return '${millions.toStringAsFixed(1)}M';
     }
 
-    if (value >= 1000) {
-      final thousands = value / 1000;
+    if (value >=
+        1000) {
+      final thousands =
+          value /
+          1000;
 
-      if (thousands == thousands.roundToDouble()) {
+      if (thousands ==
+          thousands.roundToDouble()) {
         return '${thousands.toInt()}k';
       }
 
@@ -1072,13 +1512,20 @@ class _SettingsPageViewState extends State<SettingsPageView> {
     return value.toString();
   }
 
-  Widget _buildSectionTitle(String title) {
+  Widget _buildSectionTitle(
+    String title,
+  ) {
     return Padding(
-      padding: const EdgeInsets.only(left: 4, bottom: 8),
+      padding: const EdgeInsets.only(
+        left: 4,
+        bottom: 8,
+      ),
       child: Text(
         title.toUpperCase(),
         style: TextStyle(
-          color: accentNeon.withValues(alpha: 0.8),
+          color: accentNeon.withValues(
+            alpha: 0.8,
+          ),
           fontSize: 11,
           fontWeight: FontWeight.bold,
           letterSpacing: 1.2,
@@ -1087,13 +1534,23 @@ class _SettingsPageViewState extends State<SettingsPageView> {
     );
   }
 
-  Widget _buildSettingsContainer({required Widget child}) {
+  Widget _buildSettingsContainer({
+    required Widget child,
+  }) {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.04),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        color: Colors.white.withValues(
+          alpha: 0.04,
+        ),
+        borderRadius: BorderRadius.circular(
+          20,
+        ),
+        border: Border.all(
+          color: Colors.white.withValues(
+            alpha: 0.08,
+          ),
+        ),
       ),
       child: child,
     );
@@ -1103,14 +1560,22 @@ class _SettingsPageViewState extends State<SettingsPageView> {
     required String title,
     required String subtitle,
     required bool value,
-    required ValueChanged<bool> onChanged,
+    required ValueChanged<
+      bool
+    >
+    onChanged,
   }) {
     return SwitchListTile(
       activeColor: accentNeon,
-      activeTrackColor: primaryPurple.withValues(alpha: 0.4),
+      activeTrackColor: primaryPurple.withValues(
+        alpha: 0.4,
+      ),
       inactiveThumbColor: Colors.white54,
       inactiveTrackColor: Colors.white12,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      contentPadding: const EdgeInsets.symmetric(
+        horizontal: 16,
+        vertical: 4,
+      ),
       title: Text(
         title,
         style: const TextStyle(
@@ -1121,7 +1586,10 @@ class _SettingsPageViewState extends State<SettingsPageView> {
       ),
       subtitle: Text(
         subtitle,
-        style: const TextStyle(color: Colors.white54, fontSize: 11),
+        style: const TextStyle(
+          color: Colors.white54,
+          fontSize: 11,
+        ),
       ),
       value: value,
       onChanged: onChanged,
@@ -1132,7 +1600,9 @@ class _SettingsPageViewState extends State<SettingsPageView> {
     return Divider(
       height: 1,
       thickness: 1,
-      color: Colors.white.withValues(alpha: 0.05),
+      color: Colors.white.withValues(
+        alpha: 0.05,
+      ),
       indent: 16,
       endIndent: 16,
     );

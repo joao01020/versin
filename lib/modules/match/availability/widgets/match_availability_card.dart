@@ -1,3 +1,5 @@
+import 'dart:ui' show FontFeature;
+
 import 'package:flutter/material.dart';
 
 import '../controllers/match_availability_controller.dart';
@@ -187,6 +189,26 @@ class MatchAvailabilityCard
           ),
         ),
 
+        if (active) ...[
+          const SizedBox(height: 6),
+          Text(
+            _formatRemaining(state.remaining),
+            style: TextStyle(
+              color: accentColor,
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            'Tempo restante no Agora',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.48),
+              fontSize: 9.5,
+            ),
+          ),
+        ],
         const SizedBox(
           height: 3,
         ),
@@ -207,6 +229,18 @@ class MatchAvailabilityCard
         ),
       ],
     );
+  }
+
+  static String _formatRemaining(Duration duration) {
+    final seconds = duration.inSeconds < 0 ? 0 : duration.inSeconds;
+    final hours = seconds ~/ 3600;
+    final minutes = (seconds % 3600) ~/ 60;
+    final remainder = seconds % 60;
+    String two(int value) => value.toString().padLeft(2, '0');
+    if (hours > 0) {
+      return '${two(hours)}:${two(minutes)}:${two(remainder)}';
+    }
+    return '${two(minutes)}:${two(remainder)}';
   }
 
   // ============================================================

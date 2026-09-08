@@ -3,36 +3,23 @@ import 'dart:convert';
 
 import 'package:desktop_multi_window/desktop_multi_window.dart';
 import 'package:flutter/material.dart';
+import 'package:versin/core/localization/versin_locale.dart';
 import 'package:window_manager/window_manager.dart';
 
 // ============================================================
 // JANELA EXTERNA DA LETRA
 // ============================================================
 
-class LyricsWindow
-    extends
-        StatefulWidget {
+class LyricsWindow extends StatefulWidget {
   final String arguments;
 
-  const LyricsWindow({
-    super.key,
-    required this.arguments,
-  });
+  const LyricsWindow({super.key, required this.arguments});
 
   @override
-  State<
-    LyricsWindow
-  >
-  createState() => _LyricsWindowState();
+  State<LyricsWindow> createState() => _LyricsWindowState();
 }
 
-class _LyricsWindowState
-    extends
-        State<
-          LyricsWindow
-        >
-    with
-        WindowListener {
+class _LyricsWindowState extends State<LyricsWindow> with WindowListener {
   // ============================================================
   // CANAL DE COMUNICAÇÃO ENTRE JANELAS
   // ============================================================
@@ -76,61 +63,42 @@ class _LyricsWindowState
   void initState() {
     super.initState();
 
-    final data = _parseArguments(
-      widget.arguments,
-    );
+    final data = _parseArguments(widget.arguments);
 
-    _projectId =
-        data['project_id']?.toString() ??
-        '';
+    _projectId = data['project_id']?.toString() ?? '';
 
-    final initialLyrics =
-        data['lyrics']?.toString() ??
-        '';
+    final initialLyrics = data['lyrics']?.toString() ?? '';
 
-    _lyricsController = TextEditingController(
-      text: initialLyrics,
-    );
+    _lyricsController = TextEditingController(text: initialLyrics);
 
     _focusNode = FocusNode();
 
     _characterCount = initialLyrics.length;
 
-    _lyricsController.addListener(
-      _onLyricsChanged,
-    );
+    _lyricsController.addListener(_onLyricsChanged);
 
     _configureChannel();
 
     _initializeNativeWindow();
 
-    WidgetsBinding.instance.addPostFrameCallback(
-      (
-        _,
-      ) {
-        if (!mounted) {
-          return;
-        }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
 
-        setState(
-          () {
-            _isReady = true;
-          },
-        );
+      setState(() {
+        _isReady = true;
+      });
 
-        _focusNode.requestFocus();
-      },
-    );
+      _focusNode.requestFocus();
+    });
   }
 
   // ============================================================
   // WINDOW MANAGER
   // ============================================================
 
-  Future<
-    void
-  >
-  _initializeNativeWindow() async {
+  Future<void> _initializeNativeWindow() async {
     try {
       await windowManager.ensureInitialized();
 
@@ -138,25 +106,15 @@ class _LyricsWindowState
         return;
       }
 
-      windowManager.addListener(
-        this,
-      );
+      windowManager.addListener(this);
 
-      await windowManager.setPreventClose(
-        true,
-      );
+      await windowManager.setPreventClose(true);
 
       _windowManagerReady = true;
 
-      debugPrint(
-        '[LYRICS WINDOW] Fechamento nativo interceptado.',
-      );
-    } catch (
-      e
-    ) {
-      debugPrint(
-        '[LYRICS WINDOW] Erro ao inicializar window_manager: $e',
-      );
+      debugPrint('[LYRICS WINDOW] Fechamento nativo interceptado.');
+    } catch (e) {
+      debugPrint('[LYRICS WINDOW] Erro ao inicializar window_manager: $e');
     }
   }
 
@@ -166,94 +124,64 @@ class _LyricsWindowState
 
   @override
   void onWindowClose() {
-    unawaited(
-      _dockWindow(),
-    );
+    unawaited(_dockWindow());
   }
 
   // ============================================================
   // CONFIGURAR CANAL
   // ============================================================
 
-  Future<
-    void
-  >
-  _configureChannel() async {
+  Future<void> _configureChannel() async {
     try {
-      await _channel.setMethodCallHandler(
-        (
-          call,
-        ) async {
-          switch (call.method) {
-            // ==================================================
-            // RECEBER LETRA
-            // ==================================================
+      await _channel.setMethodCallHandler((call) async {
+        switch (call.method) {
+          // ==================================================
+          // RECEBER LETRA
+          // ==================================================
 
-            case 'setLyrics':
-              final value =
-                  call.arguments?.toString() ??
-                  '';
+          case 'setLyrics':
+            final value = call.arguments?.toString() ?? '';
 
-              _updateLyricsFromMain(
-                value,
-              );
+            _updateLyricsFromMain(value);
 
-              return true;
+            return true;
 
-            // ==================================================
-            // RECEBER PROJETO
-            // ==================================================
+          // ==================================================
+          // RECEBER PROJETO
+          // ==================================================
 
-            case 'setProject':
-              final arguments = call.arguments;
+          case 'setProject':
+            final arguments = call.arguments;
 
-              if (arguments
-                  is Map) {
-                final map =
-                    Map<
-                      String,
-                      dynamic
-                    >.from(
-                      arguments,
-                    );
+            if (arguments is Map) {
+              final map = Map<String, dynamic>.from(arguments);
 
-                _projectId =
-                    map['project_id']?.toString() ??
-                    '';
+              _projectId = map['project_id']?.toString() ?? '';
 
-                final lyrics =
-                    map['lyrics']?.toString() ??
-                    '';
+              final lyrics = map['lyrics']?.toString() ?? '';
 
-                _updateLyricsFromMain(
-                  lyrics,
-                );
-              }
+              _updateLyricsFromMain(lyrics);
+            }
 
-              return true;
+            return true;
 
-            // ==================================================
-            // FOCO
-            // ==================================================
+          // ==================================================
+          // FOCO
+          // ==================================================
 
-            case 'focusEditor':
-              if (mounted) {
-                _focusNode.requestFocus();
-              }
+          case 'focusEditor':
+            if (mounted) {
+              _focusNode.requestFocus();
+            }
 
-              return true;
+            return true;
 
-            default:
-              return null;
-          }
-        },
-      );
-    } catch (
-      e
-    ) {
-      debugPrint(
-        '[LYRICS WINDOW] Erro ao configurar canal: $e',
-      );
+          default:
+            return null;
+        }
+      });
+    } catch (e) {
+      debugPrint('[LYRICS WINDOW] Erro ao configurar canal: $e');
     }
   }
 
@@ -265,28 +193,21 @@ class _LyricsWindowState
     _characterCount = _lyricsController.text.length;
 
     if (mounted) {
-      setState(
-        () {},
-      );
+      setState(() {});
     }
 
     if (_isUpdatingFromMainWindow) {
       return;
     }
 
-    unawaited(
-      _sendLyricsToMainWindow(),
-    );
+    unawaited(_sendLyricsToMainWindow());
   }
 
   // ============================================================
   // ENVIAR LETRA PARA JANELA PRINCIPAL
   // ============================================================
 
-  Future<
-    void
-  >
-  _sendLyricsToMainWindow() async {
+  Future<void> _sendLyricsToMainWindow() async {
     if (_isSending) {
       return;
     }
@@ -294,19 +215,12 @@ class _LyricsWindowState
     _isSending = true;
 
     try {
-      await _channel.invokeMethod(
-        'lyricsChanged',
-        {
-          'project_id': _projectId,
-          'lyrics': _lyricsController.text,
-        },
-      );
-    } catch (
-      e
-    ) {
-      debugPrint(
-        '[LYRICS WINDOW] Erro ao enviar letra: $e',
-      );
+      await _channel.invokeMethod('lyricsChanged', {
+        'project_id': _projectId,
+        'lyrics': _lyricsController.text,
+      });
+    } catch (e) {
+      debugPrint('[LYRICS WINDOW] Erro ao enviar letra: $e');
     } finally {
       _isSending = false;
     }
@@ -316,11 +230,8 @@ class _LyricsWindowState
   // RECEBER ALTERAÇÃO DA JANELA PRINCIPAL
   // ============================================================
 
-  void _updateLyricsFromMain(
-    String value,
-  ) {
-    if (_lyricsController.text ==
-        value) {
+  void _updateLyricsFromMain(String value) {
+    if (_lyricsController.text == value) {
       return;
     }
 
@@ -328,16 +239,11 @@ class _LyricsWindowState
 
     final currentSelection = _lyricsController.selection;
 
-    final safeOffset = currentSelection.baseOffset.clamp(
-      0,
-      value.length,
-    );
+    final safeOffset = currentSelection.baseOffset.clamp(0, value.length);
 
     _lyricsController.value = TextEditingValue(
       text: value,
-      selection: TextSelection.collapsed(
-        offset: safeOffset,
-      ),
+      selection: TextSelection.collapsed(offset: safeOffset),
     );
 
     _characterCount = value.length;
@@ -345,9 +251,7 @@ class _LyricsWindowState
     _isUpdatingFromMainWindow = false;
 
     if (mounted) {
-      setState(
-        () {},
-      );
+      setState(() {});
     }
   }
 
@@ -355,10 +259,7 @@ class _LyricsWindowState
   // ENCAIXAR NOVAMENTE
   // ============================================================
 
-  Future<
-    void
-  >
-  _dockWindow() async {
+  Future<void> _dockWindow() async {
     if (_isDocking) {
       return;
     }
@@ -366,46 +267,27 @@ class _LyricsWindowState
     _isDocking = true;
 
     if (mounted) {
-      setState(
-        () {},
-      );
+      setState(() {});
     }
 
     try {
       await _sendLyricsToMainWindow();
 
-      await _channel.invokeMethod(
-        'dockLyrics',
-        {
-          'project_id': _projectId,
-          'lyrics': _lyricsController.text,
-        },
-      );
+      await _channel.invokeMethod('dockLyrics', {
+        'project_id': _projectId,
+        'lyrics': _lyricsController.text,
+      });
 
-      debugPrint(
-        '[LYRICS WINDOW] Solicitação de encaixe enviada.',
-      );
-    } catch (
-      e
-    ) {
-      debugPrint(
-        '[LYRICS WINDOW] Erro ao encaixar janela: $e',
-      );
+      debugPrint('[LYRICS WINDOW] Solicitação de encaixe enviada.');
+    } catch (e) {
+      debugPrint('[LYRICS WINDOW] Erro ao encaixar janela: $e');
     } finally {
-      await Future<
-        void
-      >.delayed(
-        const Duration(
-          milliseconds: 200,
-        ),
-      );
+      await Future<void>.delayed(const Duration(milliseconds: 200));
 
       _isDocking = false;
 
       if (mounted) {
-        setState(
-          () {},
-        );
+        setState(() {});
       }
     }
   }
@@ -414,47 +296,25 @@ class _LyricsWindowState
   // ARGUMENTOS
   // ============================================================
 
-  Map<
-    String,
-    dynamic
-  >
-  _parseArguments(
-    String raw,
-  ) {
+  Map<String, dynamic> _parseArguments(String raw) {
     if (raw.trim().isEmpty) {
       return {};
     }
 
     try {
-      final decoded = jsonDecode(
-        raw,
-      );
+      final decoded = jsonDecode(raw);
 
-      if (decoded
-          is Map<
-            String,
-            dynamic
-          >) {
+      if (decoded is Map<String, dynamic>) {
         return decoded;
       }
 
-      if (decoded
-          is Map) {
-        return Map<
-          String,
-          dynamic
-        >.from(
-          decoded,
-        );
+      if (decoded is Map) {
+        return Map<String, dynamic>.from(decoded);
       }
 
       return {};
-    } catch (
-      e
-    ) {
-      debugPrint(
-        '[LYRICS WINDOW] Argumentos inválidos: $e',
-      );
+    } catch (e) {
+      debugPrint('[LYRICS WINDOW] Argumentos inválidos: $e');
 
       return {};
     }
@@ -467,14 +327,10 @@ class _LyricsWindowState
   @override
   void dispose() {
     if (_windowManagerReady) {
-      windowManager.removeListener(
-        this,
-      );
+      windowManager.removeListener(this);
     }
 
-    _lyricsController.removeListener(
-      _onLyricsChanged,
-    );
+    _lyricsController.removeListener(_onLyricsChanged);
 
     _lyricsController.dispose();
 
@@ -488,22 +344,17 @@ class _LyricsWindowState
   // ============================================================
 
   @override
-  Widget build(
-    BuildContext context,
-  ) {
-    const activeColor = Color(
-      0xFFE100FF,
-    );
+  Widget build(BuildContext context) {
+    const activeColor = Color(0xFFE100FF);
 
     return MaterialApp(
+      locale: VersinLocale.locale,
+      supportedLocales: VersinLocale.supportedLocales,
+      localizationsDelegates: VersinLocale.localizationsDelegates,
       debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark(
-        useMaterial3: true,
-      ),
+      theme: ThemeData.dark(useMaterial3: true),
       home: Scaffold(
-        backgroundColor: const Color(
-          0xFF0D0D0D,
-        ),
+        backgroundColor: const Color(0xFF0D0D0D),
         body: SafeArea(
           child: Column(
             children: [
@@ -512,18 +363,10 @@ class _LyricsWindowState
               // =================================================
               Container(
                 height: 48,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 14),
                 decoration: const BoxDecoration(
-                  color: Color(
-                    0xFF111111,
-                  ),
-                  border: Border(
-                    bottom: BorderSide(
-                      color: Colors.white10,
-                    ),
-                  ),
+                  color: Color(0xFF111111),
+                  border: Border(bottom: BorderSide(color: Colors.white10)),
                 ),
                 child: Row(
                   children: [
@@ -533,9 +376,7 @@ class _LyricsWindowState
                       color: activeColor,
                     ),
 
-                    const SizedBox(
-                      width: 8,
-                    ),
+                    const SizedBox(width: 8),
 
                     const Text(
                       'LETRA',
@@ -551,9 +392,7 @@ class _LyricsWindowState
 
                     if (_projectId.isNotEmpty)
                       Padding(
-                        padding: const EdgeInsets.only(
-                          right: 10,
-                        ),
+                        padding: const EdgeInsets.only(right: 10),
                         child: Text(
                           _projectId,
                           maxLines: 1,
@@ -571,15 +410,11 @@ class _LyricsWindowState
                         onPressed: _isDocking
                             ? null
                             : () {
-                                unawaited(
-                                  _dockWindow(),
-                                );
+                                unawaited(_dockWindow());
                               },
                         icon: Icon(
                           Icons.call_merge_rounded,
-                          color: _isDocking
-                              ? Colors.white24
-                              : activeColor,
+                          color: _isDocking ? Colors.white24 : activeColor,
                           size: 18,
                         ),
                       ),
@@ -593,22 +428,14 @@ class _LyricsWindowState
               // =================================================
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.all(
-                    14,
-                  ),
+                  padding: const EdgeInsets.all(14),
                   child: Container(
                     width: double.infinity,
                     decoration: BoxDecoration(
-                      color: const Color(
-                        0xFF111111,
-                      ),
-                      borderRadius: BorderRadius.circular(
-                        14,
-                      ),
+                      color: const Color(0xFF111111),
+                      borderRadius: BorderRadius.circular(14),
                       border: Border.all(
-                        color: Colors.white.withValues(
-                          alpha: 0.06,
-                        ),
+                        color: Colors.white.withValues(alpha: 0.06),
                       ),
                     ),
                     child: _isReady
@@ -628,12 +455,8 @@ class _LyricsWindowState
                             decoration: const InputDecoration(
                               border: InputBorder.none,
                               hintText: 'Escreva sua letra...',
-                              hintStyle: TextStyle(
-                                color: Colors.white24,
-                              ),
-                              contentPadding: EdgeInsets.all(
-                                18,
-                              ),
+                              hintStyle: TextStyle(color: Colors.white24),
+                              contentPadding: EdgeInsets.all(18),
                             ),
                           )
                         : const Center(
@@ -650,18 +473,10 @@ class _LyricsWindowState
               // =================================================
               Container(
                 height: 32,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 14),
                 decoration: const BoxDecoration(
-                  color: Color(
-                    0xFF111111,
-                  ),
-                  border: Border(
-                    top: BorderSide(
-                      color: Colors.white10,
-                    ),
-                  ),
+                  color: Color(0xFF111111),
+                  border: Border(top: BorderSide(color: Colors.white10)),
                 ),
                 child: Row(
                   children: [
@@ -669,16 +484,12 @@ class _LyricsWindowState
                       width: 6,
                       height: 6,
                       decoration: const BoxDecoration(
-                        color: Color(
-                          0xFF00FF66,
-                        ),
+                        color: Color(0xFF00FF66),
                         shape: BoxShape.circle,
                       ),
                     ),
 
-                    const SizedBox(
-                      width: 6,
-                    ),
+                    const SizedBox(width: 6),
 
                     Text(
                       _isDocking

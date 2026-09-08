@@ -14,6 +14,7 @@ import 'package:versin/modules/networking/invitations/controllers/project_invita
 import 'package:versin/modules/networking/invitations/models/project_invitation_model.dart';
 import 'package:versin/modules/networking/members/views/members_view.dart';
 import 'package:versin/modules/networking/page/dialogs/networking_leave_project_dialog.dart';
+import 'package:versin/modules/match/quick/services/match_quick_connection_service.dart';
 import 'package:versin/modules/networking/page/models/networking_call_banner_data.dart';
 import 'package:versin/modules/networking/page/services/networking_profile_name_resolver.dart';
 import 'package:versin/modules/networking/royalties/controllers/royalties_controller.dart';
@@ -384,94 +385,52 @@ class NetworkingSessionCoordinator extends ChangeNotifier {
   // ============================================================
 
   Future<void> requestLeaveProject(BuildContext context) async {
-    if (isLeavingProject || !context.mounted) {
-      return;
-    }
-
-    final confirmed = await NetworkingLeaveProjectDialog.show(context: context);
-
-    if (!confirmed || _disposed || !context.mounted) {
-      return;
-    }
-
-    await _leaveProject(context);
-  }
-
-  Future<void> _leaveProject(BuildContext context) async {
-    if (isLeavingProject) {
-      return;
-    }
-
-    final userId = currentUserId;
-
-    if (userId == null || projectId.isEmpty) {
-      showMessage(
-        context,
-        'Não foi possível identificar sua participação '
-        'neste projeto.',
-        error: true,
-      );
-
-      return;
-    }
-
+    if (isLeavingProject || !context.mounted) return;
     _setLeavingProject(true);
-
     try {
-      await _supabase.rpc(
-        'leave_match_project',
-        params: <String, dynamic>{'p_project_id': projectId},
+      final quick = MatchQuickConnectionService.instance;
+      final preview = await quick.previewCollaboration(projectId);
+      if (_disposed || !context.mounted) return;
+      final confirmed = await NetworkingLeaveProjectDialog.show(
+        context: context, preview: preview,
       );
-
-      debugPrint(
-        '[NETWORKING SESSION] '
-        'Usuário $userId saiu do projeto $projectId.',
+      if (!confirmed || _disposed || !context.mounted) return;
+      await quick.finishCollaboration(
+        projectId,
+        expectedMembers: (preview['member_count'] as num).toInt(),
+        expectedHasWork: preview['has_work'] == true,
       );
-
-      await _refreshDashboardActiveProject();
-
-      if (_disposed || !context.mounted) {
-        return;
-      }
-
-      showMessage(context, 'Você saiu da Studio Session.');
-
-      Navigator.of(context).pop(true);
+      if (_disposed || !context.mounted) return;
+      await handleCollaborationFinished(context);
     } on PostgrestException catch (error, stackTrace) {
-      debugPrint(
-        '[NETWORKING SESSION] '
-        'Erro Supabase ao sair do projeto: '
-        '${error.message}',
-      );
-
-      debugPrint(
-        '[NETWORKING SESSION] '
-        'Código: ${error.code}',
-      );
-
+      debugPrint('[NETWORKING SESSION] Encerramento: ${error.message}');
       debugPrint('$stackTrace');
-
       if (context.mounted) {
         showMessage(context, _leaveProjectErrorMessage(error), error: true);
       }
     } catch (error, stackTrace) {
-      debugPrint(
-        '[NETWORKING SESSION] '
-        'Erro ao sair do projeto: $error',
-      );
-
+      debugPrint('[NETWORKING SESSION] Encerramento: $error');
       debugPrint('$stackTrace');
-
       if (context.mounted) {
-        showMessage(
-          context,
-          'Não foi possível sair do projeto. '
-          'Tente novamente.',
-          error: true,
-        );
+        showMessage(context, 'Não foi possível encerrar a colaboração. '
+            'Tente novamente.', error: true);
       }
     } finally {
       _setLeavingProject(false);
+    }
+  }
+
+  /// Usado também quando o outro participante encerra a colaboração.
+  Future<void> handleCollaborationFinished(BuildContext context) async {
+    if (_disposed || !context.mounted) return;
+    try {
+      await _refreshDashboardActiveProject();
+    } catch (error) {
+      debugPrint('[NETWORKING SESSION] Atualização do dashboard: $error');
+    }
+    if (_disposed || !context.mounted) return;
+    if (ModalRoute.of(context)?.isCurrent == true) {
+      Navigator.of(context).pop(true);
     }
   }
 

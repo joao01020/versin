@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:versin/modules/match/page/services/match_confirmation_service.dart';
 
-enum MatchConfirmationAction { continueDiscovering, viewProject }
+enum MatchConfirmationAction { continueDiscovering, viewProject, startNow }
 
 class MatchConfirmationDialog extends StatelessWidget {
   final MatchConfirmation confirmation;
-  const MatchConfirmationDialog({super.key, required this.confirmation});
+  final bool allowQuickStart;
+  const MatchConfirmationDialog({
+    super.key,
+    required this.confirmation,
+    this.allowQuickStart = false,
+  });
 
   static const Color _surface = Color(0xFF111116);
   static const Color _accent = Color(0xFF8B5CF6);
@@ -133,6 +138,18 @@ class MatchConfirmationDialog extends StatelessWidget {
                       child: const Text('Ver projeto'),
                     ),
                   ),
+                  if (allowQuickStart) ...[
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.of(context).pop(
+                          MatchConfirmationAction.startNow,
+                        ),
+                        child: const Text('Iniciar conexão agora'),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 10),
                   SizedBox(
                     width: double.infinity,

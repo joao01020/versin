@@ -53,8 +53,8 @@ import 'package:versin/modules/match/widgets/discovery_card_widget.dart';
 //
 // Se não existir próximo usuário:
 //
-// - o usuário atual permanece;
-// - o card não desaparece.
+// - o card desaparece;
+// - a descoberta mostra o estado vazio.
 //
 // NÃO:
 //
@@ -67,9 +67,7 @@ import 'package:versin/modules/match/widgets/discovery_card_widget.dart';
 //
 // ============================================================
 
-class DiscoverySectionWidget
-    extends
-        StatelessWidget {
+class DiscoverySectionWidget extends StatelessWidget {
   // ============================================================
   // CONTROLLER
   // ============================================================
@@ -81,6 +79,7 @@ class DiscoverySectionWidget
   // ============================================================
 
   final bool isInitializingMatch;
+  final Future<void> Function()? onRefresh;
 
   // ============================================================
   // TEAM EXPANSION
@@ -92,25 +91,13 @@ class DiscoverySectionWidget
   // INVITATION
   // ============================================================
 
-  final Future<
-    bool
-  >
-  Function(
-    String userId,
-  )?
-  onInviteUser;
+  final Future<bool> Function(String userId)? onInviteUser;
 
   // ============================================================
   // DEMO
   // ============================================================
 
-  final Future<
-    void
-  >
-  Function(
-    String userId,
-  )?
-  onListenDemo;
+  final Future<void> Function(String userId)? onListenDemo;
 
   // ============================================================
   // CONSTRUCTOR
@@ -120,6 +107,7 @@ class DiscoverySectionWidget
     super.key,
     required this.controller,
     required this.isInitializingMatch,
+    this.onRefresh,
     this.isTeamExpansionMode = false,
     this.onInviteUser,
     this.onListenDemo,
@@ -130,9 +118,7 @@ class DiscoverySectionWidget
   // ============================================================
 
   @override
-  Widget build(
-    BuildContext context,
-  ) {
+  Widget build(BuildContext context) {
     // ==========================================================
     // LOADING
     // ==========================================================
@@ -147,8 +133,7 @@ class DiscoverySectionWidget
 
     final discoveryUser = controller.discoveryUser;
 
-    if (discoveryUser !=
-        null) {
+    if (discoveryUser != null) {
       return DiscoveryCardWidget(
         controller: controller,
 
@@ -172,8 +157,7 @@ class DiscoverySectionWidget
           if (isTeamExpansionMode) {
             final inviteCallback = onInviteUser;
 
-            if (inviteCallback ==
-                null) {
+            if (inviteCallback == null) {
               debugPrint(
                 '[DISCOVERY SECTION] '
                 'Modo de expansão ativo, mas '
@@ -183,9 +167,7 @@ class DiscoverySectionWidget
               return;
             }
 
-            final invited = await inviteCallback(
-              discoveryUser.id,
-            );
+            final invited = await inviteCallback(discoveryUser.id);
 
             if (!invited) {
               return;
@@ -206,14 +188,10 @@ class DiscoverySectionWidget
         // ======================================================
         // DEMO
         // ======================================================
-        onListenDemo:
-            onListenDemo ==
-                null
+        onListenDemo: onListenDemo == null
             ? null
             : () async {
-                await onListenDemo!(
-                  discoveryUser.id,
-                );
+                await onListenDemo!(discoveryUser.id);
               },
       );
     }
@@ -230,8 +208,7 @@ class DiscoverySectionWidget
   // ============================================================
 
   bool get _isLoading {
-    return controller.isLoading ||
-        isInitializingMatch;
+    return controller.isLoading || isInitializingMatch;
   }
 
   // ============================================================
@@ -245,25 +222,15 @@ class DiscoverySectionWidget
       height: 220,
 
       decoration: BoxDecoration(
-        color: Colors.white.withValues(
-          alpha: 0.02,
-        ),
+        color: Colors.white.withValues(alpha: 0.02),
 
-        borderRadius: BorderRadius.circular(
-          24,
-        ),
+        borderRadius: BorderRadius.circular(24),
 
-        border: Border.all(
-          color: Colors.white.withValues(
-            alpha: 0.04,
-          ),
-        ),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.04)),
       ),
 
       child: const Center(
-        child: CircularProgressIndicator(
-          color: Colors.purple,
-        ),
+        child: CircularProgressIndicator(color: Colors.purple),
       ),
     );
   }
@@ -276,26 +243,16 @@ class DiscoverySectionWidget
     return Container(
       width: double.infinity,
 
-      height: 160,
+      constraints: const BoxConstraints(minHeight: 160),
 
-      padding: const EdgeInsets.symmetric(
-        horizontal: 24,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 24),
 
       decoration: BoxDecoration(
-        color: Colors.white.withValues(
-          alpha: 0.02,
-        ),
+        color: Colors.white.withValues(alpha: 0.02),
 
-        borderRadius: BorderRadius.circular(
-          24,
-        ),
+        borderRadius: BorderRadius.circular(24),
 
-        border: Border.all(
-          color: Colors.white.withValues(
-            alpha: 0.06,
-          ),
-        ),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
       ),
 
       child: Column(
@@ -315,9 +272,7 @@ class DiscoverySectionWidget
             size: 32,
           ),
 
-          const SizedBox(
-            height: 12,
-          ),
+          const SizedBox(height: 12),
 
           // ====================================================
           // TITLE
@@ -325,6 +280,8 @@ class DiscoverySectionWidget
           Text(
             isTeamExpansionMode
                 ? 'Nenhum profissional disponível para convidar.'
+                : controller.discoveryExhausted
+                ? 'Você viu todos os perfis disponíveis.'
                 : 'Nenhum profissional compatível encontrado.',
 
             textAlign: TextAlign.center,
@@ -338,9 +295,7 @@ class DiscoverySectionWidget
             ),
           ),
 
-          const SizedBox(
-            height: 6,
-          ),
+          const SizedBox(height: 6),
 
           // ====================================================
           // SUBTITLE
@@ -349,8 +304,9 @@ class DiscoverySectionWidget
             isTeamExpansionMode
                 ? 'Novos profissionais aparecerão aqui '
                       'quando estiverem disponíveis para a equipe.'
-                : 'Novos profissionais aparecerão aqui '
-                      'quando forem encontrados.',
+                : controller.discoveryExhausted
+                ? 'Novos profissionais aparecerão aqui quando forem encontrados.'
+                : 'Tente atualizar a busca ou alterar os filtros.',
 
             textAlign: TextAlign.center,
 
@@ -362,6 +318,21 @@ class DiscoverySectionWidget
               height: 1.4,
             ),
           ),
+          if (onRefresh != null) ...[
+            const SizedBox(height: 14),
+            OutlinedButton.icon(
+              onPressed: () {
+                onRefresh!();
+              },
+              icon: const Icon(Icons.refresh_rounded, size: 17),
+              label: const Text('Atualizar busca'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFFA78BFA),
+                side: const BorderSide(color: Color(0xFF34303E)),
+                minimumSize: const Size(0, 40),
+              ),
+            ),
+          ],
         ],
       ),
     );

@@ -1,9 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class NetworkingController
     with
         ChangeNotifier {
+  StreamSubscription<List<Map<String, dynamic>>>? _projectSubscription;
+  bool _disposed = false;
+
   final String projectId;
   NetworkingController({
     required this.projectId,
@@ -18,7 +23,9 @@ class NetworkingController
 
   void initSession() {
     // Escuta em tempo real as mudanças no contrato (JSONB)
-    Supabase.instance.client
+    final previous = _projectSubscription;
+    if (previous != null) unawaited(previous.cancel());
+    _projectSubscription = Supabase.instance.client
         .from(
           'projects',
         )
@@ -41,11 +48,10 @@ class NetworkingController
             >
             snapshot,
           ) {
-            if (snapshot.isNotEmpty) {
-              projectData = snapshot.first;
-              isLoading = false;
-              notifyListeners();
-            }
+            if (_disposed) return;
+            projectData = snapshot.isNotEmpty ? snapshot.first : null;
+            isLoading = false;
+            notifyListeners();
           },
         );
   }
@@ -72,5 +78,14 @@ class NetworkingController
           'id',
           projectId,
         );
+  }
+  @override
+  void dispose() {
+    if (_disposed) return;
+    _disposed = true;
+    final subscription = _projectSubscription;
+    _projectSubscription = null;
+    if (subscription != null) unawaited(subscription.cancel());
+    super.dispose();
   }
 }

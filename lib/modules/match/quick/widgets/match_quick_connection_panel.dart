@@ -99,48 +99,38 @@ class _MatchQuickConnectionPanelState extends State<MatchQuickConnectionPanel> {
   }
 
   Future<void> _end() async {
-    final projectId = service.projectId ?? widget.projectId;
-    if (projectId == null || projectId.isEmpty) return;
-    Map<String, dynamic>? preview;
-    final inspected = await _run(() async {
-      preview = await service.previewCollaboration(projectId);
-    });
-    if (!inspected || !mounted || preview == null) return;
-    final confirmed = await MatchCollaborationConfirmationDialog.show(
-      context: context, preview: preview!,
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Encerrar conexão rápida?'),
+        content: const Text(
+          'O tempo restante do Agora ficará pausado. '
+          'O Networking, seus membros e todo o conteúdo continuarão disponíveis.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Continuar conexão'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Encerrar conexão'),
+          ),
+        ],
+      ),
     );
-    if (!confirmed || !mounted) return;
-    final completed = await _run(() async {
-      await service.finishCollaboration(
-        projectId,
-        expectedMembers: (preview!['member_count'] as num).toInt(),
-        expectedHasWork: preview!['has_work'] == true,
-      );
-    });
-    if (completed && mounted) {
-      await widget.onCollaborationFinished?.call(projectId);
-    }
+    if (confirmed == true && mounted) await _run(service.end);
   }
 
   Future<void> _respond(Map<String, dynamic> invitation, bool accept) async {
     String? projectToOpen;
-    String? projectFinished;
     final completed = await _run(() async {
       final result = await service.respond(invitation['id'].toString(), accept);
       if (accept && result['status'] == 'accepted') {
         projectToOpen = result['project_id']?.toString();
       }
-      final collaboration = result['collaboration'];
-      if (collaboration is Map && collaboration['action'] == 'closed') {
-        projectFinished = collaboration['project_id']?.toString();
-      }
     });
-    if (!completed || !mounted) return;
-    if (projectFinished != null) {
-      await widget.onCollaborationFinished?.call(projectFinished!);
-    } else {
-      await _open(projectToOpen);
-    }
+    if (completed && mounted) await _open(projectToOpen);
   }
 
   Future<void> _resume() async {

@@ -392,29 +392,86 @@ class NetworkingSessionCoordinator extends ChangeNotifier {
       final preview = await quick.previewCollaboration(projectId);
       if (_disposed || !context.mounted) return;
       final confirmed = await NetworkingLeaveProjectDialog.show(
-        context: context, preview: preview,
+        context: context,
+        preview: preview,
       );
       if (!confirmed || _disposed || !context.mounted) return;
-      await quick.finishCollaboration(
-        projectId,
-        expectedMembers: (preview['member_count'] as num).toInt(),
-        expectedHasWork: preview['has_work'] == true,
-      );
+      await _executeCollaborationDecision(preview);
       if (_disposed || !context.mounted) return;
       await handleCollaborationFinished(context);
     } on PostgrestException catch (error, stackTrace) {
-      debugPrint('[NETWORKING SESSION] Encerramento: ${error.message}');
+      debugPrint('[NETWORKING SESSION] Saída: ${error.message}');
       debugPrint('$stackTrace');
       if (context.mounted) {
         showMessage(context, _leaveProjectErrorMessage(error), error: true);
       }
     } catch (error, stackTrace) {
-      debugPrint('[NETWORKING SESSION] Encerramento: $error');
+      debugPrint('[NETWORKING SESSION] Saída: $error');
       debugPrint('$stackTrace');
       if (context.mounted) {
-        showMessage(context, 'Não foi possível encerrar a colaboração. '
-            'Tente novamente.', error: true);
+        showMessage(
+          context,
+          'Não foi possível concluir a operação. '
+          'Tente novamente.',
+          error: true,
+        );
       }
+    } finally {
+      _setLeavingProject(false);
+    }
+  }
+
+  Future<void> _executeCollaborationDecision(
+    Map<String, dynamic> preview,
+  ) async {
+    final quick = MatchQuickConnectionService.instance;
+    final count = (preview['member_count'] as num).toInt();
+    final hasWork = preview['has_work'] == true;
+    if (preview['action'] == 'archive') {
+      final updatedAt = preview['updated_at']?.toString();
+      if (updatedAt == null || updatedAt.isEmpty) {
+        throw StateError('Prévia de arquivamento incompleta.');
+      }
+      await quick.archiveCollaboration(
+        projectId,
+        expectedMembers: count,
+        expectedHasWork: hasWork,
+        expectedUpdatedAt: updatedAt,
+      );
+    } else {
+      await quick.finishCollaboration(
+        projectId,
+        expectedMembers: count,
+        expectedHasWork: hasWork,
+      );
+    }
+  }
+
+  /// Arquivamento explícito utilizado também pelo aviso de projeto solo.
+  Future<bool> requestArchiveProject(BuildContext context) async {
+    if (isLeavingProject || !context.mounted) return false;
+    _setLeavingProject(true);
+    try {
+      final quick = MatchQuickConnectionService.instance;
+      final preview = await quick.previewCollaboration(projectId);
+      if (preview['action'] != 'archive') {
+        throw StateError('O projeto mudou. Revise os participantes.');
+      }
+      if (_disposed || !context.mounted) return false;
+      final confirmed = await NetworkingLeaveProjectDialog.show(
+        context: context,
+        preview: preview,
+      );
+      if (!confirmed || _disposed || !context.mounted) return false;
+      await _executeCollaborationDecision(preview);
+      if (_disposed || !context.mounted) return false;
+      await handleCollaborationFinished(context);
+      return true;
+    } catch (error) {
+      if (context.mounted) {
+        showMessage(context, 'Não foi possível arquivar: $error', error: true);
+      }
+      return false;
     } finally {
       _setLeavingProject(false);
     }

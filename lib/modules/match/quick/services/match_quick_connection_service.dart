@@ -34,8 +34,10 @@ class MatchQuickConnectionService extends ChangeNotifier {
   List<Map<String, dynamic>> _rows(String key) {
     final value = _data[key];
     if (value is! List) return const [];
-    return value.whereType<Map>().map((row) =>
-        Map<String, dynamic>.from(row)).toList(growable: false);
+    return value
+        .whereType<Map>()
+        .map((row) => Map<String, dynamic>.from(row))
+        .toList(growable: false);
   }
 
   void _checkUser() {
@@ -84,15 +86,18 @@ class MatchQuickConnectionService extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       if (_client.auth.currentUser?.id == id) {
-        error = e is PostgrestException ? e.message : 'Não foi possível atualizar a conexão.';
+        error = e is PostgrestException
+            ? e.message
+            : 'Não foi possível atualizar a conexão.';
         notifyListeners();
       }
     }
   }
 
   Future<Map<String, dynamic>> _action(
-    String rpc, [Map<String, dynamic>? params]
-  ) async {
+    String rpc, [
+    Map<String, dynamic>? params,
+  ]) async {
     _checkUser();
     final id = _userId;
     if (id == null) throw StateError('Usuário não autenticado.');
@@ -149,7 +154,7 @@ class MatchQuickConnectionService extends ChangeNotifier {
     return Map<String, dynamic>.from(result as Map);
   }
 
-  /// Uma única transação decide entre fechar a dupla e sair de um grupo.
+  /// Sai apenas o solicitante. Nunca arquiva automaticamente.
   Future<Map<String, dynamic>> finishCollaboration(
     String projectId, {
     int? expectedMembers,
@@ -158,6 +163,19 @@ class MatchQuickConnectionService extends ChangeNotifier {
     'p_project_id': projectId,
     'p_expected_members': expectedMembers,
     'p_expected_has_work': expectedHasWork,
+  });
+
+  /// Arquiva o projeto inteiro somente após confirmação explícita.
+  Future<Map<String, dynamic>> archiveCollaboration(
+    String projectId, {
+    required int expectedMembers,
+    required bool expectedHasWork,
+    required String expectedUpdatedAt,
+  }) => _action('match_collaboration_close', {
+    'p_project_id': projectId,
+    'p_expected_members': expectedMembers,
+    'p_expected_has_work': expectedHasWork,
+    'p_expected_updated_at': expectedUpdatedAt,
   });
 
   Future<void> end() async {

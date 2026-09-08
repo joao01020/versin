@@ -6,23 +6,20 @@ abstract final class MatchCollaborationConfirmationDialog {
     required BuildContext context,
     required Map<String, dynamic> preview,
   }) async {
-    final members = (preview['member_count'] as num?)?.toInt() ?? 0;
     final hasWork = preview['has_work'] == true;
     final canFinish = preview['can_finish'] == true;
     final leaveOnly = preview['action'] == 'leave';
     final reason = preview['reason']?.toString() ?? '';
     final title = leaveOnly
         ? 'Sair desta Studio Session?'
-        : hasWork
-            ? 'Encerrar esta colaboração?'
-            : 'Encerrar esta conexão?';
+        : 'Arquivar este projeto?';
     final fallbackDescription = leaveOnly
-        ? 'Apenas você sairá. Os demais participantes continuarão no projeto.'
+        ? 'Apenas você sairá. O projeto continuará ativo com os demais participantes.'
         : hasWork
-            ? 'O projeto será encerrado para ambos e deixará de aparecer nos '
-                'projetos ativos. O histórico e as contribuições serão preservados.'
-            : 'Esta tentativa será encerrada para ambos e deixará de aparecer '
-                'nos projetos ativos. O tempo restante do Agora poderá ser retomado.';
+        ? 'O projeto será arquivado e deixará de aparecer nos '
+              'projetos ativos. O histórico e as contribuições serão preservados.'
+        : 'Este projeto será arquivado e deixará de aparecer '
+              'nos projetos ativos. O tempo restante do Agora poderá ser retomado.';
     final description = reason.isNotEmpty ? reason : fallbackDescription;
     var confirmed = false;
     return await showDialog<bool>(
@@ -42,13 +39,14 @@ abstract final class MatchCollaborationConfirmationDialog {
                     const SizedBox(height: 12),
                     CheckboxListTile(
                       value: confirmed,
-                      onChanged: (value) => setDialogState(
-                        () => confirmed = value ?? false,
-                      ),
+                      onChanged: (value) =>
+                          setDialogState(() => confirmed = value ?? false),
                       contentPadding: EdgeInsets.zero,
                       controlAffinity: ListTileControlAffinity.leading,
-                      title: const Text('Estou ciente e quero continuar.',
-                        style: TextStyle(fontSize: 12)),
+                      title: const Text(
+                        'Estou ciente e quero continuar.',
+                        style: TextStyle(fontSize: 12),
+                      ),
                     ),
                   ],
                 ],
@@ -63,11 +61,14 @@ abstract final class MatchCollaborationConfirmationDialog {
                     onPressed: confirmed
                         ? () => Navigator.pop(dialogContext, true)
                         : null,
-                    child: Text(leaveOnly ? 'Sair do projeto' : 'Encerrar colaboração'),
+                    child: Text(
+                      leaveOnly ? 'Sair do projeto' : 'Arquivar projeto',
+                    ),
                   ),
               ],
             ),
           ),
-        ) ?? false;
+        ) ??
+        false;
   }
 }

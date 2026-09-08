@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:versin/modules/networking/page/networking_session_coordinator.dart';
+import 'package:versin/modules/match/history/services/match_project_history_service.dart';
+import 'package:versin/modules/match/quick/widgets/match_solo_project_dialog.dart';
+import 'package:versin/modules/networking/recruitment/views/create_recruitment_view.dart';
 import 'package:versin/modules/match/quick/services/match_quick_project_resolver.dart';
 import 'package:versin/modules/match/quick/services/match_quick_connection_service.dart';
 import 'package:versin/modules/match/quick/widgets/match_quick_connection_panel.dart';
@@ -21,11 +24,120 @@ class NetworkingSessionView extends StatefulWidget {
 
 class _NetworkingSessionViewState extends State<NetworkingSessionView> {
   late final NetworkingSessionCoordinator _coordinator;
-  late final Future<MatchQuickProjectTarget?> _quickTarget;
+  late Future<MatchQuickProjectTarget?> _quickTarget;
+  String? _targetMembersSignature;
+  final MatchProjectHistoryService _history = MatchProjectHistoryService();
+  bool _checkingSolo = false;
+  bool _soloDialogOpen = false;
+  int? _lastSoloEvent;
+  DateTime? _lastSoloCheck;
   Timer? _projectStateCheck;
   bool _closing = false;
   bool _checkingServer = false;
   DateTime? _lastServerCheck;
+
+  Future<MatchQuickProjectTarget?> _resolveQuickTarget() async {
+    try {
+      return await MatchQuickProjectResolver.resolve(widget.projectId);
+    } catch (error) {
+      debugPrint('[NETWORKING] Alvo da conexão rápida: $error');
+      return null;
+    }
+  }
+
+  void _refreshQuickTarget(Map<String, dynamic> project) {
+    final members =
+        (project['members'] as List?)
+            ?.map((value) => value.toString())
+            .toList() ??
+        <String>[];
+    final signature = (List<String>.from(members)..sort()).join(',');
+    if (signature == _targetMembersSignature) return;
+    _targetMembersSignature = signature;
+    final future = _resolveQuickTarget();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() => _quickTarget = future);
+    });
+  }
+
+  Future<void> _checkSoloNotice() async {
+    if (!mounted ||
+        _closing ||
+        _checkingSolo ||
+        _soloDialogOpen ||
+        ModalRoute.of(context)?.isCurrent != true)
+      return;
+    final project = _coordinator.controller.projectData;
+    if (project == null ||
+        project['origin'] != 'match' ||
+        project['status'] != 'active')
+      return;
+    final me = Supabase.instance.client.auth.currentUser?.id;
+    final members =
+        (project['members'] as List?)
+            ?.map((value) => value.toString())
+            .toList() ??
+        <String>[];
+    if (members.length != 1 || members.first != me) return;
+    _checkingSolo = true;
+    try {
+      final notice = await _history.soloStatus(widget.projectId);
+      if (!mounted ||
+          notice['pending'] != true ||
+          ModalRoute.of(context)?.isCurrent != true)
+        return;
+      final eventId = (notice['event_id'] as num).toInt();
+      if (_lastSoloEvent == eventId) return;
+      _lastSoloEvent = eventId;
+      _soloDialogOpen = true;
+      try {
+        await _showSoloChoices(notice, eventId);
+      } finally {
+        _soloDialogOpen = false;
+      }
+    } catch (error) {
+      debugPrint('[NETWORKING] Aviso solo: $error');
+    } finally {
+      _checkingSolo = false;
+    }
+  }
+
+  Future<void> _showSoloChoices(
+    Map<String, dynamic> notice,
+    int eventId,
+  ) async {
+    while (mounted && !_closing) {
+      final choice = await MatchSoloProjectDialog.show(
+        context: context,
+        title: notice['title']?.toString() ?? 'Studio Session',
+      );
+      if (!mounted) return;
+      if (choice == MatchSoloChoice.archive) {
+        final archived = await _coordinator.requestArchiveProject(context);
+        if (archived || !mounted) return;
+        final current = await _history.soloStatus(widget.projectId);
+        if (current['pending'] != true ||
+            current['event_id']?.toString() != eventId.toString())
+          return;
+        continue;
+      }
+      try {
+        await _history.acknowledgeSolo(widget.projectId, eventId);
+      } on PostgrestException {
+        // Um novo participante pode ter entrado enquanto o modal estava aberto.
+        return;
+      }
+      if (!mounted) return;
+      if (choice == MatchSoloChoice.find) {
+        await Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => CreateRecruitmentView(projectId: widget.projectId),
+          ),
+        );
+      }
+      return;
+    }
+  }
 
   Future<void> _checkServerProjectState() async {
     if (!mounted || _closing || _checkingServer) return;
@@ -64,8 +176,11 @@ class _NetworkingSessionViewState extends State<NetworkingSessionView> {
       return;
     }
     final me = Supabase.instance.client.auth.currentUser?.id;
-    final members = (project['members'] as List?)
-        ?.map((value) => value.toString()).toSet() ?? <String>{};
+    final members =
+        (project['members'] as List?)
+            ?.map((value) => value.toString())
+            .toSet() ??
+        <String>{};
     if (project['status'] == 'active' && me != null && members.contains(me)) {
       return;
     }
@@ -86,18 +201,25 @@ class _NetworkingSessionViewState extends State<NetworkingSessionView> {
     }
   }
 
-
   @override
   void initState() {
     super.initState();
 
     _coordinator = NetworkingSessionCoordinator(projectId: widget.projectId);
-    _quickTarget = MatchQuickProjectResolver.resolve(widget.projectId);
+    _quickTarget = _resolveQuickTarget();
     _coordinator.initialize();
     _coordinator.controller.addListener(_checkProjectState);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _checkProjectState();
+    });
     _projectStateCheck = Timer.periodic(const Duration(seconds: 2), (_) {
       _checkProjectState();
       final now = DateTime.now();
+      if (_lastSoloCheck == null ||
+          now.difference(_lastSoloCheck!) >= const Duration(seconds: 10)) {
+        _lastSoloCheck = now;
+        unawaited(_checkSoloNotice());
+      }
       if (_lastServerCheck == null ||
           now.difference(_lastServerCheck!) >= const Duration(seconds: 15)) {
         _lastServerCheck = now;

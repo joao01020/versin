@@ -8,6 +8,7 @@ import 'package:versin/features/rhymes/presentation/controller/rhymes_controller
 import 'package:versin/modules/calendar/views/calendar_page.dart';
 
 import 'package:versin/modules/dashboard/config/menu/dashboard_menu_config.dart';
+import 'package:versin/modules/dashboard/config/models/dashboard_menu_item.dart';
 import 'package:versin/modules/dashboard/controllers/dashboard_controller.dart';
 import 'package:versin/modules/dashboard/global_call/controllers/dashboard_global_call_controller.dart';
 import 'package:versin/modules/dashboard/global_chat/controllers/dashboard_global_chat_controller.dart';

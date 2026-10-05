@@ -56,10 +56,7 @@ class SupabaseSessionManager {
   // AUTH LISTENER
   // ============================================================
 
-  StreamSubscription<
-    AuthState
-  >?
-  _authSubscription;
+  StreamSubscription<AuthState>? _authSubscription;
 
   // ============================================================
   // STATE
@@ -69,10 +66,7 @@ class SupabaseSessionManager {
 
   bool _isRefreshing = false;
 
-  Future<
-    bool
-  >?
-  _refreshFuture;
+  Future<bool>? _refreshFuture;
 
   // ============================================================
   // GETTERS
@@ -86,19 +80,14 @@ class SupabaseSessionManager {
 
   User? get currentUser => _supabase.auth.currentUser;
 
-  bool get hasSession =>
-      currentSession !=
-      null;
+  bool get hasSession => currentSession != null;
 
-  bool get hasAuthenticatedUser =>
-      currentUser !=
-      null;
+  bool get hasAuthenticatedUser => currentUser != null;
 
   bool get isSessionExpired {
     final session = currentSession;
 
-    if (session ==
-        null) {
+    if (session == null) {
       return false;
     }
 
@@ -117,10 +106,7 @@ class SupabaseSessionManager {
   //
   // ============================================================
 
-  Future<
-    bool
-  >
-  initialize() async {
+  Future<bool> initialize() async {
     if (_initialized) {
       return ensureValidSession();
     }
@@ -149,18 +135,14 @@ class SupabaseSessionManager {
   // ENSURE VALID SESSION
   // ============================================================
 
-  Future<
-    bool
-  >
-  ensureValidSession() async {
+  Future<bool> ensureValidSession() async {
     final session = _supabase.auth.currentSession;
 
     // ==========================================================
     // SEM SESSÃO
     // ==========================================================
 
-    if (session ==
-        null) {
+    if (session == null) {
       debugPrint(
         '[SUPABASE SESSION] '
         'Nenhuma sessão autenticada encontrada.',
@@ -212,14 +194,10 @@ class SupabaseSessionManager {
   //
   // ============================================================
 
-  Future<
-    bool
-  >
-  refreshSession() {
+  Future<bool> refreshSession() {
     final activeRefresh = _refreshFuture;
 
-    if (activeRefresh !=
-        null) {
+    if (activeRefresh != null) {
       return activeRefresh;
     }
 
@@ -234,17 +212,13 @@ class SupabaseSessionManager {
   // PERFORM REFRESH
   // ============================================================
 
-  Future<
-    bool
-  >
-  _performRefresh() async {
+  Future<bool> _performRefresh() async {
     _isRefreshing = true;
 
     try {
       final current = _supabase.auth.currentSession;
 
-      if (current ==
-          null) {
+      if (current == null) {
         debugPrint(
           '[SUPABASE SESSION] '
           'Refresh cancelado: sessão inexistente.',
@@ -257,8 +231,7 @@ class SupabaseSessionManager {
 
       final refreshedSession = response.session;
 
-      if (refreshedSession ==
-          null) {
+      if (refreshedSession == null) {
         debugPrint(
           '[SUPABASE SESSION] '
           'Refresh não retornou uma sessão.',
@@ -282,34 +255,24 @@ class SupabaseSessionManager {
       );
 
       return true;
-    } on AuthException catch (
-      error,
-      stackTrace
-    ) {
+    } on AuthException catch (error, stackTrace) {
       debugPrint(
         '[SUPABASE SESSION] '
         'Erro Auth ao renovar sessão: '
         '${error.message}',
       );
 
-      debugPrint(
-        '$stackTrace',
-      );
+      debugPrint('$stackTrace');
 
       return false;
-    } catch (
-      error,
-      stackTrace
-    ) {
+    } catch (error, stackTrace) {
       debugPrint(
         '[SUPABASE SESSION] '
         'Erro inesperado ao renovar sessão: '
         '$error',
       );
 
-      debugPrint(
-        '$stackTrace',
-      );
+      debugPrint('$stackTrace');
 
       return false;
     } finally {
@@ -324,29 +287,22 @@ class SupabaseSessionManager {
   // ============================================================
 
   void _listenAuthChanges() {
-    if (_authSubscription !=
-        null) {
+    if (_authSubscription != null) {
       return;
     }
 
     _authSubscription = _supabase.auth.onAuthStateChange.listen(
       _handleAuthStateChange,
 
-      onError:
-          (
-            Object error,
-            StackTrace stackTrace,
-          ) {
-            debugPrint(
-              '[SUPABASE SESSION] '
-              'Erro no AuthStateChange: '
-              '$error',
-            );
+      onError: (Object error, StackTrace stackTrace) {
+        debugPrint(
+          '[SUPABASE SESSION] '
+          'Erro no AuthStateChange: '
+          '$error',
+        );
 
-            debugPrint(
-              '$stackTrace',
-            );
-          },
+        debugPrint('$stackTrace');
+      },
     );
   }
 
@@ -354,9 +310,7 @@ class SupabaseSessionManager {
   // HANDLE AUTH STATE
   // ============================================================
 
-  void _handleAuthStateChange(
-    AuthState state,
-  ) {
+  void _handleAuthStateChange(AuthState state) {
     final event = state.event;
 
     final session = state.session;
@@ -470,14 +424,10 @@ class SupabaseSessionManager {
   //
   // ============================================================
 
-  Future<
-    bool
-  >
-  forceRefresh() async {
+  Future<bool> forceRefresh() async {
     final session = _supabase.auth.currentSession;
 
-    if (session ==
-        null) {
+    if (session == null) {
       return false;
     }
 
@@ -493,10 +443,7 @@ class SupabaseSessionManager {
   // DISPOSE
   // ============================================================
 
-  Future<
-    void
-  >
-  dispose() async {
+  Future<void> dispose() async {
     await _authSubscription?.cancel();
 
     _authSubscription = null;

@@ -23,8 +23,8 @@ class ChatListView extends StatelessWidget {
     required this.scrollController,
     required this.activeColor,
     required this.isBpmPlaying, // Adicionado
-    required this.currentBpm,   // Adicionado
-    required this.onToggleBpm,  // Adicionado
+    required this.currentBpm, // Adicionado
+    required this.onToggleBpm, // Adicionado
     this.secondsActive = 0,
   });
 
@@ -96,7 +96,7 @@ class ChatListView extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.05),
+              color: Colors.white.withValues(alpha: 0.05),
               borderRadius: BorderRadius.circular(12),
             ),
             child: const SizedBox(

@@ -472,8 +472,6 @@ class _AccountInformationPageState extends State<AccountInformationPage> {
         _dashboardController.profileImagePath = nextAvatarUrl;
       }
 
-      _dashboardController.notifyListeners();
-
       if (!mounted) {
         return;
       }

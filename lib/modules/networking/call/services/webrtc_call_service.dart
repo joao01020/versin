@@ -41,7 +41,11 @@ class WebRtcCallService {
   //
   // ==========================================================
 
-  final Map<String, dynamic> _peerConfiguration;
+  final Map<
+    String,
+    dynamic
+  >
+  _peerConfiguration;
 
   // ==========================================================
   // LOCAL MEDIA
@@ -55,28 +59,61 @@ class WebRtcCallService {
   // PEERS
   // ==========================================================
 
-  final Map<String, RTCPeerConnection> _peerConnections =
-      <String, RTCPeerConnection>{};
+  final Map<
+    String,
+    RTCPeerConnection
+  >
+  _peerConnections =
+      <
+        String,
+        RTCPeerConnection
+      >{};
 
   // ==========================================================
   // REMOTE STREAMS
   // ==========================================================
 
-  final Map<String, MediaStream> _remoteStreams = <String, MediaStream>{};
+  final Map<
+    String,
+    MediaStream
+  >
+  _remoteStreams =
+      <
+        String,
+        MediaStream
+      >{};
 
   // ==========================================================
   // REMOTE RENDERERS
   // ==========================================================
 
-  final Map<String, RTCVideoRenderer> _remoteRenderers =
-      <String, RTCVideoRenderer>{};
+  final Map<
+    String,
+    RTCVideoRenderer
+  >
+  _remoteRenderers =
+      <
+        String,
+        RTCVideoRenderer
+      >{};
 
   // ==========================================================
   // PENDING ICE
   // ==========================================================
 
-  final Map<String, List<RTCIceCandidate>> _pendingIceCandidates =
-      <String, List<RTCIceCandidate>>{};
+  final Map<
+    String,
+    List<
+      RTCIceCandidate
+    >
+  >
+  _pendingIceCandidates =
+      <
+        String,
+        List<
+          RTCIceCandidate
+        >
+      >{};
 
   // ==========================================================
   // STATE
@@ -94,30 +131,54 @@ class WebRtcCallService {
   // CALLBACKS
   // ==========================================================
 
-  void Function(String remoteUserId, RTCIceCandidate candidate)? onIceCandidate;
+  void Function(
+    String remoteUserId,
+    RTCIceCandidate candidate,
+  )?
+  onIceCandidate;
 
-  void Function(String remoteUserId, MediaStream stream)? onRemoteStream;
+  void Function(
+    String remoteUserId,
+    MediaStream stream,
+  )?
+  onRemoteStream;
 
-  void Function(String remoteUserId, RTCPeerConnectionState state)?
+  void Function(
+    String remoteUserId,
+    RTCPeerConnectionState state,
+  )?
   onConnectionState;
 
-  void Function(String remoteUserId)? onRemoteDisconnected;
+  void Function(
+    String remoteUserId,
+  )?
+  onRemoteDisconnected;
 
   // ==========================================================
   // CONSTRUCTOR
   // ==========================================================
 
-  WebRtcCallService({Map<String, dynamic>? peerConfiguration})
-    : _peerConfiguration =
-          peerConfiguration ??
-          const <String, dynamic>{
-            'iceServers': [
-              {
-                'urls': ['stun:stun.l.google.com:19302'],
-              },
-            ],
-            'sdpSemantics': 'unified-plan',
-          };
+  WebRtcCallService({
+    Map<
+      String,
+      dynamic
+    >?
+    peerConfiguration,
+  }) : _peerConfiguration =
+           peerConfiguration ??
+           const <
+             String,
+             dynamic
+           >{
+             'iceServers': [
+               {
+                 'urls': [
+                   'stun:stun.l.google.com:19302',
+                 ],
+               },
+             ],
+             'sdpSemantics': 'unified-plan',
+           };
 
   // ==========================================================
   // GETTERS
@@ -133,16 +194,31 @@ class WebRtcCallService {
 
   bool get speakerEnabled => _speakerEnabled;
 
-  Map<String, RTCVideoRenderer> get remoteRenderers =>
-      Map<String, RTCVideoRenderer>.unmodifiable(_remoteRenderers);
+  Map<
+    String,
+    RTCVideoRenderer
+  >
+  get remoteRenderers =>
+      Map<
+        String,
+        RTCVideoRenderer
+      >.unmodifiable(
+        _remoteRenderers,
+      );
 
-  Iterable<String> get remoteUserIds => _peerConnections.keys;
+  Iterable<
+    String
+  >
+  get remoteUserIds => _peerConnections.keys;
 
   // ==========================================================
   // INITIALIZE LOCAL MEDIA
   // ==========================================================
 
-  Future<void> initializeLocalMedia({
+  Future<
+    void
+  >
+  initializeLocalMedia({
     bool enableAudio = true,
     bool enableVideo = false,
   }) async {
@@ -150,7 +226,9 @@ class WebRtcCallService {
 
     await _disposeLocalMedia();
 
-    debugPrint('[WEBRTC] Inicializando mídia local...');
+    debugPrint(
+      '[WEBRTC] Inicializando mídia local...',
+    );
 
     debugPrint(
       '[WEBRTC] '
@@ -167,27 +245,46 @@ class WebRtcCallService {
 
     if (enableVideo) {
       try {
-        debugPrint('[WEBRTC] Tentando abrir microfone + câmera...');
+        debugPrint(
+          '[WEBRTC] Tentando abrir microfone + câmera...',
+        );
 
-        stream = await navigator.mediaDevices.getUserMedia({
-          'audio': enableAudio,
+        stream = await navigator.mediaDevices.getUserMedia(
+          {
+            'audio': enableAudio,
 
-          'video': {
-            'facingMode': 'user',
+            'video': {
+              'facingMode': 'user',
 
-            'width': {'ideal': 1280},
+              'width': {
+                'ideal': 1280,
+              },
 
-            'height': {'ideal': 720},
+              'height': {
+                'ideal': 720,
+              },
 
-            'frameRate': {'ideal': 30},
+              'frameRate': {
+                'ideal': 30,
+              },
+            },
           },
-        });
+        );
 
-        debugPrint('[WEBRTC] Microfone + câmera inicializados.');
-      } catch (error, stackTrace) {
-        debugPrint('[WEBRTC] Falha ao abrir câmera: $error');
+        debugPrint(
+          '[WEBRTC] Microfone + câmera inicializados.',
+        );
+      } catch (
+        error,
+        stackTrace
+      ) {
+        debugPrint(
+          '[WEBRTC] Falha ao abrir câmera: $error',
+        );
 
-        debugPrint('[WEBRTC] $stackTrace');
+        debugPrint(
+          '[WEBRTC] $stackTrace',
+        );
 
         // ====================================================
         // FALLBACK
@@ -199,20 +296,27 @@ class WebRtcCallService {
         // ====================================================
 
         if (enableAudio) {
-          debugPrint('[WEBRTC] Tentando fallback somente com áudio...');
+          debugPrint(
+            '[WEBRTC] Tentando fallback somente com áudio...',
+          );
 
           try {
-            stream = await navigator.mediaDevices.getUserMedia({
-              'audio': true,
+            stream = await navigator.mediaDevices.getUserMedia(
+              {
+                'audio': true,
 
-              'video': false,
-            });
+                'video': false,
+              },
+            );
 
             debugPrint(
               '[WEBRTC] '
               'Fallback de áudio inicializado com sucesso.',
             );
-          } catch (audioError, audioStackTrace) {
+          } catch (
+            audioError,
+            audioStackTrace
+          ) {
             debugPrint(
               '[WEBRTC] '
               'Falha também no microfone: '
@@ -236,16 +340,25 @@ class WebRtcCallService {
     // ========================================================
     else {
       try {
-        debugPrint('[WEBRTC] Tentando abrir microfone...');
+        debugPrint(
+          '[WEBRTC] Tentando abrir microfone...',
+        );
 
-        stream = await navigator.mediaDevices.getUserMedia({
-          'audio': enableAudio,
+        stream = await navigator.mediaDevices.getUserMedia(
+          {
+            'audio': enableAudio,
 
-          'video': false,
-        });
+            'video': false,
+          },
+        );
 
-        debugPrint('[WEBRTC] Microfone inicializado.');
-      } catch (error, stackTrace) {
+        debugPrint(
+          '[WEBRTC] Microfone inicializado.',
+        );
+      } catch (
+        error,
+        stackTrace
+      ) {
         debugPrint(
           '[WEBRTC] '
           'Falha ao abrir microfone: '
@@ -265,8 +378,11 @@ class WebRtcCallService {
     // VALIDAR STREAM
     // ========================================================
 
-    if (stream == null) {
-      throw StateError('Nenhum MediaStream foi criado.');
+    if (stream ==
+        null) {
+      throw StateError(
+        'Nenhum MediaStream foi criado.',
+      );
     }
 
     _localStream = stream;
@@ -279,9 +395,13 @@ class WebRtcCallService {
     // ESTADO REAL
     // ========================================================
 
-    _microphoneEnabled = enableAudio && audioTracks.isNotEmpty;
+    _microphoneEnabled =
+        enableAudio &&
+        audioTracks.isNotEmpty;
 
-    _cameraEnabled = enableVideo && videoTracks.isNotEmpty;
+    _cameraEnabled =
+        enableVideo &&
+        videoTracks.isNotEmpty;
 
     debugPrint(
       '[WEBRTC] '
@@ -319,7 +439,9 @@ class WebRtcCallService {
 
     _localRenderer = renderer;
 
-    debugPrint('[WEBRTC] Mídia local pronta.');
+    debugPrint(
+      '[WEBRTC] Mídia local pronta.',
+    );
 
     debugPrint(
       '[WEBRTC] '
@@ -336,19 +458,33 @@ class WebRtcCallService {
   // CREATE PEER
   // ==========================================================
 
-  Future<RTCPeerConnection> ensurePeer(String remoteUserId) async {
+  Future<
+    RTCPeerConnection
+  >
+  ensurePeer(
+    String remoteUserId,
+  ) async {
     _ensureNotDisposed();
 
-    final normalizedUserId = _required(remoteUserId, 'remoteUserId');
+    final normalizedUserId = _required(
+      remoteUserId,
+      'remoteUserId',
+    );
 
     final existing = _peerConnections[normalizedUserId];
 
-    if (existing != null) {
+    if (existing !=
+        null) {
       return existing;
     }
 
     final peer = await createPeerConnection(
-      Map<String, dynamic>.from(_peerConfiguration),
+      Map<
+        String,
+        dynamic
+      >.from(
+        _peerConfiguration,
+      ),
     );
 
     _peerConnections[normalizedUserId] = peer;
@@ -359,9 +495,13 @@ class WebRtcCallService {
 
     final stream = _localStream;
 
-    if (stream != null) {
+    if (stream !=
+        null) {
       for (final track in stream.getTracks()) {
-        await peer.addTrack(track, stream);
+        await peer.addTrack(
+          track,
+          stream,
+        );
       }
     }
 
@@ -369,61 +509,84 @@ class WebRtcCallService {
     // ICE
     // ========================================================
 
-    peer.onIceCandidate = (RTCIceCandidate candidate) {
-      if (_disposed) {
-        return;
-      }
+    peer.onIceCandidate =
+        (
+          RTCIceCandidate candidate,
+        ) {
+          if (_disposed) {
+            return;
+          }
 
-      final value = candidate.candidate;
+          final value = candidate.candidate;
 
-      if (value == null || value.trim().isEmpty) {
-        return;
-      }
+          if (value?.trim().isEmpty ??
+              true) {
+            return;
+          }
 
-      onIceCandidate?.call(normalizedUserId, candidate);
-    };
+          onIceCandidate?.call(
+            normalizedUserId,
+            candidate,
+          );
+        };
 
     // ========================================================
     // TRACK
     // ========================================================
 
-    peer.onTrack = (RTCTrackEvent event) {
-      if (_disposed) {
-        return;
-      }
+    peer.onTrack =
+        (
+          RTCTrackEvent event,
+        ) {
+          if (_disposed) {
+            return;
+          }
 
-      if (event.streams.isEmpty) {
-        return;
-      }
+          if (event.streams.isEmpty) {
+            return;
+          }
 
-      final remoteStream = event.streams.first;
+          final remoteStream = event.streams.first;
 
-      unawaited(_attachRemoteStream(normalizedUserId, remoteStream));
-    };
+          unawaited(
+            _attachRemoteStream(
+              normalizedUserId,
+              remoteStream,
+            ),
+          );
+        };
 
     // ========================================================
     // CONNECTION
     // ========================================================
 
-    peer.onConnectionState = (RTCPeerConnectionState state) {
-      if (_disposed) {
-        return;
-      }
+    peer.onConnectionState =
+        (
+          RTCPeerConnectionState state,
+        ) {
+          if (_disposed) {
+            return;
+          }
 
-      onConnectionState?.call(normalizedUserId, state);
+          onConnectionState?.call(
+            normalizedUserId,
+            state,
+          );
 
-      switch (state) {
-        case RTCPeerConnectionState.RTCPeerConnectionStateDisconnected:
-        case RTCPeerConnectionState.RTCPeerConnectionStateFailed:
-        case RTCPeerConnectionState.RTCPeerConnectionStateClosed:
-          onRemoteDisconnected?.call(normalizedUserId);
+          switch (state) {
+            case RTCPeerConnectionState.RTCPeerConnectionStateDisconnected:
+            case RTCPeerConnectionState.RTCPeerConnectionStateFailed:
+            case RTCPeerConnectionState.RTCPeerConnectionStateClosed:
+              onRemoteDisconnected?.call(
+                normalizedUserId,
+              );
 
-          break;
+              break;
 
-        default:
-          break;
-      }
-    };
+            default:
+              break;
+          }
+        };
 
     return peer;
   }
@@ -432,12 +595,21 @@ class WebRtcCallService {
   // CREATE OFFER
   // ==========================================================
 
-  Future<RTCSessionDescription> createOffer(String remoteUserId) async {
-    final peer = await ensurePeer(remoteUserId);
+  Future<
+    RTCSessionDescription
+  >
+  createOffer(
+    String remoteUserId,
+  ) async {
+    final peer = await ensurePeer(
+      remoteUserId,
+    );
 
     final offer = await peer.createOffer();
 
-    await peer.setLocalDescription(offer);
+    await peer.setLocalDescription(
+      offer,
+    );
 
     return offer;
   }
@@ -446,21 +618,38 @@ class WebRtcCallService {
   // HANDLE OFFER
   // ==========================================================
 
-  Future<RTCSessionDescription> handleOffer({
+  Future<
+    RTCSessionDescription
+  >
+  handleOffer({
     required String remoteUserId,
     required String sdp,
   }) async {
-    final peer = await ensurePeer(remoteUserId);
+    final peer = await ensurePeer(
+      remoteUserId,
+    );
 
-    final description = RTCSessionDescription(_required(sdp, 'sdp'), 'offer');
+    final description = RTCSessionDescription(
+      _required(
+        sdp,
+        'sdp',
+      ),
+      'offer',
+    );
 
-    await peer.setRemoteDescription(description);
+    await peer.setRemoteDescription(
+      description,
+    );
 
-    await _flushPendingIce(remoteUserId);
+    await _flushPendingIce(
+      remoteUserId,
+    );
 
     final answer = await peer.createAnswer();
 
-    await peer.setLocalDescription(answer);
+    await peer.setLocalDescription(
+      answer,
+    );
 
     return answer;
   }
@@ -469,33 +658,57 @@ class WebRtcCallService {
   // HANDLE ANSWER
   // ==========================================================
 
-  Future<void> handleAnswer({
+  Future<
+    void
+  >
+  handleAnswer({
     required String remoteUserId,
     required String sdp,
   }) async {
-    final peer = await ensurePeer(remoteUserId);
+    final peer = await ensurePeer(
+      remoteUserId,
+    );
 
-    final description = RTCSessionDescription(_required(sdp, 'sdp'), 'answer');
+    final description = RTCSessionDescription(
+      _required(
+        sdp,
+        'sdp',
+      ),
+      'answer',
+    );
 
-    await peer.setRemoteDescription(description);
+    await peer.setRemoteDescription(
+      description,
+    );
 
-    await _flushPendingIce(remoteUserId);
+    await _flushPendingIce(
+      remoteUserId,
+    );
   }
 
   // ==========================================================
   // ADD ICE
   // ==========================================================
 
-  Future<void> addIceCandidate({
+  Future<
+    void
+  >
+  addIceCandidate({
     required String remoteUserId,
     required String candidate,
     String? sdpMid,
     int? sdpMLineIndex,
   }) async {
-    final normalizedUserId = _required(remoteUserId, 'remoteUserId');
+    final normalizedUserId = _required(
+      remoteUserId,
+      'remoteUserId',
+    );
 
     final ice = RTCIceCandidate(
-      _required(candidate, 'candidate'),
+      _required(
+        candidate,
+        'candidate',
+      ),
       sdpMid,
       sdpMLineIndex,
     );
@@ -506,10 +719,19 @@ class WebRtcCallService {
     // PEER NOT YET AVAILABLE
     // ========================================================
 
-    if (peer == null) {
+    if (peer ==
+        null) {
       _pendingIceCandidates
-          .putIfAbsent(normalizedUserId, () => <RTCIceCandidate>[])
-          .add(ice);
+          .putIfAbsent(
+            normalizedUserId,
+            () =>
+                <
+                  RTCIceCandidate
+                >[],
+          )
+          .add(
+            ice,
+          );
 
       return;
     }
@@ -520,36 +742,59 @@ class WebRtcCallService {
 
     final remoteDescription = await peer.getRemoteDescription();
 
-    if (remoteDescription == null) {
+    if (remoteDescription ==
+        null) {
       _pendingIceCandidates
-          .putIfAbsent(normalizedUserId, () => <RTCIceCandidate>[])
-          .add(ice);
+          .putIfAbsent(
+            normalizedUserId,
+            () =>
+                <
+                  RTCIceCandidate
+                >[],
+          )
+          .add(
+            ice,
+          );
 
       return;
     }
 
-    await peer.addCandidate(ice);
+    await peer.addCandidate(
+      ice,
+    );
   }
 
   // ==========================================================
   // FLUSH ICE
   // ==========================================================
 
-  Future<void> _flushPendingIce(String remoteUserId) async {
+  Future<
+    void
+  >
+  _flushPendingIce(
+    String remoteUserId,
+  ) async {
     final peer = _peerConnections[remoteUserId];
 
-    if (peer == null) {
+    if (peer ==
+        null) {
       return;
     }
 
-    final candidates = _pendingIceCandidates.remove(remoteUserId);
+    final candidates = _pendingIceCandidates.remove(
+      remoteUserId,
+    );
 
-    if (candidates == null || candidates.isEmpty) {
+    if (candidates ==
+            null ||
+        candidates.isEmpty) {
       return;
     }
 
     for (final candidate in candidates) {
-      await peer.addCandidate(candidate);
+      await peer.addCandidate(
+        candidate,
+      );
     }
   }
 
@@ -557,7 +802,10 @@ class WebRtcCallService {
   // REMOTE STREAM
   // ==========================================================
 
-  Future<void> _attachRemoteStream(
+  Future<
+    void
+  >
+  _attachRemoteStream(
     String remoteUserId,
     MediaStream stream,
   ) async {
@@ -565,7 +813,8 @@ class WebRtcCallService {
 
     var renderer = _remoteRenderers[remoteUserId];
 
-    if (renderer == null) {
+    if (renderer ==
+        null) {
       renderer = RTCVideoRenderer();
 
       await renderer.initialize();
@@ -575,14 +824,19 @@ class WebRtcCallService {
 
     renderer.srcObject = stream;
 
-    onRemoteStream?.call(remoteUserId, stream);
+    onRemoteStream?.call(
+      remoteUserId,
+      stream,
+    );
   }
 
   // ==========================================================
   // REMOTE RENDERER
   // ==========================================================
 
-  RTCVideoRenderer? rendererFor(String remoteUserId) {
+  RTCVideoRenderer? rendererFor(
+    String remoteUserId,
+  ) {
     return _remoteRenderers[remoteUserId.trim()];
   }
 
@@ -590,12 +844,18 @@ class WebRtcCallService {
   // MICROPHONE
   // ==========================================================
 
-  Future<bool> setMicrophoneEnabled(bool enabled) async {
+  Future<
+    bool
+  >
+  setMicrophoneEnabled(
+    bool enabled,
+  ) async {
     _ensureNotDisposed();
 
     final stream = _localStream;
 
-    if (stream == null) {
+    if (stream ==
+        null) {
       return false;
     }
 
@@ -618,20 +878,31 @@ class WebRtcCallService {
   // TOGGLE MICROPHONE
   // ==========================================================
 
-  Future<bool> toggleMicrophone() {
-    return setMicrophoneEnabled(!_microphoneEnabled);
+  Future<
+    bool
+  >
+  toggleMicrophone() {
+    return setMicrophoneEnabled(
+      !_microphoneEnabled,
+    );
   }
 
   // ==========================================================
   // CAMERA
   // ==========================================================
 
-  Future<bool> setCameraEnabled(bool enabled) async {
+  Future<
+    bool
+  >
+  setCameraEnabled(
+    bool enabled,
+  ) async {
     _ensureNotDisposed();
 
     final stream = _localStream;
 
-    if (stream == null) {
+    if (stream ==
+        null) {
       return false;
     }
 
@@ -641,30 +912,43 @@ class WebRtcCallService {
     // CAMERA WAS NEVER ACQUIRED
     // ========================================================
 
-    if (enabled && videoTracks.isEmpty) {
+    if (enabled &&
+        videoTracks.isEmpty) {
       MediaStream? cameraStream;
 
       try {
-        debugPrint('[WEBRTC] Tentando ativar câmera...');
+        debugPrint(
+          '[WEBRTC] Tentando ativar câmera...',
+        );
 
-        cameraStream = await navigator.mediaDevices.getUserMedia({
-          'audio': false,
+        cameraStream = await navigator.mediaDevices.getUserMedia(
+          {
+            'audio': false,
 
-          'video': {
-            'facingMode': 'user',
+            'video': {
+              'facingMode': 'user',
 
-            'width': {'ideal': 1280},
+              'width': {
+                'ideal': 1280,
+              },
 
-            'height': {'ideal': 720},
+              'height': {
+                'ideal': 720,
+              },
 
-            'frameRate': {'ideal': 30},
+              'frameRate': {
+                'ideal': 30,
+              },
+            },
           },
-        });
+        );
 
         final newVideoTracks = cameraStream.getVideoTracks();
 
         if (newVideoTracks.isEmpty) {
-          debugPrint('[WEBRTC] Nenhuma video track foi criada.');
+          debugPrint(
+            '[WEBRTC] Nenhuma video track foi criada.',
+          );
 
           await cameraStream.dispose();
 
@@ -673,24 +957,41 @@ class WebRtcCallService {
 
         final track = newVideoTracks.first;
 
-        await stream.addTrack(track);
+        await stream.addTrack(
+          track,
+        );
 
-        await _addVideoTrackToPeers(track, stream);
+        await _addVideoTrackToPeers(
+          track,
+          stream,
+        );
 
         _localRenderer?.srcObject = stream;
 
         videoTracks = stream.getVideoTracks();
 
-        debugPrint('[WEBRTC] Câmera ativada com sucesso.');
-      } catch (error, stackTrace) {
-        debugPrint('[WEBRTC] Erro ativando câmera: $error');
+        debugPrint(
+          '[WEBRTC] Câmera ativada com sucesso.',
+        );
+      } catch (
+        error,
+        stackTrace
+      ) {
+        debugPrint(
+          '[WEBRTC] Erro ativando câmera: $error',
+        );
 
-        debugPrint('[WEBRTC] $stackTrace');
+        debugPrint(
+          '[WEBRTC] $stackTrace',
+        );
 
-        if (cameraStream != null) {
+        if (cameraStream !=
+            null) {
           try {
             await cameraStream.dispose();
-          } catch (_) {}
+          } catch (
+            _
+          ) {}
         }
 
         return false;
@@ -710,7 +1011,10 @@ class WebRtcCallService {
   // ADD VIDEO TRACK TO PEERS
   // ==========================================================
 
-  Future<void> _addVideoTrackToPeers(
+  Future<
+    void
+  >
+  _addVideoTrackToPeers(
     MediaStreamTrack track,
     MediaStream stream,
   ) async {
@@ -720,17 +1024,24 @@ class WebRtcCallService {
       RTCRtpSender? existingVideoSender;
 
       for (final sender in senders) {
-        if (sender.track?.kind == 'video') {
+        if (sender.track?.kind ==
+            'video') {
           existingVideoSender = sender;
 
           break;
         }
       }
 
-      if (existingVideoSender != null) {
-        await existingVideoSender.replaceTrack(track);
+      if (existingVideoSender !=
+          null) {
+        await existingVideoSender.replaceTrack(
+          track,
+        );
       } else {
-        await peer.addTrack(track, stream);
+        await peer.addTrack(
+          track,
+          stream,
+        );
       }
     }
   }
@@ -739,20 +1050,29 @@ class WebRtcCallService {
   // TOGGLE CAMERA
   // ==========================================================
 
-  Future<bool> toggleCamera() {
-    return setCameraEnabled(!_cameraEnabled);
+  Future<
+    bool
+  >
+  toggleCamera() {
+    return setCameraEnabled(
+      !_cameraEnabled,
+    );
   }
 
   // ==========================================================
   // SWITCH CAMERA
   // ==========================================================
 
-  Future<bool> switchCamera() async {
+  Future<
+    bool
+  >
+  switchCamera() async {
     _ensureNotDisposed();
 
     final stream = _localStream;
 
-    if (stream == null) {
+    if (stream ==
+        null) {
       return false;
     }
 
@@ -762,17 +1082,28 @@ class WebRtcCallService {
       return false;
     }
 
-    return Helper.switchCamera(tracks.first, null, stream);
+    return Helper.switchCamera(
+      tracks.first,
+      null,
+      stream,
+    );
   }
 
   // ==========================================================
   // SPEAKER
   // ==========================================================
 
-  Future<void> setSpeakerEnabled(bool enabled) async {
+  Future<
+    void
+  >
+  setSpeakerEnabled(
+    bool enabled,
+  ) async {
     _ensureNotDisposed();
 
-    await Helper.setSpeakerphoneOn(enabled);
+    await Helper.setSpeakerphoneOn(
+      enabled,
+    );
 
     _speakerEnabled = enabled;
   }
@@ -781,54 +1112,87 @@ class WebRtcCallService {
   // TOGGLE SPEAKER
   // ==========================================================
 
-  Future<void> toggleSpeaker() {
-    return setSpeakerEnabled(!_speakerEnabled);
+  Future<
+    void
+  >
+  toggleSpeaker() {
+    return setSpeakerEnabled(
+      !_speakerEnabled,
+    );
   }
 
   // ==========================================================
   // CLOSE PEER
   // ==========================================================
 
-  Future<void> closePeer(String remoteUserId) async {
+  Future<
+    void
+  >
+  closePeer(
+    String remoteUserId,
+  ) async {
     final normalized = remoteUserId.trim();
 
     if (normalized.isEmpty) {
       return;
     }
 
-    final peer = _peerConnections.remove(normalized);
+    final peer = _peerConnections.remove(
+      normalized,
+    );
 
-    _pendingIceCandidates.remove(normalized);
+    _pendingIceCandidates.remove(
+      normalized,
+    );
 
-    if (peer != null) {
+    if (peer !=
+        null) {
       try {
         await peer.close();
-      } catch (error) {
-        debugPrint('[WEBRTC] Erro fechando peer: $error');
+      } catch (
+        error
+      ) {
+        debugPrint(
+          '[WEBRTC] Erro fechando peer: $error',
+        );
       }
 
       try {
         await peer.dispose();
-      } catch (error) {
-        debugPrint('[WEBRTC] Erro descartando peer: $error');
+      } catch (
+        error
+      ) {
+        debugPrint(
+          '[WEBRTC] Erro descartando peer: $error',
+        );
       }
     }
 
-    final renderer = _remoteRenderers.remove(normalized);
+    final renderer = _remoteRenderers.remove(
+      normalized,
+    );
 
-    if (renderer != null) {
+    if (renderer !=
+        null) {
       renderer.srcObject = null;
 
       await renderer.dispose();
     }
 
-    final stream = _remoteStreams.remove(normalized);
+    final stream = _remoteStreams.remove(
+      normalized,
+    );
 
-    if (stream != null) {
+    if (stream !=
+        null) {
       try {
         await stream.dispose();
-      } catch (error) {
-        debugPrint('[WEBRTC] Erro descartando stream remoto: $error');
+      } catch (
+        error
+      ) {
+        debugPrint(
+          '[WEBRTC] Erro descartando stream remoto: $error',
+        );
       }
     }
   }
@@ -837,11 +1201,21 @@ class WebRtcCallService {
   // CLOSE ALL PEERS
   // ==========================================================
 
-  Future<void> closeAllPeers() async {
-    final ids = List<String>.from(_peerConnections.keys);
+  Future<
+    void
+  >
+  closeAllPeers() async {
+    final ids =
+        List<
+          String
+        >.from(
+          _peerConnections.keys,
+        );
 
     for (final userId in ids) {
-      await closePeer(userId);
+      await closePeer(
+        userId,
+      );
     }
   }
 
@@ -849,12 +1223,16 @@ class WebRtcCallService {
   // LOCAL MEDIA DISPOSE
   // ==========================================================
 
-  Future<void> _disposeLocalMedia() async {
+  Future<
+    void
+  >
+  _disposeLocalMedia() async {
     final renderer = _localRenderer;
 
     _localRenderer = null;
 
-    if (renderer != null) {
+    if (renderer !=
+        null) {
       renderer.srcObject = null;
 
       await renderer.dispose();
@@ -868,22 +1246,31 @@ class WebRtcCallService {
 
     _cameraEnabled = false;
 
-    if (stream == null) {
+    if (stream ==
+        null) {
       return;
     }
 
     for (final track in stream.getTracks()) {
       try {
         await track.stop();
-      } catch (error) {
-        debugPrint('[WEBRTC] Erro parando track: $error');
+      } catch (
+        error
+      ) {
+        debugPrint(
+          '[WEBRTC] Erro parando track: $error',
+        );
       }
     }
 
     try {
       await stream.dispose();
-    } catch (error) {
-      debugPrint('[WEBRTC] Erro descartando stream local: $error');
+    } catch (
+      error
+    ) {
+      debugPrint(
+        '[WEBRTC] Erro descartando stream local: $error',
+      );
     }
   }
 
@@ -891,11 +1278,16 @@ class WebRtcCallService {
   // REQUIRED
   // ==========================================================
 
-  String _required(String value, String field) {
+  String _required(
+    String value,
+    String field,
+  ) {
     final normalized = value.trim();
 
     if (normalized.isEmpty) {
-      throw ArgumentError('$field não pode ser vazio.');
+      throw ArgumentError(
+        '$field não pode ser vazio.',
+      );
     }
 
     return normalized;
@@ -907,7 +1299,9 @@ class WebRtcCallService {
 
   void _ensureNotDisposed() {
     if (_disposed) {
-      throw StateError('WebRtcCallService já foi descartado.');
+      throw StateError(
+        'WebRtcCallService já foi descartado.',
+      );
     }
   }
 
@@ -915,7 +1309,10 @@ class WebRtcCallService {
   // DISPOSE
   // ==========================================================
 
-  Future<void> dispose() async {
+  Future<
+    void
+  >
+  dispose() async {
     if (_disposed) {
       return;
     }

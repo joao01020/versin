@@ -8,6 +8,7 @@ class StudioTimelineLibraryDialog extends StatefulWidget {
   final Color activeColor;
 
   const StudioTimelineLibraryDialog({
+    super.key,
     required this.timelineController,
     required this.activeColor,
   });

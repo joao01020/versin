@@ -99,8 +99,6 @@ class _MindMapWindowState extends State<MindMapWindow> with WindowListener {
 
   String? _connectingFromNodeId;
 
-  _WindowMindMapPort? _connectingFromPort;
-
   Offset? _connectionStart;
 
   Offset? _connectionCurrent;
@@ -513,8 +511,6 @@ class _MindMapWindowState extends State<MindMapWindow> with WindowListener {
     setState(() {
       _connectingFromNodeId = node.id;
 
-      _connectingFromPort = port;
-
       _connectionStart = _portPosition(node, port, canvasSize);
 
       _connectionCurrent = _globalToCanvas(details.globalPosition);
@@ -593,8 +589,6 @@ class _MindMapWindowState extends State<MindMapWindow> with WindowListener {
 
     setState(() {
       _connectingFromNodeId = null;
-
-      _connectingFromPort = null;
 
       _connectionStart = null;
 

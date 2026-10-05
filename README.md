@@ -1,3 +1,21 @@
+<p align="center">
+  <img
+    src="./docs/media/versin-preview.gif"
+    width="100%"
+    alt="Demonstração animada do VERSIN"
+  />
+</p>
+
+<p align="center">
+  <strong>Componha. Encontre artistas. Crie em conjunto.</strong>
+</p>
+
+<p align="center">
+  O VERSIN é um espaço criativo para composição, IA assistiva e colaboração entre artistas.
+</p>
+
+<br>
+
 # Diretriz Técnica e Conceitual — Versin
 
 ## Plataforma Universal de Composição Musical com Inteligência Personalizada
@@ -6,9 +24,14 @@
 
 # 1. Visão Estratégica do Projeto
 
-O Versin deve evoluir de uma ferramenta de apoio criativo para uma plataforma universal de composição artística, capaz de operar como uma extensão cognitiva do compositor, independentemente de gênero musical, idioma, estrutura poética ou método criativo.
+O Versin deve evoluir de uma ferramenta de apoio criativo para uma plataforma
+universal de composição artística, capaz de operar como uma extensão cognitiva
+do compositor, independentemente de gênero musical, idioma, estrutura poética ou
+método criativo.
 
-A proposta central da nova arquitetura é abandonar o conceito de IA genérica e adotar um modelo de Inteligência Personalizada, onde cada usuário constrói e treina seu próprio Cérebro Digital.
+A proposta central da nova arquitetura é abandonar o conceito de IA genérica e
+adotar um modelo de Inteligência Personalizada, onde cada usuário constrói e
+treina seu próprio Cérebro Digital.
 
 Esse cérebro não representa apenas preferências superficiais. Ele deve aprender:
 
@@ -51,7 +74,7 @@ O sistema deve ser completamente agnóstico a estilos musicais:
 - Roteiros performáticos
 - Escrita híbrida
 
-O Versin não define como o usuário cria.  
+O Versin não define como o usuário cria.\
 Ele aprende como aquele usuário pensa.
 
 ---
@@ -147,7 +170,7 @@ Responsável por:
 - sugerir refrões,
 - adaptar escrita para moods específicos.
 
-A IA não deve substituir o compositor.  
+A IA não deve substituir o compositor.\
 Ela deve operar como amplificação do processo criativo.
 
 ---
@@ -267,7 +290,8 @@ Fluxo
 
 # 6. Ecossistema Proprietário Versin
 
-Embora o Obsidian seja suportado, o Versin deve desenvolver sua própria infraestrutura.
+Embora o Obsidian seja suportado, o Versin deve desenvolver sua própria
+infraestrutura.
 
 ---
 
@@ -346,7 +370,7 @@ O compositor nunca pode depender da internet para criar.
 
 A experiência principal deve existir localmente.
 
-A nuvem é complemento.  
+A nuvem é complemento.\
 Nunca dependência.
 
 ---
@@ -397,7 +421,7 @@ A sincronização deve ser:
 - assíncrona,
 - automática.
 
-O usuário não gerencia sync.  
+O usuário não gerencia sync.\
 Ele apenas cria.
 
 ---
@@ -679,12 +703,13 @@ Ele deve operar como:
 
 - um sistema de extensão cognitiva artística.
 
-A IA não substitui identidade.  
+A IA não substitui identidade.\
 Ela preserva, amplia e organiza a identidade criativa do compositor.
 
 O diferencial do Versin não será apenas tecnologia.
 
-Será a capacidade de transformar memória, linguagem e intenção artística em um ecossistema vivo de criação personalizada.
+Será a capacidade de transformar memória, linguagem e intenção artística em um
+ecossistema vivo de criação personalizada.
 
 ---
 

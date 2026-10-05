@@ -11,730 +11,540 @@
 </p>
 
 <p align="center">
-  O VERSIN é um espaço criativo para composição, IA assistiva e colaboração entre artistas.
+  O VERSIN é uma plataforma de criação e colaboração musical que reúne composição,
+  IA assistiva, descoberta de artistas, comunicação, projetos colaborativos
+  e preservação das criações em um único ambiente.
 </p>
 
-<br>
-
-# Diretriz Técnica e Conceitual — Versin
-
-## Plataforma Universal de Composição Musical com Inteligência Personalizada
+<p align="center">
+  <strong>VERSIN • BETA</strong>
+</p>
 
 ---
 
-# 1. Visão Estratégica do Projeto
+# VERSIN
 
-O Versin deve evoluir de uma ferramenta de apoio criativo para uma plataforma
-universal de composição artística, capaz de operar como uma extensão cognitiva
-do compositor, independentemente de gênero musical, idioma, estrutura poética ou
-método criativo.
+## Plataforma de criação e colaboração musical
 
-A proposta central da nova arquitetura é abandonar o conceito de IA genérica e
-adotar um modelo de Inteligência Personalizada, onde cada usuário constrói e
-treina seu próprio Cérebro Digital.
+O **VERSIN** nasce com uma proposta simples: permitir que artistas criem, se conectem e desenvolvam projetos musicais sem precisar dividir todo o processo entre várias ferramentas diferentes.
 
-Esse cérebro não representa apenas preferências superficiais. Ele deve aprender:
+A plataforma reúne recursos de composição, organização criativa, IA assistiva, descoberta de artistas, perfis públicos, comunicação, colaboração em projetos e preservação de versões de uma criação.
 
-- Estruturas líricas recorrentes
-- Ritmo textual
-- Densidade poética
-- Construção semântica
-- Assinatura emocional
-- Padrões fonéticos
-- Escolhas de vocabulário
-- Temáticas recorrentes
-- Fluxo narrativo
-- Estrutura de refrões e métricas
-- Padrões de improviso e associação
+A inteligência artificial faz parte desse processo como uma ferramenta de apoio.
 
-O objetivo é permitir que a IA funcione como:
+Ela pode ajudar a encontrar possibilidades, explorar rimas, analisar uma letra e oferecer feedback, mas não é tratada como substituta do processo artístico.
 
-- coautor,
-- extensão de memória,
-- organizador criativo,
-- acelerador de ideias,
-- preservador da identidade artística.
-
-O sistema deve ser completamente agnóstico a estilos musicais:
-
-- Rap
-- Trap
-- Boom bap
-- Funk
-- MPB
-- Rock
-- Metal
-- Indie
-- Gospel
-- Pop
-- Lo-fi
-- Experimental
-- Poesia
-- Spoken word
-- Roteiros performáticos
-- Escrita híbrida
-
-O Versin não define como o usuário cria.\
-Ele aprende como aquele usuário pensa.
+> **A IA auxilia. O artista cria.**
 
 ---
 
-# 2. Filosofia do “Cérebro Digital”
+# 1. Visão do projeto
 
-## 2.1 Conceito
+O VERSIN está sendo construído como um ambiente em que diferentes etapas de uma criação musical possam acontecer dentro do mesmo ecossistema.
 
-Cada usuário possui um modelo cognitivo próprio alimentado continuamente por:
+Um artista pode iniciar uma composição no Estúdio, organizar ideias, trabalhar em uma letra, consultar rimas, receber apoio da IA, encontrar outro artista disponível para colaborar, iniciar uma conversa, formar um projeto e continuar a produção em conjunto.
 
-- letras escritas,
-- rascunhos,
-- frases soltas,
-- referências,
-- ideias fragmentadas,
-- anotações,
-- revisões,
-- descartes,
-- históricos de edição,
-- padrões de repetição.
+A proposta não é definir como alguém deve criar.
 
-O sistema deve interpretar isso como um organismo vivo de linguagem.
+O VERSIN deve oferecer ferramentas que acompanhem diferentes processos criativos e permitam que cada artista construa o próprio fluxo de trabalho.
 
 ---
 
-## 2.2 Estrutura Conceitual
+# 2. Princípios do VERSIN
 
-O Cérebro Digital será composto por quatro camadas:
+O desenvolvimento do projeto segue alguns princípios centrais:
 
-### Camada 1 — Memória Bruta
-
-Armazena:
-
-- textos,
-- frases,
-- notas,
-- referências,
-- documentos,
-- imagens textualmente indexadas,
-- históricos.
-
-Persistência:
-
-- SQLite local
-- cache estruturado
-- vetorização incremental
+- o artista permanece no centro do processo criativo;
+- a IA funciona como apoio, não como substituição da autoria;
+- colaboração deve acontecer de forma simples e integrada;
+- comunicação e produção devem fazer parte do mesmo fluxo;
+- cada usuário deve manter controle sobre suas criações e arquivos;
+- a integridade de versões salvas deve poder ser verificada;
+- recursos sociais devem respeitar disponibilidade, consentimento e privacidade;
+- a plataforma deve continuar evoluindo de forma aberta e modular.
 
 ---
 
-### Camada 2 — Memória Semântica
+# 3. Estúdio de criação
 
-Transforma conteúdo em:
+O **Estúdio** é o espaço principal de composição do VERSIN.
 
-- embeddings vetoriais,
-- clusters temáticos,
-- relações contextuais,
-- conexões emocionais,
-- assinaturas linguísticas.
+Ele foi pensado para concentrar ferramentas que normalmente ficam espalhadas entre editores de texto, aplicativos de notas, listas de rimas e outros programas auxiliares.
 
-Tecnologias:
+Entre as possibilidades do Estúdio estão:
 
-- sentence transformers
-- vetorização local
-- pgvector no Supabase
-- pipelines Python
+- escrita de letras;
+- estruturação de músicas;
+- organização de versos, refrões, pontes e outras partes;
+- banco de rimas;
+- organização de ideias;
+- mapa de ideias;
+- timeline da composição;
+- acompanhamento da evolução de uma música;
+- integração com recursos de IA assistiva.
 
----
-
-### Camada 3 — Perfil Cognitivo
-
-Extrai padrões do usuário:
-
-- tamanho médio de versos,
-- uso de metáforas,
-- padrões de rima,
-- frequência silábica,
-- densidade lexical,
-- cadência textual,
-- estrutura emocional.
-
-Essa camada é o núcleo da identidade artística.
+O objetivo é permitir que o artista permaneça dentro do processo criativo sem precisar trocar constantemente de ferramenta.
 
 ---
 
-### Camada 4 — Motor Generativo Personalizado
+# 4. IA assistiva
 
-Responsável por:
+A IA do VERSIN é projetada como uma camada de apoio à criação.
 
-- sugerir continuação,
-- gerar rimas,
-- expandir ideias,
-- recriar estilo,
-- sugerir refrões,
-- adaptar escrita para moods específicos.
+O artista pode utilizá-la para:
 
-A IA não deve substituir o compositor.\
-Ela deve operar como amplificação do processo criativo.
+- buscar rimas;
+- explorar palavras relacionadas;
+- encontrar novas possibilidades;
+- analisar uma letra;
+- receber feedback;
+- observar coerência;
+- avaliar estrutura;
+- analisar originalidade;
+- analisar construção de rimas;
+- explorar diferentes caminhos para uma ideia.
 
----
+A resposta da IA não representa uma decisão final sobre a criação.
 
-# 3. Arquitetura Universal e Agnóstica
+O usuário continua escolhendo o que faz sentido para sua música, sua identidade e seu processo.
 
-## 3.1 Abstração de Gênero
-
-Toda engenharia deve evitar:
-
-- templates rígidos,
-- estruturas musicais fixas,
-- taxonomia fechada de estilos.
-
-O núcleo deve trabalhar com:
-
-- padrões linguísticos,
-- intenção semântica,
-- ritmo textual,
-- relações fonéticas.
-
-Não com “gêneros”.
+> **A IA oferece possibilidades. O artista decide o caminho.**
 
 ---
 
-## 3.2 Sistema Modular de Escrita
+# 5. Match e conexão entre artistas
 
-O editor deve permitir múltiplos modos:
+O VERSIN também busca resolver outro problema comum do processo musical: encontrar pessoas compatíveis para criar junto.
 
-### Modo Livre
+O módulo de **Match** permite descobrir artistas e profissionais com potencial de colaboração.
 
-Texto completamente aberto.
+A descoberta pode considerar diferentes informações do perfil e do contexto de cada usuário, como:
 
-### Modo Estruturado
+- função musical;
+- interesses de colaboração;
+- disponibilidade;
+- informações públicas do perfil;
+- modo de descoberta;
+- proximidade quando o usuário autorizar recursos relacionados à localização.
 
-Divisão por:
+A proposta é permitir tanto descoberta quanto conexão rápida.
 
-- verso,
-- ponte,
-- refrão,
-- intro,
-- outro.
-
-### Modo Fluxo
-
-Escrita contínua baseada em associação de ideias.
-
-### Modo Performance
-
-Ênfase em:
-
-- respiração,
-- pausa,
-- acentuação,
-- tempo de fala.
+Quando duas pessoas encontram interesse em trabalhar juntas, o VERSIN pode transformar essa conexão em uma colaboração real dentro da plataforma.
 
 ---
 
-# 4. Infraestrutura de Conhecimento
+# 6. Perfil artístico
 
-O conhecimento é o principal ativo do Versin.
+Cada usuário pode construir uma identidade própria dentro do VERSIN.
 
-A arquitetura deve funcionar em dois ecossistemas paralelos:
+O perfil artístico pode reunir informações como:
 
----
+- nome artístico;
+- foto ou avatar;
+- biografia;
+- funções musicais;
+- trabalhos;
+- faixas;
+- informações relevantes para colaboração;
+- disponibilidade.
 
-# 5. Integração com Obsidian
+O perfil funciona como a presença pública do artista dentro do ecossistema.
 
-## 5.1 Objetivo
-
-O Obsidian funciona como:
-
-- base externa de pensamento,
-- cofre criativo,
-- extensão de memória do artista.
-
-O Versin deve atuar como uma camada inteligente sobre esse conhecimento.
-
----
-
-## 5.2 Modelo de Integração
-
-Integração via:
-
-- leitura de vaults locais,
-- sincronização bidirecional,
-- parsing markdown,
-- indexação vetorial.
+Ele também ajuda outros usuários a entenderem quem aquela pessoa é, o que ela faz e em quais tipos de projeto pode colaborar.
 
 ---
 
-## 5.3 Funções da Integração
+# 7. Colaboração
 
-### Expansão de Rimas
+Depois de uma conexão, o VERSIN pode levar os artistas para um ambiente de colaboração.
 
-Busca contextual em notas antigas.
+A proposta é transformar um match em algo maior do que uma simples conversa.
 
-### Associação Semântica
+Os participantes podem trabalhar em conjunto dentro de um projeto e acompanhar:
 
-Conecta temas esquecidos.
+- membros;
+- responsabilidades;
+- tarefas;
+- atividades;
+- contribuições;
+- entregas;
+- evolução do projeto;
+- histórico das ações.
 
-### Recuperação Criativa
-
-Reapresenta ideias antigas no contexto atual.
-
-### Navegação Cognitiva
-
-Mapeia relações entre conceitos e letras.
-
----
-
-## 5.4 Pipeline Técnico
-
-Fluxo
+Isso permite que a colaboração continue organizada mesmo quando o projeto passa a envolver várias pessoas.
 
 ---
 
-# 6. Ecossistema Proprietário Versin
+# 8. Projetos compartilhados
 
-Embora o Obsidian seja suportado, o Versin deve desenvolver sua própria
-infraestrutura.
+Um projeto dentro do VERSIN pode reunir diferentes recursos relacionados à produção.
 
----
+Entre eles:
 
-## 6.1 Objetivos do Ecossistema Próprio
+- membros;
+- convites;
+- tarefas;
+- contribuições;
+- arquivos;
+- atividades recentes;
+- comunicação;
+- histórico;
+- entregas;
+- registros relacionados ao processo criativo.
 
-Permitir:
-
-- independência da plataforma externa,
-- experiência integrada,
-- automações profundas,
-- recursos impossíveis em apps genéricos.
-
----
-
-## 6.2 Componentes Principais
-
-### Knowledge Graph Proprietário
-
-Mapa semântico de:
-
-- letras,
-- emoções,
-- conceitos,
-- referências.
+A intenção é que cada colaboração tenha um espaço próprio, em vez de depender de mensagens espalhadas entre aplicativos diferentes.
 
 ---
 
-### Banco de Ideias Inteligente
+# 9. Comunicação
 
-Armazena:
+O VERSIN integra comunicação diretamente ao fluxo de colaboração.
 
-- frases,
-- punchlines,
-- hooks,
-- títulos,
-- metáforas.
+O projeto inclui recursos voltados para:
 
-Com:
+- conversa entre participantes;
+- mensagens;
+- áudio;
+- chat de projeto;
+- chamadas;
+- chamadas de voz;
+- chamadas com vídeo;
+- convites de comunicação;
+- permissões relacionadas à comunicação.
 
-- tags automáticas,
-- agrupamento semântico,
-- score de relevância.
+A comunicação deve respeitar consentimento e contexto.
 
----
+Uma conexão entre artistas não significa que toda forma de contato precisa estar automaticamente disponível.
 
-### Timeline Criativa
-
-Histórico evolutivo da escrita.
-
-Permite:
-
-- revisitar versões,
-- recuperar descartes,
-- observar evolução artística.
+O VERSIN está sendo estruturado para permitir controle sobre como cada pessoa deseja interagir.
 
 ---
 
-### Núcleo de Contexto Vivo
+# 10. Preservação da criação
 
-Mantém contexto persistente durante sessões criativas.
+O VERSIN também possui uma camada voltada à preservação de trabalhos.
 
-A IA deve lembrar:
+O usuário pode registrar e armazenar conteúdos como:
 
-- assunto atual,
-- tom emocional,
-- estrutura,
-- objetivo da música.
+- letras;
+- batidas;
+- arquivos relacionados a uma obra;
+- versões de trabalhos.
 
----
+Para determinadas versões, o sistema pode gerar uma **impressão digital criptográfica**, como um hash.
 
-# 7. Arquitetura Offline-First
+Essa impressão permite verificar que um determinado conteúdo corresponde àquela versão registrada.
 
-## 7.1 Filosofia
+Isso pode ajudar em:
 
-O compositor nunca pode depender da internet para criar.
+- integridade;
+- rastreabilidade;
+- comparação de versões;
+- organização do histórico da criação.
 
-A experiência principal deve existir localmente.
-
-A nuvem é complemento.\
-Nunca dependência.
-
----
-
-# 8. Persistência Local
-
-## 8.1 Stack Local
-
-### Flutter
-
-Interface multiplataforma.
-
-### SQLite / Hive / Isar
-
-Persistência local.
-
-### File System
-
-Armazenamento bruto.
-
-### Cache Vetorial
-
-Embeddings locais.
+> **Importante:** uma impressão digital ou hash verifica a integridade de um conteúdo. Por si só, ela não constitui prova automática de autoria legal.
 
 ---
 
-## 8.2 Dados Persistidos Offline
+# 11. Royalties e divisão
 
-- letras
-- sessões
-- embeddings
-- preferências
-- histórico
-- cache de IA
-- grafos semânticos
-- configurações
+O VERSIN também está evoluindo para organizar aspectos relacionados à participação de diferentes pessoas em um projeto.
 
----
+Essa área pode incluir recursos como:
 
-# 9. Sincronização Híbrida Inteligente
+- participantes;
+- percentuais;
+- acordos;
+- aprovações;
+- distribuição;
+- histórico de alterações;
+- eventos relacionados à divisão de participação.
 
-## 9.1 Conceito
+O objetivo é tornar mais claro quem participou do projeto e como determinados acordos foram organizados.
 
-A sincronização deve ser:
-
-- invisível,
-- resiliente,
-- assíncrona,
-- automática.
-
-O usuário não gerencia sync.\
-Ele apenas cria.
+Essa área ainda faz parte da evolução do produto e não deve ser interpretada como substituta de contratos, serviços jurídicos ou sistemas profissionais de arrecadação.
 
 ---
 
-## 9.2 Arquitetura Híbrida
+# 12. Atividades e notificações
 
-### Local First
+Conforme o ecossistema cresce, o VERSIN precisa ajudar o usuário a entender o que aconteceu dentro dos seus projetos.
 
-Toda operação nasce localmente.
+Por isso, o projeto também possui componentes relacionados a:
 
-### Sync Event Queue
+- atividades recentes;
+- notificações;
+- convites;
+- atualizações de projetos;
+- mudanças em tarefas;
+- novas conexões;
+- eventos importantes.
 
-Eventos são armazenados em fila.
-
-### Background Sync Engine
-
-Serviço responsável por:
-
-- detectar conectividade,
-- sincronizar alterações,
-- resolver conflitos,
-- atualizar cache remoto.
+A intenção é evitar que colaboração, comunicação e produção se tornem difíceis de acompanhar.
 
 ---
 
-## 9.3 Fluxo Técnico
+# 13. Arquitetura
+
+O VERSIN é desenvolvido com uma arquitetura multiplataforma e modular.
+
+## Aplicação
+
+A aplicação principal é desenvolvida em **Flutter**.
+
+Isso permite compartilhar grande parte da base de código entre diferentes plataformas e manter uma experiência consistente.
+
+Plataformas consideradas pelo projeto:
+
+- Linux;
+- Windows;
+- macOS;
+- Android;
+- iOS;
+- Web.
+
+## Supabase
+
+O Supabase é utilizado em áreas como:
+
+- autenticação;
+- banco de dados;
+- realtime;
+- armazenamento;
+- regras de acesso;
+- sincronização entre usuários e projetos.
+
+## API em Python
+
+O VERSIN possui uma API própria em Python para funções de servidor e recursos relacionados à IA.
+
+Essa camada pode atuar em tarefas como:
+
+- processamento de solicitações de IA;
+- aplicação de regras;
+- controle de quotas;
+- segurança de requisições;
+- integração com serviços externos;
+- operações que não devem depender diretamente do cliente Flutter.
+
+## Infraestrutura complementar
+
+Outros componentes podem ser utilizados para necessidades específicas de infraestrutura, armazenamento e publicação.
+
+A arquitetura continua evoluindo conforme novos módulos são integrados ao produto.
 
 ---
 
-# 10. Uso do Supabase
+# 14. Segurança e privacidade
 
-## 10.1 Papel do Supabase
+O VERSIN trabalha com informações que podem representar criações ainda não publicadas.
 
-O Supabase atua como:
+Por isso, segurança e privacidade fazem parte da arquitetura do projeto.
 
-- backend distribuído,
-- autenticação,
-- sincronização,
-- banco relacional,
-- armazenamento vetorial,
-- realtime engine.
+Entre as direções adotadas estão:
 
----
+- autenticação de usuários;
+- autorização por recurso;
+- políticas de acesso no banco;
+- isolamento de dados;
+- proteção de arquivos;
+- controle de comunicação;
+- consentimento para recursos sensíveis;
+- proteção de credenciais e segredos;
+- validação de operações no servidor.
 
-## 10.2 Componentes Utilizados
-
-### PostgreSQL
-
-Dados estruturados.
-
-### pgvector
-
-Busca semântica.
-
-### Realtime
-
-Sincronização instantânea.
-
-### Storage
-
-Arquivos e backups.
-
-### Auth
-
-Identidade do usuário.
+Recursos relacionados à localização, arquivos privados, comunicação ou projetos compartilhados devem respeitar autorização explícita do usuário.
 
 ---
 
-# 11. Papel do Python na Infraestrutura
+# 15. Estrutura geral do produto
 
-Python será o núcleo de processamento cognitivo.
+De forma simplificada, o VERSIN pode ser entendido assim:
 
----
-
-## 11.1 Responsabilidades
-
-### NLP
-
-- embeddings
-- classificação
-- análise semântica
-
-### Processamento de Estilo
-
-- fingerprint lírico
-- análise fonética
-- análise estrutural
-
-### Machine Learning
-
-- treinamento incremental
-- clustering
-- perfil artístico
-
-### Pipeline de IA
-
-- inferência
-- personalização
-- ranking contextual
-
----
-
-## 11.2 Arquitetura de Serviços
-
----
-
-# 12. Engenharia do Treinamento Individualizado
-
-## 12.1 Fine-Tuning Cognitivo
-
-O sistema deve aprender continuamente através de:
-
-- feedback implícito,
-- revisões,
-- sugestões aceitas,
-- sugestões ignoradas,
-- padrões recorrentes.
-
----
-
-## 12.2 Aprendizado Progressivo
-
-Cada ação modifica:
-
-- pesos contextuais,
-- relevância temática,
-- estilo dominante,
-- preferências estruturais.
+```text
+VERSIN
+│
+├── Estúdio
+│   ├── Letras
+│   ├── Estrutura musical
+│   ├── Banco de rimas
+│   ├── Mapa de ideias
+│   └── Timeline
+│
+├── IA assistiva
+│   ├── Rimas
+│   ├── Exploração de ideias
+│   ├── Análise
+│   └── Feedback
+│
+├── Match
+│   ├── Descoberta
+│   ├── Busca
+│   ├── Disponibilidade
+│   └── Conexão
+│
+├── Perfil artístico
+│   ├── Bio
+│   ├── Funções
+│   └── Trabalhos
+│
+├── Projetos
+│   ├── Membros
+│   ├── Convites
+│   ├── Tarefas
+│   ├── Contribuições
+│   └── Histórico
+│
+├── Comunicação
+│   ├── Chat
+│   ├── Áudio
+│   └── Chamadas
+│
+├── Preservação
+│   ├── Letras
+│   ├── Batidas
+│   ├── Arquivos
+│   └── Hashes de integridade
+│
+└── Royalties
+    ├── Participantes
+    ├── Divisões
+    ├── Aprovações
+    └── Histórico
+```
 
 ---
 
-## 12.3 Privacidade
+# 16. Fluxo de uma colaboração
 
-O treinamento deve ser:
+Um fluxo possível dentro do VERSIN pode ser representado assim:
 
-- isolado por usuário,
-- criptografado,
-- opcionalmente local.
+```text
+Criar perfil
+     ↓
+Explorar artistas
+     ↓
+Encontrar uma conexão
+     ↓
+Confirmar interesse
+     ↓
+Criar ou entrar em um projeto
+     ↓
+Conversar / realizar chamada
+     ↓
+Dividir tarefas
+     ↓
+Enviar contribuições
+     ↓
+Acompanhar a evolução
+     ↓
+Preservar versões da criação
+```
 
-O usuário deve possuir:
-
-- exportação total,
-- exclusão total,
-- controle sobre seus dados.
-
----
-
-# 13. Flutter como Núcleo de Experiência
-
-## 13.1 Motivo da Escolha
-
-Flutter oferece:
-
-- multiplataforma real,
-- performance consistente,
-- UI fluida,
-- engine própria,
-- rápida iteração.
-
----
-
-## 13.2 Plataformas
-
-- Android
-- iOS
-- Windows
-- macOS
-- Linux
-- Web
+O objetivo é reduzir a distância entre **encontrar alguém para colaborar** e **realmente construir alguma coisa com essa pessoa**.
 
 ---
 
-## 13.3 Recursos Estratégicos
+# 17. Estado do projeto
 
-### Editor Rico de Texto
+O VERSIN está atualmente em **BETA**.
 
-Com análise em tempo real.
+Isso significa que:
 
-### Canvas Criativo
+- funcionalidades podem mudar;
+- partes da interface ainda estão sendo refinadas;
+- módulos podem ser reorganizados;
+- fluxos podem evoluir;
+- algumas funcionalidades ainda estão em desenvolvimento;
+- a arquitetura continua sendo amadurecida.
 
-Organização visual de ideias.
-
-### Visualização Semântica
-
-Grafos e conexões.
-
-### Modo Estúdio
-
-Interface minimalista para foco total.
+O repositório representa um projeto em construção ativa.
 
 ---
 
-# 14. Inteligência Contextual em Tempo Real
+# 18. Open source
 
-## 14.1 IA Reativa
+O VERSIN é um projeto **open source**.
 
-Enquanto o usuário escreve, o sistema deve:
+Uma das intenções do projeto é permitir que desenvolvedores interessados em música, tecnologia, colaboração e ferramentas criativas possam participar da construção.
 
-- detectar intenção,
-- prever continuidade,
-- sugerir conexões,
-- recuperar referências antigas.
+Estamos especialmente interessados em contribuições relacionadas a:
 
----
+- Flutter;
+- Dart;
+- Python;
+- Supabase;
+- backend;
+- realtime;
+- WebRTC;
+- segurança;
+- testes;
+- arquitetura;
+- UX/UI;
+- performance;
+- documentação;
+- infraestrutura.
 
-## 14.2 IA Não Intrusiva
+Não é necessário conhecer todas essas áreas para contribuir.
 
-A IA nunca deve interromper fluxo criativo.
-
-Ela atua:
-
-- sob demanda,
-- contextual,
-- silenciosa.
-
----
-
-# 15. Arquitetura de Escalabilidade
-
-## 15.1 Microsserviços Cognitivos
-
-Separação por domínio:
-
-- embeddings,
-- sync,
-- sugestões,
-- perfil cognitivo,
-- indexação,
-- analytics.
+Se você encontrou uma parte do projeto que pode melhorar, uma contribuição pequena também pode ser valiosa.
 
 ---
 
-## 15.2 Pipeline Assíncrono
+# 19. Como colaborar
 
-Uso de:
+Se você deseja contribuir com o VERSIN:
 
-- filas,
-- workers,
-- processamento incremental,
-- cache inteligente.
+1. faça um fork do repositório;
+2. crie uma branch para sua alteração;
+3. desenvolva e teste sua contribuição;
+4. mantenha a alteração focada e bem documentada;
+5. abra um Pull Request explicando o que foi modificado e por quê.
 
----
+Exemplo:
 
-# 16. Futuro Evolutivo da Plataforma
+```bash
+git checkout -b feature/minha-contribuicao
+```
 
-## 16.1 Possíveis Expansões
+Depois:
 
-### IA de Flow
+```bash
+git add .
+git commit -m "feat: descreve a contribuição"
+git push origin feature/minha-contribuicao
+```
 
-Análise de cadência musical.
-
-### Integração DAW
-
-FL Studio, Ableton, Logic.
-
-### Análise de Voz
-
-Conversão voz → estrutura lírica.
-
-### Coautoria Multiusuário
-
-Cérebros colaborativos.
-
-### Memória Artística Temporal
-
-A IA aprende fases da carreira do artista.
+Por fim, abra um Pull Request para revisão.
 
 ---
 
-# 17. Princípio Filosófico Central
+# 20. Direção do VERSIN
 
-O Versin não deve ser percebido como:
+O VERSIN não quer ser apenas:
 
-- gerador automático de letras,
-- chatbot musical,
-- assistente genérico.
+- um editor de letras;
+- um chatbot musical;
+- um aplicativo de match;
+- um mensageiro;
+- um armazenamento de arquivos.
 
-Ele deve operar como:
+A proposta é conectar essas partes em um único fluxo.
 
-- um sistema de extensão cognitiva artística.
+O artista pode começar sozinho e terminar trabalhando com uma equipe.
 
-A IA não substitui identidade.\
-Ela preserva, amplia e organiza a identidade criativa do compositor.
+Pode escrever uma ideia, encontrar alguém compatível, iniciar um projeto, conversar, dividir tarefas, acompanhar contribuições e preservar aquilo que foi construído.
 
-O diferencial do Versin não será apenas tecnologia.
+Essa integração é o ponto central do projeto.
 
-Será a capacidade de transformar memória, linguagem e intenção artística em um
-ecossistema vivo de criação personalizada.
+> **VERSIN é uma plataforma de criação e colaboração musical que reúne composição, IA assistiva, descoberta de artistas, comunicação, projetos colaborativos e preservação das criações em um único ambiente.**
 
 ---
 
-# 18. Diretriz Final de Produto
+<p align="center">
+  <strong>A IA auxilia. O artista cria.</strong>
+</p>
 
-A união entre:
-
-- Flutter como camada universal de experiência,
-- Supabase como infraestrutura distribuída,
-- Python como motor cognitivo,
-- persistência offline-first,
-- treinamento individualizado,
-- integração com Obsidian,
-- e um ecossistema proprietário de conhecimento,
-
-forma a base de uma nova categoria de software:
-
-uma plataforma criativa adaptativa centrada na identidade do artista.
-
-O Versin deve evoluir para se tornar:
-
-- extensão da mente do compositor,
-- memória criativa persistente,
-- sistema de pensamento assistido,
-- laboratório de linguagem pessoal,
-- inteligência artística individualizada.
-
-Independentemente do gênero musical, método de escrita ou fluxo criativo.
+<p align="center">
+  VERSIN • BETA
+</p>

@@ -20,12 +20,14 @@ class MetronomePlayer extends StatelessWidget {
         padding: const EdgeInsets.all(8),
         margin: const EdgeInsets.only(right: 8), // Espaço antes do botão enviar
         decoration: BoxDecoration(
-          color: isPlaying ? activeColor.withOpacity(0.2) : Colors.transparent,
+          color: isPlaying
+              ? activeColor.withValues(alpha: 0.2)
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
         ),
         child: Icon(
           // Ícone que remete ao metrônomo do FL Studio (Triângulo isósceles)
-          Icons.change_history_rounded, 
+          Icons.change_history_rounded,
           color: isPlaying ? activeColor : Colors.white54,
           size: 20,
         ),

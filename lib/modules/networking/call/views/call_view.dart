@@ -84,58 +84,33 @@ import 'incoming_call_view.dart';
 //
 // ============================================================
 
-class CallView
-    extends
-        StatefulWidget {
+class CallView extends StatefulWidget {
   final String projectId;
 
   final String? participantName;
 
-  const CallView({
-    super.key,
-    required this.projectId,
-    this.participantName,
-  });
+  const CallView({super.key, required this.projectId, this.participantName});
 
   @override
-  State<
-    CallView
-  >
-  createState() => _CallViewState();
+  State<CallView> createState() => _CallViewState();
 }
 
 // ============================================================
 // STATE
 // ============================================================
 
-class _CallViewState
-    extends
-        State<
-          CallView
-        > {
+class _CallViewState extends State<CallView> {
   // ==========================================================
   // COLORS
   // ==========================================================
 
-  static const Color _background = Color(
-    0xFF08080B,
-  );
+  static const Color _background = Color(0xFF08080B);
 
-  static const Color _surface = Color(
-    0xFF111116,
-  );
+  static const Color _surface = Color(0xFF111116);
 
-  static const Color _purple = Color(
-    0xFF8B5CF6,
-  );
+  static const Color _purple = Color(0xFF8B5CF6);
 
-  static const Color _green = Color(
-    0xFF34D399,
-  );
-
-  static const Color _orange = Color(
-    0xFFF59E0B,
-  );
+  static const Color _green = Color(0xFF34D399);
 
   // ==========================================================
   // CONTROLLERS
@@ -182,13 +157,7 @@ class _CallViewState
   //
   // ==========================================================
 
-  List<
-    CallParticipantModel
-  >
-  _participants =
-      const <
-        CallParticipantModel
-      >[];
+  List<CallParticipantModel> _participants = const <CallParticipantModel>[];
 
   // ==========================================================
   // LOCAL MEDIA STATE
@@ -221,9 +190,7 @@ class _CallViewState
       }
 
       return value;
-    } catch (
-      _
-    ) {
+    } catch (_) {
       return null;
     }
   }
@@ -267,11 +234,7 @@ class _CallViewState
 
   int get _videoAllowedRelations {
     return _permissionController.permissions
-        .where(
-          (
-            permission,
-          ) => permission.videoAllowed,
-        )
+        .where((permission) => permission.videoAllowed)
         .length;
   }
 
@@ -283,9 +246,7 @@ class _CallViewState
   void initState() {
     super.initState();
 
-    _callController = ProjectCallController(
-      projectId: widget.projectId,
-    );
+    _callController = ProjectCallController(projectId: widget.projectId);
 
     _permissionController = CommunicationPermissionController(
       projectId: widget.projectId,
@@ -295,9 +256,7 @@ class _CallViewState
 
     final initialParticipantName = widget.participantName?.trim();
 
-    if (initialParticipantName !=
-            null &&
-        initialParticipantName.isNotEmpty) {
+    if (initialParticipantName != null && initialParticipantName.isNotEmpty) {
       _remoteParticipantName = initialParticipantName;
     }
 
@@ -308,59 +267,39 @@ class _CallViewState
   // INITIALIZE
   // ==========================================================
 
-  Future<
-    void
-  >
-  _initialize() async {
-    await Future.wait(
-      [
-        _callController.init(),
-        _permissionController.init(),
-      ],
-    );
+  Future<void> _initialize() async {
+    await Future.wait([_callController.init(), _permissionController.init()]);
 
     if (!mounted) {
       return;
     }
 
-    setState(
-      () {},
-    );
+    setState(() {});
 
-    await _syncRemoteParticipant(
-      _callController.activeCall,
-    );
+    await _syncRemoteParticipant(_callController.activeCall);
 
     final activeCall = _callController.activeCall;
 
-    if (activeCall !=
-            null &&
-        activeCall.isActive) {
-      await _syncWebRtcForCall(
-        activeCall,
-      );
+    if (activeCall != null && activeCall.isActive) {
+      await _syncWebRtcForCall(activeCall);
     }
 
     final remoteUserId = _remoteParticipantUserId;
 
     if (mounted &&
-        activeCall !=
-            null &&
-        remoteUserId !=
-            null &&
+        activeCall != null &&
+        remoteUserId != null &&
         remoteUserId.isNotEmpty &&
         _participants.isEmpty) {
-      setState(
-        () {
-          _participants = _buildRemoteParticipants(
-            userId: remoteUserId,
+      setState(() {
+        _participants = _buildRemoteParticipants(
+          userId: remoteUserId,
 
-            displayName: _participantDisplayName,
+          displayName: _participantDisplayName,
 
-            call: activeCall,
-          );
-        },
-      );
+          call: activeCall,
+        );
+      });
     }
   }
 
@@ -368,30 +307,19 @@ class _CallViewState
   // REFRESH
   // ==========================================================
 
-  Future<
-    void
-  >
-  _refresh() async {
-    await Future.wait(
-      [
-        _callController.refresh(),
+  Future<void> _refresh() async {
+    await Future.wait([
+      _callController.refresh(),
 
-        _permissionController.refresh(),
-      ],
-    );
+      _permissionController.refresh(),
+    ]);
 
-    await _syncRemoteParticipant(
-      _callController.activeCall,
-    );
+    await _syncRemoteParticipant(_callController.activeCall);
 
     final call = _callController.activeCall;
 
-    if (call !=
-            null &&
-        call.isActive) {
-      await _syncWebRtcForCall(
-        call,
-      );
+    if (call != null && call.isActive) {
+      await _syncWebRtcForCall(call);
     } else {
       await _stopWebRtcIfNeeded();
     }
@@ -401,21 +329,14 @@ class _CallViewState
   // START AUDIO
   // ==========================================================
 
-  Future<
-    void
-  >
-  _startAudio() async {
+  Future<void> _startAudio() async {
     final call = await _callController.startAudioCall();
 
-    if (!mounted ||
-        call ==
-            null) {
+    if (!mounted || call == null) {
       return;
     }
 
-    await _syncRemoteParticipant(
-      call,
-    );
+    await _syncRemoteParticipant(call);
 
     // A mídia real será aberta quando a chamada ficar ativa.
   }
@@ -424,10 +345,7 @@ class _CallViewState
   // START VIDEO
   // ==========================================================
 
-  Future<
-    void
-  >
-  _startVideo() async {
+  Future<void> _startVideo() async {
     if (!_videoAllowed) {
       _showVideoPermissionRequired();
 
@@ -436,15 +354,11 @@ class _CallViewState
 
     final call = await _callController.startVideoCall();
 
-    if (!mounted ||
-        call ==
-            null) {
+    if (!mounted || call == null) {
       return;
     }
 
-    await _syncRemoteParticipant(
-      call,
-    );
+    await _syncRemoteParticipant(call);
 
     // A câmera real será aberta quando a chamada ficar ativa.
   }
@@ -453,48 +367,31 @@ class _CallViewState
   // WEBRTC SYNC
   // ==========================================================
 
-  Future<
-    void
-  >
-  _syncWebRtcForCall(
-    ProjectCallModel call,
-  ) async {
-    if (!mounted ||
-        _isSyncingWebRtc ||
-        !call.isActive) {
+  Future<void> _syncWebRtcForCall(ProjectCallModel call) async {
+    if (!mounted || _isSyncingWebRtc || !call.isActive) {
       return;
     }
 
     final currentUserId = _currentUserId;
-    final remoteUserId = _resolveRemoteParticipantUserId(
-      call,
-    );
+    final remoteUserId = _resolveRemoteParticipantUserId(call);
     final callId = call.id.trim();
 
-    if (currentUserId ==
-            null ||
+    if (currentUserId == null ||
         currentUserId.isEmpty ||
         remoteUserId.isEmpty ||
         callId.isEmpty) {
       return;
     }
 
-    if (_webRtcController.initialized &&
-        _webRtcCallId ==
-            callId) {
-      await _startOfferIfNeeded(
-        call,
-      );
+    if (_webRtcController.initialized && _webRtcCallId == callId) {
+      await _startOfferIfNeeded(call);
       return;
     }
 
     _isSyncingWebRtc = true;
 
     try {
-      if (_webRtcCallId !=
-              null &&
-          _webRtcCallId !=
-              callId) {
+      if (_webRtcCallId != null && _webRtcCallId != callId) {
         await _webRtcController.hangup();
         _webRtcCallId = null;
         _offerSentForCallId = null;
@@ -504,22 +401,14 @@ class _CallViewState
         callId: callId,
         currentUserId: currentUserId,
         remoteUserId: remoteUserId,
-        enableVideo:
-            call.startedAsVideo &&
-            _videoAllowed,
+        enableVideo: call.startedAsVideo && _videoAllowed,
       );
 
-      if (!mounted ||
-          !initialized) {
+      if (!mounted || !initialized) {
         final error = _webRtcController.errorMessage;
 
-        if (mounted &&
-            error !=
-                null &&
-            error.isNotEmpty) {
-          _showMessage(
-            error,
-          );
+        if (mounted && error != null && error.isNotEmpty) {
+          _showMessage(error);
         }
 
         return;
@@ -527,68 +416,41 @@ class _CallViewState
 
       _webRtcCallId = callId;
 
-      debugPrint(
-        '[CALL VIEW] WebRTC preparado: $callId',
-      );
+      debugPrint('[CALL VIEW] WebRTC preparado: $callId');
 
-      await _startOfferIfNeeded(
-        call,
-      );
-    } catch (
-      error,
-      stackTrace
-    ) {
-      debugPrint(
-        '[CALL VIEW] Erro preparando WebRTC: $error',
-      );
-      debugPrint(
-        '$stackTrace',
-      );
+      await _startOfferIfNeeded(call);
+    } catch (error, stackTrace) {
+      debugPrint('[CALL VIEW] Erro preparando WebRTC: $error');
+      debugPrint('$stackTrace');
 
       if (mounted) {
-        _showMessage(
-          'Não foi possível conectar o áudio da chamada.',
-        );
+        _showMessage('Não foi possível conectar o áudio da chamada.');
       }
     } finally {
       _isSyncingWebRtc = false;
     }
   }
 
-  Future<
-    void
-  >
-  _startOfferIfNeeded(
-    ProjectCallModel call,
-  ) async {
+  Future<void> _startOfferIfNeeded(ProjectCallModel call) async {
     final currentUserId = _currentUserId;
     final callId = call.id.trim();
 
-    if (currentUserId ==
-            null ||
+    if (currentUserId == null ||
         currentUserId.isEmpty ||
         callId.isEmpty ||
         !call.isActive) {
       return;
     }
 
-    if (call.createdBy.trim() !=
-        currentUserId) {
+    if (call.createdBy.trim() != currentUserId) {
       return;
     }
 
-    if (_offerSentForCallId ==
-        callId) {
+    if (_offerSentForCallId == callId) {
       return;
     }
 
-    await Future<
-      void
-    >.delayed(
-      const Duration(
-        milliseconds: 700,
-      ),
-    );
+    await Future<void>.delayed(const Duration(milliseconds: 700));
 
     if (!mounted) {
       return;
@@ -599,13 +461,8 @@ class _CallViewState
     if (!success) {
       final error = _webRtcController.errorMessage;
 
-      if (mounted &&
-          error !=
-              null &&
-          error.isNotEmpty) {
-        _showMessage(
-          error,
-        );
+      if (mounted && error != null && error.isNotEmpty) {
+        _showMessage(error);
       }
 
       return;
@@ -613,17 +470,11 @@ class _CallViewState
 
     _offerSentForCallId = callId;
 
-    debugPrint(
-      '[CALL VIEW] Offer WebRTC enviada: $callId',
-    );
+    debugPrint('[CALL VIEW] Offer WebRTC enviada: $callId');
   }
 
-  Future<
-    void
-  >
-  _stopWebRtcIfNeeded() async {
-    if (_webRtcCallId ==
-        null) {
+  Future<void> _stopWebRtcIfNeeded() async {
+    if (_webRtcCallId == null) {
       return;
     }
 
@@ -635,15 +486,9 @@ class _CallViewState
     try {
       await _webRtcController.hangup();
 
-      debugPrint(
-        '[CALL VIEW] WebRTC encerrado: $previousCallId',
-      );
-    } catch (
-      error
-    ) {
-      debugPrint(
-        '[CALL VIEW] Erro encerrando WebRTC: $error',
-      );
+      debugPrint('[CALL VIEW] WebRTC encerrado: $previousCallId');
+    } catch (error) {
+      debugPrint('[CALL VIEW] Erro encerrando WebRTC: $error');
     }
   }
 
@@ -652,235 +497,192 @@ class _CallViewState
   // ==========================================================
 
   @override
-  Widget build(
-    BuildContext context,
-  ) {
+  Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: Listenable.merge(
-        [
-          _callController,
-          _permissionController,
-          _webRtcController,
-        ],
-      ),
+      listenable: Listenable.merge([
+        _callController,
+        _permissionController,
+        _webRtcController,
+      ]),
 
-      builder:
-          (
-            context,
-            _,
-          ) {
-            // ====================================================
-            // LOADING
-            // ====================================================
+      builder: (context, _) {
+        // ====================================================
+        // LOADING
+        // ====================================================
 
-            if (_callController.isLoading ||
-                _permissionController.isLoading) {
-              return const Scaffold(
-                backgroundColor: _background,
+        if (_callController.isLoading || _permissionController.isLoading) {
+          return const Scaffold(
+            backgroundColor: _background,
 
-                body: Center(
-                  child: CircularProgressIndicator(),
-                ),
-              );
-            }
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
 
-            final call = _callController.activeCall;
+        final call = _callController.activeCall;
 
-            if (call !=
-                    null &&
-                call.isActive) {
-              Future.microtask(
-                () => _syncWebRtcForCall(
-                  call,
-                ),
-              );
-            } else if (_webRtcCallId !=
-                null) {
-              Future.microtask(
-                _stopWebRtcIfNeeded,
-              );
-            }
+        if (call != null && call.isActive) {
+          Future.microtask(() => _syncWebRtcForCall(call));
+        } else if (_webRtcCallId != null) {
+          Future.microtask(_stopWebRtcIfNeeded);
+        }
 
-            if (call !=
-                null) {
-              final participantUserId = _resolveRemoteParticipantUserId(
-                call,
-              );
+        if (call != null) {
+          final participantUserId = _resolveRemoteParticipantUserId(call);
 
-              final shouldResolveParticipant =
-                  participantUserId !=
-                      _remoteParticipantUserId ||
-                  _remoteParticipantName ==
-                      null ||
-                  _remoteParticipantName!.trim().isEmpty;
+          final shouldResolveParticipant =
+              participantUserId != _remoteParticipantUserId ||
+              _remoteParticipantName == null ||
+              _remoteParticipantName!.trim().isEmpty;
 
-              if (shouldResolveParticipant) {
-                Future.microtask(
-                  () {
-                    _syncRemoteParticipant(
-                      call,
-                    );
-                  },
-                );
-              } else {
-                final currentParticipants = _participants;
+          if (shouldResolveParticipant) {
+            Future.microtask(() {
+              _syncRemoteParticipant(call);
+            });
+          } else {
+            final currentParticipants = _participants;
 
-                final participantNeedsStateUpdate =
-                    currentParticipants.isEmpty ||
-                    currentParticipants.first.connected !=
-                        call.isActive ||
-                    currentParticipants.first.cameraEnabled !=
-                        (call.startedAsVideo &&
-                            call.isActive);
+            final participantNeedsStateUpdate =
+                currentParticipants.isEmpty ||
+                currentParticipants.first.connected != call.isActive ||
+                currentParticipants.first.cameraEnabled !=
+                    (call.startedAsVideo && call.isActive);
 
-                if (participantNeedsStateUpdate) {
-                  Future.microtask(
-                    () {
-                      if (!mounted) {
-                        return;
-                      }
-
-                      setState(
-                        () {
-                          _participants = _buildRemoteParticipants(
-                            userId: participantUserId,
-
-                            displayName: _participantDisplayName,
-
-                            call: call,
-                          );
-                        },
-                      );
-                    },
-                  );
+            if (participantNeedsStateUpdate) {
+              Future.microtask(() {
+                if (!mounted) {
+                  return;
                 }
-              }
+
+                setState(() {
+                  _participants = _buildRemoteParticipants(
+                    userId: participantUserId,
+
+                    displayName: _participantDisplayName,
+
+                    call: call,
+                  );
+                });
+              });
             }
+          }
+        }
 
-            // ====================================================
-            // ACTIVE CALL
-            // ====================================================
+        // ====================================================
+        // ACTIVE CALL
+        // ====================================================
 
-            if (call !=
-                    null &&
-                call.isActive) {
-              return ActiveCallView(
-                projectId: widget.projectId,
+        if (call != null && call.isActive) {
+          return ActiveCallView(
+            projectId: widget.projectId,
 
-                controller: _callController,
+            controller: _callController,
 
-                call: call,
+            call: call,
 
-                participants: _participants,
+            participants: _participants,
 
-                microphoneEnabled: _microphoneEnabled,
+            microphoneEnabled: _microphoneEnabled,
 
-                cameraEnabled: _cameraEnabled,
+            cameraEnabled: _cameraEnabled,
 
-                videoAllowed: _videoAllowed,
+            videoAllowed: _videoAllowed,
 
-                speakerEnabled: _speakerEnabled,
+            speakerEnabled: _speakerEnabled,
 
-                onToggleMicrophone: _toggleMicrophone,
+            onToggleMicrophone: _toggleMicrophone,
 
-                onToggleCamera: _toggleCamera,
+            onToggleCamera: _toggleCamera,
 
-                onRequestVideo: _requestVideo,
+            onRequestVideo: _requestVideo,
 
-                onSwitchCamera: _switchCamera,
+            onSwitchCamera: _switchCamera,
 
-                onToggleSpeaker: _toggleSpeaker,
-              );
-            }
+            onToggleSpeaker: _toggleSpeaker,
+          );
+        }
 
-            // ====================================================
-            // RINGING
-            // ====================================================
+        // ====================================================
+        // RINGING
+        // ====================================================
 
-            if (call !=
-                    null &&
-                call.isRinging) {
-              final isIncoming = _isIncomingCall(
-                call,
-              );
+        if (call != null && call.isRinging) {
+          final isIncoming = _isIncomingCall(call);
 
-              // ==================================================
-              // RECEBENDO
-              // ==================================================
-              //
-              // Quem NÃO criou a chamada entra aqui.
-              //
-              // IncomingCallView é responsável por mostrar:
-              //
-              // Ligação de <nome>
-              //
-              // ==================================================
+          // ==================================================
+          // RECEBENDO
+          // ==================================================
+          //
+          // Quem NÃO criou a chamada entra aqui.
+          //
+          // IncomingCallView é responsável por mostrar:
+          //
+          // Ligação de <nome>
+          //
+          // ==================================================
 
-              if (isIncoming) {
-                return Stack(
-                  children: [
-                    IncomingCallView(
-                      controller: _callController,
+          if (isIncoming) {
+            return Stack(
+              children: [
+                IncomingCallView(
+                  controller: _callController,
 
-                      call: call,
+                  call: call,
 
-                      callerName: _participantDisplayName,
+                  callerName: _participantDisplayName,
 
-                      onAccepted: _handleCallAccepted,
+                  onAccepted: _handleCallAccepted,
 
-                      onRejected: _handleCallRejected,
-                    ),
+                  onRejected: _handleCallRejected,
+                ),
 
-                    Positioned(
-                      top: 18,
-                      left: 0,
-                      right: 0,
+                Positioned(
+                  top: 18,
+                  left: 0,
+                  right: 0,
 
-                      child: IgnorePointer(
-                        child: Center(
-                          child: _buildCallTimerPill(
-                            icon: call.startedAsVideo
-                                ? Icons.video_call_rounded
-                                : Icons.ring_volume_rounded,
+                  child: IgnorePointer(
+                    child: Center(
+                      child: _buildCallTimerPill(
+                        icon: call.startedAsVideo
+                            ? Icons.video_call_rounded
+                            : Icons.ring_volume_rounded,
 
-                            label: call.startedAsVideo
-                                ? 'Chamada de vídeo recebida'
-                                : 'Chamada recebida',
+                        label: call.startedAsVideo
+                            ? 'Chamada de vídeo recebida'
+                            : 'Chamada recebida',
 
-                            duration: _callController.currentRingingDuration,
+                        duration: _callController.currentRingingDuration,
 
-                            color: _green,
-                          ),
-                        ),
+                        color: _green,
                       ),
                     ),
-                  ],
-                );
-              }
+                  ),
+                ),
+              ],
+            );
+          }
 
-              // ==================================================
-              // LIGANDO
-              // ==================================================
-              //
-              // Somente quem criou a chamada chega aqui.
-              //
-              // A tela mostra:
-              //
-              // Chamando <nome>...
-              //
-              // ==================================================
+          // ==================================================
+          // LIGANDO
+          // ==================================================
+          //
+          // Somente quem criou a chamada chega aqui.
+          //
+          // A tela mostra:
+          //
+          // Chamando <nome>...
+          //
+          // ==================================================
 
-              return _buildOutgoingCall(
-                call,
-              );
-            }
+          return _buildOutgoingCall(call);
+        }
 
-            // ====================================================
-            // IDLE
-            // ====================================================
+        // ====================================================
+        // IDLE
+        // ====================================================
 
-            return _buildIdle();
-          },
+        return _buildIdle();
+      },
     );
   }
 
@@ -891,9 +693,7 @@ class _CallViewState
   String get _participantDisplayName {
     final value = _remoteParticipantName?.trim();
 
-    if (value !=
-            null &&
-        value.isNotEmpty) {
+    if (value != null && value.isNotEmpty) {
       return value;
     }
 
@@ -904,13 +704,10 @@ class _CallViewState
   // RESOLVE REMOTE PARTICIPANT ID
   // ==========================================================
 
-  String _resolveRemoteParticipantUserId(
-    ProjectCallModel call,
-  ) {
+  String _resolveRemoteParticipantUserId(ProjectCallModel call) {
     final currentUserId = _currentUserId;
 
-    if (currentUserId ==
-        null) {
+    if (currentUserId == null) {
       return '';
     }
 
@@ -918,10 +715,8 @@ class _CallViewState
 
     final targetUserId = call.targetUserId?.trim();
 
-    if (createdBy ==
-        currentUserId) {
-      return targetUserId ??
-          '';
+    if (createdBy == currentUserId) {
+      return targetUserId ?? '';
     }
 
     return createdBy;
@@ -931,31 +726,19 @@ class _CallViewState
   // SYNC REMOTE PARTICIPANT
   // ==========================================================
 
-  Future<
-    void
-  >
-  _syncRemoteParticipant(
-    ProjectCallModel? call,
-  ) async {
-    if (!mounted ||
-        call ==
-            null ||
-        _isResolvingRemoteParticipant) {
+  Future<void> _syncRemoteParticipant(ProjectCallModel? call) async {
+    if (!mounted || call == null || _isResolvingRemoteParticipant) {
       return;
     }
 
-    final userId = _resolveRemoteParticipantUserId(
-      call,
-    );
+    final userId = _resolveRemoteParticipantUserId(call);
 
     if (userId.isEmpty) {
       return;
     }
 
-    if (_remoteParticipantUserId ==
-            userId &&
-        _remoteParticipantName !=
-            null &&
+    if (_remoteParticipantUserId == userId &&
+        _remoteParticipantName != null &&
         _remoteParticipantName!.trim().isNotEmpty) {
       return;
     }
@@ -966,52 +749,36 @@ class _CallViewState
 
     try {
       final profile = await _supabase
-          .from(
-            'profiles',
-          )
-          .select(
-            'id, artist_name, name, username',
-          )
-          .eq(
-            'id',
-            userId,
-          )
+          .from('profiles')
+          .select('id, artist_name, name, username')
+          .eq('id', userId)
           .maybeSingle();
 
       if (!mounted) {
         return;
       }
 
-      final resolvedName = _resolveProfileName(
-        profile,
-      );
+      final resolvedName = _resolveProfileName(profile);
 
-      setState(
-        () {
-          _remoteParticipantName = resolvedName;
+      setState(() {
+        _remoteParticipantName = resolvedName;
 
-          _participants = _buildRemoteParticipants(
-            userId: userId,
+        _participants = _buildRemoteParticipants(
+          userId: userId,
 
-            displayName: resolvedName,
+          displayName: resolvedName,
 
-            call: call,
-          );
-        },
-      );
-    } catch (
-      error,
-      stackTrace
-    ) {
+          call: call,
+        );
+      });
+    } catch (error, stackTrace) {
       debugPrint(
         '[CALL VIEW] '
         'Erro ao carregar nome do participante: '
         '$error',
       );
 
-      debugPrint(
-        '$stackTrace',
-      );
+      debugPrint('$stackTrace');
     } finally {
       _isResolvingRemoteParticipant = false;
     }
@@ -1038,10 +805,7 @@ class _CallViewState
   //
   // ==========================================================
 
-  List<
-    CallParticipantModel
-  >
-  _buildRemoteParticipants({
+  List<CallParticipantModel> _buildRemoteParticipants({
     required String userId,
     required String displayName,
     required ProjectCallModel call,
@@ -1049,22 +813,16 @@ class _CallViewState
     final normalizedUserId = userId.trim();
 
     if (normalizedUserId.isEmpty) {
-      return const <
-        CallParticipantModel
-      >[];
+      return const <CallParticipantModel>[];
     }
 
     final normalizedName = displayName.trim();
 
-    return <
-      CallParticipantModel
-    >[
+    return <CallParticipantModel>[
       CallParticipantModel(
         userId: normalizedUserId,
 
-        name: normalizedName.isEmpty
-            ? 'Membro da sessão'
-            : normalizedName,
+        name: normalizedName.isEmpty ? 'Membro da sessão' : normalizedName,
 
         connected: call.isActive,
 
@@ -1072,9 +830,7 @@ class _CallViewState
 
         audioConnected: call.isActive,
 
-        cameraEnabled:
-            call.startedAsVideo &&
-            call.isActive,
+        cameraEnabled: call.startedAsVideo && call.isActive,
 
         videoConnected: false,
 
@@ -1089,44 +845,29 @@ class _CallViewState
   // RESOLVE PROFILE NAME
   // ==========================================================
 
-  String _resolveProfileName(
-    Map<
-      String,
-      dynamic
-    >?
-    profile,
-  ) {
-    if (profile ==
-        null) {
+  String _resolveProfileName(Map<String, dynamic>? profile) {
+    if (profile == null) {
       return 'Membro da sessão';
     }
 
     final artistName = profile['artist_name']?.toString().trim();
 
-    if (artistName !=
-            null &&
-        artistName.isNotEmpty) {
+    if (artistName != null && artistName.isNotEmpty) {
       return artistName;
     }
 
     final name = profile['name']?.toString().trim();
 
-    if (name !=
-            null &&
-        name.isNotEmpty) {
+    if (name != null && name.isNotEmpty) {
       return name;
     }
 
     final username = profile['username']?.toString().trim().replaceFirst(
-      RegExp(
-        r'^@+',
-      ),
+      RegExp(r'^@+'),
       '',
     );
 
-    if (username !=
-            null &&
-        username.isNotEmpty) {
+    if (username != null && username.isNotEmpty) {
       return '@$username';
     }
 
@@ -1137,14 +878,10 @@ class _CallViewState
   // INCOMING CALL
   // ==========================================================
 
-  bool _isIncomingCall(
-    ProjectCallModel call,
-  ) {
+  bool _isIncomingCall(ProjectCallModel call) {
     final currentUserId = _currentUserId;
 
-    if (currentUserId ==
-            null ||
-        currentUserId.isEmpty) {
+    if (currentUserId == null || currentUserId.isEmpty) {
       return false;
     }
 
@@ -1167,8 +904,7 @@ class _CallViewState
     //
     // ======================================================
 
-    if (createdBy ==
-        currentUserId) {
+    if (createdBy == currentUserId) {
       return false;
     }
 
@@ -1181,11 +917,8 @@ class _CallViewState
     //
     // ======================================================
 
-    if (targetUserId !=
-            null &&
-        targetUserId.isNotEmpty) {
-      return targetUserId ==
-          currentUserId;
+    if (targetUserId != null && targetUserId.isNotEmpty) {
+      return targetUserId == currentUserId;
     }
 
     // ======================================================
@@ -1220,9 +953,7 @@ class _CallViewState
       return;
     }
 
-    setState(
-      () {},
-    );
+    setState(() {});
   }
 
   // ==========================================================
@@ -1234,9 +965,7 @@ class _CallViewState
       return;
     }
 
-    setState(
-      () {},
-    );
+    setState(() {});
   }
 
   // ==========================================================
@@ -1257,10 +986,7 @@ class _CallViewState
         title: const Text(
           'Ligar',
 
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-          ),
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
         ),
       ),
 
@@ -1270,9 +996,7 @@ class _CallViewState
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
 
-          padding: const EdgeInsets.all(
-            18,
-          ),
+          padding: const EdgeInsets.all(18),
 
           children: [
             // ================================================
@@ -1280,9 +1004,7 @@ class _CallViewState
             // ================================================
             _buildHero(),
 
-            const SizedBox(
-              height: 26,
-            ),
+            const SizedBox(height: 26),
 
             // ================================================
             // SECTION
@@ -1301,9 +1023,7 @@ class _CallViewState
               ),
             ),
 
-            const SizedBox(
-              height: 12,
-            ),
+            const SizedBox(height: 12),
 
             // ================================================
             // AUDIO
@@ -1317,22 +1037,16 @@ class _CallViewState
 
               enabled: true,
 
-              onTap: _callController.isProcessing
-                  ? null
-                  : _startAudio,
+              onTap: _callController.isProcessing ? null : _startAudio,
             ),
 
-            const SizedBox(
-              height: 10,
-            ),
+            const SizedBox(height: 10),
 
             // ================================================
             // VIDEO
             // ================================================
             _buildCallAction(
-              icon: _videoAllowed
-                  ? Icons.videocam_rounded
-                  : Icons.lock_rounded,
+              icon: _videoAllowed ? Icons.videocam_rounded : Icons.lock_rounded,
 
               title: 'Vídeo',
 
@@ -1351,9 +1065,7 @@ class _CallViewState
             // VIDEO LOCK INFO
             // ================================================
             if (!_videoAllowed) ...[
-              const SizedBox(
-                height: 14,
-              ),
+              const SizedBox(height: 14),
 
               _buildVideoUnlockInfo(),
             ],
@@ -1362,9 +1074,7 @@ class _CallViewState
             // VIDEO RELATIONS INFO
             // ================================================
             if (_videoAllowed) ...[
-              const SizedBox(
-                height: 14,
-              ),
+              const SizedBox(height: 14),
 
               _buildVideoRelationsInfo(),
             ],
@@ -1373,9 +1083,7 @@ class _CallViewState
             // PERMISSION ERROR
             // ================================================
             if (_permissionController.hasError) ...[
-              const SizedBox(
-                height: 18,
-              ),
+              const SizedBox(height: 18),
 
               _buildPermissionError(),
             ],
@@ -1384,9 +1092,7 @@ class _CallViewState
             // CALL ERROR
             // ================================================
             if (_callController.hasError) ...[
-              const SizedBox(
-                height: 18,
-              ),
+              const SizedBox(height: 18),
 
               _buildCallError(),
             ],
@@ -1405,8 +1111,7 @@ class _CallViewState
       return 'Requer consentimento com pelo menos um membro.';
     }
 
-    if (_videoAllowedRelations ==
-        1) {
+    if (_videoAllowedRelations == 1) {
       return 'Vídeo liberado com 1 membro da sessão.';
     }
 
@@ -1422,48 +1127,29 @@ class _CallViewState
     return Container(
       width: double.infinity,
 
-      padding: const EdgeInsets.all(
-        20,
-      ),
+      padding: const EdgeInsets.all(20),
 
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(
-          24,
-        ),
+        borderRadius: BorderRadius.circular(24),
 
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
 
           end: Alignment.bottomRight,
 
-          colors: [
-            Color(
-              0xFF21113E,
-            ),
-            _surface,
-          ],
+          colors: [Color(0xFF21113E), _surface],
         ),
 
-        border: Border.all(
-          color: _purple.withValues(
-            alpha: 0.20,
-          ),
-        ),
+        border: Border.all(color: _purple.withValues(alpha: 0.20)),
       ),
 
       child: const Column(
         crossAxisAlignment: CrossAxisAlignment.start,
 
         children: [
-          Icon(
-            Icons.spatial_audio_off_rounded,
-            color: _purple,
-            size: 30,
-          ),
+          Icon(Icons.spatial_audio_off_rounded, color: _purple, size: 30),
 
-          SizedBox(
-            height: 14,
-          ),
+          SizedBox(height: 14),
 
           Text(
             'Converse no seu ritmo',
@@ -1477,19 +1163,13 @@ class _CallViewState
             ),
           ),
 
-          SizedBox(
-            height: 6,
-          ),
+          SizedBox(height: 6),
 
           Text(
             'Comece por áudio. O vídeo só é compartilhado '
             'entre participantes que deram consentimento.',
 
-            style: TextStyle(
-              color: Colors.white38,
-              fontSize: 11,
-              height: 1.45,
-            ),
+            style: TextStyle(color: Colors.white38, fontSize: 11, height: 1.45),
           ),
         ],
       ),
@@ -1513,30 +1193,20 @@ class _CallViewState
       child: InkWell(
         onTap: onTap,
 
-        borderRadius: BorderRadius.circular(
-          18,
-        ),
+        borderRadius: BorderRadius.circular(18),
 
         child: Ink(
-          padding: const EdgeInsets.all(
-            15,
-          ),
+          padding: const EdgeInsets.all(15),
 
           decoration: BoxDecoration(
             color: _surface,
 
-            borderRadius: BorderRadius.circular(
-              18,
-            ),
+            borderRadius: BorderRadius.circular(18),
 
             border: Border.all(
               color: enabled
-                  ? _purple.withValues(
-                      alpha: 0.16,
-                    )
-                  : Colors.white.withValues(
-                      alpha: 0.05,
-                    ),
+                  ? _purple.withValues(alpha: 0.16)
+                  : Colors.white.withValues(alpha: 0.05),
             ),
           ),
 
@@ -1552,32 +1222,22 @@ class _CallViewState
 
                 decoration: BoxDecoration(
                   color: enabled
-                      ? _purple.withValues(
-                          alpha: 0.12,
-                        )
-                      : Colors.white.withValues(
-                          alpha: 0.04,
-                        ),
+                      ? _purple.withValues(alpha: 0.12)
+                      : Colors.white.withValues(alpha: 0.04),
 
-                  borderRadius: BorderRadius.circular(
-                    14,
-                  ),
+                  borderRadius: BorderRadius.circular(14),
                 ),
 
                 child: Icon(
                   icon,
 
-                  color: enabled
-                      ? _purple
-                      : Colors.white30,
+                  color: enabled ? _purple : Colors.white30,
 
                   size: 21,
                 ),
               ),
 
-              const SizedBox(
-                width: 12,
-              ),
+              const SizedBox(width: 12),
 
               // ==============================================
               // TEXT
@@ -1591,9 +1251,7 @@ class _CallViewState
                       title,
 
                       style: TextStyle(
-                        color: enabled
-                            ? Colors.white
-                            : Colors.white38,
+                        color: enabled ? Colors.white : Colors.white38,
 
                         fontSize: 13,
 
@@ -1601,9 +1259,7 @@ class _CallViewState
                       ),
                     ),
 
-                    const SizedBox(
-                      height: 3,
-                    ),
+                    const SizedBox(height: 3),
 
                     Text(
                       description,
@@ -1628,9 +1284,7 @@ class _CallViewState
                     ? Icons.chevron_right_rounded
                     : Icons.lock_outline_rounded,
 
-                color: enabled
-                    ? Colors.white24
-                    : Colors.white12,
+                color: enabled ? Colors.white24 : Colors.white12,
               ),
             ],
           ),
@@ -1645,18 +1299,12 @@ class _CallViewState
 
   Widget _buildVideoUnlockInfo() {
     return Container(
-      padding: const EdgeInsets.all(
-        14,
-      ),
+      padding: const EdgeInsets.all(14),
 
       decoration: BoxDecoration(
-        color: _purple.withValues(
-          alpha: 0.06,
-        ),
+        color: _purple.withValues(alpha: 0.06),
 
-        borderRadius: BorderRadius.circular(
-          16,
-        ),
+        borderRadius: BorderRadius.circular(16),
       ),
 
       child: Column(
@@ -1667,15 +1315,9 @@ class _CallViewState
             crossAxisAlignment: CrossAxisAlignment.start,
 
             children: [
-              Icon(
-                Icons.verified_user_outlined,
-                color: _purple,
-                size: 18,
-              ),
+              Icon(Icons.verified_user_outlined, color: _purple, size: 18),
 
-              SizedBox(
-                width: 10,
-              ),
+              SizedBox(width: 10),
 
               Expanded(
                 child: Text(
@@ -1695,9 +1337,7 @@ class _CallViewState
             ],
           ),
 
-          const SizedBox(
-            height: 12,
-          ),
+          const SizedBox(height: 12),
 
           SizedBox(
             width: double.infinity,
@@ -1705,28 +1345,17 @@ class _CallViewState
             child: OutlinedButton.icon(
               onPressed: _openMembers,
 
-              icon: const Icon(
-                Icons.person_add_alt_1_rounded,
-                size: 16,
-              ),
+              icon: const Icon(Icons.person_add_alt_1_rounded, size: 16),
 
-              label: const Text(
-                'Escolher membros para vídeo',
-              ),
+              label: const Text('Escolher membros para vídeo'),
 
               style: OutlinedButton.styleFrom(
                 foregroundColor: _purple,
 
-                side: BorderSide(
-                  color: _purple.withValues(
-                    alpha: 0.32,
-                  ),
-                ),
+                side: BorderSide(color: _purple.withValues(alpha: 0.32)),
 
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(
-                    12,
-                  ),
+                  borderRadius: BorderRadius.circular(12),
                 ),
 
                 textStyle: const TextStyle(
@@ -1748,42 +1377,25 @@ class _CallViewState
 
   Widget _buildVideoRelationsInfo() {
     return Container(
-      padding: const EdgeInsets.all(
-        14,
-      ),
+      padding: const EdgeInsets.all(14),
 
       decoration: BoxDecoration(
-        color: _green.withValues(
-          alpha: 0.055,
-        ),
+        color: _green.withValues(alpha: 0.055),
 
-        borderRadius: BorderRadius.circular(
-          16,
-        ),
+        borderRadius: BorderRadius.circular(16),
 
-        border: Border.all(
-          color: _green.withValues(
-            alpha: 0.12,
-          ),
-        ),
+        border: Border.all(color: _green.withValues(alpha: 0.12)),
       ),
 
       child: Row(
         children: [
-          const Icon(
-            Icons.verified_rounded,
-            color: _green,
-            size: 18,
-          ),
+          const Icon(Icons.verified_rounded, color: _green, size: 18),
 
-          const SizedBox(
-            width: 10,
-          ),
+          const SizedBox(width: 10),
 
           Expanded(
             child: Text(
-              _videoAllowedRelations ==
-                      1
+              _videoAllowedRelations == 1
                   ? 'Você possui consentimento de vídeo com 1 membro.'
                   : 'Você possui consentimento de vídeo com '
                         '$_videoAllowedRelations membros.',
@@ -1820,19 +1432,11 @@ class _CallViewState
   // OPEN MEMBERS
   // ==========================================================
 
-  Future<
-    void
-  >
-  _openMembers() async {
+  Future<void> _openMembers() async {
     await Navigator.push(
       context,
       MaterialPageRoute(
-        builder:
-            (
-              _,
-            ) => MembersView(
-              projectId: widget.projectId,
-            ),
+        builder: (_) => MembersView(projectId: widget.projectId),
       ),
     );
 
@@ -1848,132 +1452,100 @@ class _CallViewState
   // ==========================================================
 
   void _showVideoPermissionRequired() {
-    showModalBottomSheet<
-      void
-    >(
+    showModalBottomSheet<void>(
       context: context,
 
       backgroundColor: _surface,
 
       showDragHandle: true,
 
-      builder:
-          (
-            sheetContext,
-          ) {
-            return SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  20,
-                  6,
-                  20,
-                  24,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 6, 20, 24),
+
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+
+              crossAxisAlignment: CrossAxisAlignment.start,
+
+              children: [
+                Container(
+                  width: 44,
+
+                  height: 44,
+
+                  decoration: BoxDecoration(
+                    color: _purple.withValues(alpha: 0.12),
+
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+
+                  child: const Icon(Icons.lock_outline_rounded, color: _purple),
                 ),
 
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
+                const SizedBox(height: 14),
 
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                const Text(
+                  'Vídeo bloqueado',
 
-                  children: [
-                    Container(
-                      width: 44,
+                  style: TextStyle(
+                    color: Colors.white,
 
-                      height: 44,
+                    fontSize: 16,
 
-                      decoration: BoxDecoration(
-                        color: _purple.withValues(
-                          alpha: 0.12,
-                        ),
-
-                        borderRadius: BorderRadius.circular(
-                          14,
-                        ),
-                      ),
-
-                      child: const Icon(
-                        Icons.lock_outline_rounded,
-                        color: _purple,
-                      ),
-                    ),
-
-                    const SizedBox(
-                      height: 14,
-                    ),
-
-                    const Text(
-                      'Vídeo bloqueado',
-
-                      style: TextStyle(
-                        color: Colors.white,
-
-                        fontSize: 16,
-
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-
-                    const SizedBox(
-                      height: 7,
-                    ),
-
-                    const Text(
-                      'Antes de usar vídeo, escolha um ou mais '
-                      'membros e envie um convite de consentimento. '
-                      'Cada pessoa decide individualmente.',
-
-                      style: TextStyle(
-                        color: Colors.white54,
-
-                        fontSize: 11,
-
-                        height: 1.45,
-                      ),
-                    ),
-
-                    const SizedBox(
-                      height: 18,
-                    ),
-
-                    SizedBox(
-                      width: double.infinity,
-
-                      child: FilledButton.icon(
-                        onPressed: () {
-                          Navigator.pop(
-                            sheetContext,
-                          );
-
-                          _openMembers();
-                        },
-
-                        icon: const Icon(
-                          Icons.person_search_rounded,
-                          size: 17,
-                        ),
-
-                        label: const Text(
-                          'Selecionar membros',
-                        ),
-
-                        style: FilledButton.styleFrom(
-                          backgroundColor: _purple,
-
-                          foregroundColor: Colors.white,
-
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(
-                              13,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-              ),
-            );
-          },
+
+                const SizedBox(height: 7),
+
+                const Text(
+                  'Antes de usar vídeo, escolha um ou mais '
+                  'membros e envie um convite de consentimento. '
+                  'Cada pessoa decide individualmente.',
+
+                  style: TextStyle(
+                    color: Colors.white54,
+
+                    fontSize: 11,
+
+                    height: 1.45,
+                  ),
+                ),
+
+                const SizedBox(height: 18),
+
+                SizedBox(
+                  width: double.infinity,
+
+                  child: FilledButton.icon(
+                    onPressed: () {
+                      Navigator.pop(sheetContext);
+
+                      _openMembers();
+                    },
+
+                    icon: const Icon(Icons.person_search_rounded, size: 17),
+
+                    label: const Text('Selecionar membros'),
+
+                    style: FilledButton.styleFrom(
+                      backgroundColor: _purple,
+
+                      foregroundColor: Colors.white,
+
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(13),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -1988,38 +1560,22 @@ class _CallViewState
     required Color color,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 12,
-        vertical: 7,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
 
       decoration: BoxDecoration(
-        color: _surface.withValues(
-          alpha: 0.96,
-        ),
+        color: _surface.withValues(alpha: 0.96),
 
-        borderRadius: BorderRadius.circular(
-          20,
-        ),
+        borderRadius: BorderRadius.circular(20),
 
-        border: Border.all(
-          color: color.withValues(
-            alpha: 0.22,
-          ),
-        ),
+        border: Border.all(color: color.withValues(alpha: 0.22)),
 
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(
-              alpha: 0.30,
-            ),
+            color: Colors.black.withValues(alpha: 0.30),
 
             blurRadius: 12,
 
-            offset: const Offset(
-              0,
-              4,
-            ),
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -2028,15 +1584,9 @@ class _CallViewState
         mainAxisSize: MainAxisSize.min,
 
         children: [
-          Icon(
-            icon,
-            color: color,
-            size: 14,
-          ),
+          Icon(icon, color: color, size: 14),
 
-          const SizedBox(
-            width: 7,
-          ),
+          const SizedBox(width: 7),
 
           Text(
             '$label · ${_formatDuration(duration)}',
@@ -2058,30 +1608,16 @@ class _CallViewState
   // FORMAT DURATION
   // ==========================================================
 
-  String _formatDuration(
-    Duration value,
-  ) {
-    final totalSeconds =
-        value.inSeconds <
-            0
-        ? 0
-        : value.inSeconds;
+  String _formatDuration(Duration value) {
+    final totalSeconds = value.inSeconds < 0 ? 0 : value.inSeconds;
 
-    final hours =
-        totalSeconds ~/
-        3600;
+    final hours = totalSeconds ~/ 3600;
 
-    final minutes =
-        (totalSeconds %
-            3600) ~/
-        60;
+    final minutes = (totalSeconds % 3600) ~/ 60;
 
-    final seconds =
-        totalSeconds %
-        60;
+    final seconds = totalSeconds % 60;
 
-    if (hours >
-        0) {
+    if (hours > 0) {
       return '${hours.toString().padLeft(2, '0')}:'
           '${minutes.toString().padLeft(2, '0')}:'
           '${seconds.toString().padLeft(2, '0')}';
@@ -2095,18 +1631,14 @@ class _CallViewState
   // OUTGOING CALL
   // ==========================================================
 
-  Widget _buildOutgoingCall(
-    ProjectCallModel call,
-  ) {
+  Widget _buildOutgoingCall(ProjectCallModel call) {
     return Scaffold(
       backgroundColor: _background,
 
       body: SafeArea(
         child: Center(
           child: Padding(
-            padding: const EdgeInsets.all(
-              30,
-            ),
+            padding: const EdgeInsets.all(30),
 
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -2121,9 +1653,7 @@ class _CallViewState
                   height: 90,
 
                   decoration: BoxDecoration(
-                    color: _purple.withValues(
-                      alpha: 0.10,
-                    ),
+                    color: _purple.withValues(alpha: 0.10),
 
                     shape: BoxShape.circle,
                   ),
@@ -2139,9 +1669,7 @@ class _CallViewState
                   ),
                 ),
 
-                const SizedBox(
-                  height: 24,
-                ),
+                const SizedBox(height: 24),
 
                 // ============================================
                 // STATUS
@@ -2160,9 +1688,7 @@ class _CallViewState
                   ),
                 ),
 
-                const SizedBox(
-                  height: 8,
-                ),
+                const SizedBox(height: 8),
 
                 Text(
                   call.startedAsVideo
@@ -2173,16 +1699,11 @@ class _CallViewState
 
                   textAlign: TextAlign.center,
 
-                  style: const TextStyle(
-                    color: Colors.white38,
-                    fontSize: 11,
-                  ),
+                  style: const TextStyle(color: Colors.white38, fontSize: 11),
                 ),
 
                 if (call.startedAsVideo) ...[
-                  const SizedBox(
-                    height: 7,
-                  ),
+                  const SizedBox(height: 7),
 
                   const Text(
                     'O vídeo será compartilhado somente '
@@ -2200,9 +1721,7 @@ class _CallViewState
                   ),
                 ],
 
-                const SizedBox(
-                  height: 38,
-                ),
+                const SizedBox(height: 38),
 
                 // ============================================
                 // CANCEL
@@ -2233,17 +1752,12 @@ class _CallViewState
                   ),
                 ),
 
-                const SizedBox(
-                  height: 10,
-                ),
+                const SizedBox(height: 10),
 
                 const Text(
                   'Cancelar',
 
-                  style: TextStyle(
-                    color: Colors.white38,
-                    fontSize: 9,
-                  ),
+                  style: TextStyle(color: Colors.white38, fontSize: 9),
                 ),
               ],
             ),
@@ -2257,10 +1771,7 @@ class _CallViewState
   // CANCEL OUTGOING CALL
   // ==========================================================
 
-  Future<
-    void
-  >
-  _cancelOutgoingCall() async {
+  Future<void> _cancelOutgoingCall() async {
     await _stopWebRtcIfNeeded();
     await _callController.endCall();
   }
@@ -2270,21 +1781,17 @@ class _CallViewState
   // ==========================================================
 
   void _toggleMicrophone() {
-    Future.microtask(
-      () async {
-        final success = await _webRtcController.toggleMicrophone();
+    Future.microtask(() async {
+      final success = await _webRtcController.toggleMicrophone();
 
-        if (!mounted) {
-          return;
-        }
+      if (!mounted) {
+        return;
+      }
 
-        if (!success) {
-          _showMessage(
-            'Não foi possível alterar o microfone.',
-          );
-        }
-      },
-    );
+      if (!success) {
+        _showMessage('Não foi possível alterar o microfone.');
+      }
+    });
   }
 
   // ==========================================================
@@ -2297,21 +1804,17 @@ class _CallViewState
       return;
     }
 
-    Future.microtask(
-      () async {
-        final success = await _webRtcController.toggleCamera();
+    Future.microtask(() async {
+      final success = await _webRtcController.toggleCamera();
 
-        if (!mounted) {
-          return;
-        }
+      if (!mounted) {
+        return;
+      }
 
-        if (!success) {
-          _showMessage(
-            'Não foi possível alterar a câmera.',
-          );
-        }
-      },
-    );
+      if (!success) {
+        _showMessage('Não foi possível alterar a câmera.');
+      }
+    });
   }
 
   // ==========================================================
@@ -2327,21 +1830,17 @@ class _CallViewState
   // ==========================================================
 
   void _switchCamera() {
-    Future.microtask(
-      () async {
-        final success = await _webRtcController.switchCamera();
+    Future.microtask(() async {
+      final success = await _webRtcController.switchCamera();
 
-        if (!mounted) {
-          return;
-        }
+      if (!mounted) {
+        return;
+      }
 
-        if (!success) {
-          _showMessage(
-            'Não foi possível trocar a câmera.',
-          );
-        }
-      },
-    );
+      if (!success) {
+        _showMessage('Não foi possível trocar a câmera.');
+      }
+    });
   }
 
   // ==========================================================
@@ -2349,11 +1848,9 @@ class _CallViewState
   // ==========================================================
 
   void _toggleSpeaker() {
-    Future.microtask(
-      () async {
-        await _webRtcController.toggleSpeaker();
-      },
-    );
+    Future.microtask(() async {
+      await _webRtcController.toggleSpeaker();
+    });
   }
 
   // ==========================================================
@@ -2362,8 +1859,7 @@ class _CallViewState
 
   Widget _buildCallError() {
     return _buildErrorBox(
-      _callController.errorMessage ??
-          'Erro ao processar chamada.',
+      _callController.errorMessage ?? 'Erro ao processar chamada.',
     );
   }
 
@@ -2382,24 +1878,16 @@ class _CallViewState
   // ERROR BOX
   // ==========================================================
 
-  Widget _buildErrorBox(
-    String message,
-  ) {
+  Widget _buildErrorBox(String message) {
     return Container(
       width: double.infinity,
 
-      padding: const EdgeInsets.all(
-        13,
-      ),
+      padding: const EdgeInsets.all(13),
 
       decoration: BoxDecoration(
-        color: Colors.redAccent.withValues(
-          alpha: 0.07,
-        ),
+        color: Colors.redAccent.withValues(alpha: 0.07),
 
-        borderRadius: BorderRadius.circular(
-          14,
-        ),
+        borderRadius: BorderRadius.circular(14),
       ),
 
       child: Row(
@@ -2414,9 +1902,7 @@ class _CallViewState
             size: 17,
           ),
 
-          const SizedBox(
-            width: 8,
-          ),
+          const SizedBox(width: 8),
 
           Expanded(
             child: Text(
@@ -2440,24 +1926,14 @@ class _CallViewState
   // MESSAGE
   // ==========================================================
 
-  void _showMessage(
-    String message,
-  ) {
+  void _showMessage(String message) {
     if (!mounted) {
       return;
     }
 
-    ScaffoldMessenger.of(
-        context,
-      )
+    ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(
-            message,
-          ),
-        ),
-      );
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   // ==========================================================

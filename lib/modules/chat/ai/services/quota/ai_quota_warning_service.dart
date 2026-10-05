@@ -35,9 +35,7 @@ class AiQuotaWarningService {
   // DEVE MOSTRAR AVISO
   // ============================================================
 
-  bool shouldShowWarning(
-    AiQuotaWarningState state,
-  ) {
+  bool shouldShowWarning(AiQuotaWarningState state) {
     return state.shouldShowWarning;
   }
 
@@ -45,24 +43,19 @@ class AiQuotaWarningService {
   // DEVE MOSTRAR AVISO DE QUOTA BAIXA
   // ============================================================
 
-  bool shouldShowLowQuotaWarning(
-    AiQuotaWarningState state,
-  ) {
+  bool shouldShowLowQuotaWarning(AiQuotaWarningState state) {
     if (state.isBlocked) {
       return false;
     }
 
-    return state.isWarning ||
-        state.isCritical;
+    return state.isWarning || state.isCritical;
   }
 
   // ============================================================
   // DEVE MOSTRAR CARD DE ESGOTADO
   // ============================================================
 
-  bool shouldShowExhaustedCard(
-    AiQuotaWarningState state,
-  ) {
+  bool shouldShowExhaustedCard(AiQuotaWarningState state) {
     return state.isBlocked;
   }
 
@@ -70,9 +63,7 @@ class AiQuotaWarningService {
   // TÍTULO
   // ============================================================
 
-  String buildTitle(
-    AiQuotaWarningState state,
-  ) {
+  String buildTitle(AiQuotaWarningState state) {
     if (state.isBlocked) {
       return 'Seus créditos Versin acabaram';
     }
@@ -92,9 +83,7 @@ class AiQuotaWarningService {
   // MENSAGEM PRINCIPAL
   // ============================================================
 
-  String buildMessage(
-    AiQuotaWarningState state,
-  ) {
+  String buildMessage(AiQuotaWarningState state) {
     if (state.isBlocked) {
       return 'Biblioteca e recursos locais continuam.\n\n'
           'Para continuar com análises por IA, '
@@ -120,9 +109,7 @@ class AiQuotaWarningService {
   // TEXTO DO BOTÃO
   // ============================================================
 
-  String? buildActionLabel(
-    AiQuotaWarningState state,
-  ) {
+  String? buildActionLabel(AiQuotaWarningState state) {
     if (state.isBlocked) {
       return 'Começar configuração';
     }
@@ -138,22 +125,16 @@ class AiQuotaWarningService {
   // TEXTO DA RENOVAÇÃO
   // ============================================================
 
-  String buildRenewalText(
-    AiQuotaWarningState state,
-  ) {
+  String buildRenewalText(AiQuotaWarningState state) {
     final renewsAt = state.renewsAt;
 
     // ==========================================================
     // SEM DATA
     // ==========================================================
 
-    if (renewsAt ==
-        null) {
-      if (state.renewsInDays >
-          0) {
-        return _buildDaysOnlyText(
-          state.renewsInDays,
-        );
+    if (renewsAt == null) {
+      if (state.renewsInDays > 0) {
+        return _buildDaysOnlyText(state.renewsInDays);
       }
 
       return '';
@@ -165,27 +146,18 @@ class AiQuotaWarningService {
 
     final localDate = renewsAt.toLocal();
 
-    final formattedDate = _formatDate(
-      localDate,
-    );
+    final formattedDate = _formatDate(localDate);
 
     // ==========================================================
     // HOJE / HORAS
     // ==========================================================
 
-    if (state.renewsInDays <=
-            1 &&
-        state.renewsInHours >
-            0 &&
-        state.renewsInHours <
-            24) {
+    if (state.renewsInDays <= 1 &&
+        state.renewsInHours > 0 &&
+        state.renewsInHours < 24) {
       final hours = state.renewsInHours;
 
-      final unit =
-          hours ==
-              1
-          ? 'hora'
-          : 'horas';
+      final unit = hours == 1 ? 'hora' : 'horas';
 
       return 'Renova em $hours $unit • $formattedDate';
     }
@@ -194,15 +166,10 @@ class AiQuotaWarningService {
     // DIAS
     // ==========================================================
 
-    if (state.renewsInDays >
-        0) {
+    if (state.renewsInDays > 0) {
       final days = state.renewsInDays;
 
-      final unit =
-          days ==
-              1
-          ? 'dia'
-          : 'dias';
+      final unit = days == 1 ? 'dia' : 'dias';
 
       return 'Renova em $days $unit • $formattedDate';
     }
@@ -218,19 +185,12 @@ class AiQuotaWarningService {
   // TEXTO SOMENTE COM DIAS
   // ============================================================
 
-  String _buildDaysOnlyText(
-    int days,
-  ) {
-    if (days <=
-        0) {
+  String _buildDaysOnlyText(int days) {
+    if (days <= 0) {
       return '';
     }
 
-    final unit =
-        days ==
-            1
-        ? 'dia'
-        : 'dias';
+    final unit = days == 1 ? 'dia' : 'dias';
 
     return 'Renova em $days $unit';
   }
@@ -244,18 +204,10 @@ class AiQuotaWarningService {
   //
   // ============================================================
 
-  String _formatDate(
-    DateTime date,
-  ) {
-    final day = date.day.toString().padLeft(
-      2,
-      '0',
-    );
+  String _formatDate(DateTime date) {
+    final day = date.day.toString().padLeft(2, '0');
 
-    final month = date.month.toString().padLeft(
-      2,
-      '0',
-    );
+    final month = date.month.toString().padLeft(2, '0');
 
     final year = date.year.toString();
 
@@ -266,29 +218,20 @@ class AiQuotaWarningService {
   // PORCENTAGEM RESTANTE
   // ============================================================
 
-  int getRemainingPercentage(
-    AiQuotaWarningState state,
-  ) {
-    return state.remainingPercentage.round().clamp(
-      0,
-      100,
-    );
+  int getRemainingPercentage(AiQuotaWarningState state) {
+    return state.remainingPercentage.round().clamp(0, 100);
   }
 
   // ============================================================
   // TEXTO DE CRÉDITOS RESTANTES
   // ============================================================
 
-  String buildRemainingText(
-    AiQuotaWarningState state,
-  ) {
+  String buildRemainingText(AiQuotaWarningState state) {
     if (state.isBlocked) {
       return '0% restante';
     }
 
-    final percentage = getRemainingPercentage(
-      state,
-    );
+    final percentage = getRemainingPercentage(state);
 
     return '$percentage% restante';
   }
@@ -306,20 +249,15 @@ class AiQuotaWarningService {
   //
   // ============================================================
 
-  bool shouldUseFullCard(
-    AiQuotaWarningState state,
-  ) {
-    return state.isCritical ||
-        state.isBlocked;
+  bool shouldUseFullCard(AiQuotaWarningState state) {
+    return state.isCritical || state.isBlocked;
   }
 
   // ============================================================
   // AVISO DISCRETO?
   // ============================================================
 
-  bool shouldUseCompactWarning(
-    AiQuotaWarningState state,
-  ) {
+  bool shouldUseCompactWarning(AiQuotaWarningState state) {
     return state.isWarning;
   }
 
@@ -338,35 +276,23 @@ class AiQuotaWarningService {
   //
   // ============================================================
 
-  String buildWarningId(
-    AiQuotaWarningState state,
-  ) {
+  String buildWarningId(AiQuotaWarningState state) {
     final level = state.level.name;
 
     final renewal = state.renewsAt;
 
-    if (renewal ==
-        null) {
+    if (renewal == null) {
       return 'ai_quota_$level';
     }
 
     final utc = renewal.toUtc();
 
-    final year = utc.year.toString().padLeft(
-      4,
-      '0',
-    );
+    final year = utc.year.toString().padLeft(4, '0');
 
-    final month = utc.month.toString().padLeft(
-      2,
-      '0',
-    );
+    final month = utc.month.toString().padLeft(2, '0');
 
-    final day = utc.day.toString().padLeft(
-      2,
-      '0',
-    );
+    final day = utc.day.toString().padLeft(2, '0');
 
-    return 'ai_quota_${level}_${year}_${month}_${day}';
+    return 'ai_quota_${level}_${year}_${month}_$day';
   }
 }

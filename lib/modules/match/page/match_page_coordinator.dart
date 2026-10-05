@@ -151,7 +151,9 @@ class MatchPageCoordinator extends ChangeNotifier {
   }
 
   Future<void> _ensureNotDiscoveringWhilePaused() async {
-    if (_quickExitInProgress || _disposed) return;
+    if (_quickExitInProgress || _disposed) {
+      return;
+    }
     _quickExitInProgress = true;
     try {
       final quick = MatchQuickConnectionService.instance;
@@ -162,7 +164,9 @@ class MatchPageCoordinator extends ChangeNotifier {
           matchController.discoveryMode != MatchDiscoveryMode.global)
         return;
       await availabilityController.refresh();
-      if (_disposed || !quick.isPaused) return;
+      if (_disposed || !quick.isPaused) {
+        return;
+      }
       await _sessionService.changeDiscoveryMode(MatchDiscoveryMode.compatible);
     } catch (error) {
       debugPrint('[MATCH] Não foi possível sair do Agora pausado: $error');

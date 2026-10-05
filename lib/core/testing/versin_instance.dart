@@ -22,10 +22,10 @@ class VersinInstance {
     // Must happen before the first SharedPreferences.getInstance().
     // The default prefix is unchanged for the ordinary application.
     if (isIsolated) {
-      SharedPreferences.setPrefix('flutter.versin_${id}.');
+      SharedPreferences.setPrefix('flutter.versin_$id.');
     }
   }
 
   static String secureKey(String key) =>
-      isIsolated ? 'versin_test_${id}::$key' : key;
+      isIsolated ? 'versin_test_$id::$key' : key;
 }

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:versin/modules/networking/call/data/repositories/project_call_repository_impl.dart';
@@ -44,15 +45,10 @@ class DashboardGlobalCallService {
     SupabaseClient? supabase,
     ProjectCallRepositoryImpl? callRepository,
     ProfileNameCacheService? profileNameCacheService,
-  }) : _supabase =
-           supabase ??
-           Supabase.instance.client,
-       _callRepository =
-           callRepository ??
-           ProjectCallRepositoryImpl(),
+  }) : _supabase = supabase ?? Supabase.instance.client,
+       _callRepository = callRepository ?? ProjectCallRepositoryImpl(),
        _profileNameCacheService =
-           profileNameCacheService ??
-           ProfileNameCacheService();
+           profileNameCacheService ?? ProfileNameCacheService();
 
   // ============================================================
   // CURRENT USER ID
@@ -61,9 +57,7 @@ class DashboardGlobalCallService {
   String? get currentUserId {
     final value = _supabase.auth.currentUser?.id.trim();
 
-    if (value ==
-            null ||
-        value.isEmpty) {
+    if (value == null || value.isEmpty) {
       return null;
     }
 
@@ -74,46 +68,19 @@ class DashboardGlobalCallService {
   // WATCH CALLS
   // ============================================================
 
-  Stream<
-    List<
-      Map<
-        String,
-        dynamic
-      >
-    >
-  >
-  watchCalls() {
+  Stream<List<Map<String, dynamic>>> watchCalls() {
     return _supabase
-        .from(
-          'project_calls',
-        )
-        .stream(
-          primaryKey: [
-            'id',
-          ],
-        )
-        .order(
-          'created_at',
-          ascending: false,
-        );
+        .from('project_calls')
+        .stream(primaryKey: ['id'])
+        .order('created_at', ascending: false);
   }
 
   // ============================================================
   // FIND ACTIVE CALL
   // ============================================================
 
-  Map<
-    String,
-    dynamic
-  >?
-  findActiveCall({
-    required List<
-      Map<
-        String,
-        dynamic
-      >
-    >
-    rows,
+  Map<String, dynamic>? findActiveCall({
+    required List<Map<String, dynamic>> rows,
     required String currentUserId,
   }) {
     final normalizedCurrentUserId = currentUserId.trim();
@@ -125,10 +92,7 @@ class DashboardGlobalCallService {
     for (final row in rows) {
       final status = row['status']?.toString().trim();
 
-      if (status !=
-              'ringing' &&
-          status !=
-              'active') {
+      if (status != 'ringing' && status != 'active') {
         continue;
       }
 
@@ -137,18 +101,12 @@ class DashboardGlobalCallService {
       final targetUserId = row['target_user_id']?.toString().trim();
 
       final directlyInvolved =
-          createdBy ==
-              normalizedCurrentUserId ||
-          targetUserId ==
-              normalizedCurrentUserId;
+          createdBy == normalizedCurrentUserId ||
+          targetUserId == normalizedCurrentUserId;
 
-      final groupCall =
-          targetUserId ==
-              null ||
-          targetUserId.isEmpty;
+      final groupCall = targetUserId == null || targetUserId.isEmpty;
 
-      if (!directlyInvolved &&
-          !groupCall) {
+      if (!directlyInvolved && !groupCall) {
         continue;
       }
 
@@ -162,63 +120,42 @@ class DashboardGlobalCallService {
   // ACCEPT CALL
   // ============================================================
 
-  Future<
-    void
-  >
-  acceptCall({
-    required String callId,
-  }) async {
+  Future<void> acceptCall({required String callId}) async {
     final normalizedCallId = callId.trim();
 
     if (normalizedCallId.isEmpty) {
       return;
     }
 
-    await _callRepository.acceptCall(
-      callId: normalizedCallId,
-    );
+    await _callRepository.acceptCall(callId: normalizedCallId);
   }
 
   // ============================================================
   // REJECT CALL
   // ============================================================
 
-  Future<
-    void
-  >
-  rejectCall({
-    required String callId,
-  }) async {
+  Future<void> rejectCall({required String callId}) async {
     final normalizedCallId = callId.trim();
 
     if (normalizedCallId.isEmpty) {
       return;
     }
 
-    await _callRepository.rejectCall(
-      callId: normalizedCallId,
-    );
+    await _callRepository.rejectCall(callId: normalizedCallId);
   }
 
   // ============================================================
   // END CALL
   // ============================================================
 
-  Future<
-    void
-  >
-  endCall({
-    required String callId,
-  }) async {
+  Future<void> endCall({required String callId}) async {
     final normalizedCallId = callId.trim();
 
     if (normalizedCallId.isEmpty) {
       return;
     }
 
-    await _callRepository.endCall(
-      callId: normalizedCallId,
-    );
+    await _callRepository.endCall(callId: normalizedCallId);
   }
 
   // ============================================================
@@ -240,11 +177,8 @@ class DashboardGlobalCallService {
     // EU CRIEI A CHAMADA
     // ========================================================
 
-    if (normalizedCreatedBy ==
-        normalizedCurrentUserId) {
-      if (normalizedTargetUserId !=
-              null &&
-          normalizedTargetUserId.isNotEmpty) {
+    if (normalizedCreatedBy == normalizedCurrentUserId) {
+      if (normalizedTargetUserId != null && normalizedTargetUserId.isNotEmpty) {
         return normalizedTargetUserId;
       }
 
@@ -262,12 +196,7 @@ class DashboardGlobalCallService {
   // RESOLVE PARTICIPANT NAME
   // ============================================================
 
-  Future<
-    String
-  >
-  resolveParticipantName(
-    String userId,
-  ) async {
+  Future<String> resolveParticipantName(String userId) async {
     final normalizedUserId = userId.trim();
 
     if (normalizedUserId.isEmpty) {
@@ -281,24 +210,17 @@ class DashboardGlobalCallService {
 
       final normalizedName = resolvedName.trim();
 
-      if (normalizedName.isNotEmpty &&
-          normalizedName !=
-              'Membro') {
+      if (normalizedName.isNotEmpty && normalizedName != 'Membro') {
         return normalizedName;
       }
-    } catch (
-      error,
-      stackTrace
-    ) {
-      print(
+    } catch (error, stackTrace) {
+      debugPrint(
         '[DASHBOARD GLOBAL CALL SERVICE] '
         'Erro ao resolver participante: '
         '$error',
       );
 
-      print(
-        stackTrace,
-      );
+      debugPrint(stackTrace.toString());
     }
 
     return 'Membro da sessão';

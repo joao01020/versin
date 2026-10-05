@@ -578,7 +578,7 @@ class _RhymeLibraryPageState
                                       separatorBuilder:
                                           (
                                             _,
-                                            __,
+                                            _,
                                           ) => const SizedBox(
                                             height: 7,
                                           ),

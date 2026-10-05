@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:versin/features/rhymes/data/repositories/project_repository.dart';
 
 class SessionService {
@@ -7,12 +8,12 @@ class SessionService {
   Future<Map<String, dynamic>?> hasPendingSession() async {
     try {
       final activeProject = await _repository.getActiveProject();
-      
+
       if (activeProject != null) {
         return activeProject;
       }
     } catch (e) {
-      print("Erro ao verificar sessão pendente: $e");
+      debugPrint("Erro ao verificar sessão pendente: $e");
     }
     return null;
   }
@@ -34,7 +35,7 @@ class SessionService {
       'genre': genre,
       'mood': mood,
       'template': template,
-      'content': '', 
+      'content': '',
     };
   }
 }

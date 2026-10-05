@@ -663,7 +663,7 @@ class _RecruitmentCandidatesViewState
       ),
       label: const Text(
         'Convidar',
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 9,
           fontWeight: FontWeight.w700,
         ),

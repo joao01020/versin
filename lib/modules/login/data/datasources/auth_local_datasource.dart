@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+
 import 'package:sqflite/sqflite.dart';
 
 import 'package:versin/core/database/database_helper.dart';
@@ -24,28 +24,44 @@ import 'package:versin/core/database/database_helper.dart';
 // ============================================================
 
 abstract class AuthLocalDatasource {
-  Future<void> saveLocalProfile({
+  Future<
+    void
+  >
+  saveLocalProfile({
     required String userId,
     required String username,
     required String wallet,
     String? artistName,
   });
 
-  Future<void> saveArtistName({
+  Future<
+    void
+  >
+  saveArtistName({
     required String userId,
     required String artistName,
   });
 
-  Future<String?> getArtistName(String userId);
+  Future<
+    String?
+  >
+  getArtistName(
+    String userId,
+  );
 
-  Future<void> clearLocalProfile();
+  Future<
+    void
+  >
+  clearLocalProfile();
 }
 
 // ============================================================
 // IMPLEMENTAÇÃO
 // ============================================================
 
-class AuthLocalDatasourceImpl implements AuthLocalDatasource {
+class AuthLocalDatasourceImpl
+    implements
+        AuthLocalDatasource {
   // ==========================================================
   // DISPONIBILIDADE DO CACHE LOCAL
   // ==========================================================
@@ -59,7 +75,10 @@ class AuthLocalDatasourceImpl implements AuthLocalDatasource {
   // ==========================================================
 
   @override
-  Future<void> saveLocalProfile({
+  Future<
+    void
+  >
+  saveLocalProfile({
     required String userId,
     required String username,
     required String wallet,
@@ -85,7 +104,9 @@ class AuthLocalDatasourceImpl implements AuthLocalDatasource {
 
       final normalizedWalletAddress = normalizedWallet.isEmpty
           ? ''
-          : normalizedWallet.startsWith('wallet@')
+          : normalizedWallet.startsWith(
+              'wallet@',
+            )
           ? normalizedWallet
           : 'wallet@$normalizedWallet';
 
@@ -98,33 +119,44 @@ class AuthLocalDatasourceImpl implements AuthLocalDatasource {
         {
           'name': normalizedUsername,
           'wallet': normalizedWalletAddress,
-          if (normalizedArtistName != null && normalizedArtistName.isNotEmpty)
+          if (normalizedArtistName !=
+                  null &&
+              normalizedArtistName.isNotEmpty)
             'artist_name': normalizedArtistName,
           'synced': 1,
         },
         where: 'id = ?',
-        whereArgs: [userId],
+        whereArgs: [
+          userId,
+        ],
       );
 
       // ======================================================
       // CRIAR PERFIL
       // ======================================================
 
-      if (updatedRows == 0) {
-        await db.insert('user_profile', {
-          'id': userId,
-          'name': normalizedUsername,
-          'artist_name': normalizedArtistName,
-          'wallet': normalizedWalletAddress,
-          'synced': 1,
-        }, conflictAlgorithm: ConflictAlgorithm.ignore);
+      if (updatedRows ==
+          0) {
+        await db.insert(
+          'user_profile',
+          {
+            'id': userId,
+            'name': normalizedUsername,
+            'artist_name': normalizedArtistName,
+            'wallet': normalizedWalletAddress,
+            'synced': 1,
+          },
+          conflictAlgorithm: ConflictAlgorithm.ignore,
+        );
       }
 
       debugPrint(
         '[VERSIN AUTH] '
         'Perfil sincronizado no SQLite.',
       );
-    } catch (error) {
+    } catch (
+      error
+    ) {
       debugPrint(
         '[VERSIN AUTH] '
         'Erro ao salvar perfil local: $error',
@@ -139,17 +171,24 @@ class AuthLocalDatasourceImpl implements AuthLocalDatasource {
   // ==========================================================
 
   @override
-  Future<void> saveArtistName({
+  Future<
+    void
+  >
+  saveArtistName({
     required String userId,
     required String artistName,
   }) async {
     final normalizedArtistName = artistName.trim().replaceAll(
-      RegExp(r'\s+'),
+      RegExp(
+        r'\s+',
+      ),
       ' ',
     );
 
     if (normalizedArtistName.isEmpty) {
-      throw ArgumentError('O nome artístico não pode ser vazio.');
+      throw ArgumentError(
+        'O nome artístico não pode ser vazio.',
+      );
     }
 
     if (!_supportsLocalDatabase) {
@@ -171,23 +210,33 @@ class AuthLocalDatasourceImpl implements AuthLocalDatasource {
 
       final updatedRows = await db.update(
         'user_profile',
-        {'artist_name': normalizedArtistName, 'synced': 1},
+        {
+          'artist_name': normalizedArtistName,
+          'synced': 1,
+        },
         where: 'id = ?',
-        whereArgs: [userId],
+        whereArgs: [
+          userId,
+        ],
       );
 
       // ======================================================
       // PERFIL AINDA NÃO EXISTE
       // ======================================================
 
-      if (updatedRows == 0) {
-        await db.insert('user_profile', {
-          'id': userId,
-          'name': '',
-          'artist_name': normalizedArtistName,
-          'wallet': '',
-          'synced': 1,
-        }, conflictAlgorithm: ConflictAlgorithm.ignore);
+      if (updatedRows ==
+          0) {
+        await db.insert(
+          'user_profile',
+          {
+            'id': userId,
+            'name': '',
+            'artist_name': normalizedArtistName,
+            'wallet': '',
+            'synced': 1,
+          },
+          conflictAlgorithm: ConflictAlgorithm.ignore,
+        );
       }
 
       debugPrint(
@@ -195,7 +244,9 @@ class AuthLocalDatasourceImpl implements AuthLocalDatasource {
         'Nome artístico salvo localmente: '
         '$normalizedArtistName',
       );
-    } catch (error) {
+    } catch (
+      error
+    ) {
       debugPrint(
         '[VERSIN AUTH] '
         'Erro ao salvar nome artístico '
@@ -211,7 +262,12 @@ class AuthLocalDatasourceImpl implements AuthLocalDatasource {
   // ==========================================================
 
   @override
-  Future<String?> getArtistName(String userId) async {
+  Future<
+    String?
+  >
+  getArtistName(
+    String userId,
+  ) async {
     if (!_supportsLocalDatabase) {
       debugPrint(
         '[VERSIN AUTH] '
@@ -226,9 +282,13 @@ class AuthLocalDatasourceImpl implements AuthLocalDatasource {
 
       final result = await db.query(
         'user_profile',
-        columns: ['artist_name'],
+        columns: [
+          'artist_name',
+        ],
         where: 'id = ?',
-        whereArgs: [userId],
+        whereArgs: [
+          userId,
+        ],
         limit: 1,
       );
 
@@ -244,7 +304,8 @@ class AuthLocalDatasourceImpl implements AuthLocalDatasource {
 
       final value = result.first['artist_name'];
 
-      if (value == null) {
+      if (value ==
+          null) {
         return null;
       }
 
@@ -261,7 +322,9 @@ class AuthLocalDatasourceImpl implements AuthLocalDatasource {
       );
 
       return artistName;
-    } catch (error) {
+    } catch (
+      error
+    ) {
       debugPrint(
         '[VERSIN AUTH] '
         'Erro ao buscar nome artístico '
@@ -277,7 +340,10 @@ class AuthLocalDatasourceImpl implements AuthLocalDatasource {
   // ==========================================================
 
   @override
-  Future<void> clearLocalProfile() async {
+  Future<
+    void
+  >
+  clearLocalProfile() async {
     // ========================================================
     // WEB
     // ========================================================
@@ -301,13 +367,17 @@ class AuthLocalDatasourceImpl implements AuthLocalDatasource {
     try {
       final db = await DatabaseHelper.instance.database;
 
-      await db.delete('user_profile');
+      await db.delete(
+        'user_profile',
+      );
 
       debugPrint(
         '[VERSIN AUTH] '
         'Perfil local removido.',
       );
-    } catch (error) {
+    } catch (
+      error
+    ) {
       debugPrint(
         '[VERSIN AUTH] '
         'Erro ao remover perfil local: $error',

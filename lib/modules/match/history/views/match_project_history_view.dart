@@ -262,10 +262,11 @@ class _MatchProjectHistoryDetailViewState
         _hasMore = rows.length == _pageSize;
       });
     } catch (error) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text(_errorMessage(error))));
+      }
     } finally {
       if (mounted) setState(() => _loadingMore = false);
     }

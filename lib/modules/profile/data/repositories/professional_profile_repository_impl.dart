@@ -84,8 +84,9 @@ class ProfessionalProfileRepositoryImpl
   @override
   Future<ProfessionalProfileModel> getProfessionalProfile() async {
     final userId = Supabase.instance.client.auth.currentUser?.id.trim();
-    if (userId == null || userId.isEmpty)
+    if (userId == null || userId.isEmpty) {
       return ProfessionalProfileModel.empty();
+    }
 
     final key = CacheKeys.professionalProfile(userId);
     final cached = await _cache.read(

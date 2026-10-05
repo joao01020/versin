@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -139,8 +138,11 @@ class MatchPageCoordinator extends ChangeNotifier {
 
   void _handleQuickState() {
     final quick = MatchQuickConnectionService.instance;
-    if (_disposed || !_initialized || isInitializingMatch ||
-        _quickExitInProgress || isTeamExpansionMode ||
+    if (_disposed ||
+        !_initialized ||
+        isInitializingMatch ||
+        _quickExitInProgress ||
+        isTeamExpansionMode ||
         !quick.isPaused ||
         matchController.discoveryMode != MatchDiscoveryMode.global) {
       return;
@@ -154,9 +156,11 @@ class MatchPageCoordinator extends ChangeNotifier {
     try {
       final quick = MatchQuickConnectionService.instance;
       await quick.refresh();
-      if (_disposed || !quick.isPaused ||
+      if (_disposed ||
+          !quick.isPaused ||
           discoveryController.isBusy ||
-          matchController.discoveryMode != MatchDiscoveryMode.global) return;
+          matchController.discoveryMode != MatchDiscoveryMode.global)
+        return;
       await availabilityController.refresh();
       if (_disposed || !quick.isPaused) return;
       await _sessionService.changeDiscoveryMode(MatchDiscoveryMode.compatible);

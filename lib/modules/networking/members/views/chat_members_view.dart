@@ -229,7 +229,7 @@ class _ChatMembersViewState
         separatorBuilder:
             (
               _,
-              __,
+              _,
             ) => const SizedBox(
               height: 10,
             ),
@@ -506,8 +506,8 @@ class _ChatMembersViewState
           errorBuilder:
               (
                 _,
-                __,
-                ___,
+                _,
+                _,
               ) {
                 return _buildAvatarFallback(
                   member,

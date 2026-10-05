@@ -35,16 +35,16 @@ class RoyaltyChartWidget extends StatelessWidget {
         lineBarsData: [
           LineChartBarData(
             // Utiliza o getter revenueHistory definido no RoyaltiesController
-            spots: controller.revenueHistory.isNotEmpty 
-                ? controller.revenueHistory 
+            spots: controller.revenueHistory.isNotEmpty
+                ? controller.revenueHistory
                 : const [FlSpot(0, 0), FlSpot(5, 0)],
-            
+
             isCurved: true,
             color: controller.accentNeon,
             barWidth: 3,
             isStrokeCapRound: true,
             dotData: const FlDotData(show: false),
-            
+
             // Gradiente moderno abaixo da linha para efeito visual
             belowBarData: BarAreaData(
               show: true,
@@ -52,7 +52,7 @@ class RoyaltyChartWidget extends StatelessWidget {
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  controller.accentNeon.withOpacity(0.3),
+                  controller.accentNeon.withValues(alpha: 0.3),
                   Colors.transparent,
                 ],
               ),

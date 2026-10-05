@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -13,14 +12,25 @@ import 'package:versin/modules/storage/views/lyrics/register_lyrics_page.dart';
 import 'package:versin/modules/storage/views/storage_details_page.dart';
 import 'package:versin/modules/storage/views/transfer_authorship_page.dart';
 
-class StoragePageCoordinator extends ChangeNotifier {
-  static const Color accentColor = Color(0xFFE100FF);
+class StoragePageCoordinator
+    extends
+        ChangeNotifier {
+  static const Color accentColor = Color(
+    0xFFE100FF,
+  );
 
-  static const Color backgroundColor = Color(0xFF0D0B1F);
+  static const Color backgroundColor = Color(
+    0xFF0D0B1F,
+  );
 
-  static const Color surfaceColor = Color(0xFF17132D);
+  static const Color surfaceColor = Color(
+    0xFF17132D,
+  );
 
-  final StorageController controller = sl<StorageController>();
+  final StorageController controller =
+      sl<
+        StorageController
+      >();
 
   final SupabaseClient _supabase;
 
@@ -35,14 +45,25 @@ class StoragePageCoordinator extends ChangeNotifier {
   StoragePageCoordinator({
     required TickerProvider vsync,
     SupabaseClient? supabase,
-  }) : _supabase = supabase ?? Supabase.instance.client {
-    tabController = TabController(length: 2, vsync: vsync);
+  }) : _supabase =
+           supabase ??
+           Supabase.instance.client {
+    tabController = TabController(
+      length: 2,
+      vsync: vsync,
+    );
 
-    controller.addListener(_relayControllerState);
+    controller.addListener(
+      _relayControllerState,
+    );
   }
 
-  Future<void> initialize() async {
-    if (_disposed || _initializing) {
+  Future<
+    void
+  >
+  initialize() async {
+    if (_disposed ||
+        _initializing) {
       return;
     }
 
@@ -56,7 +77,9 @@ class StoragePageCoordinator extends ChangeNotifier {
 
       final authenticatedUserId = authUser?.id.trim();
 
-      if (authenticatedUserId == null || authenticatedUserId.isEmpty) {
+      if (authenticatedUserId ==
+              null ||
+          authenticatedUserId.isEmpty) {
         throw StateError(
           'Nenhum usuário autenticado. '
           'Faça login novamente para acessar suas obras.',
@@ -65,10 +88,14 @@ class StoragePageCoordinator extends ChangeNotifier {
 
       final controllerUserId = controller.currentUserId?.trim();
 
-      if (controllerUserId == null ||
+      if (controllerUserId ==
+              null ||
           controllerUserId.isEmpty ||
-          controllerUserId != authenticatedUserId) {
-        await controller.init(userId: authenticatedUserId);
+          controllerUserId !=
+              authenticatedUserId) {
+        await controller.init(
+          userId: authenticatedUserId,
+        );
       } else {
         await controller.refresh();
       }
@@ -79,10 +106,15 @@ class StoragePageCoordinator extends ChangeNotifier {
 
       final controllerError = controller.errorMessage?.trim();
 
-      if (controllerError != null && controllerError.isNotEmpty) {
+      if (controllerError !=
+              null &&
+          controllerError.isNotEmpty) {
         initializationError = controllerError;
       }
-    } catch (error, stackTrace) {
+    } catch (
+      error,
+      stackTrace
+    ) {
       debugPrint(
         '[STORAGE PAGE] '
         'Não foi possível inicializar o armazenamento.',
@@ -98,7 +130,9 @@ class StoragePageCoordinator extends ChangeNotifier {
         'StackTrace: $stackTrace',
       );
 
-      initializationError = error is StateError
+      initializationError =
+          error
+              is StateError
           ? error.message
           : 'Não foi possível carregar suas obras.';
     } finally {
@@ -111,24 +145,53 @@ class StoragePageCoordinator extends ChangeNotifier {
     }
   }
 
-  Future<void> refresh() {
+  Future<
+    void
+  >
+  refresh() {
     return controller.refresh();
   }
 
-  List<StoredWorkModel> worksFor(StoredWorkType type) {
-    return type == StoredWorkType.beat ? controller.beats : controller.lyrics;
+  List<
+    StoredWorkModel
+  >
+  worksFor(
+    StoredWorkType type,
+  ) {
+    return type ==
+            StoredWorkType.beat
+        ? controller.beats
+        : controller.lyrics;
   }
 
-  Future<void> openRegisterLyrics(BuildContext context) async {
-    final registered = await Navigator.of(context).push<bool>(
-      MaterialPageRoute<bool>(
-        builder: (_) {
-          return const RegisterLyricsPage();
-        },
-      ),
-    );
+  Future<
+    void
+  >
+  openRegisterLyrics(
+    BuildContext context,
+  ) async {
+    final registered =
+        await Navigator.of(
+          context,
+        ).push<
+          bool
+        >(
+          MaterialPageRoute<
+            bool
+          >(
+            builder:
+                (
+                  _,
+                ) {
+                  return const RegisterLyricsPage();
+                },
+          ),
+        );
 
-    if (_disposed || !context.mounted || registered != true) {
+    if (_disposed ||
+        !context.mounted ||
+        registered !=
+            true) {
       return;
     }
 
@@ -138,19 +201,39 @@ class StoragePageCoordinator extends ChangeNotifier {
       return;
     }
 
-    tabController.animateTo(1);
+    tabController.animateTo(
+      1,
+    );
   }
 
-  Future<void> openRegisterBeat(BuildContext context) async {
-    final registered = await Navigator.of(context).push<bool>(
-      MaterialPageRoute<bool>(
-        builder: (_) {
-          return const RegisterBeatsPage();
-        },
-      ),
-    );
+  Future<
+    void
+  >
+  openRegisterBeat(
+    BuildContext context,
+  ) async {
+    final registered =
+        await Navigator.of(
+          context,
+        ).push<
+          bool
+        >(
+          MaterialPageRoute<
+            bool
+          >(
+            builder:
+                (
+                  _,
+                ) {
+                  return const RegisterBeatsPage();
+                },
+          ),
+        );
 
-    if (_disposed || !context.mounted || registered != true) {
+    if (_disposed ||
+        !context.mounted ||
+        registered !=
+            true) {
       return;
     }
 
@@ -160,36 +243,72 @@ class StoragePageCoordinator extends ChangeNotifier {
       return;
     }
 
-    tabController.animateTo(0);
-  }
-
-  Future<void> openDetails(BuildContext context, StoredWorkModel work) async {
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
-        builder: (_) {
-          return StorageDetailsPage(work: work, accentColor: accentColor);
-        },
-      ),
+    tabController.animateTo(
+      0,
     );
   }
 
-  Future<void> openTransferAuthorship(
+  Future<
+    void
+  >
+  openDetails(
     BuildContext context,
     StoredWorkModel work,
   ) async {
-    final transferred = await Navigator.of(context).push<bool>(
-      MaterialPageRoute<bool>(
-        builder: (_) {
-          return TransferAuthorshipPage(
-            work: work,
-            controller: controller,
-            accentColor: accentColor,
-          );
-        },
+    await Navigator.of(
+      context,
+    ).push<
+      void
+    >(
+      MaterialPageRoute<
+        void
+      >(
+        builder:
+            (
+              _,
+            ) {
+              return StorageDetailsPage(
+                work: work,
+                accentColor: accentColor,
+              );
+            },
       ),
     );
+  }
 
-    if (_disposed || !context.mounted || transferred != true) {
+  Future<
+    void
+  >
+  openTransferAuthorship(
+    BuildContext context,
+    StoredWorkModel work,
+  ) async {
+    final transferred =
+        await Navigator.of(
+          context,
+        ).push<
+          bool
+        >(
+          MaterialPageRoute<
+            bool
+          >(
+            builder:
+                (
+                  _,
+                ) {
+                  return TransferAuthorshipPage(
+                    work: work,
+                    controller: controller,
+                    accentColor: accentColor,
+                  );
+                },
+          ),
+        );
+
+    if (_disposed ||
+        !context.mounted ||
+        transferred !=
+            true) {
       return;
     }
 
@@ -199,59 +318,94 @@ class StoragePageCoordinator extends ChangeNotifier {
       return;
     }
 
-    showMessage(context, 'Autoria transferida com sucesso.');
+    showMessage(
+      context,
+      'Autoria transferida com sucesso.',
+    );
   }
 
-  Future<void> confirmDelete(BuildContext context, StoredWorkModel work) async {
+  Future<
+    void
+  >
+  confirmDelete(
+    BuildContext context,
+    StoredWorkModel work,
+  ) async {
     final confirmed = await StorageDeleteWorkDialog.show(
       context: context,
       work: work,
       surfaceColor: surfaceColor,
     );
 
-    if (!confirmed || _disposed || !context.mounted) {
+    if (!confirmed ||
+        _disposed ||
+        !context.mounted) {
       return;
     }
 
-    final deleted = await controller.deleteWork(work.id);
+    final deleted = await controller.deleteWork(
+      work.id,
+    );
 
-    if (_disposed || !context.mounted) {
+    if (_disposed ||
+        !context.mounted) {
       return;
     }
 
-    final isBeat = work.type == StoredWorkType.beat;
+    final isBeat =
+        work.type ==
+        StoredWorkType.beat;
 
     showMessage(
       context,
       deleted
           ? '${isBeat ? 'Beat' : 'Letra'} apagado com sucesso.'
-          : controller.errorMessage ?? 'Não foi possível apagar a obra.',
+          : controller.errorMessage ??
+                'Não foi possível apagar a obra.',
       error: !deleted,
     );
   }
 
-  Future<void> showRegisterWorkOptions(BuildContext context) {
+  Future<
+    void
+  >
+  showRegisterWorkOptions(
+    BuildContext context,
+  ) {
     return StorageRegisterWorkSheet.show(
       context: context,
       accentColor: accentColor,
       surfaceColor: surfaceColor,
       onRegisterLyrics: () {
-        return openRegisterLyrics(context);
+        return openRegisterLyrics(
+          context,
+        );
       },
       onRegisterBeat: () {
-        return openRegisterBeat(context);
+        return openRegisterBeat(
+          context,
+        );
       },
     );
   }
 
-  Future<void> showWorkActions(BuildContext context, StoredWorkModel work) {
+  Future<
+    void
+  >
+  showWorkActions(
+    BuildContext context,
+    StoredWorkModel work,
+  ) {
     return StorageWorkActionsSheet.show(
       context: context,
       work: work,
       accentColor: accentColor,
       surfaceColor: surfaceColor,
       onOpenDetails: () {
-        openDetails(context, work);
+        openDetails(
+          context,
+          work,
+        );
       },
       onVerifyHash: () {
         showMessage(
@@ -260,25 +414,43 @@ class StoragePageCoordinator extends ChangeNotifier {
         );
       },
       onTransferAuthorship: () {
-        return openTransferAuthorship(context, work);
+        return openTransferAuthorship(
+          context,
+          work,
+        );
       },
       onDelete: () {
-        return confirmDelete(context, work);
+        return confirmDelete(
+          context,
+          work,
+        );
       },
     );
   }
 
-  void showMessage(BuildContext context, String message, {bool error = false}) {
+  void showMessage(
+    BuildContext context,
+    String message, {
+    bool error = false,
+  }) {
     if (!context.mounted) {
       return;
     }
 
-    ScaffoldMessenger.of(context)
+    ScaffoldMessenger.of(
+        context,
+      )
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
-          content: Text(message),
-          backgroundColor: error ? const Color(0xFF8B1E3F) : surfaceColor,
+          content: Text(
+            message,
+          ),
+          backgroundColor: error
+              ? const Color(
+                  0xFF8B1E3F,
+                )
+              : surfaceColor,
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -300,7 +472,9 @@ class StoragePageCoordinator extends ChangeNotifier {
 
     _disposed = true;
 
-    controller.removeListener(_relayControllerState);
+    controller.removeListener(
+      _relayControllerState,
+    );
 
     tabController.dispose();
 

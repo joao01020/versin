@@ -7,7 +7,7 @@ class StudioToolbar extends StatelessWidget {
   final String selectedVibe;
   final String selectedTechnique;
   final Color activeColor;
-  
+
   final VoidCallback onEditName;
   final VoidCallback onShowStructure;
   final Function(String, List<String>, Function(String)) onShowMenu;
@@ -37,7 +37,7 @@ class StudioToolbar extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: const Color(0xFF15122C).withOpacity(0.8),
+        color: const Color(0xFF15122C).withValues(alpha: 0.8),
         borderRadius: BorderRadius.circular(30),
         border: Border.all(color: Colors.white10, width: 1),
       ),
@@ -68,18 +68,29 @@ class StudioToolbar extends StatelessWidget {
               child: MouseRegion(
                 cursor: SystemMouseCursors.resizeUpDown,
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 6,
+                  ),
                   child: Row(
                     children: [
                       Icon(Icons.speed, size: 16, color: activeColor),
                       const SizedBox(width: 6),
                       Text(
                         "$currentBpm BPM",
-                        style: TextStyle(color: activeColor, fontWeight: FontWeight.bold, fontSize: 13),
+                        style: TextStyle(
+                          color: activeColor,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
                       ),
                       const SizedBox(width: 2),
                       // CORREÇÃO: Ícone correto de setas verticais nativo do SDK
-                      const Icon(Icons.unfold_more, size: 14, color: Colors.white30),
+                      const Icon(
+                        Icons.unfold_more,
+                        size: 14,
+                        color: Colors.white30,
+                      ),
                     ],
                   ),
                 ),
@@ -100,29 +111,54 @@ class StudioToolbar extends StatelessWidget {
             PopupMenuButton<String>(
               initialValue: selectedTechnique,
               tooltip: "Alterar Técnica",
-              color: const Color(0xFF15122C), // CORREÇÃO: Propriedade corrigida para 'color'
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              color: const Color(
+                0xFF15122C,
+              ), // CORREÇÃO: Propriedade corrigida para 'color'
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
               onSelected: onTechniqueChanged,
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                 child: Row(
                   children: [
-                    const Icon(Icons.music_note_outlined, size: 16, color: Colors.white70),
+                    const Icon(
+                      Icons.music_note_outlined,
+                      size: 16,
+                      color: Colors.white70,
+                    ),
                     const SizedBox(width: 6),
                     Text(
                       selectedTechnique,
-                      style: const TextStyle(color: Colors.white70, fontSize: 13),
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 13,
+                      ),
                     ),
-                    const Icon(Icons.keyboard_arrow_down, size: 14, color: Colors.white30),
+                    const Icon(
+                      Icons.keyboard_arrow_down,
+                      size: 14,
+                      color: Colors.white30,
+                    ),
                   ],
                 ),
               ),
-              itemBuilder: (context) => ["Melódico", "Flow Rápido", "Speedflow", "Plugg", "Aggressive"].map((tech) {
-                return PopupMenuItem<String>(
-                  value: tech,
-                  child: Text(tech, style: const TextStyle(color: Colors.white)),
-                );
-              }).toList(),
+              itemBuilder: (context) =>
+                  [
+                    "Melódico",
+                    "Flow Rápido",
+                    "Speedflow",
+                    "Plugg",
+                    "Aggressive",
+                  ].map((tech) {
+                    return PopupMenuItem<String>(
+                      value: tech,
+                      child: Text(
+                        tech,
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                    );
+                  }).toList(),
             ),
             _buildDivider(),
 
@@ -130,30 +166,55 @@ class StudioToolbar extends StatelessWidget {
             PopupMenuButton<String>(
               initialValue: selectedVibe,
               tooltip: "Alterar Vibe",
-              color: const Color(0xFF15122C), // CORREÇÃO: Propriedade corrigida para 'color'
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              color: const Color(
+                0xFF15122C,
+              ), // CORREÇÃO: Propriedade corrigida para 'color'
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
               onSelected: onVibeChanged,
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                 child: Row(
                   children: [
                     // CORREÇÃO: Nome do ícone corrigido para a versão válida do Material Icons
-                    const Icon(Icons.auto_awesome_outlined, size: 16, color: Colors.white70),
+                    const Icon(
+                      Icons.auto_awesome_outlined,
+                      size: 16,
+                      color: Colors.white70,
+                    ),
                     const SizedBox(width: 6),
                     Text(
                       selectedVibe,
-                      style: const TextStyle(color: Colors.white70, fontSize: 13),
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 13,
+                      ),
                     ),
-                    const Icon(Icons.keyboard_arrow_down, size: 14, color: Colors.white30),
+                    const Icon(
+                      Icons.keyboard_arrow_down,
+                      size: 14,
+                      color: Colors.white30,
+                    ),
                   ],
                 ),
               ),
-              itemBuilder: (context) => ["Calmo", "Dark", "Melancólico", "Enérgico", "Psychedelic"].map((vibe) {
-                return PopupMenuItem<String>(
-                  value: vibe,
-                  child: Text(vibe, style: const TextStyle(color: Colors.white)),
-                );
-              }).toList(),
+              itemBuilder: (context) =>
+                  [
+                    "Calmo",
+                    "Dark",
+                    "Melancólico",
+                    "Enérgico",
+                    "Psychedelic",
+                  ].map((vibe) {
+                    return PopupMenuItem<String>(
+                      value: vibe,
+                      child: Text(
+                        vibe,
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                    );
+                  }).toList(),
             ),
           ],
         ),
@@ -181,12 +242,20 @@ class StudioToolbar extends StatelessWidget {
             const SizedBox(width: 6),
             Text(
               label,
-              style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
             ),
             if (hasArrow) ...[
               const SizedBox(width: 2),
-              const Icon(Icons.keyboard_arrow_down, size: 14, color: Colors.white30),
-            ]
+              const Icon(
+                Icons.keyboard_arrow_down,
+                size: 14,
+                color: Colors.white30,
+              ),
+            ],
           ],
         ),
       ),

@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'package:versin/features/rhymes/presentation/pages/components/auth_modal/auth_modal_email/email_auth_form.dart';

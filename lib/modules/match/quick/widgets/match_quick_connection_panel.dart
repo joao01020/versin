@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../services/match_quick_connection_service.dart';
-import 'match_collaboration_confirmation_dialog.dart';
 
 /// Estado compacto da conexão rápida. Não altera projetos ou chamadas.
 class MatchQuickConnectionPanel extends StatefulWidget {

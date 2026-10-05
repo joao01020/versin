@@ -196,10 +196,10 @@ class _AiMonthlyUsageCardWidgetState extends State<AiMonthlyUsageCardWidget> {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.035),
+        color: Colors.white.withValues(alpha: 0.035),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: accentColor.withOpacity(percentage >= 80 ? 0.30 : 0.12),
+          color: accentColor.withValues(alpha: percentage >= 80 ? 0.30 : 0.12),
         ),
       ),
       child: Column(
@@ -268,9 +268,9 @@ class _AiMonthlyUsageCardWidgetState extends State<AiMonthlyUsageCardWidget> {
           width: 40,
           height: 40,
           decoration: BoxDecoration(
-            color: accentColor.withOpacity(0.10),
+            color: accentColor.withValues(alpha: 0.10),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: accentColor.withOpacity(0.22)),
+            border: Border.all(color: accentColor.withValues(alpha: 0.22)),
           ),
           child: Icon(Icons.auto_awesome_rounded, color: accentColor, size: 20),
         ),
@@ -313,9 +313,9 @@ class _AiMonthlyUsageCardWidgetState extends State<AiMonthlyUsageCardWidget> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
-            color: accentColor.withOpacity(0.10),
+            color: accentColor.withValues(alpha: 0.10),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: accentColor.withOpacity(0.22)),
+            border: Border.all(color: accentColor.withValues(alpha: 0.22)),
           ),
           child: Text(
             isLoadingQuota ? '—' : '${_formatPercentage(percentage)}%',
@@ -444,16 +444,16 @@ class _AiMonthlyUsageCardWidgetState extends State<AiMonthlyUsageCardWidget> {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
-              color: accentColor.withOpacity(0.06),
+              color: accentColor.withValues(alpha: 0.06),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: accentColor.withOpacity(0.12)),
+              border: Border.all(color: accentColor.withValues(alpha: 0.12)),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Icon(
                   Icons.info_outline_rounded,
-                  color: accentColor.withOpacity(0.90),
+                  color: accentColor.withValues(alpha: 0.90),
                   size: 15,
                 ),
 
@@ -463,7 +463,7 @@ class _AiMonthlyUsageCardWidgetState extends State<AiMonthlyUsageCardWidget> {
                   child: Text(
                     _normalizeMessage(message, percentage),
                     style: TextStyle(
-                      color: accentColor.withOpacity(0.92),
+                      color: accentColor.withValues(alpha: 0.92),
                       fontSize: 11,
                       height: 1.35,
                       fontWeight: FontWeight.w500,
@@ -620,7 +620,7 @@ class _AiMonthlyUsageCardWidgetState extends State<AiMonthlyUsageCardWidget> {
       child: LinearProgressIndicator(
         value: progress,
         minHeight: height,
-        backgroundColor: Colors.white.withOpacity(0.07),
+        backgroundColor: Colors.white.withValues(alpha: 0.07),
         valueColor: AlwaysStoppedAnimation<Color>(accentColor),
       ),
     );
@@ -642,9 +642,9 @@ class _AiMonthlyUsageCardWidgetState extends State<AiMonthlyUsageCardWidget> {
           width: double.infinity,
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
-            color: accentColor.withOpacity(0.05),
+            color: accentColor.withValues(alpha: 0.05),
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: accentColor.withOpacity(0.10)),
+            border: Border.all(color: accentColor.withValues(alpha: 0.10)),
           ),
           child: Row(
             children: [
@@ -701,7 +701,7 @@ class _AiMonthlyUsageCardWidgetState extends State<AiMonthlyUsageCardWidget> {
       borderRadius: BorderRadius.circular(20),
       child: LinearProgressIndicator(
         minHeight: height,
-        backgroundColor: Colors.white.withOpacity(0.07),
+        backgroundColor: Colors.white.withValues(alpha: 0.07),
         color: accentColor,
       ),
     );
@@ -744,9 +744,9 @@ class _AiMonthlyUsageCardWidgetState extends State<AiMonthlyUsageCardWidget> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.18),
+        color: Colors.black.withValues(alpha: 0.18),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.white.withOpacity(0.04)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.04)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -934,9 +934,9 @@ class _LoadingMetricPlaceholder extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.18),
+        color: Colors.black.withValues(alpha: 0.18),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.white.withOpacity(0.04)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.04)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

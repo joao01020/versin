@@ -7,7 +7,8 @@ class StudioToolbar extends StatelessWidget {
   final String selectedTechnique;
   final Color activeColor;
   final VoidCallback onShowStructure;
-  final Function(String title, List<String> options, Function(String) onSelect) onShowMenu;
+  final Function(String title, List<String> options, Function(String) onSelect)
+  onShowMenu;
   final Function(int) onBpmChanged;
   final Function(String) onTechniqueChanged;
   final Function(String) onVibeChanged;
@@ -33,7 +34,7 @@ class StudioToolbar extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.03),
+        color: Colors.white.withValues(alpha: 0.03),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
@@ -42,9 +43,13 @@ class StudioToolbar extends StatelessWidget {
           _buildItem(
             icon: Icons.speed,
             label: "$currentBpm BPM",
-            onTap: () => onShowMenu("Ajustar BPM", ["80", "90", "100", "120", "140", "160"], (val) {
-              onBpmChanged(int.parse(val));
-            }),
+            onTap: () => onShowMenu(
+              "Ajustar BPM",
+              ["80", "90", "100", "120", "140", "160"],
+              (val) {
+                onBpmChanged(int.parse(val));
+              },
+            ),
           ),
           const SizedBox(width: 12),
           _buildItem(
@@ -56,20 +61,36 @@ class StudioToolbar extends StatelessWidget {
           _buildItem(
             icon: Icons.mic_external_on_outlined,
             label: selectedTechnique,
-            onTap: () => onShowMenu("Performance Vocal", ["Melódico", "Agressivo", "Flow Rápido", "Sussurrado", "Falsete"], onTechniqueChanged),
+            onTap: () => onShowMenu("Performance Vocal", [
+              "Melódico",
+              "Agressivo",
+              "Flow Rápido",
+              "Sussurrado",
+              "Falsete",
+            ], onTechniqueChanged),
           ),
           const SizedBox(width: 12),
           _buildItem(
             icon: Icons.auto_awesome,
             label: selectedVibe,
-            onTap: () => onShowMenu("Alterar Vibe", ["Calmo", "Energético", "Agressivo", "Triste", "Melancólico"], onVibeChanged),
+            onTap: () => onShowMenu("Alterar Vibe", [
+              "Calmo",
+              "Energético",
+              "Agressivo",
+              "Triste",
+              "Melancólico",
+            ], onVibeChanged),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildItem({required IconData icon, required String label, required VoidCallback onTap}) {
+  Widget _buildItem({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(15),
@@ -77,8 +98,15 @@ class StudioToolbar extends StatelessWidget {
         children: [
           Icon(icon, size: 14, color: Colors.white54),
           const SizedBox(width: 4),
-          Text(label, style: const TextStyle(color: Colors.white70, fontSize: 11)),
-          const Icon(Icons.keyboard_arrow_down, size: 14, color: Colors.white30),
+          Text(
+            label,
+            style: const TextStyle(color: Colors.white70, fontSize: 11),
+          ),
+          const Icon(
+            Icons.keyboard_arrow_down,
+            size: 14,
+            color: Colors.white30,
+          ),
         ],
       ),
     );

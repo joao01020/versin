@@ -419,9 +419,7 @@ class _ConnectionProfileCardWidgetState
     try {
       await widget.onEditProfile();
     } finally {
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) {}
 
       setState(
         () {

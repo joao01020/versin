@@ -51,13 +51,16 @@ class _MatchPageState extends State<MatchPage> {
   late final MatchPageCoordinator _coordinator;
   bool _confirmationBusy = false;
   bool _confirmationScheduled = false;
-  final MatchQuickConnectionService _quick = MatchQuickConnectionService.instance;
+  final MatchQuickConnectionService _quick =
+      MatchQuickConnectionService.instance;
 
   Future<void> _openQuickProject(String projectId) async {
     if (!mounted) return;
-    await Navigator.of(context).push(MaterialPageRoute<void>(
-      builder: (_) => NetworkingSessionView(projectId: projectId),
-    ));
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => NetworkingSessionView(projectId: projectId),
+      ),
+    );
     if (mounted) {
       await _quick.refresh();
       await _coordinator.availabilityController.refresh();
@@ -72,24 +75,26 @@ class _MatchPageState extends State<MatchPage> {
   Future<void> _resumeAgora() async {
     if (!mounted) return;
     await _coordinator.handleDiscoveryModeSelected(
-      context, MatchDiscoveryMode.global,
+      context,
+      MatchDiscoveryMode.global,
     );
   }
-
 
   void _scheduleConfirmation() {
     if (!mounted ||
         _confirmationBusy ||
         _confirmationScheduled ||
-        !_coordinator.hasPendingConfirmation)
+        !_coordinator.hasPendingConfirmation) {
       return;
+    }
     _confirmationScheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _confirmationScheduled = false;
       if (!mounted ||
           _confirmationBusy ||
-          ModalRoute.of(context)?.isCurrent != true)
+          ModalRoute.of(context)?.isCurrent != true) {
         return;
+      }
       unawaited(_showNextConfirmation());
     });
   }
@@ -107,7 +112,8 @@ class _MatchPageState extends State<MatchPage> {
         barrierDismissible: false,
         builder: (_) => MatchConfirmationDialog(
           confirmation: confirmation,
-          allowQuickStart: _coordinator.matchController.discoveryMode ==
+          allowQuickStart:
+              _coordinator.matchController.discoveryMode ==
                   MatchDiscoveryMode.global &&
               _coordinator.availabilityController.isActive &&
               !_quick.isInSession,
@@ -119,12 +125,17 @@ class _MatchPageState extends State<MatchPage> {
           await _quick.invite(confirmation.projectId, confirmation.other.id);
         } catch (error) {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(error.toString())),
-            );
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text(error.toString())));
           }
         }
       }
+
+      if (!mounted) {
+        return;
+      }
+
       if (action == MatchConfirmationAction.viewProject) {
         await Navigator.of(context).push(
           MaterialPageRoute<void>(

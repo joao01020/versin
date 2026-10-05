@@ -60,7 +60,9 @@ import 'action_button_widget.dart';
 //
 // ============================================================
 
-class DiscoveryCardWidget extends StatefulWidget {
+class DiscoveryCardWidget
+    extends
+        StatefulWidget {
   // ============================================================
   // MATCH
   // ============================================================
@@ -79,7 +81,11 @@ class DiscoveryCardWidget extends StatefulWidget {
 
   final VoidCallback? onDismiss;
 
-  final Future<void> Function()? onLike;
+  final Future<
+    void
+  >
+  Function()?
+  onLike;
 
   // ============================================================
   // DEMO
@@ -97,7 +103,11 @@ class DiscoveryCardWidget extends StatefulWidget {
   //
   // ============================================================
 
-  final Future<void> Function()? onListenDemo;
+  final Future<
+    void
+  >
+  Function()?
+  onListenDemo;
 
   // ============================================================
   // CONSTRUTOR
@@ -113,14 +123,21 @@ class DiscoveryCardWidget extends StatefulWidget {
   });
 
   @override
-  State<DiscoveryCardWidget> createState() => _DiscoveryCardWidgetState();
+  State<
+    DiscoveryCardWidget
+  >
+  createState() => _DiscoveryCardWidgetState();
 }
 
 // ============================================================
 // STATE
 // ============================================================
 
-class _DiscoveryCardWidgetState extends State<DiscoveryCardWidget> {
+class _DiscoveryCardWidgetState
+    extends
+        State<
+          DiscoveryCardWidget
+        > {
   // ============================================================
   // ESTADO
   // ============================================================
@@ -129,8 +146,7 @@ class _DiscoveryCardWidgetState extends State<DiscoveryCardWidget> {
 
   bool _isOpeningDemo = false;
 
-  static const String _fallbackShowcaseUrl =
-      'https://images.unsplash.com/photo-1514525253361-bee8718a7439?q=80&w=500';
+  static const String _fallbackShowcaseUrl = 'https://images.unsplash.com/photo-1514525253361-bee8718a7439?q=80&w=500';
 
   // ============================================================
   // DID UPDATE WIDGET
@@ -143,10 +159,15 @@ class _DiscoveryCardWidgetState extends State<DiscoveryCardWidget> {
   // ============================================================
 
   @override
-  void didUpdateWidget(covariant DiscoveryCardWidget oldWidget) {
-    super.didUpdateWidget(oldWidget);
+  void didUpdateWidget(
+    covariant DiscoveryCardWidget oldWidget,
+  ) {
+    super.didUpdateWidget(
+      oldWidget,
+    );
 
-    if (oldWidget.user.id != widget.user.id) {
+    if (oldWidget.user.id !=
+        widget.user.id) {
       _isWaitingForNetworking = false;
 
       _isOpeningDemo = false;
@@ -157,10 +178,14 @@ class _DiscoveryCardWidgetState extends State<DiscoveryCardWidget> {
   // MATCH INTENT
   // ============================================================
 
-  Future<void> _handleMatchIntent() async {
+  Future<
+    void
+  >
+  _handleMatchIntent() async {
     final callback = widget.onLike;
 
-    if (callback == null) {
+    if (callback ==
+        null) {
       debugPrint(
         '[DISCOVERY] '
         'Callback de like não configurado.',
@@ -174,14 +199,19 @@ class _DiscoveryCardWidgetState extends State<DiscoveryCardWidget> {
     }
 
     if (mounted) {
-      setState(() {
-        _isWaitingForNetworking = true;
-      });
+      setState(
+        () {
+          _isWaitingForNetworking = true;
+        },
+      );
     }
 
     try {
       await callback();
-    } catch (error, stackTrace) {
+    } catch (
+      error,
+      stackTrace
+    ) {
       debugPrint(
         '[DISCOVERY] '
         'Erro ao processar conexão: '
@@ -195,9 +225,11 @@ class _DiscoveryCardWidgetState extends State<DiscoveryCardWidget> {
       );
     } finally {
       if (mounted) {
-        setState(() {
-          _isWaitingForNetworking = false;
-        });
+        setState(
+          () {
+            _isWaitingForNetworking = false;
+          },
+        );
       }
     }
   }
@@ -207,7 +239,8 @@ class _DiscoveryCardWidgetState extends State<DiscoveryCardWidget> {
   // ============================================================
 
   void _handleDismiss() {
-    if (_isWaitingForNetworking || _isOpeningDemo) {
+    if (_isWaitingForNetworking ||
+        _isOpeningDemo) {
       return;
     }
 
@@ -224,10 +257,14 @@ class _DiscoveryCardWidgetState extends State<DiscoveryCardWidget> {
   // OUVIR DEMO
   // ============================================================
 
-  Future<void> _handleListenDemo() async {
+  Future<
+    void
+  >
+  _handleListenDemo() async {
     final callback = widget.onListenDemo;
 
-    if (callback == null) {
+    if (callback ==
+        null) {
       debugPrint(
         '[DISCOVERY] '
         'Callback de demo não configurado para: '
@@ -255,9 +292,11 @@ class _DiscoveryCardWidgetState extends State<DiscoveryCardWidget> {
     // ========================================================
 
     if (mounted) {
-      setState(() {
-        _isOpeningDemo = true;
-      });
+      setState(
+        () {
+          _isOpeningDemo = true;
+        },
+      );
     }
 
     try {
@@ -267,9 +306,6 @@ class _DiscoveryCardWidgetState extends State<DiscoveryCardWidget> {
         '${widget.user.id}',
       );
 
-      // ======================================================
-      // DELEGAR TODO O FLUXO
-      // ======================================================
       //
       // IMPORTANTE:
       //
@@ -290,7 +326,10 @@ class _DiscoveryCardWidgetState extends State<DiscoveryCardWidget> {
         '[DISCOVERY] '
         'Fluxo da demo finalizado.',
       );
-    } catch (error, stackTrace) {
+    } catch (
+      error,
+      stackTrace
+    ) {
       debugPrint(
         '[DISCOVERY] '
         'Erro ao abrir demo: '
@@ -304,9 +343,11 @@ class _DiscoveryCardWidgetState extends State<DiscoveryCardWidget> {
       );
     } finally {
       if (mounted) {
-        setState(() {
-          _isOpeningDemo = false;
-        });
+        setState(
+          () {
+            _isOpeningDemo = false;
+          },
+        );
       }
     }
   }
@@ -316,27 +357,39 @@ class _DiscoveryCardWidgetState extends State<DiscoveryCardWidget> {
   // ============================================================
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(
+    BuildContext context,
+  ) {
     return Container(
       height: 270,
 
       width: double.infinity,
 
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(
+          24,
+        ),
 
-        border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+        border: Border.all(
+          color: Colors.white.withValues(
+            alpha: 0.10,
+          ),
+        ),
       ),
 
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(
+          24,
+        ),
 
         child: Stack(
           children: [
             // ==================================================
             // BACKGROUND
             // ==================================================
-            Positioned.fill(child: _buildShowcaseBackground()),
+            Positioned.fill(
+              child: _buildShowcaseBackground(),
+            ),
 
             // ==================================================
             // GRADIENT
@@ -350,9 +403,13 @@ class _DiscoveryCardWidgetState extends State<DiscoveryCardWidget> {
                     end: Alignment.topLeft,
 
                     colors: [
-                      widget.controller.primaryPurple.withValues(alpha: 0.85),
+                      widget.controller.primaryPurple.withValues(
+                        alpha: 0.85,
+                      ),
 
-                      Colors.black.withValues(alpha: 0.78),
+                      Colors.black.withValues(
+                        alpha: 0.78,
+                      ),
 
                       Colors.black26,
                     ],
@@ -365,7 +422,9 @@ class _DiscoveryCardWidgetState extends State<DiscoveryCardWidget> {
             // CONTENT
             // ==================================================
             Padding(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(
+                20,
+              ),
 
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -412,7 +471,9 @@ class _DiscoveryCardWidgetState extends State<DiscoveryCardWidget> {
                         ),
                       ),
 
-                      const SizedBox(width: 8),
+                      const SizedBox(
+                        width: 8,
+                      ),
 
                       Icon(
                         Icons.verified,
@@ -428,7 +489,9 @@ class _DiscoveryCardWidgetState extends State<DiscoveryCardWidget> {
                   // USERNAME
                   // ==================================================
                   if (widget.user.hasUsername) ...[
-                    const SizedBox(height: 2),
+                    const SizedBox(
+                      height: 2,
+                    ),
 
                     Text(
                       widget.user.usernameLabel,
@@ -447,7 +510,9 @@ class _DiscoveryCardWidgetState extends State<DiscoveryCardWidget> {
                     ),
                   ],
 
-                  const SizedBox(height: 4),
+                  const SizedBox(
+                    height: 4,
+                  ),
 
                   // ==================================================
                   // FUNÇÃO PRINCIPAL
@@ -468,7 +533,9 @@ class _DiscoveryCardWidgetState extends State<DiscoveryCardWidget> {
                     ),
                   ),
 
-                  const SizedBox(height: 6),
+                  const SizedBox(
+                    height: 6,
+                  ),
 
                   // ==================================================
                   // BIO
@@ -495,17 +562,23 @@ class _DiscoveryCardWidgetState extends State<DiscoveryCardWidget> {
                   // QUEM PROCURA
                   // ==================================================
                   if (widget.user.lookingForRoles.isNotEmpty) ...[
-                    const SizedBox(height: 8),
+                    const SizedBox(
+                      height: 8,
+                    ),
 
                     _buildLookingForRow(),
                   ],
 
-                  const SizedBox(height: 14),
+                  const SizedBox(
+                    height: 14,
+                  ),
 
                   // ==================================================
                   // AÇÕES
                   // ==================================================
-                  _isWaitingForNetworking ? _buildWaiting() : _buildActions(),
+                  _isWaitingForNetworking
+                      ? _buildWaiting()
+                      : _buildActions(),
                 ],
               ),
             ),
@@ -524,18 +597,29 @@ class _DiscoveryCardWidgetState extends State<DiscoveryCardWidget> {
       widget.user.showcaseMediaUrl,
     );
 
-    final imageUrl = showcaseUrl ?? _fallbackShowcaseUrl;
+    final imageUrl =
+        showcaseUrl ??
+        _fallbackShowcaseUrl;
 
     return Image.network(
       imageUrl,
       fit: BoxFit.cover,
-      errorBuilder: (context, error, stackTrace) {
-        return Container(
-          color: Colors.black45,
-          alignment: Alignment.center,
-          child: const Icon(Icons.music_note, color: Colors.white24, size: 50),
-        );
-      },
+      errorBuilder:
+          (
+            context,
+            error,
+            stackTrace,
+          ) {
+            return Container(
+              color: Colors.black45,
+              alignment: Alignment.center,
+              child: const Icon(
+                Icons.music_note,
+                color: Colors.white24,
+                size: 50,
+              ),
+            );
+          },
     );
   }
 
@@ -545,15 +629,27 @@ class _DiscoveryCardWidgetState extends State<DiscoveryCardWidget> {
 
   Widget _buildOnlineBadge() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 9,
+        vertical: 5,
+      ),
 
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.48),
+        color: Colors.black.withValues(
+          alpha: 0.48,
+        ),
 
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(
+          8,
+        ),
 
         border: Border.all(
-          color: const Color(0xFF34D399).withValues(alpha: 0.18),
+          color:
+              const Color(
+                0xFF34D399,
+              ).withValues(
+                alpha: 0.18,
+              ),
         ),
       ),
 
@@ -566,7 +662,9 @@ class _DiscoveryCardWidgetState extends State<DiscoveryCardWidget> {
           // ====================================================
           _OnlineDot(),
 
-          SizedBox(width: 6),
+          SizedBox(
+            width: 6,
+          ),
 
           // ====================================================
           // LABEL
@@ -575,7 +673,9 @@ class _DiscoveryCardWidgetState extends State<DiscoveryCardWidget> {
             'ONLINE AGORA',
 
             style: TextStyle(
-              color: Color(0xFF34D399),
+              color: Color(
+                0xFF34D399,
+              ),
 
               fontSize: 9,
 
@@ -597,19 +697,28 @@ class _DiscoveryCardWidgetState extends State<DiscoveryCardWidget> {
     return Container(
       width: double.infinity,
 
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(
+        12,
+      ),
 
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.10),
+        color: Colors.white.withValues(
+          alpha: 0.10,
+        ),
 
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          12,
+        ),
       ),
 
       child: const Center(
         child: Text(
           'VERIFICANDO NETWORKING...',
 
-          style: TextStyle(color: Colors.white70, fontSize: 12),
+          style: TextStyle(
+            color: Colors.white70,
+            fontSize: 12,
+          ),
         ),
       ),
     );
@@ -630,10 +739,16 @@ class _DiscoveryCardWidgetState extends State<DiscoveryCardWidget> {
 
           color: Colors.white24,
 
-          onTap: widget.onDismiss == null ? null : _handleDismiss,
+          onTap:
+              widget.onDismiss ==
+                  null
+              ? null
+              : _handleDismiss,
         ),
 
-        const SizedBox(width: 12),
+        const SizedBox(
+          width: 12,
+        ),
 
         // ======================================================
         // LIKE
@@ -643,7 +758,11 @@ class _DiscoveryCardWidgetState extends State<DiscoveryCardWidget> {
 
           color: widget.controller.accentNeon,
 
-          onTap: widget.onLike == null ? null : _handleMatchIntent,
+          onTap:
+              widget.onLike ==
+                  null
+              ? null
+              : _handleMatchIntent,
         ),
 
         const Spacer(),
@@ -652,7 +771,10 @@ class _DiscoveryCardWidgetState extends State<DiscoveryCardWidget> {
         // OUVIR DEMO
         // ======================================================
         ElevatedButton.icon(
-          onPressed: widget.onListenDemo == null || _isOpeningDemo
+          onPressed:
+              widget.onListenDemo ==
+                      null ||
+                  _isOpeningDemo
               ? null
               : _handleListenDemo,
 
@@ -668,7 +790,9 @@ class _DiscoveryCardWidgetState extends State<DiscoveryCardWidget> {
             elevation: 0,
 
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(
+                12,
+              ),
             ),
           ),
 
@@ -678,14 +802,24 @@ class _DiscoveryCardWidgetState extends State<DiscoveryCardWidget> {
 
                   height: 14,
 
-                  child: CircularProgressIndicator(strokeWidth: 2),
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                  ),
                 )
-              : const Icon(Icons.play_arrow_rounded, size: 17),
+              : const Icon(
+                  Icons.play_arrow_rounded,
+                  size: 17,
+                ),
 
           label: Text(
-            _isOpeningDemo ? 'CARREGANDO...' : 'OUVIR DEMO',
+            _isOpeningDemo
+                ? 'CARREGANDO...'
+                : 'OUVIR DEMO',
 
-            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+            style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
       ],
@@ -699,7 +833,9 @@ class _DiscoveryCardWidgetState extends State<DiscoveryCardWidget> {
   Widget _buildLookingForRow() {
     final roles = widget.user.lookingForRoles;
 
-    final visibleRoles = roles.take(3);
+    final visibleRoles = roles.take(
+      3,
+    );
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -713,7 +849,9 @@ class _DiscoveryCardWidgetState extends State<DiscoveryCardWidget> {
           size: 13,
         ),
 
-        const SizedBox(width: 5),
+        const SizedBox(
+          width: 5,
+        ),
 
         const Text(
           'Procura:',
@@ -727,21 +865,35 @@ class _DiscoveryCardWidgetState extends State<DiscoveryCardWidget> {
           ),
         ),
 
-        const SizedBox(width: 6),
+        const SizedBox(
+          width: 6,
+        ),
 
         Expanded(
           child: Text(
-            visibleRoles.map((role) => role.label).join(' • '),
+            visibleRoles
+                .map(
+                  (
+                    role,
+                  ) => role.label,
+                )
+                .join(
+                  ' • ',
+                ),
 
             maxLines: 1,
 
             overflow: TextOverflow.ellipsis,
 
-            style: const TextStyle(color: Colors.white70, fontSize: 9),
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 9,
+            ),
           ),
         ),
 
-        if (roles.length > 3)
+        if (roles.length >
+            3)
           Text(
             '+${roles.length - 3}',
 
@@ -762,24 +914,35 @@ class _DiscoveryCardWidgetState extends State<DiscoveryCardWidget> {
 // ONLINE DOT
 // ============================================================
 
-class _OnlineDot extends StatelessWidget {
+class _OnlineDot
+    extends
+        StatelessWidget {
   const _OnlineDot();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(
+    BuildContext context,
+  ) {
     return Container(
       width: 7,
 
       height: 7,
 
       decoration: BoxDecoration(
-        color: const Color(0xFF34D399),
+        color: const Color(
+          0xFF34D399,
+        ),
 
         shape: BoxShape.circle,
 
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF34D399).withValues(alpha: 0.50),
+            color:
+                const Color(
+                  0xFF34D399,
+                ).withValues(
+                  alpha: 0.50,
+                ),
 
             blurRadius: 6,
           ),

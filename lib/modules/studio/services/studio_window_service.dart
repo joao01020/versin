@@ -36,9 +36,7 @@ class StudioWindowArguments {
     return jsonEncode(
       {
         typeKey: lyricsType,
-        if (projectId !=
-            null)
-          projectIdKey: projectId,
+        projectIdKey: projectId,
       },
     );
   }
@@ -53,9 +51,7 @@ class StudioWindowArguments {
     return jsonEncode(
       {
         typeKey: mindMapType,
-        if (projectId !=
-            null)
-          projectIdKey: projectId,
+        projectIdKey: projectId,
       },
     );
   }

@@ -81,7 +81,8 @@ class DashboardPageCoordinator extends ChangeNotifier {
   // DERIVED STATE
   // ============================================================
 
-  get visibleMenuItems => DashboardMenuConfig.visibleItems;
+  List<DashboardMenuItem> get visibleMenuItems =>
+      DashboardMenuConfig.visibleItems;
 
   bool get requiresDisplayName {
     if (!dashboardController.artistNameResolved) {

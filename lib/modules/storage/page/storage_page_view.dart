@@ -9,13 +9,20 @@ import 'package:versin/modules/storage/widgets/storage_empty_state.dart';
 import 'package:versin/modules/storage/widgets/storage_item_card.dart';
 import 'package:versin/modules/storage/widgets/storage_summary_card.dart';
 
-class StoragePageView extends StatelessWidget {
+class StoragePageView
+    extends
+        StatelessWidget {
   final StoragePageCoordinator coordinator;
 
-  const StoragePageView({super.key, required this.coordinator});
+  const StoragePageView({
+    super.key,
+    required this.coordinator,
+  });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(
+    BuildContext context,
+  ) {
     return Scaffold(
       backgroundColor: StoragePageCoordinator.backgroundColor,
       body: Container(
@@ -36,34 +43,55 @@ class StoragePageView extends StatelessWidget {
                   color: StoragePageCoordinator.accentColor,
                 ),
               )
-            : coordinator.initializationError != null
-            ? _InitializationError(coordinator: coordinator)
-            : _StorageContent(coordinator: coordinator),
+            : coordinator.initializationError !=
+                  null
+            ? _InitializationError(
+                coordinator: coordinator,
+              )
+            : _StorageContent(
+                coordinator: coordinator,
+              ),
       ),
     );
   }
 }
 
-class _InitializationError extends StatelessWidget {
+class _InitializationError
+    extends
+        StatelessWidget {
   final StoragePageCoordinator coordinator;
 
-  const _InitializationError({required this.coordinator});
+  const _InitializationError({
+    required this.coordinator,
+  });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(
+    BuildContext context,
+  ) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(
+          24,
+        ),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 460),
+          constraints: const BoxConstraints(
+            maxWidth: 460,
+          ),
           child: Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(
+              20,
+            ),
             decoration: BoxDecoration(
               color: StoragePageCoordinator.surfaceColor,
-              borderRadius: BorderRadius.circular(18),
+              borderRadius: BorderRadius.circular(
+                18,
+              ),
               border: Border.all(
-                color: Colors.redAccent.withValues(alpha: 0.22),
+                color: Colors.redAccent.withValues(
+                  alpha: 0.22,
+                ),
               ),
             ),
             child: Column(
@@ -74,7 +102,9 @@ class _InitializationError extends StatelessWidget {
                   color: Colors.redAccent,
                   size: 34,
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(
+                  height: 12,
+                ),
                 const Text(
                   'Não foi possível carregar o armazenamento',
                   textAlign: TextAlign.center,
@@ -84,9 +114,12 @@ class _InitializationError extends StatelessWidget {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(
+                  height: 8,
+                ),
                 Text(
-                  coordinator.initializationError ?? 'Tente novamente.',
+                  coordinator.initializationError ??
+                      'Tente novamente.',
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     color: Colors.white54,
@@ -94,19 +127,29 @@ class _InitializationError extends StatelessWidget {
                     height: 1.4,
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(
+                  height: 16,
+                ),
                 FilledButton.icon(
                   onPressed: () {
-                    unawaited(coordinator.initialize());
+                    unawaited(
+                      coordinator.initialize(),
+                    );
                   },
                   style: FilledButton.styleFrom(
                     backgroundColor: StoragePageCoordinator.accentColor,
                     foregroundColor: Colors.black,
                   ),
-                  icon: const Icon(Icons.refresh_rounded, size: 17),
+                  icon: const Icon(
+                    Icons.refresh_rounded,
+                    size: 17,
+                  ),
                   label: const Text(
                     'TENTAR NOVAMENTE',
-                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ],
@@ -118,13 +161,19 @@ class _InitializationError extends StatelessWidget {
   }
 }
 
-class _StorageContent extends StatelessWidget {
+class _StorageContent
+    extends
+        StatelessWidget {
   final StoragePageCoordinator coordinator;
 
-  const _StorageContent({required this.coordinator});
+  const _StorageContent({
+    required this.coordinator,
+  });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(
+    BuildContext context,
+  ) {
     final controller = coordinator.controller;
 
     if (controller.isLoading) {
@@ -140,11 +189,17 @@ class _StorageContent extends StatelessWidget {
         StorageHeader(
           accentColor: StoragePageCoordinator.accentColor,
           onRegister: () {
-            unawaited(coordinator.showRegisterWorkOptions(context));
+            unawaited(
+              coordinator.showRegisterWorkOptions(
+                context,
+              ),
+            );
           },
         ),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
+          padding: const EdgeInsets.symmetric(
+            horizontal: 20,
+          ),
           child: Row(
             children: [
               _SummaryCard(
@@ -152,13 +207,17 @@ class _StorageContent extends StatelessWidget {
                 value: controller.lyricsCount,
                 icon: Icons.description_outlined,
               ),
-              const SizedBox(width: 10),
+              const SizedBox(
+                width: 10,
+              ),
               _SummaryCard(
                 title: 'Beats',
                 value: controller.beatsCount,
                 icon: Icons.graphic_eq_rounded,
               ),
-              const SizedBox(width: 10),
+              const SizedBox(
+                width: 10,
+              ),
               _SummaryCard(
                 title: 'Íntegras',
                 value: controller.verifiedCount,
@@ -167,16 +226,30 @@ class _StorageContent extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: 18),
+        const SizedBox(
+          height: 18,
+        ),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
+          padding: const EdgeInsets.symmetric(
+            horizontal: 20,
+          ),
           child: Container(
             height: 44,
-            padding: const EdgeInsets.all(4),
+            padding: const EdgeInsets.all(
+              4,
+            ),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.035),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+              color: Colors.white.withValues(
+                alpha: 0.035,
+              ),
+              borderRadius: BorderRadius.circular(
+                14,
+              ),
+              border: Border.all(
+                color: Colors.white.withValues(
+                  alpha: 0.05,
+                ),
+              ),
             ),
             child: TabBar(
               controller: coordinator.tabController,
@@ -188,22 +261,36 @@ class _StorageContent extends StatelessWidget {
                 color: StoragePageCoordinator.accentColor.withValues(
                   alpha: 0.12,
                 ),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(
+                  10,
+                ),
               ),
               tabs: const [
-                Tab(text: 'BEATS'),
-                Tab(text: 'LETRAS'),
+                Tab(
+                  text: 'BEATS',
+                ),
+                Tab(
+                  text: 'LETRAS',
+                ),
               ],
             ),
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(
+          height: 8,
+        ),
         Expanded(
           child: TabBarView(
             controller: coordinator.tabController,
             children: [
-              _WorksList(coordinator: coordinator, type: StoredWorkType.beat),
-              _WorksList(coordinator: coordinator, type: StoredWorkType.lyrics),
+              _WorksList(
+                coordinator: coordinator,
+                type: StoredWorkType.beat,
+              ),
+              _WorksList(
+                coordinator: coordinator,
+                type: StoredWorkType.lyrics,
+              ),
             ],
           ),
         ),
@@ -212,7 +299,9 @@ class _StorageContent extends StatelessWidget {
   }
 }
 
-class _SummaryCard extends StatelessWidget {
+class _SummaryCard
+    extends
+        StatelessWidget {
   final String title;
   final int value;
   final IconData icon;
@@ -224,7 +313,9 @@ class _SummaryCard extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(
+    BuildContext context,
+  ) {
     return Expanded(
       child: StorageSummaryCard(
         title: title,
@@ -236,33 +327,58 @@ class _SummaryCard extends StatelessWidget {
   }
 }
 
-class _WorksList extends StatelessWidget {
+class _WorksList
+    extends
+        StatelessWidget {
   final StoragePageCoordinator coordinator;
   final StoredWorkType type;
 
-  const _WorksList({required this.coordinator, required this.type});
+  const _WorksList({
+    required this.coordinator,
+    required this.type,
+  });
 
   @override
-  Widget build(BuildContext context) {
-    final works = coordinator.worksFor(type);
+  Widget build(
+    BuildContext context,
+  ) {
+    final works = coordinator.worksFor(
+      type,
+    );
 
     if (works.isEmpty) {
-      final isBeat = type == StoredWorkType.beat;
+      final isBeat =
+          type ==
+          StoredWorkType.beat;
 
       return StorageEmptyState(
-        title: isBeat ? 'Nenhum beat registrado' : 'Nenhuma letra registrada',
+        title: isBeat
+            ? 'Nenhum beat registrado'
+            : 'Nenhuma letra registrada',
         message: isBeat
             ? 'Adicione um arquivo de áudio para gerar seu hash de integridade.'
             : 'Cole ou escreva uma letra para criar seu registro de integridade.',
-        icon: isBeat ? Icons.graphic_eq_rounded : Icons.description_outlined,
-        buttonLabel: isBeat ? 'REGISTRAR BEAT' : 'REGISTRAR LETRA',
+        icon: isBeat
+            ? Icons.graphic_eq_rounded
+            : Icons.description_outlined,
+        buttonLabel: isBeat
+            ? 'REGISTRAR BEAT'
+            : 'REGISTRAR LETRA',
         accentColor: StoragePageCoordinator.accentColor,
         onPressed: isBeat
             ? () {
-                unawaited(coordinator.openRegisterBeat(context));
+                unawaited(
+                  coordinator.openRegisterBeat(
+                    context,
+                  ),
+                );
               }
             : () {
-                unawaited(coordinator.openRegisterLyrics(context));
+                unawaited(
+                  coordinator.openRegisterLyrics(
+                    context,
+                  ),
+                );
               },
       );
     }
@@ -272,25 +388,50 @@ class _WorksList extends StatelessWidget {
       onRefresh: coordinator.refresh,
       child: ListView.separated(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+        padding: const EdgeInsets.fromLTRB(
+          20,
+          12,
+          20,
+          24,
+        ),
         itemCount: works.length,
-        separatorBuilder: (_, __) {
-          return const SizedBox(height: 12);
-        },
-        itemBuilder: (_, index) {
-          final work = works[index];
+        separatorBuilder:
+            (
+              _,
+              _,
+            ) {
+              return const SizedBox(
+                height: 12,
+              );
+            },
+        itemBuilder:
+            (
+              _,
+              index,
+            ) {
+              final work = works[index];
 
-          return StorageItemCard(
-            work: work,
-            accentColor: StoragePageCoordinator.accentColor,
-            onTap: () {
-              unawaited(coordinator.openDetails(context, work));
+              return StorageItemCard(
+                work: work,
+                accentColor: StoragePageCoordinator.accentColor,
+                onTap: () {
+                  unawaited(
+                    coordinator.openDetails(
+                      context,
+                      work,
+                    ),
+                  );
+                },
+                onMorePressed: () {
+                  unawaited(
+                    coordinator.showWorkActions(
+                      context,
+                      work,
+                    ),
+                  );
+                },
+              );
             },
-            onMorePressed: () {
-              unawaited(coordinator.showWorkActions(context, work));
-            },
-          );
-        },
       ),
     );
   }

@@ -63,8 +63,6 @@ class _MindMapState extends State<MindMap> {
 
   static const double _nodeHeight = 76;
 
-  static const double _handleSize = 12;
-
   static const double _connectionSnapDistance = 24;
 
   // ============================================================
@@ -78,8 +76,6 @@ class _MindMapState extends State<MindMap> {
   // ============================================================
 
   String? _connectingFromNodeId;
-
-  _MindMapPort? _connectingFromPort;
 
   Offset? _connectionStart;
 
@@ -168,8 +164,6 @@ class _MindMapState extends State<MindMap> {
     setState(() {
       _connectingFromNodeId = node.id;
 
-      _connectingFromPort = port;
-
       _connectionStart = start;
 
       _connectionCurrent = _globalToCanvas(details.globalPosition);
@@ -228,8 +222,6 @@ class _MindMapState extends State<MindMap> {
 
     setState(() {
       _connectingFromNodeId = null;
-
-      _connectingFromPort = null;
 
       _connectionStart = null;
 

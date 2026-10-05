@@ -31,39 +31,25 @@ import 'package:versin/modules/dashboard/controllers/dashboard_controller.dart';
 //
 // ============================================================
 
-class AccountInformationPage
-    extends
-        StatefulWidget {
-  const AccountInformationPage({
-    super.key,
-  });
+class AccountInformationPage extends StatefulWidget {
+  const AccountInformationPage({super.key});
 
   @override
-  State<
-    AccountInformationPage
-  >
-  createState() => _AccountInformationPageState();
+  State<AccountInformationPage> createState() => _AccountInformationPageState();
 }
 
 // ============================================================
 // STATE
 // ============================================================
 
-class _AccountInformationPageState
-    extends
-        State<
-          AccountInformationPage
-        > {
+class _AccountInformationPageState extends State<AccountInformationPage> {
   // ============================================================
   // DEPENDÊNCIAS
   // ============================================================
 
   final SupabaseClient _supabase = Supabase.instance.client;
 
-  final DashboardController _dashboardController =
-      sl<
-        DashboardController
-      >();
+  final DashboardController _dashboardController = sl<DashboardController>();
 
   // ============================================================
   // CONTROLLERS
@@ -99,21 +85,13 @@ class _AccountInformationPageState
   // CORES
   // ============================================================
 
-  static const Color _backgroundColor = Color(
-    0xFF0D0B1F,
-  );
+  static const Color _backgroundColor = Color(0xFF0D0B1F);
 
-  static const Color _surfaceColor = Color(
-    0xFF17132D,
-  );
+  static const Color _surfaceColor = Color(0xFF17132D);
 
-  static const Color _primaryPurple = Color(
-    0xFF6A1B9A,
-  );
+  static const Color _primaryPurple = Color(0xFF6A1B9A);
 
-  static const Color _accentNeon = Color(
-    0xFFE040FB,
-  );
+  static const Color _accentNeon = Color(0xFFE040FB);
 
   // ============================================================
   // INIT
@@ -145,25 +123,19 @@ class _AccountInformationPageState
   // CARREGAR CONTA
   // ============================================================
 
-  Future<
-    void
-  >
-  _loadAccount() async {
+  Future<void> _loadAccount() async {
     final user = _supabase.auth.currentUser;
 
-    if (user ==
-        null) {
+    if (user == null) {
       if (!mounted) {
         return;
       }
 
-      setState(
-        () {
-          _isLoading = false;
+      setState(() {
+        _isLoading = false;
 
-          _errorMessage = 'Nenhum usuário autenticado.';
-        },
-      );
+        _errorMessage = 'Nenhum usuário autenticado.';
+      });
 
       return;
     }
@@ -174,16 +146,9 @@ class _AccountInformationPageState
       // ========================================================
 
       final profile = await _supabase
-          .from(
-            'profiles',
-          )
-          .select(
-            'username, artist_name, avatar_url',
-          )
-          .eq(
-            'id',
-            user.id,
-          )
+          .from('profiles')
+          .select('username, artist_name, avatar_url')
+          .eq('id', user.id)
           .maybeSingle();
 
       if (!mounted) {
@@ -194,17 +159,13 @@ class _AccountInformationPageState
       // EMAIL
       // ========================================================
 
-      _emailController.text =
-          user.email ??
-          '';
+      _emailController.text = user.email ?? '';
 
       // ========================================================
       // USERNAME
       // ========================================================
 
-      final username =
-          profile?['username']?.toString().trim() ??
-          '';
+      final username = profile?['username']?.toString().trim() ?? '';
 
       _usernameController.text = username;
 
@@ -215,56 +176,43 @@ class _AccountInformationPageState
       // ========================================================
 
       _artistNameController.text =
-          profile?['artist_name']?.toString().trim() ??
-          '';
+          profile?['artist_name']?.toString().trim() ?? '';
 
       // ========================================================
       // STATE
       // ========================================================
 
-      setState(
-        () {
-          _avatarUrl = NetworkImageUrlHelper.validUrlOrNull(
-            profile?['avatar_url']?.toString(),
-          );
+      setState(() {
+        _avatarUrl = NetworkImageUrlHelper.validUrlOrNull(
+          profile?['avatar_url']?.toString(),
+        );
 
-          _isLoading = false;
-        },
-      );
-    } on PostgrestException catch (
-      error
-    ) {
+        _isLoading = false;
+      });
+    } on PostgrestException catch (error) {
       if (!mounted) {
         return;
       }
 
-      setState(
-        () {
-          _isLoading = false;
+      setState(() {
+        _isLoading = false;
 
-          _errorMessage =
-              'Não foi possível carregar o perfil: '
-              '${error.message}';
-        },
-      );
-    } catch (
-      error
-    ) {
+        _errorMessage =
+            'Não foi possível carregar o perfil: '
+            '${error.message}';
+      });
+    } catch (error) {
       if (!mounted) {
         return;
       }
 
-      setState(
-        () {
-          _isLoading = false;
+      setState(() {
+        _isLoading = false;
 
-          _errorMessage = 'Não foi possível carregar as informações da conta.';
-        },
-      );
+        _errorMessage = 'Não foi possível carregar as informações da conta.';
+      });
 
-      debugPrint(
-        '[ACCOUNT] Erro ao carregar perfil: $error',
-      );
+      debugPrint('[ACCOUNT] Erro ao carregar perfil: $error');
     }
   }
 
@@ -272,10 +220,7 @@ class _AccountInformationPageState
   // ESCOLHER AVATAR
   // ============================================================
 
-  Future<
-    void
-  >
-  _pickAvatar() async {
+  Future<void> _pickAvatar() async {
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.image,
@@ -283,9 +228,7 @@ class _AccountInformationPageState
         withData: true,
       );
 
-      if (result ==
-              null ||
-          result.files.isEmpty) {
+      if (result == null || result.files.isEmpty) {
         return;
       }
 
@@ -293,45 +236,31 @@ class _AccountInformationPageState
 
       final bytes = file.bytes;
 
-      if (bytes ==
-              null ||
-          bytes.isEmpty) {
-        _showError(
-          'Não foi possível ler a imagem selecionada.',
-        );
+      if (bytes == null || bytes.isEmpty) {
+        _showError('Não foi possível ler a imagem selecionada.');
 
         return;
       }
 
-      final extension = _normalizeExtension(
-        file.extension,
-      );
+      final extension = _normalizeExtension(file.extension);
 
       if (!mounted) {
         return;
       }
 
-      setState(
-        () {
-          _selectedAvatarBytes = bytes;
+      setState(() {
+        _selectedAvatarBytes = bytes;
 
-          _selectedAvatarExtension = extension;
+        _selectedAvatarExtension = extension;
 
-          _errorMessage = null;
+        _errorMessage = null;
 
-          _successMessage = null;
-        },
-      );
-    } catch (
-      error
-    ) {
-      _showError(
-        'Não foi possível selecionar a imagem.',
-      );
+        _successMessage = null;
+      });
+    } catch (error) {
+      _showError('Não foi possível selecionar a imagem.');
 
-      debugPrint(
-        '[ACCOUNT] Erro ao selecionar avatar: $error',
-      );
+      debugPrint('[ACCOUNT] Erro ao selecionar avatar: $error');
     }
   }
 
@@ -339,10 +268,7 @@ class _AccountInformationPageState
   // VERIFICAR USERNAME
   // ============================================================
 
-  Future<
-    bool
-  >
-  _isUsernameAvailable({
+  Future<bool> _isUsernameAvailable({
     required String username,
     required String userId,
   }) async {
@@ -350,8 +276,7 @@ class _AccountInformationPageState
     // NÃO ALTEROU
     // ==========================================================
 
-    if (_originalUsername ==
-        username) {
+    if (_originalUsername == username) {
       return true;
     }
 
@@ -360,49 +285,30 @@ class _AccountInformationPageState
     // ==========================================================
 
     final existing = await _supabase
-        .from(
-          'profiles',
-        )
-        .select(
-          'id',
-        )
-        .ilike(
-          'username',
-          username,
-        )
-        .neq(
-          'id',
-          userId,
-        )
+        .from('profiles')
+        .select('id')
+        .ilike('username', username)
+        .neq('id', userId)
         .maybeSingle();
 
-    return existing ==
-        null;
+    return existing == null;
   }
 
   // ============================================================
   // SALVAR
   // ============================================================
 
-  Future<
-    void
-  >
-  _save() async {
+  Future<void> _save() async {
     if (_isSaving) {
       return;
     }
 
-    FocusScope.of(
-      context,
-    ).unfocus();
+    FocusScope.of(context).unfocus();
 
     final user = _supabase.auth.currentUser;
 
-    if (user ==
-        null) {
-      _showError(
-        'Sua sessão não está disponível.',
-      );
+    if (user == null) {
+      _showError('Sua sessão não está disponível.');
 
       return;
     }
@@ -417,18 +323,14 @@ class _AccountInformationPageState
     // NORMALIZAR USERNAME
     // ==========================================================
 
-    final username = _normalizeUsername(
-      _usernameController.text,
-    );
+    final username = _normalizeUsername(_usernameController.text);
 
     // ==========================================================
     // NORMALIZAR NOME ARTÍSTICO
     // ==========================================================
 
     final artistName = _artistNameController.text.trim().replaceAll(
-      RegExp(
-        r'\s+',
-      ),
+      RegExp(r'\s+'),
       ' ',
     );
 
@@ -436,12 +338,8 @@ class _AccountInformationPageState
     // VALIDAR EMAIL
     // ==========================================================
 
-    if (!_isValidEmail(
-      email,
-    )) {
-      _showError(
-        'Informe um e-mail válido.',
-      );
+    if (!_isValidEmail(email)) {
+      _showError('Informe um e-mail válido.');
 
       return;
     }
@@ -450,15 +348,10 @@ class _AccountInformationPageState
     // VALIDAR USERNAME
     // ==========================================================
 
-    final usernameError = _validateUsername(
-      username,
-    );
+    final usernameError = _validateUsername(username);
 
-    if (usernameError !=
-        null) {
-      _showError(
-        usernameError,
-      );
+    if (usernameError != null) {
+      _showError(usernameError);
 
       return;
     }
@@ -467,20 +360,14 @@ class _AccountInformationPageState
     // VALIDAR NOME ARTÍSTICO
     // ==========================================================
 
-    if (artistName.length <
-        2) {
-      _showError(
-        'O nome artístico deve ter pelo menos 2 caracteres.',
-      );
+    if (artistName.length < 2) {
+      _showError('O nome artístico deve ter pelo menos 2 caracteres.');
 
       return;
     }
 
-    if (artistName.length >
-        40) {
-      _showError(
-        'O nome artístico deve ter no máximo 40 caracteres.',
-      );
+    if (artistName.length > 40) {
+      _showError('O nome artístico deve ter no máximo 40 caracteres.');
 
       return;
     }
@@ -489,15 +376,13 @@ class _AccountInformationPageState
     // LOADING
     // ==========================================================
 
-    setState(
-      () {
-        _isSaving = true;
+    setState(() {
+      _isSaving = true;
 
-        _errorMessage = null;
+      _errorMessage = null;
 
-        _successMessage = null;
-      },
-    );
+      _successMessage = null;
+    });
 
     try {
       // ========================================================
@@ -514,13 +399,11 @@ class _AccountInformationPageState
           return;
         }
 
-        setState(
-          () {
-            _isSaving = false;
+        setState(() {
+          _isSaving = false;
 
-            _errorMessage = 'Esse nome de usuário já está sendo usado.';
-          },
-        );
+          _errorMessage = 'Esse nome de usuário já está sendo usado.';
+        });
 
         return;
       }
@@ -531,36 +414,25 @@ class _AccountInformationPageState
 
       final currentEmail = user.email?.trim().toLowerCase();
 
-      final emailChanged =
-          currentEmail !=
-          email;
+      final emailChanged = currentEmail != email;
 
       if (emailChanged) {
-        await _supabase.auth.updateUser(
-          UserAttributes(
-            email: email,
-          ),
-        );
+        await _supabase.auth.updateUser(UserAttributes(email: email));
       }
 
       // ========================================================
       // AVATAR
       // ========================================================
 
-      var nextAvatarUrl = NetworkImageUrlHelper.validUrlOrNull(
-        _avatarUrl,
-      );
+      var nextAvatarUrl = NetworkImageUrlHelper.validUrlOrNull(_avatarUrl);
 
       final selectedBytes = _selectedAvatarBytes;
 
-      if (selectedBytes !=
-          null) {
+      if (selectedBytes != null) {
         nextAvatarUrl = await _uploadAvatar(
           userId: user.id,
           bytes: selectedBytes,
-          extension:
-              _selectedAvatarExtension ??
-              'png',
+          extension: _selectedAvatarExtension ?? 'png',
         );
       }
 
@@ -569,45 +441,34 @@ class _AccountInformationPageState
       // ========================================================
 
       await _supabase
-          .from(
-            'profiles',
-          )
-          .update(
-            {
-              // ====================================================
-              // USERNAME
-              // ====================================================
-              'username': username,
+          .from('profiles')
+          .update({
+            // ====================================================
+            // USERNAME
+            // ====================================================
+            'username': username,
 
-              // ====================================================
-              // NOME ARTÍSTICO
-              // ====================================================
-              'artist_name': artistName,
+            // ====================================================
+            // NOME ARTÍSTICO
+            // ====================================================
+            'artist_name': artistName,
 
-              'artist_name_updated_at': DateTime.now().toUtc().toIso8601String(),
+            'artist_name_updated_at': DateTime.now().toUtc().toIso8601String(),
 
-              // ====================================================
-              // AVATAR
-              // ====================================================
-              'avatar_url': nextAvatarUrl,
-            },
-          )
-          .eq(
-            'id',
-            user.id,
-          );
+            // ====================================================
+            // AVATAR
+            // ====================================================
+            'avatar_url': nextAvatarUrl,
+          })
+          .eq('id', user.id);
 
       // ========================================================
       // DASHBOARD
       // ========================================================
 
-      _dashboardController.updateArtistName(
-        artistName,
-      );
+      _dashboardController.updateArtistName(artistName);
 
-      if (nextAvatarUrl !=
-              null &&
-          nextAvatarUrl.isNotEmpty) {
+      if (nextAvatarUrl != null && nextAvatarUrl.isNotEmpty) {
         _dashboardController.profileImagePath = nextAvatarUrl;
       }
 
@@ -621,60 +482,46 @@ class _AccountInformationPageState
       // SUCESSO
       // ========================================================
 
-      setState(
-        () {
-          _avatarUrl = nextAvatarUrl;
+      setState(() {
+        _avatarUrl = nextAvatarUrl;
 
-          _originalUsername = username;
+        _originalUsername = username;
 
-          _usernameController.text = username;
+        _usernameController.text = username;
 
-          _selectedAvatarBytes = null;
+        _selectedAvatarBytes = null;
 
-          _selectedAvatarExtension = null;
+        _selectedAvatarExtension = null;
 
-          _isSaving = false;
+        _isSaving = false;
 
-          _successMessage = emailChanged
-              ? 'Perfil salvo. Confirme a alteração de e-mail pelo link enviado pelo Supabase.'
-              : 'Informações da conta atualizadas.';
-        },
-      );
-    } on AuthException catch (
-      error
-    ) {
+        _successMessage = emailChanged
+            ? 'Perfil salvo. Confirme a alteração de e-mail pelo link enviado pelo Supabase.'
+            : 'Informações da conta atualizadas.';
+      });
+    } on AuthException catch (error) {
       if (!mounted) {
         return;
       }
 
-      setState(
-        () {
-          _isSaving = false;
+      setState(() {
+        _isSaving = false;
 
-          _errorMessage = _translateAuthError(
-            error,
-          );
-        },
-      );
-    } on StorageException catch (
-      error
-    ) {
+        _errorMessage = _translateAuthError(error);
+      });
+    } on StorageException catch (error) {
       if (!mounted) {
         return;
       }
 
-      setState(
-        () {
-          _isSaving = false;
+      setState(() {
+        _isSaving = false;
 
-          _errorMessage =
-              'Não foi possível salvar o avatar: '
-              '${error.message}';
-        },
-      );
-    } on PostgrestException catch (
-      error
-    ) {
+        _errorMessage =
+            'Não foi possível salvar o avatar: '
+            '${error.message}';
+      });
+    } on PostgrestException catch (error) {
       if (!mounted) {
         return;
       }
@@ -688,46 +535,35 @@ class _AccountInformationPageState
       //
       // ========================================================
 
-      if (error.code ==
-          '23505') {
-        setState(
-          () {
-            _isSaving = false;
+      if (error.code == '23505') {
+        setState(() {
+          _isSaving = false;
 
-            _errorMessage = 'Esse nome de usuário já está sendo usado.';
-          },
-        );
+          _errorMessage = 'Esse nome de usuário já está sendo usado.';
+        });
 
         return;
       }
 
-      setState(
-        () {
-          _isSaving = false;
+      setState(() {
+        _isSaving = false;
 
-          _errorMessage =
-              'Não foi possível salvar o perfil: '
-              '${error.message}';
-        },
-      );
-    } catch (
-      error
-    ) {
+        _errorMessage =
+            'Não foi possível salvar o perfil: '
+            '${error.message}';
+      });
+    } catch (error) {
       if (!mounted) {
         return;
       }
 
-      setState(
-        () {
-          _isSaving = false;
+      setState(() {
+        _isSaving = false;
 
-          _errorMessage = 'Não foi possível atualizar a conta.';
-        },
-      );
+        _errorMessage = 'Não foi possível atualizar a conta.';
+      });
 
-      debugPrint(
-        '[ACCOUNT] Erro ao salvar: $error',
-      );
+      debugPrint('[ACCOUNT] Erro ao salvar: $error');
     }
   }
 
@@ -735,10 +571,7 @@ class _AccountInformationPageState
   // UPLOAD DO AVATAR
   // ============================================================
 
-  Future<
-    String
-  >
-  _uploadAvatar({
+  Future<String> _uploadAvatar({
     required String userId,
     required Uint8List bytes,
     required String extension,
@@ -746,27 +579,17 @@ class _AccountInformationPageState
     final path = '$userId/avatar.$extension';
 
     await _supabase.storage
-        .from(
-          'avatars',
-        )
+        .from('avatars')
         .uploadBinary(
           path,
           bytes,
           fileOptions: FileOptions(
             upsert: true,
-            contentType: _contentTypeForExtension(
-              extension,
-            ),
+            contentType: _contentTypeForExtension(extension),
           ),
         );
 
-    final publicUrl = _supabase.storage
-        .from(
-          'avatars',
-        )
-        .getPublicUrl(
-          path,
-        );
+    final publicUrl = _supabase.storage.from('avatars').getPublicUrl(path);
 
     return '$publicUrl?v=${DateTime.now().millisecondsSinceEpoch}';
   }
@@ -776,9 +599,7 @@ class _AccountInformationPageState
   // ============================================================
 
   @override
-  Widget build(
-    BuildContext context,
-  ) {
+  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _backgroundColor,
       appBar: AppBar(
@@ -787,14 +608,9 @@ class _AccountInformationPageState
         leading: IconButton(
           tooltip: 'Voltar',
           onPressed: () {
-            Navigator.of(
-              context,
-            ).pop();
+            Navigator.of(context).pop();
           },
-          icon: const Icon(
-            Icons.arrow_back_rounded,
-            color: Colors.white,
-          ),
+          icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
         ),
         title: const Text(
           'Informações da Conta',
@@ -806,24 +622,13 @@ class _AccountInformationPageState
         ),
       ),
       body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(
-                color: _accentNeon,
-              ),
-            )
+          ? const Center(child: CircularProgressIndicator(color: _accentNeon))
           : SingleChildScrollView(
               physics: const BouncingScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(
-                20,
-                10,
-                20,
-                40,
-              ),
+              padding: const EdgeInsets.fromLTRB(20, 10, 20, 40),
               child: Center(
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(
-                    maxWidth: 620,
-                  ),
+                  constraints: const BoxConstraints(maxWidth: 620),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -832,9 +637,7 @@ class _AccountInformationPageState
                       // ============================================
                       _buildAvatarCard(),
 
-                      const SizedBox(
-                        height: 18,
-                      ),
+                      const SizedBox(height: 18),
 
                       // ============================================
                       // FORM
@@ -844,36 +647,22 @@ class _AccountInformationPageState
                       // ============================================
                       // ERROR
                       // ============================================
-                      if (_errorMessage !=
-                          null) ...[
-                        const SizedBox(
-                          height: 14,
-                        ),
+                      if (_errorMessage != null) ...[
+                        const SizedBox(height: 14),
 
-                        _buildMessage(
-                          message: _errorMessage!,
-                          error: true,
-                        ),
+                        _buildMessage(message: _errorMessage!, error: true),
                       ],
 
                       // ============================================
                       // SUCCESS
                       // ============================================
-                      if (_successMessage !=
-                          null) ...[
-                        const SizedBox(
-                          height: 14,
-                        ),
+                      if (_successMessage != null) ...[
+                        const SizedBox(height: 14),
 
-                        _buildMessage(
-                          message: _successMessage!,
-                          error: false,
-                        ),
+                        _buildMessage(message: _successMessage!, error: false),
                       ],
 
-                      const SizedBox(
-                        height: 20,
-                      ),
+                      const SizedBox(height: 20),
 
                       // ============================================
                       // SALVAR
@@ -882,9 +671,7 @@ class _AccountInformationPageState
                         width: double.infinity,
                         height: 52,
                         child: ElevatedButton.icon(
-                          onPressed: _isSaving
-                              ? null
-                              : _save,
+                          onPressed: _isSaving ? null : _save,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: _primaryPurple,
                             foregroundColor: Colors.white,
@@ -893,14 +680,10 @@ class _AccountInformationPageState
                             ),
                             elevation: 0,
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(
-                                14,
-                              ),
+                              borderRadius: BorderRadius.circular(14),
                             ),
                             side: BorderSide(
-                              color: _accentNeon.withValues(
-                                alpha: 0.35,
-                              ),
+                              color: _accentNeon.withValues(alpha: 0.35),
                             ),
                           ),
                           icon: _isSaving
@@ -912,14 +695,9 @@ class _AccountInformationPageState
                                     color: Colors.white,
                                   ),
                                 )
-                              : const Icon(
-                                  Icons.save_outlined,
-                                  size: 19,
-                                ),
+                              : const Icon(Icons.save_outlined, size: 19),
                           label: Text(
-                            _isSaving
-                                ? 'SALVANDO...'
-                                : 'SALVAR ALTERAÇÕES',
+                            _isSaving ? 'SALVANDO...' : 'SALVAR ALTERAÇÕES',
                             style: const TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
@@ -943,17 +721,13 @@ class _AccountInformationPageState
   Widget _buildAvatarCard() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(
-        22,
-      ),
+      padding: const EdgeInsets.all(22),
       decoration: _cardDecoration(),
       child: Column(
         children: [
           _buildAvatar(),
 
-          const SizedBox(
-            height: 14,
-          ),
+          const SizedBox(height: 14),
 
           const Text(
             'Avatar',
@@ -964,50 +738,29 @@ class _AccountInformationPageState
             ),
           ),
 
-          const SizedBox(
-            height: 4,
-          ),
+          const SizedBox(height: 4),
 
           const Text(
             'Escolha uma imagem para o seu perfil.',
             textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.white38,
-              fontSize: 11,
-            ),
+            style: TextStyle(color: Colors.white38, fontSize: 11),
           ),
 
-          const SizedBox(
-            height: 14,
-          ),
+          const SizedBox(height: 14),
 
           OutlinedButton.icon(
-            onPressed: _isSaving
-                ? null
-                : _pickAvatar,
+            onPressed: _isSaving ? null : _pickAvatar,
             style: OutlinedButton.styleFrom(
               foregroundColor: _accentNeon,
-              side: BorderSide(
-                color: _accentNeon.withValues(
-                  alpha: 0.35,
-                ),
-              ),
+              side: BorderSide(color: _accentNeon.withValues(alpha: 0.35)),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(
-                  12,
-                ),
+                borderRadius: BorderRadius.circular(12),
               ),
             ),
-            icon: const Icon(
-              Icons.image_outlined,
-              size: 18,
-            ),
+            icon: const Icon(Icons.image_outlined, size: 18),
             label: const Text(
               'ESCOLHER IMAGEM',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
             ),
           ),
         ],
@@ -1022,46 +775,28 @@ class _AccountInformationPageState
   Widget _buildAvatar() {
     final selectedBytes = _selectedAvatarBytes;
 
-    if (selectedBytes !=
-        null) {
+    if (selectedBytes != null) {
       return CircleAvatar(
         radius: 52,
-        backgroundColor: _primaryPurple.withValues(
-          alpha: 0.25,
-        ),
-        backgroundImage: MemoryImage(
-          selectedBytes,
-        ),
+        backgroundColor: _primaryPurple.withValues(alpha: 0.25),
+        backgroundImage: MemoryImage(selectedBytes),
       );
     }
 
-    final validAvatarUrl = NetworkImageUrlHelper.validUrlOrNull(
-      _avatarUrl,
-    );
+    final validAvatarUrl = NetworkImageUrlHelper.validUrlOrNull(_avatarUrl);
 
-    if (validAvatarUrl !=
-        null) {
+    if (validAvatarUrl != null) {
       return CircleAvatar(
         radius: 52,
-        backgroundColor: _primaryPurple.withValues(
-          alpha: 0.25,
-        ),
-        backgroundImage: NetworkImage(
-          validAvatarUrl,
-        ),
+        backgroundColor: _primaryPurple.withValues(alpha: 0.25),
+        backgroundImage: NetworkImage(validAvatarUrl),
       );
     }
 
     return CircleAvatar(
       radius: 52,
-      backgroundColor: _primaryPurple.withValues(
-        alpha: 0.25,
-      ),
-      child: const Icon(
-        Icons.person_rounded,
-        color: _accentNeon,
-        size: 46,
-      ),
+      backgroundColor: _primaryPurple.withValues(alpha: 0.25),
+      child: const Icon(Icons.person_rounded, color: _accentNeon, size: 46),
     );
   }
 
@@ -1072,9 +807,7 @@ class _AccountInformationPageState
   Widget _buildFormCard() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(
-        20,
-      ),
+      padding: const EdgeInsets.all(20),
       decoration: _cardDecoration(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1088,9 +821,7 @@ class _AccountInformationPageState
             ),
           ),
 
-          const SizedBox(
-            height: 18,
-          ),
+          const SizedBox(height: 18),
 
           // ====================================================
           // EMAIL
@@ -1103,9 +834,7 @@ class _AccountInformationPageState
             keyboardType: TextInputType.emailAddress,
           ),
 
-          const SizedBox(
-            height: 14,
-          ),
+          const SizedBox(height: 14),
 
           // ====================================================
           // USERNAME
@@ -1118,25 +847,19 @@ class _AccountInformationPageState
             prefixText: '@',
           ),
 
-          const SizedBox(
-            height: 6,
-          ),
+          const SizedBox(height: 6),
 
           Text(
             'Identificador único no Versin. '
             'Use de 3 a 24 caracteres: letras, números, ponto ou underline.',
             style: TextStyle(
-              color: Colors.white.withValues(
-                alpha: 0.30,
-              ),
+              color: Colors.white.withValues(alpha: 0.30),
               fontSize: 10,
               height: 1.4,
             ),
           ),
 
-          const SizedBox(
-            height: 14,
-          ),
+          const SizedBox(height: 14),
 
           // ====================================================
           // ARTIST NAME
@@ -1148,16 +871,12 @@ class _AccountInformationPageState
             icon: Icons.person_outline_rounded,
           ),
 
-          const SizedBox(
-            height: 12,
-          ),
+          const SizedBox(height: 12),
 
           Text(
             'O nome artístico será atualizado também no Dashboard.',
             style: TextStyle(
-              color: Colors.white.withValues(
-                alpha: 0.30,
-              ),
+              color: Colors.white.withValues(alpha: 0.30),
               fontSize: 10,
               height: 1.4,
             ),
@@ -1185,68 +904,36 @@ class _AccountInformationPageState
       enabled: !_isSaving,
       autocorrect: false,
       enableSuggestions: false,
-      style: const TextStyle(
-        color: Colors.white,
-        fontSize: 14,
-      ),
+      style: const TextStyle(color: Colors.white, fontSize: 14),
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
         prefixText: prefixText,
-        prefixStyle: TextStyle(
-          color: _accentNeon.withValues(
-            alpha: 0.75,
-          ),
-        ),
+        prefixStyle: TextStyle(color: _accentNeon.withValues(alpha: 0.75)),
         labelStyle: const TextStyle(
           color: Colors.white38,
           fontSize: 10,
           letterSpacing: 0.8,
         ),
-        hintStyle: const TextStyle(
-          color: Colors.white24,
-          fontSize: 12,
-        ),
+        hintStyle: const TextStyle(color: Colors.white24, fontSize: 12),
         prefixIcon: Icon(
           icon,
-          color: _accentNeon.withValues(
-            alpha: 0.75,
-          ),
+          color: _accentNeon.withValues(alpha: 0.75),
           size: 20,
         ),
         filled: true,
-        fillColor: Colors.black.withValues(
-          alpha: 0.18,
-        ),
+        fillColor: Colors.black.withValues(alpha: 0.18),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(
-            12,
-          ),
-          borderSide: BorderSide(
-            color: Colors.white.withValues(
-              alpha: 0.06,
-            ),
-          ),
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.06)),
         ),
         disabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(
-            12,
-          ),
-          borderSide: BorderSide(
-            color: Colors.white.withValues(
-              alpha: 0.04,
-            ),
-          ),
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.04)),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(
-            12,
-          ),
-          borderSide: BorderSide(
-            color: _accentNeon.withValues(
-              alpha: 0.45,
-            ),
-          ),
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: _accentNeon.withValues(alpha: 0.45)),
         ),
       ),
     );
@@ -1256,31 +943,16 @@ class _AccountInformationPageState
   // MESSAGE
   // ============================================================
 
-  Widget _buildMessage({
-    required String message,
-    required bool error,
-  }) {
-    final color = error
-        ? Colors.redAccent
-        : Colors.greenAccent;
+  Widget _buildMessage({required String message, required bool error}) {
+    final color = error ? Colors.redAccent : Colors.greenAccent;
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(
-        12,
-      ),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: color.withValues(
-          alpha: 0.07,
-        ),
-        borderRadius: BorderRadius.circular(
-          12,
-        ),
-        border: Border.all(
-          color: color.withValues(
-            alpha: 0.18,
-          ),
-        ),
+        color: color.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.18)),
       ),
       child: Row(
         children: [
@@ -1292,18 +964,10 @@ class _AccountInformationPageState
             size: 17,
           ),
 
-          const SizedBox(
-            width: 9,
-          ),
+          const SizedBox(width: 9),
 
           Expanded(
-            child: Text(
-              message,
-              style: TextStyle(
-                color: color,
-                fontSize: 11,
-              ),
-            ),
+            child: Text(message, style: TextStyle(color: color, fontSize: 11)),
           ),
         ],
       ),
@@ -1316,17 +980,9 @@ class _AccountInformationPageState
 
   BoxDecoration _cardDecoration() {
     return BoxDecoration(
-      color: _surfaceColor.withValues(
-        alpha: 0.72,
-      ),
-      borderRadius: BorderRadius.circular(
-        20,
-      ),
-      border: Border.all(
-        color: Colors.white.withValues(
-          alpha: 0.07,
-        ),
-      ),
+      color: _surfaceColor.withValues(alpha: 0.72),
+      borderRadius: BorderRadius.circular(20),
+      border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
     );
   }
 
@@ -1334,83 +990,51 @@ class _AccountInformationPageState
   // ERROR
   // ============================================================
 
-  void _showError(
-    String message,
-  ) {
+  void _showError(String message) {
     if (!mounted) {
       return;
     }
 
-    setState(
-      () {
-        _errorMessage = message;
+    setState(() {
+      _errorMessage = message;
 
-        _successMessage = null;
-      },
-    );
+      _successMessage = null;
+    });
   }
 
   // ============================================================
   // USERNAME
   // ============================================================
 
-  String _normalizeUsername(
-    String value,
-  ) {
-    return value.trim().toLowerCase().replaceFirst(
-      RegExp(
-        r'^@+',
-      ),
-      '',
-    );
+  String _normalizeUsername(String value) {
+    return value.trim().toLowerCase().replaceFirst(RegExp(r'^@+'), '');
   }
 
-  String? _validateUsername(
-    String username,
-  ) {
+  String? _validateUsername(String username) {
     if (username.isEmpty) {
       return 'Informe um nome de usuário.';
     }
 
-    if (username.length <
-        3) {
+    if (username.length < 3) {
       return 'O nome de usuário deve ter pelo menos 3 caracteres.';
     }
 
-    if (username.length >
-        24) {
+    if (username.length > 24) {
       return 'O nome de usuário deve ter no máximo 24 caracteres.';
     }
 
-    if (!RegExp(
-      r'^[a-z0-9._]+$',
-    ).hasMatch(
-      username,
-    )) {
+    if (!RegExp(r'^[a-z0-9._]+$').hasMatch(username)) {
       return 'Use apenas letras, números, ponto e underline no nome de usuário.';
     }
 
-    if (username.startsWith(
-          '.',
-        ) ||
-        username.startsWith(
-          '_',
-        ) ||
-        username.endsWith(
-          '.',
-        ) ||
-        username.endsWith(
-          '_',
-        )) {
+    if (username.startsWith('.') ||
+        username.startsWith('_') ||
+        username.endsWith('.') ||
+        username.endsWith('_')) {
       return 'O nome de usuário deve começar e terminar com letra ou número.';
     }
 
-    if (username.contains(
-          '..',
-        ) ||
-        username.contains(
-          '__',
-        )) {
+    if (username.contains('..') || username.contains('__')) {
       return 'Evite pontos ou underlines duplicados no nome de usuário.';
     }
 
@@ -1421,23 +1045,15 @@ class _AccountInformationPageState
   // EMAIL
   // ============================================================
 
-  bool _isValidEmail(
-    String email,
-  ) {
-    return RegExp(
-      r'^[^@\s]+@[^@\s]+\.[^@\s]+$',
-    ).hasMatch(
-      email,
-    );
+  bool _isValidEmail(String email) {
+    return RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email);
   }
 
   // ============================================================
   // IMAGE EXTENSION
   // ============================================================
 
-  String _normalizeExtension(
-    String? extension,
-  ) {
+  String _normalizeExtension(String? extension) {
     final normalized = extension?.trim().toLowerCase();
 
     switch (normalized) {
@@ -1456,9 +1072,7 @@ class _AccountInformationPageState
   // CONTENT TYPE
   // ============================================================
 
-  String _contentTypeForExtension(
-    String extension,
-  ) {
+  String _contentTypeForExtension(String extension) {
     switch (extension) {
       case 'jpg':
       case 'jpeg':
@@ -1476,27 +1090,19 @@ class _AccountInformationPageState
   // AUTH ERROR
   // ============================================================
 
-  String _translateAuthError(
-    AuthException error,
-  ) {
+  String _translateAuthError(AuthException error) {
     final message = error.message.toLowerCase();
 
-    if (message.contains(
-      'email rate limit exceeded',
-    )) {
+    if (message.contains('email rate limit exceeded')) {
       return 'Muitos e-mails foram enviados em pouco tempo. '
           'Aguarde e tente novamente.';
     }
 
-    if (message.contains(
-      'already registered',
-    )) {
+    if (message.contains('already registered')) {
       return 'Este e-mail já está sendo usado por outra conta.';
     }
 
-    if (message.contains(
-      'email',
-    )) {
+    if (message.contains('email')) {
       return 'Não foi possível alterar o e-mail: '
           '${error.message}';
     }

@@ -313,13 +313,6 @@ class _CalendarPageState
       date,
     );
 
-    if (note ==
-        null) {
-      note = await _calendarController.loadDayNote(
-        date,
-      );
-    }
-
     if (!mounted) {
       return;
     }

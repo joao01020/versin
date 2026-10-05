@@ -49,41 +49,64 @@ class AddProfileTrackResult {
 //
 // ============================================================
 
-class AddProfileTrackSheet extends StatefulWidget {
+class AddProfileTrackSheet
+    extends
+        StatefulWidget {
   final Color accentColor;
 
   const AddProfileTrackSheet({
     super.key,
-    this.accentColor = const Color(0xFFE100FF),
+    this.accentColor = const Color(
+      0xFFE100FF,
+    ),
   });
 
   // ============================================================
   // SHOW
   // ============================================================
 
-  static Future<AddProfileTrackResult?> show({
+  static Future<
+    AddProfileTrackResult?
+  >
+  show({
     required BuildContext context,
-    Color accentColor = const Color(0xFFE100FF),
+    Color accentColor = const Color(
+      0xFFE100FF,
+    ),
   }) {
-    return showModalBottomSheet<AddProfileTrackResult>(
+    return showModalBottomSheet<
+      AddProfileTrackResult
+    >(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) {
-        return AddProfileTrackSheet(accentColor: accentColor);
-      },
+      builder:
+          (
+            _,
+          ) {
+            return AddProfileTrackSheet(
+              accentColor: accentColor,
+            );
+          },
     );
   }
 
   @override
-  State<AddProfileTrackSheet> createState() => _AddProfileTrackSheetState();
+  State<
+    AddProfileTrackSheet
+  >
+  createState() => _AddProfileTrackSheetState();
 }
 
 // ============================================================
 // STATE
 // ============================================================
 
-class _AddProfileTrackSheetState extends State<AddProfileTrackSheet> {
+class _AddProfileTrackSheetState
+    extends
+        State<
+          AddProfileTrackSheet
+        > {
   // ============================================================
   // SERVICES
   // ============================================================
@@ -94,7 +117,13 @@ class _AddProfileTrackSheetState extends State<AddProfileTrackSheet> {
   // FORM
   // ============================================================
 
-  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  final GlobalKey<
+    FormState
+  >
+  _formKey =
+      GlobalKey<
+        FormState
+      >();
 
   final TextEditingController _titleController = TextEditingController();
 
@@ -120,70 +149,94 @@ class _AddProfileTrackSheetState extends State<AddProfileTrackSheet> {
   //
   // ============================================================
 
-  static const List<_AudienceOption> _audienceOptions = <_AudienceOption>[
-    _AudienceOption(
-      id: 'artist',
-      label: 'Artistas',
-      icon: Icons.mic_external_on_outlined,
-    ),
-    _AudienceOption(
-      id: 'beatmaker',
-      label: 'Beatmakers',
-      icon: Icons.graphic_eq_rounded,
-    ),
-    _AudienceOption(
-      id: 'producer',
-      label: 'Produtores',
-      icon: Icons.tune_rounded,
-    ),
-    _AudienceOption(
-      id: 'composer',
-      label: 'Compositores',
-      icon: Icons.edit_note_rounded,
-    ),
-  ];
+  static const List<
+    _AudienceOption
+  >
+  _audienceOptions =
+      <
+        _AudienceOption
+      >[
+        _AudienceOption(
+          id: 'artist',
+          label: 'Artistas',
+          icon: Icons.mic_external_on_outlined,
+        ),
+        _AudienceOption(
+          id: 'beatmaker',
+          label: 'Beatmakers',
+          icon: Icons.graphic_eq_rounded,
+        ),
+        _AudienceOption(
+          id: 'producer',
+          label: 'Produtores',
+          icon: Icons.tune_rounded,
+        ),
+        _AudienceOption(
+          id: 'composer',
+          label: 'Compositores',
+          icon: Icons.edit_note_rounded,
+        ),
+      ];
 
   // ============================================================
   // SELECT FILE
   // ============================================================
 
-  Future<void> _selectFile() async {
+  Future<
+    void
+  >
+  _selectFile() async {
     if (_isPicking) {
       return;
     }
 
-    setState(() {
-      _isPicking = true;
-    });
+    setState(
+      () {
+        _isPicking = true;
+      },
+    );
 
     try {
       final file = await _pickerService.pickTrack();
 
-      if (!mounted || file == null) {
+      if (!mounted ||
+          file ==
+              null) {
         return;
       }
 
-      setState(() {
-        _selectedFile = file;
+      setState(
+        () {
+          _selectedFile = file;
 
-        if (_titleController.text.trim().isEmpty) {
-          _titleController.text = _titleFromFileName(file.fileName);
-        }
-      });
-    } catch (error) {
+          if (_titleController.text.trim().isEmpty) {
+            _titleController.text = _titleFromFileName(
+              file.fileName,
+            );
+          }
+        },
+      );
+    } catch (
+      error
+    ) {
       if (!mounted) {
         return;
       }
 
-      _showError(error.toString().replaceFirst('Bad state: ', ''));
+      _showError(
+        error.toString().replaceFirst(
+          'Bad state: ',
+          '',
+        ),
+      );
     } finally {
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) {}
 
-      setState(() {
-        _isPicking = false;
-      });
+      setState(
+        () {
+          _isPicking = false;
+        },
+      );
     }
   }
 
@@ -191,10 +244,16 @@ class _AddProfileTrackSheetState extends State<AddProfileTrackSheet> {
   // TOGGLE ROLE
   // ============================================================
 
-  void _toggleRole(String role) {
-    setState(() {
-      _audience = _audience.toggle(role);
-    });
+  void _toggleRole(
+    String role,
+  ) {
+    setState(
+      () {
+        _audience = _audience.toggle(
+          role,
+        );
+      },
+    );
   }
 
   // ============================================================
@@ -202,9 +261,13 @@ class _AddProfileTrackSheetState extends State<AddProfileTrackSheet> {
   // ============================================================
 
   void _submit() {
-    FocusScope.of(context).unfocus();
+    FocusScope.of(
+      context,
+    ).unfocus();
 
-    final valid = _formKey.currentState?.validate() ?? false;
+    final valid =
+        _formKey.currentState?.validate() ??
+        false;
 
     if (!valid) {
       return;
@@ -212,19 +275,26 @@ class _AddProfileTrackSheetState extends State<AddProfileTrackSheet> {
 
     final file = _selectedFile;
 
-    if (file == null) {
-      _showError('Selecione uma música.');
+    if (file ==
+        null) {
+      _showError(
+        'Selecione uma música.',
+      );
 
       return;
     }
 
     if (_audience.isEmpty) {
-      _showError('Escolha pelo menos um grupo que poderá ouvir a demo.');
+      _showError(
+        'Escolha pelo menos um grupo que poderá ouvir a demo.',
+      );
 
       return;
     }
 
-    Navigator.of(context).pop(
+    Navigator.of(
+      context,
+    ).pop(
       AddProfileTrackResult(
         title: _titleController.text.trim(),
         file: file,
@@ -237,10 +307,20 @@ class _AddProfileTrackSheetState extends State<AddProfileTrackSheet> {
   // ERROR
   // ============================================================
 
-  void _showError(String message) {
-    ScaffoldMessenger.of(context)
+  void _showError(
+    String message,
+  ) {
+    ScaffoldMessenger.of(
+        context,
+      )
       ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            message,
+          ),
+        ),
+      );
   }
 
   // ============================================================
@@ -248,18 +328,40 @@ class _AddProfileTrackSheetState extends State<AddProfileTrackSheet> {
   // ============================================================
 
   @override
-  Widget build(BuildContext context) {
-    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+  Widget build(
+    BuildContext context,
+  ) {
+    final bottomInset = MediaQuery.of(
+      context,
+    ).viewInsets.bottom;
 
     return Container(
       constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.90,
+        maxHeight:
+            MediaQuery.of(
+              context,
+            ).size.height *
+            0.90,
       ),
-      margin: const EdgeInsets.only(top: 40),
-      padding: EdgeInsets.fromLTRB(20, 14, 20, 20 + bottomInset),
+      margin: const EdgeInsets.only(
+        top: 40,
+      ),
+      padding: EdgeInsets.fromLTRB(
+        20,
+        14,
+        20,
+        20 +
+            bottomInset,
+      ),
       decoration: const BoxDecoration(
-        color: Color(0xFF151126),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        color: Color(
+          0xFF151126,
+        ),
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(
+            24,
+          ),
+        ),
       ),
       child: SafeArea(
         top: false,
@@ -278,12 +380,16 @@ class _AddProfileTrackSheetState extends State<AddProfileTrackSheet> {
                     height: 4,
                     decoration: BoxDecoration(
                       color: Colors.white24,
-                      borderRadius: BorderRadius.circular(99),
+                      borderRadius: BorderRadius.circular(
+                        99,
+                      ),
                     ),
                   ),
                 ),
 
-                const SizedBox(height: 22),
+                const SizedBox(
+                  height: 22,
+                ),
 
                 // ==============================================
                 // HEADER
@@ -303,7 +409,9 @@ class _AddProfileTrackSheetState extends State<AddProfileTrackSheet> {
                             ),
                           ),
 
-                          const SizedBox(height: 4),
+                          const SizedBox(
+                            height: 4,
+                          ),
 
                           const Text(
                             'Publique uma prévia no seu perfil público.',
@@ -319,7 +427,9 @@ class _AddProfileTrackSheetState extends State<AddProfileTrackSheet> {
                     IconButton(
                       tooltip: 'Fechar',
                       onPressed: () {
-                        Navigator.of(context).pop();
+                        Navigator.of(
+                          context,
+                        ).pop();
                       },
                       icon: const Icon(
                         Icons.close_rounded,
@@ -329,58 +439,84 @@ class _AddProfileTrackSheetState extends State<AddProfileTrackSheet> {
                   ],
                 ),
 
-                const SizedBox(height: 26),
+                const SizedBox(
+                  height: 26,
+                ),
 
                 // ==============================================
                 // TITLE
                 // ==============================================
-                _buildLabel('Título'),
+                _buildLabel(
+                  'Título',
+                ),
 
-                const SizedBox(height: 8),
+                const SizedBox(
+                  height: 8,
+                ),
 
                 TextFormField(
                   controller: _titleController,
                   maxLength: 80,
                   textInputAction: TextInputAction.done,
-                  style: const TextStyle(color: Colors.white),
+                  style: const TextStyle(
+                    color: Colors.white,
+                  ),
                   decoration: _inputDecoration(
                     hint: 'Nome da demo',
                     icon: Icons.music_note_rounded,
                   ),
-                  validator: (value) {
-                    final normalized = value?.trim() ?? '';
+                  validator:
+                      (
+                        value,
+                      ) {
+                        final normalized =
+                            value?.trim() ??
+                            '';
 
-                    if (normalized.isEmpty) {
-                      return 'Informe o título.';
-                    }
+                        if (normalized.isEmpty) {
+                          return 'Informe o título.';
+                        }
 
-                    if (normalized.length < 2) {
-                      return 'Use pelo menos 2 caracteres.';
-                    }
+                        if (normalized.length <
+                            2) {
+                          return 'Use pelo menos 2 caracteres.';
+                        }
 
-                    return null;
-                  },
+                        return null;
+                      },
                 ),
 
-                const SizedBox(height: 20),
+                const SizedBox(
+                  height: 20,
+                ),
 
                 // ==============================================
                 // FILE
                 // ==============================================
-                _buildLabel('Arquivo'),
+                _buildLabel(
+                  'Arquivo',
+                ),
 
-                const SizedBox(height: 8),
+                const SizedBox(
+                  height: 8,
+                ),
 
                 _buildFileSelector(),
 
-                const SizedBox(height: 26),
+                const SizedBox(
+                  height: 26,
+                ),
 
                 // ==============================================
                 // AUDIENCE
                 // ==============================================
-                _buildLabel('Quem pode ouvir?'),
+                _buildLabel(
+                  'Quem pode ouvir?',
+                ),
 
-                const SizedBox(height: 4),
+                const SizedBox(
+                  height: 4,
+                ),
 
                 const Text(
                   'Selecione os grupos profissionais que terão acesso à demo.',
@@ -391,23 +527,35 @@ class _AddProfileTrackSheetState extends State<AddProfileTrackSheet> {
                   ),
                 ),
 
-                const SizedBox(height: 12),
+                const SizedBox(
+                  height: 12,
+                ),
 
                 _buildAudience(),
 
-                const SizedBox(height: 28),
+                const SizedBox(
+                  height: 28,
+                ),
 
                 // ==============================================
                 // INFO
                 // ==============================================
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(
+                    12,
+                  ),
                   decoration: BoxDecoration(
-                    color: widget.accentColor.withValues(alpha: 0.06),
-                    borderRadius: BorderRadius.circular(12),
+                    color: widget.accentColor.withValues(
+                      alpha: 0.06,
+                    ),
+                    borderRadius: BorderRadius.circular(
+                      12,
+                    ),
                     border: Border.all(
-                      color: widget.accentColor.withValues(alpha: 0.15),
+                      color: widget.accentColor.withValues(
+                        alpha: 0.15,
+                      ),
                     ),
                   ),
                   child: const Row(
@@ -419,7 +567,9 @@ class _AddProfileTrackSheetState extends State<AddProfileTrackSheet> {
                         size: 17,
                       ),
 
-                      SizedBox(width: 10),
+                      SizedBox(
+                        width: 10,
+                      ),
 
                       Expanded(
                         child: Text(
@@ -435,7 +585,9 @@ class _AddProfileTrackSheetState extends State<AddProfileTrackSheet> {
                   ),
                 ),
 
-                const SizedBox(height: 24),
+                const SizedBox(
+                  height: 24,
+                ),
 
                 // ==============================================
                 // PUBLISH
@@ -449,10 +601,14 @@ class _AddProfileTrackSheetState extends State<AddProfileTrackSheet> {
                       backgroundColor: widget.accentColor,
                       foregroundColor: Colors.black,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(
+                          14,
+                        ),
                       ),
                     ),
-                    icon: const Icon(Icons.cloud_upload_outlined),
+                    icon: const Icon(
+                      Icons.cloud_upload_outlined,
+                    ),
                     label: const Text(
                       'PUBLICAR DEMO',
                       style: TextStyle(
@@ -478,17 +634,33 @@ class _AddProfileTrackSheetState extends State<AddProfileTrackSheet> {
   Widget _buildFileSelector() {
     final file = _selectedFile;
 
-    if (file == null) {
+    if (file ==
+        null) {
       return InkWell(
-        onTap: _isPicking ? null : _selectFile,
-        borderRadius: BorderRadius.circular(14),
+        onTap: _isPicking
+            ? null
+            : _selectFile,
+        borderRadius: BorderRadius.circular(
+          14,
+        ),
         child: Container(
           width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+          padding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 18,
+          ),
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.035),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+            color: Colors.white.withValues(
+              alpha: 0.035,
+            ),
+            borderRadius: BorderRadius.circular(
+              14,
+            ),
+            border: Border.all(
+              color: Colors.white.withValues(
+                alpha: 0.08,
+              ),
+            ),
           ),
           child: Row(
             children: [
@@ -508,11 +680,15 @@ class _AddProfileTrackSheetState extends State<AddProfileTrackSheet> {
                   size: 24,
                 ),
 
-              const SizedBox(width: 12),
+              const SizedBox(
+                width: 12,
+              ),
 
               Expanded(
                 child: Text(
-                  _isPicking ? 'Abrindo arquivos...' : 'Selecionar MP3 / WAV',
+                  _isPicking
+                      ? 'Abrindo arquivos...'
+                      : 'Selecionar MP3 / WAV',
                   style: const TextStyle(
                     color: Colors.white70,
                     fontSize: 12,
@@ -521,7 +697,10 @@ class _AddProfileTrackSheetState extends State<AddProfileTrackSheet> {
                 ),
               ),
 
-              const Icon(Icons.chevron_right_rounded, color: Colors.white30),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: Colors.white30,
+              ),
             ],
           ),
         ),
@@ -530,17 +709,33 @@ class _AddProfileTrackSheetState extends State<AddProfileTrackSheet> {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(
+        14,
+      ),
       decoration: BoxDecoration(
-        color: widget.accentColor.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: widget.accentColor.withValues(alpha: 0.18)),
+        color: widget.accentColor.withValues(
+          alpha: 0.06,
+        ),
+        borderRadius: BorderRadius.circular(
+          14,
+        ),
+        border: Border.all(
+          color: widget.accentColor.withValues(
+            alpha: 0.18,
+          ),
+        ),
       ),
       child: Row(
         children: [
-          Icon(Icons.audio_file_rounded, color: widget.accentColor, size: 25),
+          Icon(
+            Icons.audio_file_rounded,
+            color: widget.accentColor,
+            size: 25,
+          ),
 
-          const SizedBox(width: 12),
+          const SizedBox(
+            width: 12,
+          ),
 
           Expanded(
             child: Column(
@@ -557,11 +752,18 @@ class _AddProfileTrackSheetState extends State<AddProfileTrackSheet> {
                   ),
                 ),
 
-                const SizedBox(height: 4),
+                const SizedBox(
+                  height: 4,
+                ),
 
                 Text(
-                  _formatFileSize(file.fileSizeBytes),
-                  style: const TextStyle(color: Colors.white38, fontSize: 9),
+                  _formatFileSize(
+                    file.fileSizeBytes,
+                  ),
+                  style: const TextStyle(
+                    color: Colors.white38,
+                    fontSize: 9,
+                  ),
                 ),
               ],
             ),
@@ -570,17 +772,25 @@ class _AddProfileTrackSheetState extends State<AddProfileTrackSheet> {
           IconButton(
             tooltip: 'Trocar arquivo',
             onPressed: _selectFile,
-            icon: const Icon(Icons.swap_horiz_rounded, color: Colors.white54),
+            icon: const Icon(
+              Icons.swap_horiz_rounded,
+              color: Colors.white54,
+            ),
           ),
 
           IconButton(
             tooltip: 'Remover',
             onPressed: () {
-              setState(() {
-                _selectedFile = null;
-              });
+              setState(
+                () {
+                  _selectedFile = null;
+                },
+              );
             },
-            icon: const Icon(Icons.close_rounded, color: Colors.white38),
+            icon: const Icon(
+              Icons.close_rounded,
+              color: Colors.white38,
+            ),
           ),
         ],
       ),
@@ -595,35 +805,58 @@ class _AddProfileTrackSheetState extends State<AddProfileTrackSheet> {
     return Wrap(
       spacing: 8,
       runSpacing: 8,
-      children: _audienceOptions.map((option) {
-        final selected = _audience.contains(option.id);
+      children: _audienceOptions.map(
+        (
+          option,
+        ) {
+          final selected = _audience.contains(
+            option.id,
+          );
 
-        return FilterChip(
-          selected: selected,
-          onSelected: (_) {
-            _toggleRole(option.id);
-          },
-          avatar: Icon(
-            option.icon,
-            size: 15,
-            color: selected ? Colors.black : Colors.white54,
-          ),
-          label: Text(option.label),
-          selectedColor: widget.accentColor,
-          backgroundColor: Colors.white.withValues(alpha: 0.035),
-          side: BorderSide(
-            color: selected
-                ? widget.accentColor
-                : Colors.white.withValues(alpha: 0.08),
-          ),
-          labelStyle: TextStyle(
-            color: selected ? Colors.black : Colors.white60,
-            fontSize: 10,
-            fontWeight: selected ? FontWeight.bold : FontWeight.normal,
-          ),
-          showCheckmark: false,
-        );
-      }).toList(),
+          return FilterChip(
+            selected: selected,
+            onSelected:
+                (
+                  _,
+                ) {
+                  _toggleRole(
+                    option.id,
+                  );
+                },
+            avatar: Icon(
+              option.icon,
+              size: 15,
+              color: selected
+                  ? Colors.black
+                  : Colors.white54,
+            ),
+            label: Text(
+              option.label,
+            ),
+            selectedColor: widget.accentColor,
+            backgroundColor: Colors.white.withValues(
+              alpha: 0.035,
+            ),
+            side: BorderSide(
+              color: selected
+                  ? widget.accentColor
+                  : Colors.white.withValues(
+                      alpha: 0.08,
+                    ),
+            ),
+            labelStyle: TextStyle(
+              color: selected
+                  ? Colors.black
+                  : Colors.white60,
+              fontSize: 10,
+              fontWeight: selected
+                  ? FontWeight.bold
+                  : FontWeight.normal,
+            ),
+            showCheckmark: false,
+          );
+        },
+      ).toList(),
     );
   }
 
@@ -631,7 +864,9 @@ class _AddProfileTrackSheetState extends State<AddProfileTrackSheet> {
   // LABEL
   // ============================================================
 
-  Widget _buildLabel(String value) {
+  Widget _buildLabel(
+    String value,
+  ) {
     return Text(
       value,
       style: const TextStyle(
@@ -652,22 +887,47 @@ class _AddProfileTrackSheetState extends State<AddProfileTrackSheet> {
   }) {
     return InputDecoration(
       hintText: hint,
-      hintStyle: const TextStyle(color: Colors.white30),
-      prefixIcon: Icon(icon, color: Colors.white38),
+      hintStyle: const TextStyle(
+        color: Colors.white30,
+      ),
+      prefixIcon: Icon(
+        icon,
+        color: Colors.white38,
+      ),
       filled: true,
-      fillColor: Colors.white.withValues(alpha: 0.035),
-      counterStyle: const TextStyle(color: Colors.white30),
+      fillColor: Colors.white.withValues(
+        alpha: 0.035,
+      ),
+      counterStyle: const TextStyle(
+        color: Colors.white30,
+      ),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+        borderRadius: BorderRadius.circular(
+          14,
+        ),
+        borderSide: BorderSide(
+          color: Colors.white.withValues(
+            alpha: 0.08,
+          ),
+        ),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+        borderRadius: BorderRadius.circular(
+          14,
+        ),
+        borderSide: BorderSide(
+          color: Colors.white.withValues(
+            alpha: 0.08,
+          ),
+        ),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: BorderSide(color: widget.accentColor),
+        borderRadius: BorderRadius.circular(
+          14,
+        ),
+        borderSide: BorderSide(
+          color: widget.accentColor,
+        ),
       ),
     );
   }
@@ -676,32 +936,46 @@ class _AddProfileTrackSheetState extends State<AddProfileTrackSheet> {
   // FILE TITLE
   // ============================================================
 
-  String _titleFromFileName(String fileName) {
+  String _titleFromFileName(
+    String fileName,
+  ) {
     final normalized = fileName.trim();
 
-    final index = normalized.lastIndexOf('.');
+    final index = normalized.lastIndexOf(
+      '.',
+    );
 
-    if (index <= 0) {
+    if (index <=
+        0) {
       return normalized;
     }
 
-    return normalized.substring(0, index);
+    return normalized.substring(
+      0,
+      index,
+    );
   }
 
   // ============================================================
   // FILE SIZE
   // ============================================================
 
-  String _formatFileSize(int bytes) {
+  String _formatFileSize(
+    int bytes,
+  ) {
     const kb = 1024;
 
-    const mb = kb * 1024;
+    const mb =
+        kb *
+        1024;
 
-    if (bytes >= mb) {
+    if (bytes >=
+        mb) {
       return '${(bytes / mb).toStringAsFixed(2)} MB';
     }
 
-    if (bytes >= kb) {
+    if (bytes >=
+        kb) {
       return '${(bytes / kb).toStringAsFixed(1)} KB';
     }
 

@@ -1,0 +1,40 @@
+PID=[0;1;39m158430[0m
+PIDFD=[0;1;39myes[0m
+PPID=[0;1;39m1[0m
+TTY=[0;1;39mn/a[0m
+UID=[0;1;39m112[0m
+EUID=[0;1;39m112[0m
+SUID=[0;1;39m112[0m
+FSUID=[0;1;39m112[0m
+GID=[0;1;39m116[0m
+EGID=[0;1;39m116[0m
+SGID=[0;1;39m116[0m
+FSGID=[0;1;39m116[0m
+SupplementaryGIDs=[0;1;39m116[0m
+Comm=[0;1;39mgeoclue[0m
+CommandLine=[0;1;39m/usr/libexec/geoclue[0m
+Label=[0;1;39m/usr/libexec/geoclue (enforce)[0m
+CGroup=[0;1;39m/system.slice/geoclue.service[0m
+Unit=[0;1;39mgeoclue.service[0m
+Slice=[0;1;39msystem.slice[0m
+UserUnit=[0;1;39mn/a[0m
+UserSlice=[0;1;39mn/a[0m
+Session=[0;1;39mn/a[0m
+AuditLoginUID=[0;1;39mn/a[0m
+AuditSessionID=[0;1;39mn/a[0m
+UniqueName=[0;1;39m:1.1218[0m
+EffectiveCapabilities=[0;1;39m
+[0mPermittedCapabilities=[0;1;39m
+[0mInheritableCapabilities=[0;1;39mcap_setpcap cap_sys_admin
+[0mBoundingCapabilities=[0;1;39mcap_chown cap_dac_override cap_dac_read_search 
+        cap_fowner cap_fsetid cap_kill cap_setgid 
+        cap_setuid cap_setpcap cap_linux_immutable cap_net_bind_service 
+        cap_net_broadcast cap_net_admin cap_net_raw cap_ipc_lock 
+        cap_ipc_owner cap_sys_rawio cap_sys_chroot cap_sys_ptrace 
+        cap_sys_pacct cap_sys_admin cap_sys_boot cap_sys_nice 
+        cap_sys_resource cap_sys_time cap_sys_tty_config cap_mknod 
+        cap_lease cap_audit_write cap_audit_control cap_setfcap 
+        cap_mac_override cap_mac_admin cap_syslog cap_wake_alarm 
+        cap_block_suspend cap_audit_read cap_perfmon cap_bpf 
+        cap_checkpoint_restore
+[0m

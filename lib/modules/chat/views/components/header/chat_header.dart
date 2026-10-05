@@ -1,10 +1,25 @@
 import 'package:flutter/material.dart';
-import 'package:versin/features/rhymes/presentation/controller/rhymes_controller.dart';
-import 'package:versin/features/rhymes/presentation/widgets/thermometer_gamification/thermometer_widget.dart';
 
-class ChatHeader extends StatelessWidget {
+import 'package:versin/features/rhymes/presentation/controller/rhymes_controller.dart';
+
+// ============================================================
+// CHAT HEADER
+// ============================================================
+
+class ChatHeader
+    extends
+        StatelessWidget {
+  // ============================================================
+  // PROPRIEDADES
+  // ============================================================
+
   final Color activeColor;
+
   final RhymesController rhymesController;
+
+  // ============================================================
+  // CONSTRUTOR
+  // ============================================================
 
   const ChatHeader({
     super.key,
@@ -12,44 +27,42 @@ class ChatHeader extends StatelessWidget {
     required this.rhymesController,
   });
 
+  // ============================================================
+  // BUILD
+  // ============================================================
+
   @override
-  Widget build(BuildContext context) {
-    return ListenableBuilder(
-      listenable: rhymesController,
-      builder: (context, _) {
-        return Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: const BoxDecoration(color: Color(0xFF0F0F0F)),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Logo centralizado
-              _buildBranding(),
-              
-              const SizedBox(height: 16),
-              
-              // Termômetro de gamificação centralizado
-              ThermometerFeedback(
-                starProgress: rhymesController.starProgress,
-                fireProgress: rhymesController.fireProgress,
-                feedbackText: rhymesController.currentFeedback,
-              ),
-              
-              
-            ],
-          ),
-        );
-      },
+  Widget build(
+    BuildContext context,
+  ) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(
+        horizontal: 16,
+        vertical: 12,
+      ),
+      decoration: const BoxDecoration(
+        color: Color(
+          0xFF0F0F0F,
+        ),
+      ),
+      child: _buildBranding(),
     );
   }
+
+  // ============================================================
+  // BRANDING
+  // ============================================================
 
   Widget _buildBranding() {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
+        // ======================================================
+        // VERSIN
+        // ======================================================
         Text(
-          "VERSIN",
+          'VERSIN',
           style: TextStyle(
             color: activeColor,
             fontSize: 14,
@@ -57,8 +70,12 @@ class ChatHeader extends StatelessWidget {
             letterSpacing: 2.0,
           ),
         ),
+
+        // ======================================================
+        // GENESIS
+        // ======================================================
         const Text(
-          "GENESIS",
+          'GENESIS',
           style: TextStyle(
             color: Colors.white38,
             fontSize: 8,

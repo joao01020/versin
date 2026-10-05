@@ -5,7 +5,6 @@ import 'package:versin/features/rhymes/data/datasources/utils/hash_helper.dart';
 class SupabaseStorageService {
   final _supabase = Supabase.instance.client;
 
-  /// Registra a obra completa, gera o Hash real e salva rimas utilizadas
   Future<
     void
   >
@@ -19,15 +18,16 @@ class SupabaseStorageService {
     usedRhymes,
   }) async {
     final user = _supabase.auth.currentUser;
+
     if (user ==
-        null)
+        null) {
       throw Exception(
-        "Usuário não autenticado",
+        'Usuário não autenticado',
       );
+    }
 
-    final wallet = "wallet@$username";
+    final wallet = 'wallet@$username';
 
-    // Geração de Hash Real usando o nosso HashHelper
     final hash = HashHelper.generateVersinHash(
       lyric: content,
       userWallet: wallet,
@@ -62,7 +62,7 @@ class SupabaseStorageService {
       if (usedRhymes !=
               null &&
           usedRhymes.isNotEmpty) {
-        for (var rhyme in usedRhymes) {
+        for (final rhyme in usedRhymes) {
           await _supabase.rpc(
             'increment_word_score',
             params: {
@@ -73,19 +73,18 @@ class SupabaseStorageService {
       }
 
       debugPrint(
-        "🚀 Obra registrada e assinada: $hash",
+        '🚀 Obra registrada e assinada: $hash',
       );
     } catch (
       e
     ) {
       debugPrint(
-        "❌ Erro ao registrar obra: $e",
+        '❌ Erro ao registrar obra: $e',
       );
       rethrow;
     }
   }
 
-  /// Salva uma letra no histórico (Utilizado pelo botão Finalizar)
   Future<
     void
   >
@@ -98,9 +97,11 @@ class SupabaseStorageService {
     String? structure,
   }) async {
     final user = _supabase.auth.currentUser;
+
     if (user ==
-        null)
+        null) {
       return;
+    }
 
     try {
       await _supabase
@@ -109,7 +110,7 @@ class SupabaseStorageService {
           )
           .insert(
             {
-              'user_id': user.id, // Corrigido: valor do ID adicionado
+              'user_id': user.id,
               'content': content,
               'hash_signature': hash,
               'bpm': bpm,
@@ -119,19 +120,19 @@ class SupabaseStorageService {
               'created_at': DateTime.now().toIso8601String(),
             },
           );
+
       debugPrint(
-        "✅ Letra salva no histórico do Versin.",
+        '✅ Letra salva no histórico do Versin.',
       );
     } catch (
       e
     ) {
       debugPrint(
-        "⚠️ Erro ao salvar histórico: $e",
+        '⚠️ Erro ao salvar histórico: $e',
       );
     }
   }
 
-  /// Transfere a posse de uma obra assinada
   Future<
     void
   >
@@ -155,29 +156,33 @@ class SupabaseStorageService {
             'original_hash',
             workHash,
           );
+
       debugPrint(
-        "✅ Sucesso: Transferido para a carteira $newDestinationWallet",
+        '✅ Sucesso: Transferido para a carteira $newDestinationWallet',
       );
     } catch (
       e
     ) {
       debugPrint(
-        "❌ Falha na transferência: $e",
+        '❌ Falha na transferência: $e',
       );
       rethrow;
     }
   }
 
-  /// Lista obras por carteira do proprietário
   Future<
     List<
-      dynamic
+      Map<
+        String,
+        dynamic
+      >
     >
   >
   listWorksByOwner(
     String username,
   ) async {
-    final wallet = "wallet@$username";
+    final wallet = 'wallet@$username';
+
     try {
       final response = await _supabase
           .from(
@@ -192,16 +197,22 @@ class SupabaseStorageService {
             'created_at',
             ascending: false,
           );
-      return response
-          as List<
-            dynamic
-          >;
+
+      return List<
+        Map<
+          String,
+          dynamic
+        >
+      >.from(
+        response,
+      );
     } catch (
       e
     ) {
       debugPrint(
-        "⚠️ Nenhuma obra encontrada ou erro na busca: $e",
+        '⚠️ Nenhuma obra encontrada ou erro na busca: $e',
       );
+
       return [];
     }
   }

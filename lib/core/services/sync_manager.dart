@@ -1,111 +1,162 @@
-import 'package:flutter/foundation.dart'; // Necessário para debugPrint
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../database/database_helper.dart';
+
+// ============================================================
+// SYNC MANAGER
+// ============================================================
+//
+// Responsável pela sincronização do cache SQLite com Supabase.
+//
+// DESKTOP / MOBILE:
+// SQLite → Supabase.
+//
+// WEB:
+// Não utiliza o SQLite desta implementação.
+//
+// ============================================================
 
 class SyncManager {
   final _dbHelper = DatabaseHelper.instance;
+
   final _supabase = Supabase.instance.client;
 
-  Future<
-    void
-  >
-  saveAndSync(
-    String word,
-  ) async {
+  // ==========================================================
+  // SUPORTE A BANCO LOCAL
+  // ==========================================================
+
+  bool get _supportsLocalDatabase {
+    return !kIsWeb;
+  }
+
+  // ==========================================================
+  // SALVAR E SINCRONIZAR
+  // ==========================================================
+
+  Future<void> saveAndSync(String word) async {
+    // ========================================================
+    // WEB
+    // ========================================================
+
+    if (!_supportsLocalDatabase) {
+      await _saveDirectlyToCloud(word);
+
+      return;
+    }
+
+    // ========================================================
+    // SQLITE
+    // ========================================================
+
     final db = await _dbHelper.database;
+
     final id = DateTime.now().microsecondsSinceEpoch.toString();
 
-    // Salva no SQLite primeiro
-    await db.insert(
-      'offline_rhymes',
-      {
-        'id': id,
-        'word': word,
-        'synced': 0,
-      },
-    );
+    await db.insert('offline_rhymes', {'id': id, 'word': word, 'synced': 0});
 
-    // Dispara sincronização em background
     pushToCloud().ignore();
   }
 
-  Future<
-    void
-  >
-  pushToCloud() async {
+  // ==========================================================
+  // SALVAR DIRETAMENTE NA NUVEM
+  // ==========================================================
+
+  Future<void> _saveDirectlyToCloud(String word) async {
+    final user = _supabase.auth.currentUser;
+
+    if (user == null) {
+      return;
+    }
+
+    try {
+      await _supabase.from('user_vocabulary').insert({
+        'word': word,
+        'user_id': user.id,
+      });
+    } catch (error) {
+      debugPrint(
+        '[SYNC] '
+        'Falha ao salvar diretamente '
+        'na nuvem: $error',
+      );
+
+      rethrow;
+    }
+  }
+
+  // ==========================================================
+  // PUSH PARA NUVEM
+  // ==========================================================
+
+  Future<void> pushToCloud() async {
+    // Web não possui fila SQLite nesta implementação.
+    if (!_supportsLocalDatabase) {
+      return;
+    }
+
     final results = await Connectivity().checkConnectivity();
 
-    // Corrigido para incluir blocos de chaves conforme solicitado pelo linter
-    if (results.contains(
-      ConnectivityResult.none,
-    )) {
+    if (results.contains(ConnectivityResult.none)) {
       return;
     }
 
     final user = _supabase.auth.currentUser;
-    if (user ==
-        null) {
+
+    if (user == null) {
       return;
     }
 
     final db = await _dbHelper.database;
-    final unsynced = await db.query(
-      'offline_rhymes',
-      where: 'synced = 0',
-    );
 
-    for (var item in unsynced) {
+    final unsynced = await db.query('offline_rhymes', where: 'synced = 0');
+
+    for (final item in unsynced) {
       try {
-        await _supabase
-            .from(
-              'user_vocabulary',
-            )
-            .insert(
-              {
-                'word': item['word'],
-                'user_id': user.id,
-              },
-            );
+        await _supabase.from('user_vocabulary').insert({
+          'word': item['word'],
+          'user_id': user.id,
+        });
 
         await db.update(
           'offline_rhymes',
-          {
-            'synced': 1,
-          },
+          {'synced': 1},
           where: 'id = ?',
-          whereArgs: [
-            item['id'],
-          ],
+          whereArgs: [item['id']],
         );
-      } catch (
-        e
-      ) {
+      } catch (error) {
         debugPrint(
-          "Falha na sincronização do item ${item['id']}: $e",
+          '[SYNC] '
+          'Falha na sincronização '
+          'do item ${item['id']}: '
+          '$error',
         );
       }
     }
   }
 
+  // ==========================================================
+  // OBSERVAR CONEXÃO
+  // ==========================================================
+
   void watchConnection() {
-    Connectivity().onConnectivityChanged.listen(
-      (
-        List<
-          ConnectivityResult
-        >
-        results,
-      ) {
-        if (results.any(
-          (
-            r,
-          ) =>
-              r !=
-              ConnectivityResult.none,
-        )) {
-          pushToCloud();
-        }
-      },
-    );
+    // Não existe fila SQLite para sincronizar no Web.
+    if (!_supportsLocalDatabase) {
+      debugPrint(
+        '[SYNC] '
+        'Monitor de SQLite desativado no Web.',
+      );
+
+      return;
+    }
+
+    Connectivity().onConnectivityChanged.listen((
+      List<ConnectivityResult> results,
+    ) {
+      if (results.any((result) => result != ConnectivityResult.none)) {
+        pushToCloud();
+      }
+    });
   }
 }

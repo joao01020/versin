@@ -1,302 +1,196 @@
 import 'dart:async';
-import 'package:flutter/material.dart';
-import 'package:versin/app/locator.dart';
-import '../data/repositories/match_repository.dart';
-import '../controllers/match_controllers.dart';
-import '../models/match_user_entity.dart';
-import '../widgets/discovery_card_widget.dart';
-import '../widgets/profile_tile_widget.dart';
-import '../../networking/views/networking_session_view.dart';
 
-class MatchPage
-    extends
-        StatefulWidget {
+import 'package:flutter/material.dart';
+
+import 'package:versin/modules/match/page/match_page_coordinator.dart';
+import 'package:versin/modules/match/models/match_discovery_mode.dart';
+import 'package:versin/modules/match/quick/services/match_quick_connection_service.dart';
+import 'package:versin/modules/match/quick/widgets/match_quick_connection_panel.dart';
+import 'package:versin/modules/match/page/match_page_view.dart';
+import 'package:versin/modules/match/page/dialogs/match_confirmation_dialog.dart';
+import 'package:versin/modules/networking/views/networking_session_view.dart';
+
+// ============================================================
+// MATCH PAGE
+// ============================================================
+//
+// RESPONSABILIDADE:
+//
+// - criar o coordinator da página;
+// - iniciar o fluxo;
+// - observar o estado;
+// - entregar estado/callbacks para a View;
+// - encerrar recursos pertencentes à página.
+//
+// NÃO:
+//
+// - conhece Supabase;
+// - cria controllers de feature;
+// - abre dialogs/sheets;
+// - executa lógica de localização;
+// - executa lógica de disponibilidade;
+// - executa busca;
+// - executa fluxo de demo;
+// - contém layout da tela.
+//
+// ============================================================
+
+class MatchPage extends StatefulWidget {
   static const String routeName = '/match';
-  const MatchPage({
-    super.key,
-  });
+
+  final String? targetProjectId;
+  final String? targetProjectTitle;
+
+  const MatchPage({super.key, this.targetProjectId, this.targetProjectTitle});
 
   @override
-  State<
-    MatchPage
-  >
-  createState() => _MatchPageState();
+  State<MatchPage> createState() => _MatchPageState();
 }
 
-class _MatchPageState
-    extends
-        State<
-          MatchPage
-        > {
-  // Alterado para buscar via locator (sl) se disponível, ou manter a instância
-  final MatchController _matchController = MatchController();
-  StreamSubscription? _matchSubscription;
+class _MatchPageState extends State<MatchPage> {
+  late final MatchPageCoordinator _coordinator;
+  bool _confirmationBusy = false;
+  bool _confirmationScheduled = false;
+  final MatchQuickConnectionService _quick = MatchQuickConnectionService.instance;
+
+  Future<void> _openQuickProject(String projectId) async {
+    if (!mounted) return;
+    await Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => NetworkingSessionView(projectId: projectId),
+    ));
+    if (mounted) {
+      await _quick.refresh();
+      await _coordinator.availabilityController.refresh();
+    }
+  }
+
+  Future<void> _refreshQuickAvailability() async {
+    if (!mounted || _coordinator.availabilityController.isLoading) return;
+    await _coordinator.availabilityController.refresh();
+  }
+
+  Future<void> _resumeAgora() async {
+    if (!mounted) return;
+    await _coordinator.handleDiscoveryModeSelected(
+      context, MatchDiscoveryMode.global,
+    );
+  }
+
+
+  void _scheduleConfirmation() {
+    if (!mounted ||
+        _confirmationBusy ||
+        _confirmationScheduled ||
+        !_coordinator.hasPendingConfirmation)
+      return;
+    _confirmationScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _confirmationScheduled = false;
+      if (!mounted ||
+          _confirmationBusy ||
+          ModalRoute.of(context)?.isCurrent != true)
+        return;
+      unawaited(_showNextConfirmation());
+    });
+  }
+
+  Future<void> _showNextConfirmation() async {
+    if (_confirmationBusy || !mounted) return;
+    final confirmation = _coordinator.takeNextConfirmation();
+    if (confirmation == null) return;
+    _confirmationBusy = true;
+    try {
+      await _coordinator.acknowledgeConfirmation(confirmation);
+      if (!mounted) return;
+      final action = await showDialog<MatchConfirmationAction>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => MatchConfirmationDialog(
+          confirmation: confirmation,
+          allowQuickStart: _coordinator.matchController.discoveryMode ==
+                  MatchDiscoveryMode.global &&
+              _coordinator.availabilityController.isActive &&
+              !_quick.isInSession,
+        ),
+      );
+      if (!mounted) return;
+      if (action == MatchConfirmationAction.startNow) {
+        try {
+          await _quick.invite(confirmation.projectId, confirmation.other.id);
+        } catch (error) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(error.toString())),
+            );
+          }
+        }
+      }
+      if (action == MatchConfirmationAction.viewProject) {
+        await Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) =>
+                NetworkingSessionView(projectId: confirmation.projectId),
+          ),
+        );
+      }
+    } finally {
+      _confirmationBusy = false;
+      if (mounted) _scheduleConfirmation();
+    }
+  }
 
   @override
   void initState() {
     super.initState();
 
-    // 1. Escutando o evento de match antes de iniciar a sessão
-    _matchSubscription = _matchController.matchEventStream.listen(
-      (
-        projectId,
-      ) {
-        debugPrint(
-          "🎯 MatchPage: Evento recebido no stream! Projeto: $projectId",
+    _coordinator = MatchPageCoordinator(
+      targetProjectId: widget.targetProjectId,
+      targetProjectTitle: widget.targetProjectTitle,
+    );
+
+    _coordinator.addListener(_scheduleConfirmation);
+    _quick.watch();
+    unawaited(_coordinator.initialize());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    _scheduleConfirmation();
+    return AnimatedBuilder(
+      animation: Listenable.merge([_coordinator, _quick]),
+      builder: (context, _) {
+        final active = _quick.isInSession;
+        final panel = MatchQuickConnectionPanel(
+          onOpenProject: _openQuickProject,
+          onAvailabilityChanged: _refreshQuickAvailability,
+          onResume: _resumeAgora,
         );
-        if (mounted) {
-          navigateToNetworkingSession(
-            projectId,
+        if (active) {
+          return Scaffold(
+            backgroundColor: const Color(0xFF0F0F0F),
+            appBar: AppBar(title: const Text('Em conexão')),
+            body: SafeArea(child: SingleChildScrollView(child: panel)),
           );
         }
-      },
-      onError:
-          (
-            e,
-          ) => debugPrint(
-            "❌ Erro no stream de match: $e",
-          ),
-    );
-
-    // 2. Inicializa a sessão
-    _matchController.initMatchSession(
-      UserRole.artist,
-    );
-    _matchController.addListener(
-      _onControllerUpdate,
-    );
-
-    // 3. Carrega os dados
-    sl<
-          MatchRepository
-        >()
-        .streamCrossRoleMatches(
-          _matchController,
-          UserRole.artist,
-        );
-  }
-
-  void navigateToNetworkingSession(
-    String projectId,
-  ) {
-    debugPrint(
-      "🚀 Navegando para NetworkingSessionView com ID: $projectId",
-    );
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder:
-            (
-              _,
-            ) => NetworkingSessionView(
-              projectId: projectId,
+        return Column(
+          children: [
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 240),
+              child: SingleChildScrollView(child: panel),
             ),
-      ),
+            Expanded(child: MatchPageView(coordinator: _coordinator)),
+          ],
+        );
+      },
     );
-  }
-
-  void _onControllerUpdate() {
-    if (mounted) {
-      setState(
-        () {},
-      );
-    }
   }
 
   @override
   void dispose() {
-    _matchSubscription?.cancel();
-    _matchController.removeListener(
-      _onControllerUpdate,
-    );
-    _matchController.dispose();
+    _coordinator.removeListener(_scheduleConfirmation);
+    _quick.unwatch();
+    _coordinator.dispose();
+
     super.dispose();
-  }
-
-  @override
-  Widget build(
-    BuildContext context,
-  ) {
-    final bool hasNoDiscovery =
-        _matchController.discoveryUser ==
-        null;
-    final bool hasNoRecommendations = _matchController.recommendedUsers.isEmpty;
-
-    return Scaffold(
-      backgroundColor: const Color(
-        0xFF0D0B1F,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(
-          horizontal: 20,
-          vertical: 20,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(
-              height: 20,
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      "Novas Conexões",
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    Text(
-                      "Encontre sua parceria profissional",
-                      style: TextStyle(
-                        color: Colors.white38,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-                IconButton(
-                  icon: Icon(
-                    Icons.tune,
-                    color: _matchController.accentNeon,
-                  ),
-                  onPressed: _matchController.openFilters,
-                ),
-              ],
-            ),
-            const SizedBox(
-              height: 24,
-            ),
-            if (_matchController.isLoading) ...[
-              Container(
-                height: 220,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(
-                    alpha: 0.02,
-                  ),
-                  borderRadius: BorderRadius.circular(
-                    24,
-                  ),
-                ),
-                child: const Center(
-                  child: CircularProgressIndicator(
-                    color: Colors.purple,
-                  ),
-                ),
-              ),
-              const SizedBox(
-                height: 24,
-              ),
-            ] else if (!hasNoDiscovery) ...[
-              DiscoveryCardWidget(
-                controller: _matchController,
-                user: _matchController.discoveryUser!,
-              ),
-              const SizedBox(
-                height: 24,
-              ),
-            ] else ...[
-              Container(
-                height: 160,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(
-                    alpha: 0.02,
-                  ),
-                  borderRadius: BorderRadius.circular(
-                    24,
-                  ),
-                  border: Border.all(
-                    color: Colors.white10,
-                  ),
-                ),
-                child: const Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.wifi_tethering,
-                      color: Colors.white24,
-                      size: 32,
-                    ),
-                    SizedBox(
-                      height: 12,
-                    ),
-                    Text(
-                      "Buscando novos talentos...",
-                      style: TextStyle(
-                        color: Colors.white38,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(
-                height: 24,
-              ),
-            ],
-            const Text(
-              "Recomendados para você",
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(
-              height: 16,
-            ),
-            if (_matchController.isLoading)
-              const Center(
-                child: Text(
-                  "Processando vitrines pela IA...",
-                  style: TextStyle(
-                    color: Colors.white38,
-                    fontSize: 12,
-                  ),
-                ),
-              )
-            else if (!hasNoRecommendations)
-              Column(
-                children: _matchController.recommendedUsers
-                    .map(
-                      (
-                        user,
-                      ) => ProfileTileWidget(
-                        user: user,
-                        controller: _matchController,
-                      ),
-                    )
-                    .toList(),
-              )
-            else
-              const Padding(
-                padding: EdgeInsets.symmetric(
-                  vertical: 20,
-                ),
-                child: Center(
-                  child: Text(
-                    "Nenhuma recomendação disponível.",
-                    style: TextStyle(
-                      color: Colors.white24,
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-              ),
-            const SizedBox(
-              height: 30,
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }

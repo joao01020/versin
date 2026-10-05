@@ -1,36 +1,117 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class MemoryService {
-  final _supabase = Supabase.instance.client;
+  final SupabaseClient _supabase = Supabase.instance.client;
 
-  // 1. BUSCAR O QUE A IA JÁ SABE SOBRE O USUÁRIO
-  Future<String> retrieveMemory(String username) async {
-    final data = await _supabase
-        .from('profiles')
-        .select('ia_memory')
-        .eq('username', username)
-        .single();
+  static const String _defaultMemory = 'O usuário prefere rimas de Trap.';
 
-    // Retorno padrão caso a memória esteja vazia no banco
-    return data['ia_memory'] ?? "O usuário prefere rimas de Trap.";
+  // =========================================================
+  // BUSCAR MEMÓRIA
+  // =========================================================
+
+  Future<
+    String
+  >
+  retrieveMemory(
+    String username,
+  ) async {
+    final normalizedUsername = username.trim();
+
+    if (normalizedUsername.isEmpty) {
+      return _defaultMemory;
+    }
+
+    try {
+      final data = await _supabase
+          .from(
+            'profiles',
+          )
+          .select(
+            'ia_memory',
+          )
+          .eq(
+            'username',
+            normalizedUsername,
+          )
+          .maybeSingle();
+
+      if (data ==
+          null) {
+        return _defaultMemory;
+      }
+
+      final memory = data['ia_memory']?.toString().trim();
+
+      if (memory ==
+              null ||
+          memory.isEmpty) {
+        return _defaultMemory;
+      }
+
+      return memory;
+    } catch (
+      e
+    ) {
+      debugPrint(
+        'Erro ao recuperar memória da IA: $e',
+      );
+
+      return _defaultMemory;
+    }
   }
 
-  // 2. ATUALIZAR A MEMÓRIA (O "APRENDIZADO")
-  // Exemplo: "Usuário gosta de BPM 140 e rimas sobre a vida em Osasco"
-  Future<void> learnNewPattern(String username, String newKnowledge) async {
-    // Primeiro recuperamos a memória existente
-    String oldMemory = await retrieveMemory(username);
+  // =========================================================
+  // APRENDER NOVO PADRÃO
+  // =========================================================
 
-    // Concatenamos a memória antiga com o novo aprendizado
-    String updatedMemory = "$oldMemory | $newKnowledge";
+  Future<
+    void
+  >
+  learnNewPattern(
+    String username,
+    String newKnowledge,
+  ) async {
+    final normalizedUsername = username.trim();
+    final normalizedKnowledge = newKnowledge.trim();
 
-    // Salvamos a atualização no banco de dados Supabase
-    await _supabase
-        .from('profiles')
-        .update({'ia_memory': updatedMemory})
-        .eq('username', username);
+    if (normalizedUsername.isEmpty ||
+        normalizedKnowledge.isEmpty) {
+      return;
+    }
 
-    // Log técnico para o terminal do Linux no seu Dell
-    print("🧠 Versin evoluiu: $newKnowledge");
+    try {
+      final oldMemory = await retrieveMemory(
+        normalizedUsername,
+      );
+
+      final updatedMemory = '$oldMemory | $normalizedKnowledge';
+
+      await _supabase
+          .from(
+            'profiles',
+          )
+          .update(
+            {
+              'ia_memory': updatedMemory,
+            },
+          )
+          .eq(
+            'username',
+            normalizedUsername,
+          );
+
+      debugPrint(
+        '🧠 Versin evoluiu: $normalizedKnowledge',
+      );
+    } catch (
+      e
+    ) {
+      debugPrint(
+        'Erro ao atualizar memória da IA: $e',
+      );
+
+      rethrow;
+    }
   }
 }

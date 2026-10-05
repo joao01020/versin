@@ -1,13 +1,19 @@
 import 'package:flutter/material.dart';
 
 import 'package:versin/modules/chat/views/components/chat/list/chat_message_bubble.dart';
-
+import 'package:versin/modules/chat/views/components/chat/message/animated_chat_message.dart';
+import 'package:versin/modules/chat/views/components/chat/message/typing_indicator.dart';
 import 'package:versin/modules/chat/views/widgets/chat_welcome_card.dart';
+
+// ============================================================
+// CHAT LIST VIEW
+// ============================================================
 
 class ChatListView
     extends
         StatelessWidget {
   final bool isInitializing;
+
   final List<
     Map<
       String,
@@ -15,10 +21,33 @@ class ChatListView
     >
   >
   messages;
+
   final bool isAiTyping;
+
   final ScrollController scrollController;
+
   final Color activeColor;
+
   final int secondsActive;
+
+  // ============================================================
+  // ADICIONAR RIMA
+  // ============================================================
+
+  final ValueChanged<
+    String
+  >
+  onAddRhyme;
+
+  // ============================================================
+  // METRÔNOMO
+  // ============================================================
+
+  final bool isBpmPlaying;
+
+  final int currentBpm;
+
+  final VoidCallback onToggleBpm;
 
   const ChatListView({
     super.key,
@@ -27,8 +56,16 @@ class ChatListView
     required this.isAiTyping,
     required this.scrollController,
     required this.activeColor,
+    required this.onAddRhyme,
+    required this.isBpmPlaying,
+    required this.currentBpm,
+    required this.onToggleBpm,
     this.secondsActive = 0,
   });
+
+  // ============================================================
+  // BUILD
+  // ============================================================
 
   @override
   Widget build(
@@ -44,162 +81,311 @@ class ChatListView
 
     return ListView.builder(
       controller: scrollController,
+
       clipBehavior: Clip.hardEdge,
+
       physics: const AlwaysScrollableScrollPhysics(
         parent: BouncingScrollPhysics(),
       ),
+
       padding: const EdgeInsets.fromLTRB(
         16,
         5,
         16,
         120,
       ),
+
       itemCount:
           messages.length +
           (isAiTyping
               ? 1
               : 0),
+
       itemBuilder:
           (
             context,
             index,
           ) {
-            if (index ==
-                messages.length) {
+            // ======================================================
+            // IA DIGITANDO
+            // ======================================================
+
+            if (isAiTyping &&
+                index ==
+                    messages.length) {
               return _buildTypingIndicator();
             }
 
-            final message = messages[index];
-            final Widget? customWidget = message['customWidget'];
+            // ======================================================
+            // MENSAGEM
+            // ======================================================
 
-            return Padding(
-              padding: const EdgeInsets.only(
-                bottom: 12,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ChatMessageBubble(
-                    message: {
-                      "role":
-                          message["role"]?.toString() ??
-                          "assistant",
-                      "content":
-                          message["content"]?.toString() ??
-                          "",
-                    },
-                    activeColor: activeColor,
-                    onAddRhyme:
-                        (
-                          word,
-                        ) {
-                          // Lógica de callback aqui
-                        },
+            final message = messages[index];
+
+            final role =
+                message['role']?.toString() ??
+                'assistant';
+
+            final isUser =
+                role ==
+                'user';
+
+            final content =
+                message['content']?.toString() ??
+                '';
+
+            final normalizedContent = content.trim();
+
+            final customWidget =
+                message['customWidget']
+                    as Widget?;
+
+            // ======================================================
+            // KEY ESTÁVEL
+            // ======================================================
+            //
+            // Incluímos também o tipo do customWidget para que cards
+            // diferentes de quota mantenham identidade própria.
+            //
+            // ======================================================
+
+            final messageKey = ValueKey(
+              '${message['timestamp'] ?? index}'
+              '-$normalizedContent'
+              '-${customWidget?.runtimeType ?? 'message'}',
+            );
+
+            // ======================================================
+            // SOMENTE WIDGET CUSTOMIZADO
+            // ======================================================
+            //
+            // Os cards de quota são adicionados pelo ChatController
+            // com:
+            //
+            // content: ''
+            // customWidget: AiQuotaWarningCard(...)
+            //
+            // Nesse caso NÃO desenhamos ChatMessageBubble, evitando
+            // uma bolha vazia acima do card.
+            //
+            // ======================================================
+
+            if (customWidget !=
+                    null &&
+                normalizedContent.isEmpty) {
+              return AnimatedChatMessage(
+                key: messageKey,
+
+                isUser: false,
+
+                child: Padding(
+                  padding: const EdgeInsets.only(
+                    bottom: 12,
                   ),
-                  if (customWidget !=
-                      null)
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(
-                        8,
-                        12,
-                        8,
-                        8,
-                      ),
-                      child: customWidget,
+
+                  child: customWidget,
+                ),
+              );
+            }
+
+            // ======================================================
+            // MENSAGEM NORMAL / MENSAGEM + WIDGET
+            // ======================================================
+
+            return AnimatedChatMessage(
+              key: messageKey,
+
+              isUser: isUser,
+
+              child: Padding(
+                padding: const EdgeInsets.only(
+                  bottom: 12,
+                ),
+
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+
+                  mainAxisSize: MainAxisSize.min,
+
+                  children: [
+                    // =================================================
+                    // BOLHA DA MENSAGEM
+                    // =================================================
+                    ChatMessageBubble(
+                      message: {
+                        'role': role,
+                        'content': content,
+                      },
+
+                      activeColor: activeColor,
+
+                      // ===============================================
+                      // ADICIONAR RIMA
+                      // ===============================================
+                      onAddRhyme: onAddRhyme,
+
+                      // ===============================================
+                      // METRÔNOMO
+                      // ===============================================
+                      isBpmPlaying: isBpmPlaying,
+
+                      currentBpm: currentBpm,
+
+                      onToggleBpm: onToggleBpm,
                     ),
-                ],
+
+                    // =================================================
+                    // WIDGET CUSTOMIZADO
+                    // =================================================
+                    //
+                    // Mantemos suporte para mensagens que tenham texto
+                    // e um widget complementar ao mesmo tempo.
+                    //
+                    // =================================================
+                    if (customWidget !=
+                        null)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          8,
+                          12,
+                          8,
+                          8,
+                        ),
+
+                        child: customWidget,
+                      ),
+                  ],
+                ),
               ),
             );
           },
     );
   }
 
+  // ============================================================
+  // INDICADOR DA IA
+  // ============================================================
+
   Widget _buildTypingIndicator() {
-    String mainMessage = "Versin analisando...";
-    String subMessage = "processando métrica e rimas...";
+    final isSlow =
+        secondsActive >
+        5;
 
-    if (secondsActive >
-        5) {
-      mainMessage = "Servidor acordando...";
-      subMessage = "Otimizando rimas (Tempo: ${secondsActive}s)...";
-    }
+    final mainMessage = isSlow
+        ? 'Servidor acordando...'
+        : 'Versin analisando...';
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 16,
-        vertical: 12,
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(
-              8,
-            ),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(
-                0.05,
+    final subMessage = isSlow
+        ? 'Otimizando rimas (Tempo: ${secondsActive}s)...'
+        : 'processando métrica e rimas...';
+
+    return AnimatedChatMessage(
+      isUser: false,
+
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: 16,
+
+          vertical: 12,
+        ),
+
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+
+          children: [
+            // ==================================================
+            // TRÊS PONTOS
+            // ==================================================
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 11,
+
+                vertical: 10,
               ),
-              borderRadius: BorderRadius.circular(
-                12,
+
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(
+                  alpha: 0.05,
+                ),
+
+                borderRadius: BorderRadius.circular(
+                  12,
+                ),
+
+                border: Border.all(
+                  color: activeColor.withValues(
+                    alpha: 0.08,
+                  ),
+                ),
+              ),
+
+              child: TypingIndicator(
+                color: activeColor,
               ),
             ),
-            child: SizedBox(
-              width: 14,
-              height: 14,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor:
-                    AlwaysStoppedAnimation<
-                      Color
-                    >(
-                      activeColor.withOpacity(
-                        0.4,
-                      ),
+
+            const SizedBox(
+              width: 12,
+            ),
+
+            // ==================================================
+            // TEXTO
+            // ==================================================
+            Flexible(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+
+                mainAxisSize: MainAxisSize.min,
+
+                children: [
+                  NeonGlintText(
+                    text: mainMessage,
+
+                    baseColor: Colors.white.withValues(
+                      alpha: 0.85,
                     ),
+
+                    glintColor: activeColor,
+                  ),
+
+                  const SizedBox(
+                    height: 2,
+                  ),
+
+                  Text(
+                    subMessage,
+
+                    maxLines: 1,
+
+                    overflow: TextOverflow.ellipsis,
+
+                    style: const TextStyle(
+                      color: Colors.white38,
+
+                      fontSize: 10,
+                    ),
+                  ),
+                ],
               ),
             ),
-          ),
-          const SizedBox(
-            width: 12,
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // SÊNIOR: Efeito aplicado cirurgicamente apenas na palavra principal durante o loading
-              NeonGlintText(
-                text: mainMessage,
-                baseColor: Colors.white.withOpacity(
-                  0.85,
-                ),
-                glintColor: activeColor, // Usa o roxo neon dinâmico do estúdio
-              ),
-              const SizedBox(
-                height: 2,
-              ),
-              Text(
-                subMessage,
-                style: const TextStyle(
-                  color: Colors.white38,
-                  fontSize: 10,
-                ),
-              ),
-            ],
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
 
-// --- COMPONENTE SÊNIOR: NEON GLINT TEXT (EFEITO CHATGPT STYLE) ---
+// ============================================================
+// NEON GLINT TEXT
+// ============================================================
 
 class NeonGlintText
     extends
         StatefulWidget {
   final String text;
+
   final Color baseColor;
+
   final Color glintColor;
 
   const NeonGlintText({
@@ -216,6 +402,10 @@ class NeonGlintText
   createState() => _NeonGlintTextState();
 }
 
+// ============================================================
+// NEON GLINT TEXT STATE
+// ============================================================
+
 class _NeonGlintTextState
     extends
         State<
@@ -228,18 +418,20 @@ class _NeonGlintTextState
   @override
   void initState() {
     super.initState();
-    // Controla a velocidade do ciclo do feixe de luz passando pela palavra (2.2 segundos para suavidade sutil)
+
     _animationController = AnimationController(
       vsync: this,
+
       duration: const Duration(
         milliseconds: 2200,
       ),
-    )..repeat(); // Repete infinitamente enquanto o loading estiver ativo
+    )..repeat();
   }
 
   @override
   void dispose() {
     _animationController.dispose();
+
     super.dispose();
   }
 
@@ -249,42 +441,73 @@ class _NeonGlintTextState
   ) {
     return AnimatedBuilder(
       animation: _animationController,
+
       builder:
           (
             context,
             child,
           ) {
+            final value = _animationController.value;
+
+            final start =
+                (value -
+                        0.3)
+                    .clamp(
+                      0.0,
+                      1.0,
+                    );
+
+            final middle = value.clamp(
+              0.0,
+              1.0,
+            );
+
+            final end =
+                (value +
+                        0.3)
+                    .clamp(
+                      0.0,
+                      1.0,
+                    );
+
             return ShaderMask(
               blendMode: BlendMode.srcIn,
+
               shaderCallback:
                   (
                     bounds,
                   ) {
                     return LinearGradient(
                       begin: Alignment.topLeft,
+
                       end: Alignment.bottomRight,
-                      // Sênior: Mapeamento de paradas do gradiente que cria o feixe de luz passando da esquerda para a direita
+
                       stops: [
-                        _animationController.value -
-                            0.3,
-                        _animationController.value,
-                        _animationController.value +
-                            0.3,
+                        start,
+                        middle,
+                        end,
                       ],
+
                       colors: [
                         widget.baseColor,
-                        widget.glintColor, // O reflexo roxo neon brilha no centro do feixe
+
+                        widget.glintColor,
+
                         widget.baseColor,
                       ],
                     ).createShader(
                       bounds,
                     );
                   },
+
               child: Text(
                 widget.text,
+
                 style: const TextStyle(
                   fontSize: 13,
+
                   fontWeight: FontWeight.w600,
+
                   letterSpacing: 0.3,
                 ),
               ),

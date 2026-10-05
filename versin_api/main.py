@@ -1,92 +1,467 @@
-import os
+from contextlib import asynccontextmanager
 from pathlib import Path
+
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+
+# ============================================================
+# .ENV
+# ============================================================
+#
+# Estrutura esperada:
+#
+# versin/
+# ├── .env
+# └── versin_api/
+#     └── main.py
+#
+# Portanto, o .env está um nível acima de versin_api.
+#
+# ============================================================
+
+BASE_DIR = Path(
+    __file__
+).resolve().parent
+
+PROJECT_DIR = (
+    BASE_DIR.parent
+)
+
+ENV_FILE = (
+    PROJECT_DIR / ".env"
+)
+
+load_dotenv(
+    dotenv_path=ENV_FILE
+)
+
+
+# ============================================================
+# IMPORTS DO PROJETO
+# ============================================================
+
 from core.config import settings
-from core.security import get_safe_key
-from models.schemas import ChatRequest
-from services.ai_service import AIService
-from services.prompt_engine import create_producer_prompt
-from services.quota_service import QuotaService
-from services.safety_service import SafetyService
-from services.rate_limiter import RateLimiter
+from routes.chat_route import router as chat_router
+from services.chat_service import ChatService
 
-# Carregamento robusto das variáveis de ambiente na raiz
-BASE_DIR = Path(__file__).resolve().parent
-load_dotenv(dotenv_path=BASE_DIR / ".env")
 
-# Inicialização da aplicação
-app = FastAPI(title=settings.PROJECT_NAME)
+# ============================================================
+# CHAT SERVICE GLOBAL
+# ============================================================
+#
+# Uma única instância durante toda a vida da aplicação.
+#
+# O ChatService orquestra:
+#
+# - RateLimiter
+# - QuotaService
+# - SafetyService
+# - PromptEngine
+# - AIService
+#
+# ============================================================
 
-# Instâncias de serviços globais
-quota_service = QuotaService()
-safety_service = SafetyService()
-limiter = RateLimiter(requests_per_minute=5)
+chat_service = ChatService()
 
-@app.get("/")
-async def health_check():
-    return {"status": "online", "message": f"{settings.PROJECT_NAME} is operational"}
 
-@app.post("/chat")
-async def chat_versin(data: ChatRequest):
-    """Rota principal com fluxo de execução linear e seguro."""
+# ============================================================
+# LIFESPAN
+# ============================================================
 
-    # 1. Proteção contra Abuso (Rate Limiting)
-    await limiter.check_rate_limit(data.user_id)
+@asynccontextmanager
+async def lifespan(
+    app: FastAPI,
+):
+    # ========================================================
+    # STARTUP
+    # ========================================================
 
-    # 2. Validação de Limite de Créditos
-    if not await quota_service.check_limit(data.user_id):
-        raise HTTPException(
-            status_code=429,
-            detail="Usage limit exceeded. Please acquire more credits."
+    print()
+    print(
+        "=============================================="
+    )
+
+    print(
+        f"[VERSIN] {settings.PROJECT_NAME}"
+    )
+
+    print(
+        "[VERSIN] Backend iniciado."
+    )
+
+    print(
+        f"[VERSIN] Modelo: {settings.GROQ_MODEL}"
+    )
+
+    print(
+        (
+            "[VERSIN] Quota mensal por usuário: "
+            f"{settings.AI_MONTHLY_TOKEN_LIMIT} tokens"
         )
+    )
 
-    # 3. Inicialização do serviço de IA dentro da rota
-    api_key = get_safe_key(data.private_api_key, settings.GROQ_API_KEY)
-    if not api_key:
-        raise HTTPException(status_code=500, detail="API Key not configured.")
-    ai = AIService(api_key)
+    print(
+        (
+            "[VERSIN] Limite global diário: "
+            f"{settings.AI_GLOBAL_DAILY_TOKEN_LIMIT} tokens"
+        )
+    )
 
-    # 4. Sanitização da Entrada
-    clean_message = safety_service.sanitize_input(data.message)
+    print(
+        (
+            "[VERSIN] Rate limit: "
+            f"{settings.AI_RATE_LIMIT_PER_MINUTE}/min"
+        )
+    )
 
-    # 5. Definição de modelo
-    model = "llama-3.3-70b-versatile" if data.private_api_key else "llama-3.1-8b-instant"
+    print(
+        (
+            "[VERSIN] Entrada máxima: "
+            f"{settings.AI_MAX_INPUT_LENGTH} caracteres"
+        )
+    )
 
-    # 6. Geração de prompt
-    prompt = create_producer_prompt(
-        context=data.history_context or {},
-        rhymes=data.current_list or []
+    print(
+        f"[VERSIN] ENV: {ENV_FILE}"
+    )
+
+    print(
+        "=============================================="
+    )
+
+    print()
+
+    # ========================================================
+    # TESTAR REDIS
+    # ========================================================
+
+    print(
+        "[VERSIN] Testando conexão com Redis..."
     )
 
     try:
-        # 7. Execução da análise
-        result = await ai.get_analysis(model, prompt, clean_message)
+        redis_connected = (
+            await chat_service
+            .quota_service
+            .check_connection()
+        )
 
-        # 8. Validação de Segurança da Saída
-        if not safety_service.is_content_safe(result):
-            return {
-                "role": "assistant",
-                "content": "Analysis blocked due to safety policies.",
-                "impact_level": 1
-            }
+        if redis_connected:
+            print(
+                "[VERSIN] Redis disponível."
+            )
 
-        # 9. Registro de consumo
-        await quota_service.register_usage(data.user_id, 50)
+        else:
+            print(
+                (
+                    "[VERSIN] Redis indisponível. "
+                    "A IA continuará funcionando, "
+                    "mas a quota não será persistida."
+                )
+            )
 
-        return {
-            "role": "assistant",
-            "content": result.get("content") or "No feedback available.",
-            "is_acceptable": bool(result.get("is_acceptable", False)),
-            "impact_level": int(result.get("impact_level", 1)),
-            "feedback_reason": result.get("feedback_reason") or "Analysis complete."
-        }
+    except Exception as error:
+        print(
+            (
+                "[VERSIN] Falha ao testar Redis: "
+                f"{type(error).__name__}: "
+                f"{error}"
+            )
+        )
 
-    except Exception as e:
-        # Logamos o erro internamente para você ver no terminal, mas devolvemos uma mensagem genérica para o usuário
-        print(f"CRITICAL ERROR: {str(e)}")
-        raise HTTPException(status_code=500, detail="Brain connection error.")
+    print()
+
+    # ========================================================
+    # APLICAÇÃO ATIVA
+    # ========================================================
+
+    yield
+
+    # ========================================================
+    # SHUTDOWN
+    # ========================================================
+
+    print()
+    print(
+        "[VERSIN] Encerrando serviços..."
+    )
+
+    try:
+        await chat_service.close()
+
+    except Exception as error:
+        print(
+            (
+                "[VERSIN] Erro ao encerrar serviços: "
+                f"{type(error).__name__}: "
+                f"{error}"
+            )
+        )
+
+    print(
+        "[VERSIN] Serviços encerrados."
+    )
+
+    print()
+
+
+# ============================================================
+# FASTAPI
+# ============================================================
+
+app = FastAPI(
+    title=settings.PROJECT_NAME,
+    lifespan=lifespan,
+)
+
+
+# ============================================================
+# CORS
+# ============================================================
+#
+# Permite que o Flutter Web faça requisições para a API
+# hospedada no Render.
+#
+# Sem esta configuração:
+#
+# Flutter Web
+#     ↓
+# https://versin.onrender.com
+#     ↓
+# navegador bloqueia por CORS
+#
+# Mesmo que o backend responda HTTP 200.
+#
+# IMPORTANTE:
+#
+# Não utilizamos:
+#
+# allow_origins=["*"]
+#
+# porque o Versin envia Authorization: Bearer <JWT> e é melhor
+# manter uma allowlist explícita.
+#
+# Adicione aqui o domínio Web de produção quando ele existir.
+#
+# ============================================================
+
+CORS_ALLOWED_ORIGINS = [
+    # ========================================================
+    # DESENVOLVIMENTO LOCAL
+    # ========================================================
+
+    "http://localhost:8080",
+    "http://127.0.0.1:8080",
+
+    # ========================================================
+    # PRODUÇÃO
+    # ========================================================
+    #
+    # Exemplos futuros:
+    #
+    # "https://versin.com",
+    # "https://app.versin.com",
+    #
+    # ========================================================
+]
+
+
+app.add_middleware(
+    CORSMiddleware,
+
+    # ========================================================
+    # ORIGENS
+    # ========================================================
+
+    allow_origins=CORS_ALLOWED_ORIGINS,
+
+    # ========================================================
+    # CREDENCIAIS
+    # ========================================================
+    #
+    # Mantemos habilitado para permitir fluxos autenticados.
+    #
+    # ========================================================
+
+    allow_credentials=True,
+
+    # ========================================================
+    # MÉTODOS HTTP
+    # ========================================================
+    #
+    # GET
+    # POST
+    # PUT
+    # PATCH
+    # DELETE
+    # OPTIONS
+    #
+    # ========================================================
+
+    allow_methods=[
+        "*",
+    ],
+
+    # ========================================================
+    # HEADERS
+    # ========================================================
+    #
+    # Necessário principalmente para:
+    #
+    # Authorization
+    # Content-Type
+    # Accept
+    #
+    # ========================================================
+
+    allow_headers=[
+        "*",
+    ],
+)
+
+
+# ============================================================
+# DISPONIBILIZAR CHAT SERVICE
+# ============================================================
+#
+# chat_route.py acessa:
+#
+# request.app.state.chat_service
+#
+# ============================================================
+
+app.state.chat_service = (
+    chat_service
+)
+
+
+# ============================================================
+# ROTAS
+# ============================================================
+
+app.include_router(
+    chat_router
+)
+
+
+# ============================================================
+# HEALTH CHECK SIMPLES
+# ============================================================
+#
+# GET /
+#
+# ============================================================
+
+@app.get("/")
+async def health_check():
+    return {
+        "status":
+            "online",
+
+        "project":
+            settings.PROJECT_NAME,
+
+        "provider":
+            "Groq",
+
+        "model":
+            settings.GROQ_MODEL,
+
+        "message":
+            (
+                f"{settings.PROJECT_NAME} "
+                "is operational"
+            ),
+    }
+
+
+# ============================================================
+# HEALTH CHECK DETALHADO
+# ============================================================
+#
+# GET /health
+#
+# ============================================================
+
+@app.get(
+    "/health"
+)
+async def health():
+    quota_service = (
+        chat_service.quota_service
+    )
+
+    return {
+        "status":
+            "healthy",
+
+        "project":
+            settings.PROJECT_NAME,
+
+        "ai": {
+            "provider":
+                "Groq",
+
+            "model":
+                settings.GROQ_MODEL,
+
+            "monthly_user_token_limit":
+                settings.AI_MONTHLY_TOKEN_LIMIT,
+
+            "global_daily_token_limit":
+                settings.AI_GLOBAL_DAILY_TOKEN_LIMIT,
+
+            "rate_limit_per_minute":
+                settings.AI_RATE_LIMIT_PER_MINUTE,
+
+            "max_input_length":
+                settings.AI_MAX_INPUT_LENGTH,
+        },
+
+        "redis": {
+            "available":
+                quota_service.redis_available,
+        },
+
+        # ====================================================
+        # CORS
+        # ====================================================
+        #
+        # Útil para diagnóstico.
+        #
+        # Não contém segredo.
+        #
+        # ====================================================
+
+        "cors": {
+            "allowed_origins":
+                CORS_ALLOWED_ORIGINS,
+        },
+    }
+
+
+# ============================================================
+# EXECUÇÃO LOCAL
+# ============================================================
+#
+# Pode iniciar com:
+#
+# python main.py
+#
+# ou:
+#
+# python -m uvicorn main:app --reload
+#
+# ============================================================
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=settings.PORT)
+
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=settings.PORT,
+        reload=True,
+    )

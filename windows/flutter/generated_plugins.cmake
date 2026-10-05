@@ -6,10 +6,17 @@ list(APPEND FLUTTER_PLUGIN_LIST
   app_links
   audioplayers_windows
   connectivity_plus
+  desktop_drop
+  desktop_multi_window
   file_selector_windows
+  flutter_secure_storage_windows
+  flutter_webrtc
+  geolocator_windows
   printing
   record_windows
+  screen_retriever_windows
   url_launcher_windows
+  window_manager
 )
 
 list(APPEND FLUTTER_FFI_PLUGIN_LIST
